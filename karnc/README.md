@@ -5,7 +5,7 @@ parses and type-checks it, and emits a TypeScript module.
 
 ## Pipeline
 
-```
+```text
 lex  →  parse  →  resolve  →  check  →  emit
 ```
 
@@ -28,13 +28,13 @@ a source span, and a primary message; many carry secondary labels and notes.
 
 Requires Rust stable ≥ 1.85 (edition 2024).
 
-```
+```bash
 cargo build --release
 ```
 
 ## Using the CLI
 
-```
+```bash
 karnc compile path/to/input.karn -o out.ts
 karnc check   path/to/input.karn
 ```
@@ -44,7 +44,7 @@ into the crate at `runtime/runtime.ts`) into the same output directory.
 
 ## Tests
 
-```
+```bash
 cargo test
 ```
 
@@ -56,7 +56,7 @@ Two test sets:
 
 To verify emitted TypeScript externally:
 
-```
+```bash
 cp runtime/runtime.ts /tmp/karn-ts-check/
 cp tests/fixtures/positive/*/expected.ts /tmp/karn-ts-check/
 (cd /tmp/karn-ts-check && tsc --noEmit --strict --target es2020 \
