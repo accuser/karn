@@ -30,6 +30,16 @@ enum Command {
         /// Input `.karn` file or project root.
         input: PathBuf,
     },
+    /// Format `.karn` source files in place. Passing `-` reads from stdin
+    /// and writes to stdout.
+    Fmt {
+        /// Files to format. Use `-` for stdin → stdout.
+        inputs: Vec<PathBuf>,
+        /// Check formatting without writing changes. Exits non-zero if any
+        /// file is not already canonical.
+        #[arg(long)]
+        check: bool,
+    },
 }
 
 fn main() -> ExitCode {
@@ -37,6 +47,72 @@ fn main() -> ExitCode {
     match cli.command {
         Command::Compile { input, output } => run_compile(input, output),
         Command::Check { input } => run_check(input),
+        Command::Fmt { inputs, check } => run_fmt(inputs, check),
+    }
+}
+
+fn run_fmt(inputs: Vec<PathBuf>, check: bool) -> ExitCode {
+    use karnc::fmt::{FormatOptions, format_source};
+    let opts = FormatOptions::default();
+    if inputs.is_empty() {
+        eprintln!("karnc fmt: no input files (pass file paths or `-` for stdin)");
+        return ExitCode::FAILURE;
+    }
+    let mut had_diff = false;
+    let mut had_error = false;
+    for input in &inputs {
+        if input.as_os_str() == "-" {
+            use std::io::Read;
+            let mut source = String::new();
+            if let Err(e) = std::io::stdin().read_to_string(&mut source) {
+                eprintln!("karnc fmt: read from stdin: {e}");
+                return ExitCode::FAILURE;
+            }
+            match format_source(&source, &opts) {
+                Ok(formatted) => print!("{formatted}"),
+                Err(e) => {
+                    karnc::print_errors(&e.errors, &source, "<stdin>");
+                    return ExitCode::FAILURE;
+                }
+            }
+            continue;
+        }
+        let source = match std::fs::read_to_string(input) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("karnc fmt: read `{}`: {e}", input.display());
+                had_error = true;
+                continue;
+            }
+        };
+        let filename = input.display().to_string();
+        match format_source(&source, &opts) {
+            Ok(formatted) => {
+                if check {
+                    if formatted != source {
+                        eprintln!(
+                            "karnc fmt: {} is not canonically formatted",
+                            input.display()
+                        );
+                        had_diff = true;
+                    }
+                } else if formatted != source
+                    && let Err(e) = std::fs::write(input, formatted)
+                {
+                    eprintln!("karnc fmt: write `{}`: {e}", input.display());
+                    had_error = true;
+                }
+            }
+            Err(e) => {
+                karnc::print_errors(&e.errors, &source, &filename);
+                had_error = true;
+            }
+        }
+    }
+    if had_error || (check && had_diff) {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }
 

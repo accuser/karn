@@ -1,0 +1,64 @@
+{
+  "name": "karn-vscode",
+  "displayName": "Karn",
+  "description": "Language support for Karn (.karn) source files.",
+  "version": "0.5.0",
+  "publisher": "karn",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Programming Languages", "Linters", "Formatters"],
+  "activationEvents": [
+    "onLanguage:karn",
+    "workspaceContains:karn.toml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "karn",
+        "aliases": ["Karn", "karn"],
+        "extensions": [".karn"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "karn",
+        "scopeName": "source.karn",
+        "path": "./syntaxes/karn.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Karn",
+      "properties": {
+        "karn.executablePath": {
+          "type": "string",
+          "default": "karnc-lsp",
+          "description": "Path to the karnc-lsp executable. Defaults to looking up `karnc-lsp` on PATH."
+        },
+        "karn.trace.server": {
+          "type": "string",
+          "enum": ["off", "messages", "verbose"],
+          "default": "off",
+          "description": "Trace LSP protocol communication (visible in the Karn LSP output channel)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "tsc -p .",
+    "watch": "tsc -p . --watch",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

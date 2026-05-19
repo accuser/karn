@@ -1,0 +1,40 @@
+==========================
+context with consumes and exports
+==========================
+
+context commerce.payment {
+	uses commerce.money
+
+	consumes commerce.identifiers
+
+	exports opaque { Money }
+}
+
+--------------------------
+
+(source_file
+  (context_decl
+    name: (qualified_name (identifier) (identifier))
+    (uses_decl target: (qualified_name (identifier) (identifier)))
+    (consumes_decl target: (qualified_name (identifier) (identifier)))
+    (exports_decl
+      visibility: "opaque"
+      name: (identifier))))
+
+==========================
+transparent exports
+==========================
+
+context catalog {
+	exports transparent { Product, Sku }
+}
+
+--------------------------
+
+(source_file
+  (context_decl
+    name: (qualified_name (identifier))
+    (exports_decl
+      visibility: "transparent"
+      name: (identifier)
+      name: (identifier))))

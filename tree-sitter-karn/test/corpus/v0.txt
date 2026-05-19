@@ -1,0 +1,52 @@
+==========================
+empty commons
+==========================
+
+commons fitness.units {}
+
+--------------------------
+
+(source_file
+  (commons_decl
+    name: (qualified_name (identifier) (identifier))))
+
+==========================
+refined int with NonNegative
+==========================
+
+commons fitness.units {
+	type Metres = Int where NonNegative
+}
+
+--------------------------
+
+(source_file
+  (commons_decl
+    name: (qualified_name (identifier) (identifier))
+    (type_decl
+      name: (identifier)
+      body: (refined_type
+        base: "Int"
+        refinement: (refinement
+          (pred_atom (predicate_name)))))))
+
+==========================
+function with arithmetic body
+==========================
+
+commons math {
+	fn add(a: Int, b: Int) -> Int { a + b }
+}
+
+--------------------------
+
+(source_file
+  (commons_decl
+    name: (qualified_name (identifier))
+    (fn_decl
+      name: (identifier)
+      (param name: (identifier) type: "Int")
+      (param name: (identifier) type: "Int")
+      return_type: "Int"
+      body: (block
+        tail: (binary_expr (identifier) (identifier))))))

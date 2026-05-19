@@ -1,0 +1,13 @@
+[package]
+name = "karn-fmt"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+karnc = { path = "../karnc" }
+
+[dev-dependencies]
+insta.workspace = true

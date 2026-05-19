@@ -31,6 +31,47 @@ pub fn parse(tokens: &[Token], source: &str) -> Result<Commons, Vec<CompileError
     }
 }
 
+/// Parse a token slice into a [`SourceUnit`] with error recovery, returning a
+/// best-effort partial AST plus the full list of parse errors and warnings.
+///
+/// Used by the LSP: item-level recovery skips past a malformed declaration to
+/// the next top-level item, so multiple errors are reported per compilation
+/// rather than just the first. Compared to [`parse_unit`], this never bails;
+/// if no SourceUnit could be parsed at all (e.g. the file is empty or the
+/// header itself fails) the returned `Option` is `None`.
+pub fn parse_unit_with_recovery(
+    tokens: &[Token],
+    source: &str,
+) -> (Option<SourceUnit>, Vec<CompileError>) {
+    let mut warnings = Vec::new();
+    let mut p = Parser::new(tokens, source, &mut warnings);
+    p.recover_mode = true;
+    let unit_opt = match p.parse_unit() {
+        Ok(u) => {
+            if let Some(extra) = p.peek() {
+                p.recovered_errors.push(
+                    CompileError::new(
+                        "karn.parse.extra_tokens",
+                        extra.span,
+                        "unexpected token after top-level declaration",
+                    )
+                    .with_note(
+                        "a `.karn` file contains exactly one `commons` or `context` declaration",
+                    ),
+                );
+            }
+            Some(u)
+        }
+        Err(e) => {
+            p.recovered_errors.push(e);
+            None
+        }
+    };
+    let mut all_errors = p.recovered_errors;
+    all_errors.append(&mut warnings);
+    (unit_opt, all_errors)
+}
+
 /// Parse a token slice into a [`SourceUnit`] — either a commons or a context.
 ///
 /// Each `.karn` file is exactly one declaration of one kind.
@@ -77,6 +118,15 @@ struct Parser<'a> {
     /// Accumulated non-fatal diagnostics. v0.3 uses this for orphan-doc
     /// warnings, which are emitted as errors with a distinguishable category.
     warnings: &'a mut Vec<CompileError>,
+    /// When true, the item-level loops catch errors from individual item
+    /// parses, push them into `recovered_errors`, and skip forward to the
+    /// next top-level item boundary instead of bailing. Used by the LSP via
+    /// [`parse_unit_with_recovery`]; disabled in the normal `parse` path so
+    /// existing single-error behaviour is preserved.
+    recover_mode: bool,
+    /// Errors collected during recovery-mode parsing. Only populated when
+    /// `recover_mode` is true.
+    recovered_errors: Vec<CompileError>,
 }
 
 impl<'a> Parser<'a> {
@@ -86,6 +136,47 @@ impl<'a> Parser<'a> {
             source,
             pos: 0,
             warnings,
+            recover_mode: false,
+            recovered_errors: Vec::new(),
+        }
+    }
+
+    /// Handle a per-item parse error. In recovery mode, record the error and
+    /// advance to the next sync point so the item loop can continue; otherwise
+    /// propagate as a hard failure.
+    fn handle_item_err(&mut self, e: CompileError) -> Result<(), CompileError> {
+        if self.recover_mode {
+            self.recovered_errors.push(e);
+            self.recover_to_top_item();
+            Ok(())
+        } else {
+            Err(e)
+        }
+    }
+
+    /// Skip forward to the next top-level item boundary: either a top-level
+    /// declaration keyword (`type`, `fn`, `uses`, `consumes`, `exports`,
+    /// `capability`, `provides`, `service`, `agent`), a closing brace, or
+    /// end-of-input. Used only in recovery mode.
+    fn recover_to_top_item(&mut self) {
+        while let Some(t) = self.peek() {
+            match t.kind {
+                TokenKind::Type
+                | TokenKind::Fn
+                | TokenKind::Uses
+                | TokenKind::Consumes
+                | TokenKind::Exports
+                | TokenKind::Capability
+                | TokenKind::Provides
+                | TokenKind::Service
+                | TokenKind::Agent
+                | TokenKind::RBrace
+                | TokenKind::Commons
+                | TokenKind::Context => return,
+                _ => {
+                    self.bump();
+                }
+            }
         }
     }
 
@@ -321,53 +412,68 @@ impl<'a> Parser<'a> {
                             ),
                         );
                     }
-                    uses.push(self.parse_uses_decl()?);
+                    match self.parse_uses_decl() {
+                        Ok(u) => uses.push(u),
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Type) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
-                    let mut t = self.parse_type_decl()?;
-                    t.documentation = doc;
-                    items.push(CommonsItem::Type(t));
+                    match self.parse_type_decl() {
+                        Ok(mut t) => {
+                            t.documentation = doc;
+                            items.push(CommonsItem::Type(t));
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Fn) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
-                    let mut f = self.parse_fn_decl()?;
-                    f.documentation = doc;
-                    items.push(CommonsItem::Fn(f));
+                    match self.parse_fn_decl() {
+                        Ok(mut f) => {
+                            f.documentation = doc;
+                            items.push(CommonsItem::Fn(f));
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Capability) => {
-                    return Err(CompileError::new(
+                    let err = CompileError::new(
                         "karn.capability.outside_context",
                         self.peek().unwrap().span,
                         "`capability` declarations are only allowed inside a context, not a commons",
-                    ));
+                    );
+                    self.handle_item_err(err)?;
                 }
                 Some(TokenKind::Provides) => {
-                    return Err(CompileError::new(
+                    let err = CompileError::new(
                         "karn.provider.outside_context",
                         self.peek().unwrap().span,
                         "`provides` declarations are only allowed inside a context, not a commons",
-                    ));
+                    );
+                    self.handle_item_err(err)?;
                 }
                 Some(TokenKind::Service) => {
-                    return Err(CompileError::new(
+                    let err = CompileError::new(
                         "karn.service.outside_context",
                         self.peek().unwrap().span,
                         "`service` declarations are only allowed inside a context, not a commons",
-                    ));
+                    );
+                    self.handle_item_err(err)?;
                 }
                 Some(TokenKind::Agent) => {
-                    return Err(CompileError::new(
+                    let err = CompileError::new(
                         "karn.agent.outside_context",
                         self.peek().unwrap().span,
                         "`agent` declarations are only allowed inside a context, not a commons",
-                    ));
+                    );
+                    self.handle_item_err(err)?;
                 }
                 Some(_) => {
                     let t = self.peek().unwrap();
-                    return Err(CompileError::new(
+                    let err = CompileError::new(
                         "karn.parse.expected_item",
                         t.span,
                         format!(
@@ -377,7 +483,14 @@ impl<'a> Parser<'a> {
                     )
                     .with_note(
                         "the body of a commons contains zero or more `type`, `fn`, or `uses` declarations",
-                    ));
+                    );
+                    if self.recover_mode {
+                        self.recovered_errors.push(err);
+                        self.bump();
+                        self.recover_to_top_item();
+                    } else {
+                        return Err(err);
+                    }
                 }
                 None => {
                     return Err(CompileError::new(
@@ -433,27 +546,39 @@ impl<'a> Parser<'a> {
                             "move all `uses` lines to immediately after the `commons` header",
                         ));
                     }
-                    let u = self.parse_uses_decl()?;
-                    last_span = u.span;
-                    uses.push(u);
+                    match self.parse_uses_decl() {
+                        Ok(u) => {
+                            last_span = u.span;
+                            uses.push(u);
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Type) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
-                    let mut t = self.parse_type_decl()?;
-                    t.documentation = doc;
-                    last_span = t.span;
-                    items.push(CommonsItem::Type(t));
-                    seen_item = true;
+                    match self.parse_type_decl() {
+                        Ok(mut t) => {
+                            t.documentation = doc;
+                            last_span = t.span;
+                            items.push(CommonsItem::Type(t));
+                            seen_item = true;
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Fn) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
-                    let mut f = self.parse_fn_decl()?;
-                    f.documentation = doc;
-                    last_span = f.span;
-                    items.push(CommonsItem::Fn(f));
-                    seen_item = true;
+                    match self.parse_fn_decl() {
+                        Ok(mut f) => {
+                            f.documentation = doc;
+                            last_span = f.span;
+                            items.push(CommonsItem::Fn(f));
+                            seen_item = true;
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 None => {
                     if let Some((_, doc_span)) = item_doc {
@@ -466,36 +591,40 @@ impl<'a> Parser<'a> {
                     break;
                 }
                 Some(TokenKind::Capability) => {
-                    return Err(CompileError::new(
+                    let err = CompileError::new(
                         "karn.capability.outside_context",
                         self.peek().unwrap().span,
                         "`capability` declarations are only allowed inside a context, not a commons",
-                    ));
+                    );
+                    self.handle_item_err(err)?;
                 }
                 Some(TokenKind::Provides) => {
-                    return Err(CompileError::new(
+                    let err = CompileError::new(
                         "karn.provider.outside_context",
                         self.peek().unwrap().span,
                         "`provides` declarations are only allowed inside a context, not a commons",
-                    ));
+                    );
+                    self.handle_item_err(err)?;
                 }
                 Some(TokenKind::Service) => {
-                    return Err(CompileError::new(
+                    let err = CompileError::new(
                         "karn.service.outside_context",
                         self.peek().unwrap().span,
                         "`service` declarations are only allowed inside a context, not a commons",
-                    ));
+                    );
+                    self.handle_item_err(err)?;
                 }
                 Some(TokenKind::Agent) => {
-                    return Err(CompileError::new(
+                    let err = CompileError::new(
                         "karn.agent.outside_context",
                         self.peek().unwrap().span,
                         "`agent` declarations are only allowed inside a context, not a commons",
-                    ));
+                    );
+                    self.handle_item_err(err)?;
                 }
                 Some(_) => {
                     let t = self.peek().unwrap();
-                    return Err(CompileError::new(
+                    let err = CompileError::new(
                         "karn.parse.expected_item",
                         t.span,
                         format!(
@@ -505,7 +634,15 @@ impl<'a> Parser<'a> {
                     )
                     .with_note(
                         "in fragment-form commons (no braces), the body is a sequence of `type`, `fn`, or `uses` declarations to end of file",
-                    ));
+                    );
+                    if self.recover_mode {
+                        self.recovered_errors.push(err);
+                        // Force progress in recovery: bump at least one token, then sync.
+                        self.bump();
+                        self.recover_to_top_item();
+                    } else {
+                        return Err(err);
+                    }
                 }
             }
         }
@@ -615,7 +752,10 @@ impl<'a> Parser<'a> {
                             "documentation block before `uses` is not allowed; only `type` and `fn` declarations carry docs",
                         ));
                     }
-                    uses.push(self.parse_uses_decl()?);
+                    match self.parse_uses_decl() {
+                        Ok(u) => uses.push(u),
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Consumes) => {
                     if let Some((_, doc_span)) = item_doc {
@@ -625,7 +765,10 @@ impl<'a> Parser<'a> {
                             "documentation block before `consumes` is not allowed; only `type` and `fn` declarations carry docs",
                         ));
                     }
-                    consumes.push(self.parse_consumes_decl()?);
+                    match self.parse_consumes_decl() {
+                        Ok(c) => consumes.push(c),
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Exports) => {
                     if let Some((_, doc_span)) = item_doc {
@@ -635,60 +778,94 @@ impl<'a> Parser<'a> {
                             "documentation block before `exports` is not allowed; only `type` and `fn` declarations carry docs",
                         ));
                     }
-                    exports.push(self.parse_exports_decl()?);
+                    match self.parse_exports_decl() {
+                        Ok(e) => exports.push(e),
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Type) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
-                    let mut t = self.parse_type_decl()?;
-                    t.documentation = doc;
-                    items.push(CommonsItem::Type(t));
+                    match self.parse_type_decl() {
+                        Ok(mut t) => {
+                            t.documentation = doc;
+                            items.push(CommonsItem::Type(t));
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Fn) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
-                    let mut f = self.parse_fn_decl()?;
-                    f.documentation = doc;
-                    items.push(CommonsItem::Fn(f));
+                    match self.parse_fn_decl() {
+                        Ok(mut f) => {
+                            f.documentation = doc;
+                            items.push(CommonsItem::Fn(f));
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Capability) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
-                    let mut c = self.parse_capability_decl()?;
-                    c.documentation = doc;
-                    items.push(CommonsItem::Capability(c));
+                    match self.parse_capability_decl() {
+                        Ok(mut c) => {
+                            c.documentation = doc;
+                            items.push(CommonsItem::Capability(c));
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Provides) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
-                    let mut p = self.parse_provider_decl()?;
-                    p.documentation = doc;
-                    items.push(CommonsItem::Provider(p));
+                    match self.parse_provider_decl() {
+                        Ok(mut p) => {
+                            p.documentation = doc;
+                            items.push(CommonsItem::Provider(p));
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Service) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
-                    let mut s = self.parse_service_decl()?;
-                    s.documentation = doc;
-                    items.push(CommonsItem::Service(s));
+                    match self.parse_service_decl() {
+                        Ok(mut s) => {
+                            s.documentation = doc;
+                            items.push(CommonsItem::Service(s));
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Agent) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
-                    let mut a = self.parse_agent_decl()?;
-                    a.documentation = doc;
-                    items.push(CommonsItem::Agent(a));
+                    match self.parse_agent_decl() {
+                        Ok(mut a) => {
+                            a.documentation = doc;
+                            items.push(CommonsItem::Agent(a));
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(_) => {
                     let t = self.peek().unwrap();
-                    return Err(CompileError::new(
+                    let err = CompileError::new(
                         "karn.parse.expected_item",
                         t.span,
                         format!(
                             "expected a `type`, `fn`, `uses`, `consumes`, `exports`, `capability`, `provides`, `service`, or `agent` declaration, found {}",
                             t.kind.describe()
                         ),
-                    ));
+                    );
+                    if self.recover_mode {
+                        self.recovered_errors.push(err);
+                        self.bump();
+                        self.recover_to_top_item();
+                    } else {
+                        return Err(err);
+                    }
                 }
                 None => {
                     return Err(CompileError::new(
@@ -746,9 +923,13 @@ impl<'a> Parser<'a> {
                             "move all `uses` lines to immediately after the `context` header",
                         ));
                     }
-                    let u = self.parse_uses_decl()?;
-                    last_span = u.span;
-                    uses.push(u);
+                    match self.parse_uses_decl() {
+                        Ok(u) => {
+                            last_span = u.span;
+                            uses.push(u);
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Consumes) => {
                     if let Some((_, doc_span)) = item_doc {
@@ -760,18 +941,30 @@ impl<'a> Parser<'a> {
                     }
                     if seen_item {
                         let t = self.peek().unwrap();
-                        return Err(CompileError::new(
+                        let err = CompileError::new(
                             "karn.parse.consumes_after_decls",
                             t.span,
                             "`consumes` clauses must appear before any `type` or `fn` declaration in a fragment-form context",
                         )
                         .with_note(
                             "move all `consumes` lines to immediately after the `uses` clauses",
-                        ));
+                        );
+                        if self.recover_mode {
+                            self.recovered_errors.push(err);
+                            self.bump();
+                            self.recover_to_top_item();
+                            continue;
+                        } else {
+                            return Err(err);
+                        }
                     }
-                    let c = self.parse_consumes_decl()?;
-                    last_span = c.span;
-                    consumes.push(c);
+                    match self.parse_consumes_decl() {
+                        Ok(c) => {
+                            last_span = c.span;
+                            consumes.push(c);
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Exports) => {
                     if let Some((_, doc_span)) = item_doc {
@@ -783,72 +976,108 @@ impl<'a> Parser<'a> {
                     }
                     if seen_item {
                         let t = self.peek().unwrap();
-                        return Err(CompileError::new(
+                        let err = CompileError::new(
                             "karn.parse.exports_after_decls",
                             t.span,
                             "`exports` clauses must appear before any `type` or `fn` declaration in a fragment-form context",
                         )
                         .with_note(
                             "move all `exports` lines to immediately after the `consumes` clauses",
-                        ));
+                        );
+                        if self.recover_mode {
+                            self.recovered_errors.push(err);
+                            self.bump();
+                            self.recover_to_top_item();
+                            continue;
+                        } else {
+                            return Err(err);
+                        }
                     }
-                    let e = self.parse_exports_decl()?;
-                    last_span = e.span;
-                    exports.push(e);
+                    match self.parse_exports_decl() {
+                        Ok(e) => {
+                            last_span = e.span;
+                            exports.push(e);
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Type) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
-                    let mut t = self.parse_type_decl()?;
-                    t.documentation = doc;
-                    last_span = t.span;
-                    items.push(CommonsItem::Type(t));
-                    seen_item = true;
+                    match self.parse_type_decl() {
+                        Ok(mut t) => {
+                            t.documentation = doc;
+                            last_span = t.span;
+                            items.push(CommonsItem::Type(t));
+                            seen_item = true;
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Fn) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
-                    let mut f = self.parse_fn_decl()?;
-                    f.documentation = doc;
-                    last_span = f.span;
-                    items.push(CommonsItem::Fn(f));
-                    seen_item = true;
+                    match self.parse_fn_decl() {
+                        Ok(mut f) => {
+                            f.documentation = doc;
+                            last_span = f.span;
+                            items.push(CommonsItem::Fn(f));
+                            seen_item = true;
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Capability) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
-                    let mut c = self.parse_capability_decl()?;
-                    c.documentation = doc;
-                    last_span = c.span;
-                    items.push(CommonsItem::Capability(c));
-                    seen_item = true;
+                    match self.parse_capability_decl() {
+                        Ok(mut c) => {
+                            c.documentation = doc;
+                            last_span = c.span;
+                            items.push(CommonsItem::Capability(c));
+                            seen_item = true;
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Provides) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
-                    let mut p = self.parse_provider_decl()?;
-                    p.documentation = doc;
-                    last_span = p.span;
-                    items.push(CommonsItem::Provider(p));
-                    seen_item = true;
+                    match self.parse_provider_decl() {
+                        Ok(mut p) => {
+                            p.documentation = doc;
+                            last_span = p.span;
+                            items.push(CommonsItem::Provider(p));
+                            seen_item = true;
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Service) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
-                    let mut s = self.parse_service_decl()?;
-                    s.documentation = doc;
-                    last_span = s.span;
-                    items.push(CommonsItem::Service(s));
-                    seen_item = true;
+                    match self.parse_service_decl() {
+                        Ok(mut s) => {
+                            s.documentation = doc;
+                            last_span = s.span;
+                            items.push(CommonsItem::Service(s));
+                            seen_item = true;
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 Some(TokenKind::Agent) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
-                    let mut a = self.parse_agent_decl()?;
-                    a.documentation = doc;
-                    last_span = a.span;
-                    items.push(CommonsItem::Agent(a));
-                    seen_item = true;
+                    match self.parse_agent_decl() {
+                        Ok(mut a) => {
+                            a.documentation = doc;
+                            last_span = a.span;
+                            items.push(CommonsItem::Agent(a));
+                            seen_item = true;
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
                 }
                 None => {
                     if let Some((_, doc_span)) = item_doc {
@@ -862,14 +1091,21 @@ impl<'a> Parser<'a> {
                 }
                 Some(_) => {
                     let t = self.peek().unwrap();
-                    return Err(CompileError::new(
+                    let err = CompileError::new(
                         "karn.parse.expected_item",
                         t.span,
                         format!(
                             "expected a `type`, `fn`, `uses`, `consumes`, `exports`, `capability`, `provides`, `service`, or `agent` declaration, found {}",
                             t.kind.describe()
                         ),
-                    ));
+                    );
+                    if self.recover_mode {
+                        self.recovered_errors.push(err);
+                        self.bump();
+                        self.recover_to_top_item();
+                    } else {
+                        return Err(err);
+                    }
                 }
             }
         }
@@ -2753,6 +2989,71 @@ mod tests {
     fn parse_str(src: &str) -> Result<Commons, Vec<CompileError>> {
         let toks = tokenize(src).map_err(|e| vec![e])?;
         parse(&toks, src)
+    }
+
+    fn parse_recover_str(src: &str) -> (Option<SourceUnit>, Vec<CompileError>) {
+        let toks = match tokenize(src) {
+            Ok(t) => t,
+            Err(e) => return (None, vec![e]),
+        };
+        parse_unit_with_recovery(&toks, src)
+    }
+
+    #[test]
+    fn recovery_skips_garbage_between_decls() {
+        // Two `type` declarations separated by garbage. Recovery should
+        // accept both and report one error for the garbage between them.
+        let src = "commons x {\n\
+                   type A = Int where NonNegative\n\
+                   ??? !!!\n\
+                   type B = String where NonEmpty\n\
+                   }";
+        let (unit, errors) = parse_recover_str(src);
+        let unit = unit.expect("recovery should produce a partial AST");
+        let SourceUnit::Commons(c) = unit else {
+            panic!("expected commons")
+        };
+        // Both type decls should have been collected despite the garbage.
+        let names: Vec<_> = c
+            .items
+            .iter()
+            .map(|i| match i {
+                CommonsItem::Type(t) => t.name.name.clone(),
+                _ => panic!("expected only types"),
+            })
+            .collect();
+        assert!(
+            names.contains(&"A".to_string()) && names.contains(&"B".to_string()),
+            "expected both A and B; got {names:?}",
+        );
+        assert!(!errors.is_empty(), "expected at least one parse error");
+    }
+
+    #[test]
+    fn recovery_handles_bad_first_decl_then_good_second() {
+        // First decl is malformed (missing `=`); second is well-formed.
+        let src = "commons x {\n\
+                   type A Int where NonNegative\n\
+                   type B = String where NonEmpty\n\
+                   }";
+        let (unit, errors) = parse_recover_str(src);
+        let unit = unit.expect("recovery should produce a partial AST");
+        let SourceUnit::Commons(c) = unit else {
+            panic!("expected commons")
+        };
+        let names: Vec<_> = c
+            .items
+            .iter()
+            .filter_map(|i| match i {
+                CommonsItem::Type(t) => Some(t.name.name.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            names.contains(&"B".to_string()),
+            "B should be parsed after A's failure; got {names:?}"
+        );
+        assert!(!errors.is_empty(), "expected at least one parse error");
     }
 
     #[test]

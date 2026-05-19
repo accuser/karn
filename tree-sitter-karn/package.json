@@ -1,0 +1,23 @@
+{
+  "name": "tree-sitter-karn",
+  "version": "0.5.0",
+  "description": "Tree-sitter grammar for the Karn DSL (v0–v0.5).",
+  "main": "bindings/node",
+  "scripts": {
+    "build": "tree-sitter generate",
+    "test": "tree-sitter test"
+  },
+  "keywords": ["tree-sitter", "parser", "karn"],
+  "author": "Karn project",
+  "license": "see project root",
+  "tree-sitter": [
+    {
+      "scope": "source.karn",
+      "file-types": ["karn"],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "devDependencies": {
+    "tree-sitter-cli": "^0.24.0"
+  }
+}

@@ -1,7 +1,7 @@
 [package]
 name = "karnc"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 
 [lib]
 path = "src/lib.rs"
@@ -11,13 +11,10 @@ name = "karnc"
 path = "src/main.rs"
 
 [dependencies]
-ariadne = "0.5"
-logos = "0.15"
-clap = { version = "4", features = ["derive"] }
-regex = "1"
+ariadne.workspace = true
+logos.workspace = true
+clap.workspace = true
+regex.workspace = true
 
 [dev-dependencies]
-insta = { version = "1", features = ["yaml"] }
-
-[profile.release]
-lto = "thin"
+insta.workspace = true

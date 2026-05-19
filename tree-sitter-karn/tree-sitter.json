@@ -1,0 +1,17 @@
+{
+  "grammars": [
+    {
+      "name": "karn",
+      "camelcase": "Karn",
+      "scope": "source.karn",
+      "path": ".",
+      "file-types": ["karn"],
+      "highlights": ["queries/highlights.scm"]
+    }
+  ],
+  "metadata": {
+    "version": "0.5.0",
+    "license": "see project root",
+    "description": "Tree-sitter grammar for the Karn DSL"
+  }
+}
