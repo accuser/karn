@@ -1,0 +1,9 @@
+context commerce.payment {
+  uses commerce.money
+
+  exports transparent { Payment }
+
+  type Payment = {
+    amount: Money,
+  }
+}

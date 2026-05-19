@@ -1,0 +1,8 @@
+context commerce.payment {
+  exports transparent { PaymentError }
+
+  type PaymentError = enum {
+    Declined,
+    InsufficientFunds,
+  }
+}

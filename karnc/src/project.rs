@@ -1,17 +1,24 @@
-//! Multi-file project compilation (v0.3 §3.2 and §3.3).
+//! Multi-file project compilation (v0.3 §3.2 and §3.3, v0.4 §3.5).
 //!
 //! A "project" is a directory tree of `.karn` source files. The dotted name
-//! of a commons (e.g., `karn.time`) maps to a path under the project root —
-//! either a single file (`karn/time.karn`) or a directory of files all
-//! sharing the same `commons karn.time` header (`karn/time/*.karn`).
+//! of a commons or context (e.g., `karn.time`, `commerce.orders`) maps to a
+//! path under the project root — either a single file (`karn/time.karn`) or
+//! a directory of files all sharing the same header (`karn/time/*.karn`).
+//!
+//! v0.4: each file is one of two kinds — commons or context. Both kinds share
+//! the same multi-file directory machinery; they differ in body content
+//! (contexts have `consumes`/`exports`, types are nominally per-context), in
+//! visibility (contexts export only the types listed), and in TypeScript
+//! emission (contexts re-brand types from used commons).
 //!
 //! Compilation proceeds in two passes:
-//!   1. **Discover and parse** every `.karn` file. Group by commons name.
-//!      Build a global symbol table where each commons contributes its
-//!      declarations.
-//!   2. **Resolve, type-check, and emit** each commons with full visibility
-//!      of the commons it transitively `uses`. Two passes keep `uses` cycles
-//!      trivial — there is no order-of-evaluation, only declarative mixin.
+//!   1. **Discover and parse** every `.karn` file. Group by qualified name
+//!      and kind. Build a global symbol table where each unit contributes
+//!      its declarations.
+//!   2. **Resolve, type-check, and emit** each unit with full visibility of
+//!      the units it transitively `uses` or `consumes`. Two passes keep
+//!      `uses` cycles trivial — there is no order-of-evaluation, only
+//!      declarative mixin.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -42,6 +49,22 @@ pub struct ProjectOutput {
     pub files: Vec<CompiledFile>,
 }
 
+/// Distinguishes a commons from a context in the project graph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum UnitKind {
+    Commons,
+    Context,
+}
+
+impl UnitKind {
+    pub fn display(self) -> &'static str {
+        match self {
+            UnitKind::Commons => "commons",
+            UnitKind::Context => "context",
+        }
+    }
+}
+
 /// Compile a Karn project rooted at `root`. The root must be a directory.
 pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> {
     let mut errors = Vec::new();
@@ -58,8 +81,6 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
             format!("no `.karn` source files found under {}", root.display()),
         )]);
     }
-    // Detect conflicts: a file `X.karn` and a directory `X/` (with .karn files)
-    // both encoding the same logical commons.
     if let Err(e) = check_file_directory_conflicts(root, &karn_files) {
         errors.extend(e);
     }
@@ -76,39 +97,46 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
         return Err(errors);
     }
 
-    // -- 3. Group by commons name and validate per-directory consistency. --
+    // -- 3. Group by (name, kind) and validate per-directory consistency. --
     let mut groups: HashMap<String, Vec<usize>> = HashMap::new();
+    let mut kinds: HashMap<String, UnitKind> = HashMap::new();
     for (i, pf) in parsed.iter().enumerate() {
-        let name = pf.commons.name.joined();
-        groups.entry(name).or_default().push(i);
+        let name = pf.unit.name().joined();
+        groups.entry(name.clone()).or_default().push(i);
+        kinds.entry(name).or_insert(pf.kind);
     }
-    // Per spec §4.1: every file in a single directory must declare the same
-    // commons name. (A multi-file commons is one directory of files.)
     if let Err(e) = check_directory_name_consistency(&parsed) {
         errors.extend(e);
     }
+    if let Err(e) = check_directory_kind_consistency(&parsed) {
+        errors.extend(e);
+    }
+    // A group must agree on kind across all its files (different name but
+    // same kind is fine; same name but different kind is an error).
+    if let Err(e) = check_group_kind_consistency(&parsed, &groups) {
+        errors.extend(e);
+    }
+    // Each file's path must match its declared qualified name.
+    if let Err(e) = check_path_name_alignment(&parsed) {
+        errors.extend(e);
+    }
 
-    // -- 4. Build per-commons combined symbol tables. --
-    let mut commons_tables: HashMap<String, CommonsTable> = HashMap::new();
+    // -- 4. Build per-unit combined symbol tables. --
+    let mut unit_tables: HashMap<String, UnitTable> = HashMap::new();
     for (name, indices) in &groups {
-        let table = build_commons_table(name, indices, &parsed, &mut errors);
-        commons_tables.insert(name.clone(), table);
+        let kind = *kinds.get(name).expect("every group has a kind");
+        let table = build_unit_table(name, kind, indices, &parsed, &mut errors);
+        unit_tables.insert(name.clone(), table);
     }
 
-    if !errors.is_empty() {
-        // Don't proceed to checking if we already have hard structural errors.
-        // Some of the errors below might be redundant but it's safer.
-        // We still attempt checking only if there are no fatal errors yet.
-    }
-
-    // -- 5. Resolve `uses` clauses (existence + name-conflict detection). --
-    let mut commons_uses: HashMap<String, Vec<String>> = HashMap::new();
+    // -- 5. Resolve `uses` clauses (target must exist + be a commons). --
+    let mut unit_uses: HashMap<String, Vec<String>> = HashMap::new();
     for (name, indices) in &groups {
         let mut uses_targets: Vec<String> = Vec::new();
         for &i in indices {
-            for u in &parsed[i].commons.uses {
+            for u in parsed[i].uses() {
                 let target = u.target.joined();
-                if !commons_tables.contains_key(&target) {
+                if !unit_tables.contains_key(&target) {
                     errors.push(
                         CompileError::new(
                             "karn.uses.unknown_commons",
@@ -116,7 +144,23 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
                             format!("unknown commons `{target}`"),
                         )
                         .with_note(
-                            "the target of a `uses` clause must be another commons in the project",
+                            "the target of a `uses` clause must be a commons in the project",
+                        ),
+                    );
+                    continue;
+                }
+                let target_kind = *kinds.get(&target).unwrap();
+                if target_kind != UnitKind::Commons {
+                    errors.push(
+                        CompileError::new(
+                            "karn.uses.target_is_context",
+                            u.span,
+                            format!(
+                                "`uses {target}` targets a context — `uses` may only target a commons"
+                            ),
+                        )
+                        .with_note(
+                            "to declare a dependency on a context, use `consumes` instead",
                         ),
                     );
                     continue;
@@ -125,7 +169,7 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
                     errors.push(CompileError::new(
                         "karn.uses.self_reference",
                         u.span,
-                        format!("commons `{name}` cannot `uses` itself"),
+                        format!("`{name}` cannot `uses` itself"),
                     ));
                     continue;
                 }
@@ -134,30 +178,98 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
                 }
             }
         }
-        commons_uses.insert(name.clone(), uses_targets);
+        unit_uses.insert(name.clone(), uses_targets);
     }
 
-    // -- 6. Check for name conflicts among used commons. --
-    for (name, targets) in &commons_uses {
-        let local = commons_tables.get(name).expect("commons table present");
+    // -- 5b. Resolve `consumes` clauses (target must exist + be a context). --
+    let mut unit_consumes: HashMap<String, Vec<String>> = HashMap::new();
+    for (name, indices) in &groups {
+        let kind = *kinds.get(name).unwrap();
+        let mut consumes_targets: Vec<String> = Vec::new();
+        for &i in indices {
+            for c in parsed[i].consumes() {
+                let target = c.target.joined();
+                if kind != UnitKind::Context {
+                    errors.push(
+                        CompileError::new(
+                            "karn.consumes.in_commons",
+                            c.span,
+                            format!(
+                                "`consumes` is only valid inside a context, not a commons `{name}`",
+                            ),
+                        )
+                        .with_note(
+                            "commons declare vocabulary; only contexts can declare behavioural dependencies",
+                        ),
+                    );
+                    continue;
+                }
+                if !unit_tables.contains_key(&target) {
+                    errors.push(
+                        CompileError::new(
+                            "karn.consumes.unknown_context",
+                            c.span,
+                            format!("unknown context `{target}`"),
+                        )
+                        .with_note(
+                            "the target of a `consumes` clause must be a context in the project",
+                        ),
+                    );
+                    continue;
+                }
+                let target_kind = *kinds.get(&target).unwrap();
+                if target_kind != UnitKind::Context {
+                    errors.push(
+                        CompileError::new(
+                            "karn.consumes.target_is_commons",
+                            c.span,
+                            format!(
+                                "`consumes {target}` targets a commons — `consumes` may only target a context"
+                            ),
+                        )
+                        .with_note(
+                            "to mix in declarations from a commons, use `uses` instead",
+                        ),
+                    );
+                    continue;
+                }
+                if target == *name {
+                    errors.push(CompileError::new(
+                        "karn.consumes.self_reference",
+                        c.span,
+                        format!("context `{name}` cannot `consumes` itself"),
+                    ));
+                    continue;
+                }
+                if !consumes_targets.contains(&target) {
+                    consumes_targets.push(target);
+                }
+            }
+        }
+        unit_consumes.insert(name.clone(), consumes_targets);
+    }
+
+    // -- 5c. Detect `consumes` cycles. --
+    detect_consumes_cycles(&unit_consumes, &mut errors);
+
+    // -- 6. Name-conflict detection for uses imports (commons-only check). --
+    for (name, targets) in &unit_uses {
+        let local = unit_tables.get(name).expect("unit table present");
         let mut imported: HashMap<String, String> = HashMap::new();
         for t in targets {
-            let used = commons_tables.get(t).expect("used commons table present");
+            let used = unit_tables.get(t).expect("used unit table present");
             for type_name in used.types.keys() {
-                // Local declarations always take precedence; only flag
-                // conflicts between two used commons.
                 if local.types.contains_key(type_name) || local.fns.contains_key(type_name) {
                     continue;
                 }
                 if let Some(prev) = imported.get(type_name) {
-                    // Find the uses-span of either target to report on.
                     let span = uses_span_of(&parsed, &groups[name], t).unwrap_or_default();
                     errors.push(
                         CompileError::new(
                             "karn.uses.name_conflict",
                             span,
                             format!(
-                                "commons `{name}` uses two commons that both declare `{type_name}`: `{prev}` and `{t}`",
+                                "`{name}` uses two commons that both declare `{type_name}`: `{prev}` and `{t}`",
                             ),
                         )
                         .with_note(
@@ -179,7 +291,7 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
                             "karn.uses.name_conflict",
                             span,
                             format!(
-                                "commons `{name}` uses two commons that both declare `{fn_name}`: `{prev}` and `{t}`",
+                                "`{name}` uses two commons that both declare `{fn_name}`: `{prev}` and `{t}`",
                             ),
                         )
                         .with_note(
@@ -193,44 +305,143 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
         }
     }
 
+    // -- 6b. Validate exports clauses (each name is a locally-declared type;
+    //         no duplicates within or across opaque/transparent). --
+    let mut exports_visibility: HashMap<String, HashMap<String, Visibility>> = HashMap::new();
+    for (name, indices) in &groups {
+        let kind = *kinds.get(name).unwrap();
+        if kind != UnitKind::Context {
+            // Commons may not have exports clauses (parsed grammar prevents it
+            // at the parser level), but in case any sneak in, skip.
+            continue;
+        }
+        let local = unit_tables.get(name).unwrap();
+        let mut seen: HashMap<String, (Visibility, Span)> = HashMap::new();
+        for &i in indices {
+            let Some(ctx) = parsed[i].context() else {
+                continue;
+            };
+            for clause in &ctx.exports {
+                let mut within: HashMap<String, Span> = HashMap::new();
+                for n in &clause.names {
+                    if let Some(prev) = within.get(&n.name) {
+                        errors.push(
+                            CompileError::new(
+                                "karn.exports.duplicate_in_clause",
+                                n.span,
+                                format!(
+                                    "type `{}` appears more than once in this exports clause",
+                                    n.name
+                                ),
+                            )
+                            .with_label(*prev, "previously listed here"),
+                        );
+                        continue;
+                    }
+                    within.insert(n.name.clone(), n.span);
+
+                    if !local.types.contains_key(&n.name) {
+                        errors.push(
+                            CompileError::new(
+                                "karn.exports.undeclared_type",
+                                n.span,
+                                format!(
+                                    "exports clause references `{}`, which is not a type declared in context `{}`",
+                                    n.name, name
+                                ),
+                            )
+                            .with_note(
+                                "only types declared in the same context can appear in `exports` clauses",
+                            ),
+                        );
+                        continue;
+                    }
+
+                    if let Some((prev_vis, prev_span)) = seen.get(&n.name) {
+                        if *prev_vis == clause.visibility {
+                            errors.push(
+                                CompileError::new(
+                                    "karn.exports.duplicate_export",
+                                    n.span,
+                                    format!("type `{}` is exported more than once", n.name),
+                                )
+                                .with_label(*prev_span, "previously exported here"),
+                            );
+                        } else {
+                            errors.push(
+                                CompileError::new(
+                                    "karn.exports.conflicting_visibility",
+                                    n.span,
+                                    format!(
+                                        "type `{}` is exported with conflicting visibilities — pick `opaque` or `transparent`",
+                                        n.name,
+                                    ),
+                                )
+                                .with_label(*prev_span, "previously exported here"),
+                            );
+                        }
+                        continue;
+                    }
+                    seen.insert(n.name.clone(), (clause.visibility, n.span));
+                }
+            }
+        }
+        let mut visibility_map: HashMap<String, Visibility> = HashMap::new();
+        for (n, (v, _)) in seen {
+            visibility_map.insert(n, v);
+        }
+        exports_visibility.insert(name.clone(), visibility_map);
+    }
+
     if !errors.is_empty() {
         return Err(errors);
     }
 
-    // -- 6b. Build per-commons file index (which file declares which name).
-    // Needed by the emitter to compute cross-commons import paths.
-    let mut commons_file_index: HashMap<String, FileDeclIndex> = HashMap::new();
+    // -- 7. Build per-unit file index (which file declares which name). --
+    let mut unit_file_index: HashMap<String, FileDeclIndex> = HashMap::new();
     for (name, indices) in &groups {
-        commons_file_index.insert(name.clone(), build_file_decl_index(indices, &parsed));
+        unit_file_index.insert(name.clone(), build_file_decl_index(indices, &parsed));
     }
 
-    // -- 7. For each commons, build the full (local + imported) symbol space
-    //       and run resolve+check per source file. --
+    // -- 8. For each unit, build the combined symbol space and run
+    //       resolve+check per source file. --
     let mut compiled: Vec<CompiledFile> = Vec::new();
+    let empty_exports = HashMap::new();
 
     for (name, indices) in &groups {
-        // Compose: local + transitive (one level) uses. The spec says
-        // imported types share identity with the defining commons, so we
-        // simply union the symbol tables, with local shadowing imports.
-        let local_table = commons_tables.get(name).expect("commons table present");
+        let kind = *kinds.get(name).unwrap();
+        let local_table = unit_tables.get(name).unwrap();
+
+        // Compose: local + transitive (one level) uses. For commons, mixin
+        // preserves type identity; for contexts, mixin produces per-context
+        // nominal types. The resolver doesn't distinguish (the rebranding is
+        // observable in emission); the symbol table union is the same.
         let mut combined_types = local_table.types.clone();
         let mut combined_fns = local_table.fns.clone();
         let mut combined_methods = local_table.methods.clone();
-        // Track which type names came from which used commons (for emission
-        // and for "is this type local?" decisions).
         let mut imported_from: HashMap<String, String> = HashMap::new();
-        for t in commons_uses.get(name).into_iter().flatten() {
-            let used = commons_tables.get(t).expect("used commons table present");
+        let mut imported_from_kind: HashMap<String, UnitKind> = HashMap::new();
+        // Names visible from `consumes` (read-only types from consumed contexts).
+        // For each name we track:
+        // - the type decl, with the consumed context's identity
+        // - the visibility (opaque/transparent)
+        // - the owning context's qualified name (for external-construction errors)
+        let mut consumed_types: HashMap<String, ConsumedType> = HashMap::new();
+
+        for t in unit_uses.get(name).into_iter().flatten() {
+            let used = unit_tables.get(t).expect("used unit table present");
             for (type_name, decl) in &used.types {
                 if !combined_types.contains_key(type_name) {
                     combined_types.insert(type_name.clone(), decl.clone());
                     imported_from.insert(type_name.clone(), t.clone());
+                    imported_from_kind.insert(type_name.clone(), UnitKind::Commons);
                 }
             }
             for (fn_name, decl) in &used.fns {
                 if !combined_fns.contains_key(fn_name) {
                     combined_fns.insert(fn_name.clone(), decl.clone());
                     imported_from.insert(fn_name.clone(), t.clone());
+                    imported_from_kind.insert(fn_name.clone(), UnitKind::Commons);
                 }
             }
             for (type_name, mt) in &used.methods {
@@ -250,15 +461,78 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
             }
         }
 
+        // Now process `consumes` for contexts: add exported types into the
+        // symbol table with visibility metadata so the checker can enforce
+        // construction / inspection rules.
+        for t in unit_consumes.get(name).into_iter().flatten() {
+            let used = unit_tables.get(t).expect("consumed unit table present");
+            let used_exports = exports_visibility.get(t).unwrap_or(&empty_exports);
+            for (type_name, vis) in used_exports {
+                let Some(decl) = used.types.get(type_name) else {
+                    continue;
+                };
+                if combined_types.contains_key(type_name) {
+                    // Name conflict between local/uses and consumed export.
+                    let consumes_span =
+                        consumes_span_of(&parsed, &groups[name], t).unwrap_or_default();
+                    errors.push(
+                        CompileError::new(
+                            "karn.consumes.name_conflict",
+                            consumes_span,
+                            format!(
+                                "context `{name}` consumes `{t}` which exports type `{type_name}`, but a type of the same name is already in scope",
+                            ),
+                        )
+                        .with_note(
+                            "rename one of the conflicting declarations or restructure the import",
+                        ),
+                    );
+                    continue;
+                }
+                combined_types.insert(type_name.clone(), decl.clone());
+                imported_from.insert(type_name.clone(), t.clone());
+                imported_from_kind.insert(type_name.clone(), UnitKind::Context);
+                consumed_types.insert(
+                    type_name.clone(),
+                    ConsumedType {
+                        owning_context: t.clone(),
+                        visibility: *vis,
+                    },
+                );
+                // Methods on transparently-exported types: they're emitted in
+                // the owning context's output, but reading-side methods (like
+                // user-declared instance methods) are callable from consumers.
+                // For v0.4, we expose all instance methods on consumed types
+                // so the checker can resolve method calls; the checker
+                // separately enforces that constructors (.of/unsafe) aren't
+                // callable externally.
+                if let Some(mt) = used.methods.get(type_name) {
+                    let entry = combined_methods.entry(type_name.clone()).or_default();
+                    for (m, decl) in &mt.instance {
+                        entry
+                            .instance
+                            .entry(m.clone())
+                            .or_insert_with(|| decl.clone());
+                    }
+                    // We deliberately *don't* import static methods from
+                    // consumed contexts. Static methods can construct new
+                    // values, which is forbidden externally.
+                }
+            }
+        }
+
+        if !errors.is_empty() {
+            continue;
+        }
+
         let local_names: HashSet<String> = local_table.types.keys().cloned().collect();
 
-        // Collect every method declaration in this commons, keyed by
-        // (type-name, method-name), so each file's emission can include the
-        // methods attached to types it declares — even if the method itself
-        // was authored in a sibling file.
+        // Collect methods authored anywhere in this unit, keyed by their
+        // attached type's name. Used to surface a type's methods in the
+        // file that declares the type even if the method is in a sibling file.
         let mut local_methods_for_type: HashMap<String, Vec<FnDecl>> = HashMap::new();
         for &j in indices {
-            for item in &parsed[j].commons.items {
+            for item in parsed[j].items() {
                 if let CommonsItem::Fn(f) = item
                     && let FnName::Method { type_name, .. } = &f.name
                 {
@@ -270,25 +544,26 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
             }
         }
 
-        // For each file in this commons, type-check and emit.
+        // Per-context view information for the emitter and checker.
+        let owning_context_for_emit = if kind == UnitKind::Context {
+            Some(name.clone())
+        } else {
+            None
+        };
+
         for &i in indices {
             let pf = &parsed[i];
-            // Synthesize the items list for emission: this file's type and
-            // free-fn declarations, plus methods on those types from any
-            // file in the commons. Methods declared in this file but
-            // attached to a sibling-file type are skipped (they'll surface
-            // in the sibling's output instead).
+
             let mut emit_items: Vec<CommonsItem> = Vec::new();
             let types_in_this_file: HashSet<String> = pf
-                .commons
-                .items
+                .items()
                 .iter()
                 .filter_map(|it| match it {
                     CommonsItem::Type(t) => Some(t.name.name.clone()),
                     _ => None,
                 })
                 .collect();
-            for item in &pf.commons.items {
+            for item in pf.items() {
                 match item {
                     CommonsItem::Type(t) => {
                         emit_items.push(CommonsItem::Type(t.clone()));
@@ -303,11 +578,9 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
                     },
                 }
             }
-            // Add methods authored elsewhere whose attached type is in this file.
             for type_name in &types_in_this_file {
                 if let Some(methods) = local_methods_for_type.get(type_name) {
                     for m in methods {
-                        // Skip methods already added (declared in this file).
                         let already = emit_items.iter().any(|it| match it {
                             CommonsItem::Fn(existing) => match &existing.name {
                                 FnName::Method {
@@ -330,23 +603,22 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
                     }
                 }
             }
-            let mut commons_for_emit = pf.commons.clone();
-            commons_for_emit.items = emit_items;
+
+            // Synthesize a "Commons-shaped" view of this file's items so we
+            // can drive the existing resolver/checker without duplication.
+            let synthetic_commons = pf.as_synthetic_commons(emit_items);
+
             let resolved = ResolvedCommons {
-                commons: commons_for_emit,
+                commons: synthetic_commons,
                 types: combined_types.clone(),
                 fns: combined_fns.clone(),
                 methods: combined_methods.clone(),
                 local_type_names: local_names.clone(),
             };
-            // Run resolution checks restricted to this file's items only
-            // (cross-references to the rest of the commons resolve via the
-            // combined tables we already plugged in).
             if let Err(errs) = resolver::resolve_file(&resolved) {
                 errors.extend(errs);
                 continue;
             }
-            // Type-check this file's items against the combined symbol table.
             let typed = match checker::check(resolved) {
                 Ok(t) => t,
                 Err(errs) => {
@@ -354,14 +626,22 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
                     continue;
                 }
             };
-            // Emit. We need to know inter-file dependencies so we can render
-            // imports. The emitter computes them by walking expressions.
-            // For cross-commons imports, plug in per-target file indexes so
-            // the emitter can point each import at the exact source file
-            // that declares each name.
+
+            // Run the context-specific checks: forbidden construction,
+            // private-type references.
+            if kind == UnitKind::Context {
+                let context_check_errs =
+                    check_context_constraints(&typed, &consumed_types, &local_names);
+                if !context_check_errs.is_empty() {
+                    errors.extend(context_check_errs);
+                    continue;
+                }
+            }
+
+            // Build the emitter context.
             let mut imported_decl_paths: HashMap<String, HashMap<String, PathBuf>> = HashMap::new();
-            for t in commons_uses.get(name).into_iter().flatten() {
-                if let Some(target_index) = commons_file_index.get(t) {
+            for t in unit_uses.get(name).into_iter().flatten() {
+                if let Some(target_index) = unit_file_index.get(t) {
                     let mut paths: HashMap<String, PathBuf> = HashMap::new();
                     for (n, p) in &target_index.types {
                         paths.insert(n.clone(), p.clone());
@@ -372,6 +652,34 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
                     imported_decl_paths.insert(t.clone(), paths);
                 }
             }
+            for t in unit_consumes.get(name).into_iter().flatten() {
+                if let Some(target_index) = unit_file_index.get(t) {
+                    let mut paths: HashMap<String, PathBuf> = HashMap::new();
+                    // Only expose exported names — the emitter needs to know
+                    // which file declares them so it can render the import.
+                    let exports_for_target = exports_visibility.get(t).unwrap_or(&empty_exports);
+                    for n in exports_for_target.keys() {
+                        if let Some(p) = target_index.types.get(n) {
+                            paths.insert(n.clone(), p.clone());
+                        }
+                    }
+                    imported_decl_paths.insert(t.clone(), paths);
+                }
+            }
+
+            let exports_local = exports_visibility.get(name).cloned().unwrap_or_default();
+            let exports_for_consumed = unit_consumes
+                .get(name)
+                .into_iter()
+                .flatten()
+                .map(|t| {
+                    (
+                        t.clone(),
+                        exports_visibility.get(t).cloned().unwrap_or_default(),
+                    )
+                })
+                .collect();
+
             let emit_ctx = EmitProjectCtx {
                 source_path: pf.source_path.clone(),
                 commons_name: name.clone(),
@@ -385,7 +693,7 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
                         }
                     })
                     .collect(),
-                file_decl_index: commons_file_index.get(name).cloned().unwrap_or_else(|| {
+                file_decl_index: unit_file_index.get(name).cloned().unwrap_or_else(|| {
                     FileDeclIndex {
                         types: HashMap::new(),
                         fns: HashMap::new(),
@@ -393,8 +701,14 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
                     }
                 }),
                 imported_from: imported_from.clone(),
+                imported_from_kind: imported_from_kind.clone(),
                 imported_decl_paths,
                 commons_dir: commons_dir_for(name),
+                unit_kind: kind,
+                owning_context: owning_context_for_emit.clone(),
+                exports_local,
+                exports_for_consumed,
+                consumed_types: consumed_types.clone(),
             };
             let ts = emitter::emit_project(&typed, &emit_ctx);
             let output_path = ts_output_path(&pf.source_path);
@@ -409,7 +723,6 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
     if !errors.is_empty() {
         return Err(errors);
     }
-    // Sort outputs for deterministic ordering.
     compiled.sort_by(|a, b| a.source_path.cmp(&b.source_path));
     Ok(ProjectOutput { files: compiled })
 }
@@ -421,7 +734,67 @@ struct ParsedFile {
     source_path: PathBuf,
     #[allow(dead_code)]
     source: String,
-    commons: Commons,
+    unit: SourceUnit,
+    kind: UnitKind,
+}
+
+impl ParsedFile {
+    fn items(&self) -> &Vec<CommonsItem> {
+        match &self.unit {
+            SourceUnit::Commons(c) => &c.items,
+            SourceUnit::Context(c) => &c.items,
+        }
+    }
+
+    fn uses(&self) -> &Vec<UsesDecl> {
+        match &self.unit {
+            SourceUnit::Commons(c) => &c.uses,
+            SourceUnit::Context(c) => &c.uses,
+        }
+    }
+
+    fn consumes(&self) -> &[ConsumesDecl] {
+        match &self.unit {
+            SourceUnit::Commons(_) => &[],
+            SourceUnit::Context(c) => &c.consumes,
+        }
+    }
+
+    fn context(&self) -> Option<&Context> {
+        match &self.unit {
+            SourceUnit::Context(c) => Some(c),
+            _ => None,
+        }
+    }
+
+    /// Build a synthetic Commons AST node carrying the given items, so the
+    /// existing resolver/checker pipeline can be driven uniformly.
+    fn as_synthetic_commons(&self, items: Vec<CommonsItem>) -> Commons {
+        let (name, uses, documentation, form, span) = match &self.unit {
+            SourceUnit::Commons(c) => (
+                c.name.clone(),
+                c.uses.clone(),
+                c.documentation.clone(),
+                c.form,
+                c.span,
+            ),
+            SourceUnit::Context(c) => (
+                c.name.clone(),
+                c.uses.clone(),
+                c.documentation.clone(),
+                c.form,
+                c.span,
+            ),
+        };
+        Commons {
+            name,
+            items,
+            uses,
+            documentation,
+            form,
+            span,
+        }
+    }
 }
 
 fn parse_file(root: &Path, path: &Path) -> Result<ParsedFile, Vec<CompileError>> {
@@ -436,16 +809,20 @@ fn parse_file(root: &Path, path: &Path) -> Result<ParsedFile, Vec<CompileError>>
         }
     };
     let tokens = lexer::tokenize(&source).map_err(|e| vec![e])?;
-    let commons = parser::parse(&tokens, &source)?;
+    let unit = parser::parse_unit(&tokens, &source)?;
+    let kind = match &unit {
+        SourceUnit::Commons(_) => UnitKind::Commons,
+        SourceUnit::Context(_) => UnitKind::Context,
+    };
     let rel = path.strip_prefix(root).unwrap_or(path).to_path_buf();
     Ok(ParsedFile {
         source_path: rel,
         source,
-        commons,
+        unit,
+        kind,
     })
 }
 
-/// Walk `root` and collect every `.karn` file (recursively).
 fn discover_karn_files(root: &Path) -> Result<Vec<PathBuf>, CompileError> {
     if !root.exists() {
         return Err(CompileError::new(
@@ -480,10 +857,6 @@ fn discover_karn_files(root: &Path) -> Result<Vec<PathBuf>, CompileError> {
     Ok(out)
 }
 
-/// Compute the commons-name dotted path for a single-file commons at path
-/// `karn/time.karn` (`karn.time`) or for a multi-file commons directory
-/// `karn/time/foo.karn` (`karn.time`). Returns None for paths that can't
-/// be interpreted (e.g., empty).
 fn commons_dir_for(name: &str) -> PathBuf {
     let parts: Vec<&str> = name.split('.').collect();
     let mut p = PathBuf::new();
@@ -499,55 +872,52 @@ fn ts_output_path(source: &Path) -> PathBuf {
     out
 }
 
-/// Check that every file in a single directory declares the same commons
-/// name. Per spec §4.1.
+/// Within a multi-file unit (i.e., 2+ files in the same directory that share
+/// a qualified name), every file must declare exactly the same name.
+///
+/// In v0.4 the same directory may contain multiple *single-file* units (one
+/// commons and one context, say), provided each file's path matches the
+/// last segment of its declared qualified name. Mixed-name files in one
+/// directory are only flagged when they collide on the same name (handled by
+/// [`check_group_kind_consistency`]) or when path/name alignment fails.
 fn check_directory_name_consistency(parsed: &[ParsedFile]) -> Result<(), Vec<CompileError>> {
     let mut errors: Vec<CompileError> = Vec::new();
-    let mut by_dir: HashMap<PathBuf, Vec<(usize, &str)>> = HashMap::new();
+    // For each unit (group of files sharing the same name), verify they all
+    // live in the same directory.
+    let mut by_name: HashMap<String, Vec<usize>> = HashMap::new();
     for (i, pf) in parsed.iter().enumerate() {
-        let dir = pf
+        by_name.entry(pf.unit.name().joined()).or_default().push(i);
+    }
+    for indices in by_name.values() {
+        if indices.len() < 2 {
+            continue;
+        }
+        let first_dir = parsed[indices[0]]
             .source_path
             .parent()
             .unwrap_or(Path::new(""))
             .to_path_buf();
-        by_dir.entry(dir).or_default().push((
-            i,
-            pf.commons
-                .name
-                .parts
-                .last()
-                .map(|p| p.name.as_str())
-                .unwrap_or(""),
-        ));
-    }
-    for (dir, files) in &by_dir {
-        // The implicit "commons directory" rule is: when more than one file
-        // lives in the same directory, they must all share the exact same
-        // commons header. Otherwise the directory can't be a multi-file
-        // commons.
-        if files.len() < 2 {
-            continue;
-        }
-        // Compare full joined names, not just the leaf.
-        let first = parsed[files[0].0].commons.name.joined();
-        for &(idx, _) in files.iter().skip(1) {
-            let other = parsed[idx].commons.name.joined();
-            if other != first {
+        for &idx in indices.iter().skip(1) {
+            let dir = parsed[idx]
+                .source_path
+                .parent()
+                .unwrap_or(Path::new(""))
+                .to_path_buf();
+            if dir != first_dir {
                 errors.push(
                     CompileError::new(
                         "karn.project.inconsistent_commons_name",
-                        parsed[idx].commons.span,
+                        parsed[idx].unit.span(),
                         format!(
-                            "files in directory `{}` declare different commons names: `{first}` vs `{other}`",
-                            dir.display()
+                            "files declaring `{}` are spread across different directories: `{}` vs `{}`",
+                            parsed[idx].unit.name().joined(),
+                            first_dir.display(),
+                            dir.display(),
                         ),
                     )
-                    .with_label(
-                        parsed[files[0].0].commons.span,
-                        format!("first file declares `{first}`"),
-                    )
+                    .with_label(parsed[indices[0]].unit.span(), "first file is here")
                     .with_note(
-                        "every `.karn` file in a directory must share the same `commons` header",
+                        "all files of a multi-file commons or context must live in the same directory",
                     ),
                 );
             }
@@ -560,8 +930,109 @@ fn check_directory_name_consistency(parsed: &[ParsedFile]) -> Result<(), Vec<Com
     }
 }
 
-/// Check that no commons is represented both by a single file `X.karn` and
-/// a directory `X/` (with `.karn` files).
+/// Within a multi-file unit (files sharing a qualified name), every file must
+/// agree on kind. Handled by [`check_group_kind_consistency`]; this check is
+/// the v0.4-style directory-level guard which now defers to it.
+fn check_directory_kind_consistency(_parsed: &[ParsedFile]) -> Result<(), Vec<CompileError>> {
+    Ok(())
+}
+
+/// Each file's relative path must match its declared qualified name. Two
+/// arrangements are valid:
+/// - **Single-file**: `a/b/c.karn` declaring `a.b.c`.
+/// - **Multi-file**: `a/b/c/<any>.karn` declaring `a.b.c`.
+fn check_path_name_alignment(parsed: &[ParsedFile]) -> Result<(), Vec<CompileError>> {
+    let mut errors: Vec<CompileError> = Vec::new();
+    for pf in parsed {
+        let name = pf.unit.name().joined();
+        let name_parts: Vec<&str> = name.split('.').collect();
+        let rel = &pf.source_path;
+        let stem = rel.with_extension("");
+        let stem_parts: Vec<String> = stem
+            .components()
+            .filter_map(|c| match c {
+                Component::Normal(s) => Some(s.to_string_lossy().to_string()),
+                _ => None,
+            })
+            .collect();
+        let parent_parts: Vec<String> = if stem_parts.is_empty() {
+            Vec::new()
+        } else {
+            stem_parts[..stem_parts.len() - 1].to_vec()
+        };
+        let single_file_match = stem_parts.len() == name_parts.len()
+            && stem_parts
+                .iter()
+                .zip(name_parts.iter())
+                .all(|(a, b)| a == b);
+        let multi_file_match = parent_parts.len() == name_parts.len()
+            && parent_parts
+                .iter()
+                .zip(name_parts.iter())
+                .all(|(a, b)| a == b);
+        if !single_file_match && !multi_file_match {
+            errors.push(
+                CompileError::new(
+                    "karn.project.inconsistent_commons_name",
+                    pf.unit.span(),
+                    format!(
+                        "file `{}` declares `{name}`, but its path doesn't match — expected either `{}.karn` (single-file) or `{}/...karn` (multi-file)",
+                        rel.display(),
+                        name_parts.join("/"),
+                        name_parts.join("/"),
+                    ),
+                )
+                .with_note(
+                    "the source-tree layout determines a unit's identity: each commons or context's qualified name must match its path",
+                ),
+            );
+        }
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
+/// Files grouped by qualified name must agree on kind (even across directories).
+fn check_group_kind_consistency(
+    parsed: &[ParsedFile],
+    groups: &HashMap<String, Vec<usize>>,
+) -> Result<(), Vec<CompileError>> {
+    let mut errors: Vec<CompileError> = Vec::new();
+    for (name, indices) in groups {
+        if indices.len() < 2 {
+            continue;
+        }
+        let first_kind = parsed[indices[0]].kind;
+        for &idx in indices.iter().skip(1) {
+            if parsed[idx].kind != first_kind {
+                errors.push(
+                    CompileError::new(
+                        "karn.project.kind_conflict",
+                        parsed[idx].unit.span(),
+                        format!(
+                            "name `{name}` is declared as both a {} and a {}",
+                            first_kind.display(),
+                            parsed[idx].kind.display(),
+                        ),
+                    )
+                    .with_label(
+                        parsed[indices[0]].unit.span(),
+                        format!("first declared as a {} here", first_kind.display()),
+                    ),
+                );
+            }
+        }
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
 fn check_file_directory_conflicts(root: &Path, files: &[PathBuf]) -> Result<(), Vec<CompileError>> {
     let mut errors: Vec<CompileError> = Vec::new();
     let mut karn_files: HashSet<PathBuf> = HashSet::new();
@@ -569,14 +1040,11 @@ fn check_file_directory_conflicts(root: &Path, files: &[PathBuf]) -> Result<(), 
     for p in files {
         let rel = p.strip_prefix(root).unwrap_or(p);
         karn_files.insert(rel.to_path_buf());
-        // The dir containing this file (relative).
         if let Some(parent) = rel.parent() {
             dirs_with_karn.insert(parent.to_path_buf());
         }
     }
     for f in &karn_files {
-        // If the file `X/Y.karn` exists, and the directory `X/Y/` also has
-        // karn files, conflict.
         let stem = f.with_extension("");
         if dirs_with_karn.contains(&stem) {
             errors.push(
@@ -603,26 +1071,29 @@ fn check_file_directory_conflicts(root: &Path, files: &[PathBuf]) -> Result<(), 
     }
 }
 
-/// Combined symbol tables for a single logical commons.
+/// Combined symbol tables for a single logical commons or context.
 #[derive(Clone, Default)]
-struct CommonsTable {
+struct UnitTable {
+    #[allow(dead_code)]
+    kind: Option<UnitKind>,
     types: HashMap<String, TypeDecl>,
     fns: HashMap<String, FnDecl>,
     methods: HashMap<String, ResolverMethodTable>,
 }
 
-fn build_commons_table(
+fn build_unit_table(
     _name: &str,
+    kind: UnitKind,
     indices: &[usize],
     parsed: &[ParsedFile],
     errors: &mut Vec<CompileError>,
-) -> CommonsTable {
-    let mut table = CommonsTable::default();
-    // Pass A: register all types across every file in the commons. Doing
-    // types first lets methods attached to a type defined in *another* file
-    // of the same commons resolve in pass B (file order is unspecified).
+) -> UnitTable {
+    let mut table = UnitTable {
+        kind: Some(kind),
+        ..UnitTable::default()
+    };
     for &i in indices {
-        for item in &parsed[i].commons.items {
+        for item in parsed[i].items() {
             if let CommonsItem::Type(t) = item {
                 if let Some(prev) = table.types.get(&t.name.name) {
                     errors.push(
@@ -640,9 +1111,8 @@ fn build_commons_table(
             }
         }
     }
-    // Pass B: register all functions and methods.
     for &i in indices {
-        for item in &parsed[i].commons.items {
+        for item in parsed[i].items() {
             let CommonsItem::Fn(f) = item else { continue };
             match &f.name {
                 FnName::Free(id) => {
@@ -686,7 +1156,7 @@ fn build_commons_table(
                                 ),
                             )
                             .with_note(
-                                "methods can only be declared on types defined in the same commons (across all of its files)",
+                                "methods can only be declared on types defined in the same commons or context (across all of its files)",
                             ),
                         );
                         continue;
@@ -719,7 +1189,7 @@ fn build_commons_table(
     table
 }
 
-/// For each name declared in the commons (type, fn, method), record which
+/// For each name declared in the unit (type, fn, method), record which
 /// source file declared it. Used by the emitter to render relative imports.
 #[derive(Clone)]
 pub struct FileDeclIndex {
@@ -736,7 +1206,7 @@ fn build_file_decl_index(indices: &[usize], parsed: &[ParsedFile]) -> FileDeclIn
     };
     for &i in indices {
         let path = parsed[i].source_path.clone();
-        for item in &parsed[i].commons.items {
+        for item in parsed[i].items() {
             match item {
                 CommonsItem::Type(t) => {
                     idx.types
@@ -768,7 +1238,7 @@ fn build_file_decl_index(indices: &[usize], parsed: &[ParsedFile]) -> FileDeclIn
 
 fn uses_span_of(parsed: &[ParsedFile], indices: &[usize], target: &str) -> Option<Span> {
     for &i in indices {
-        for u in &parsed[i].commons.uses {
+        for u in parsed[i].uses() {
             if u.target.joined() == target {
                 return Some(u.span);
             }
@@ -777,38 +1247,404 @@ fn uses_span_of(parsed: &[ParsedFile], indices: &[usize], target: &str) -> Optio
     None
 }
 
+fn consumes_span_of(parsed: &[ParsedFile], indices: &[usize], target: &str) -> Option<Span> {
+    for &i in indices {
+        for c in parsed[i].consumes() {
+            if c.target.joined() == target {
+                return Some(c.span);
+            }
+        }
+    }
+    None
+}
+
+fn detect_consumes_cycles(consumes: &HashMap<String, Vec<String>>, errors: &mut Vec<CompileError>) {
+    // Tarjan / Kosaraju overkill — a simple DFS with a path stack catches
+    // cycles and yields the cycle path for the diagnostic.
+    let mut visited: HashSet<String> = HashSet::new();
+    let mut reported: HashSet<Vec<String>> = HashSet::new();
+    for start in consumes.keys() {
+        if visited.contains(start) {
+            continue;
+        }
+        let mut stack: Vec<String> = Vec::new();
+        let mut on_stack: HashSet<String> = HashSet::new();
+        dfs_consumes(
+            start,
+            consumes,
+            &mut visited,
+            &mut stack,
+            &mut on_stack,
+            &mut reported,
+            errors,
+        );
+    }
+}
+
+fn dfs_consumes(
+    node: &str,
+    consumes: &HashMap<String, Vec<String>>,
+    visited: &mut HashSet<String>,
+    stack: &mut Vec<String>,
+    on_stack: &mut HashSet<String>,
+    reported: &mut HashSet<Vec<String>>,
+    errors: &mut Vec<CompileError>,
+) {
+    if on_stack.contains(node) {
+        // Found a cycle: extract the path from `node`'s position in stack.
+        let start = stack.iter().position(|s| s == node).unwrap_or(0);
+        let mut cycle: Vec<String> = stack[start..].to_vec();
+        cycle.push(node.to_string());
+        // Canonicalise the cycle for de-dup.
+        let canon = canonicalise_cycle(&cycle);
+        if reported.insert(canon.clone()) {
+            errors.push(CompileError::new(
+                "karn.context.consumes_cycle",
+                Span::default(),
+                format!(
+                    "`consumes` cycle detected: {}",
+                    cycle.join(" → ")
+                ),
+            )
+            .with_note(
+                "contexts must form an acyclic dependency graph; remove one of the `consumes` clauses or restructure",
+            ));
+        }
+        return;
+    }
+    if visited.contains(node) {
+        return;
+    }
+    visited.insert(node.to_string());
+    on_stack.insert(node.to_string());
+    stack.push(node.to_string());
+    if let Some(targets) = consumes.get(node) {
+        for t in targets {
+            dfs_consumes(t, consumes, visited, stack, on_stack, reported, errors);
+        }
+    }
+    stack.pop();
+    on_stack.remove(node);
+}
+
+fn canonicalise_cycle(cycle: &[String]) -> Vec<String> {
+    if cycle.is_empty() {
+        return Vec::new();
+    }
+    // Drop the duplicated last element (cycle vector ends with the start node).
+    let body = &cycle[..cycle.len() - 1];
+    if body.is_empty() {
+        return Vec::new();
+    }
+    let mut min_idx = 0;
+    for (i, s) in body.iter().enumerate() {
+        if s < &body[min_idx] {
+            min_idx = i;
+        }
+    }
+    let mut rotated: Vec<String> = body[min_idx..].to_vec();
+    rotated.extend(body[..min_idx].iter().cloned());
+    rotated
+}
+
+/// A type imported into a context via `consumes`. Carries enough metadata for
+/// the checker and emitter to enforce / express visibility.
+#[derive(Debug, Clone)]
+pub struct ConsumedType {
+    pub owning_context: String,
+    pub visibility: Visibility,
+}
+
+/// Enforce v0.4 construction rules: types owned by a consumed context can be
+/// referenced (held, passed, read for transparent exports) but cannot be
+/// constructed. This catches `OtherType { ... }`, `OtherType.of(...)`,
+/// `OtherType.unsafe(...)`, and `OtherType.Variant(...)` expressions where
+/// `OtherType` is from a consumed context.
+fn check_context_constraints(
+    typed: &checker::TypedCommons,
+    consumed_types: &HashMap<String, ConsumedType>,
+    local_type_names: &HashSet<String>,
+) -> Vec<CompileError> {
+    let mut errors = Vec::new();
+    for item in &typed.commons.items {
+        if let CommonsItem::Fn(f) = item {
+            walk_block_for_constraints(
+                &f.body,
+                typed,
+                consumed_types,
+                local_type_names,
+                &mut errors,
+            );
+        }
+    }
+    errors
+}
+
+fn walk_block_for_constraints(
+    block: &Block,
+    typed: &checker::TypedCommons,
+    consumed: &HashMap<String, ConsumedType>,
+    local: &HashSet<String>,
+    errors: &mut Vec<CompileError>,
+) {
+    for stmt in &block.statements {
+        match stmt {
+            Statement::Let(l) => {
+                walk_expr_for_constraints(&l.value, typed, consumed, local, errors);
+            }
+        }
+    }
+    walk_expr_for_constraints(&block.tail, typed, consumed, local, errors);
+}
+
+fn walk_expr_for_constraints(
+    e: &Expr,
+    typed: &checker::TypedCommons,
+    consumed: &HashMap<String, ConsumedType>,
+    local: &HashSet<String>,
+    errors: &mut Vec<CompileError>,
+) {
+    match &e.kind {
+        ExprKind::RecordConstruction { type_name, fields } => {
+            if let Some(ct) = consumed.get(&type_name.name) {
+                errors.push(
+                    CompileError::new(
+                        "karn.context.external_construction",
+                        type_name.span,
+                        format!(
+                            "cannot construct `{}` here — it is owned by context `{}`",
+                            type_name.name, ct.owning_context,
+                        ),
+                    )
+                    .with_note(
+                        "values of an externally-owned type can only be created inside the owning context",
+                    ),
+                );
+            }
+            for f in fields {
+                if let Some(v) = &f.value {
+                    walk_expr_for_constraints(v, typed, consumed, local, errors);
+                }
+            }
+        }
+        ExprKind::ConstructorCall {
+            type_name,
+            method,
+            args,
+        } => {
+            if let Some(ct) = consumed.get(&type_name.name) {
+                let is_construct = method.name == "of"
+                    || method.name == "unsafe"
+                    || matches!(
+                        typed.types.get(&type_name.name).map(|d| &d.body),
+                        Some(TypeBody::Sum(s)) if s.variants.iter().any(|v| v.name.name == method.name),
+                    );
+                if is_construct {
+                    errors.push(
+                        CompileError::new(
+                            "karn.context.external_construction",
+                            type_name.span.merge(method.span),
+                            format!(
+                                "cannot construct `{}.{}` here — `{}` is owned by context `{}`",
+                                type_name.name, method.name, type_name.name, ct.owning_context,
+                            ),
+                        )
+                        .with_note(
+                            "values of an externally-owned type can only be created inside the owning context",
+                        ),
+                    );
+                }
+            }
+            for a in args {
+                walk_expr_for_constraints(a, typed, consumed, local, errors);
+            }
+        }
+        ExprKind::MethodCall {
+            receiver,
+            method,
+            args,
+        } => {
+            // `T.method(...)` written as MethodCall with receiver Ident(T).
+            if let ExprKind::Ident(id) = &receiver.kind
+                && let Some(ct) = consumed.get(&id.name)
+            {
+                let is_construct = method.name == "of"
+                    || method.name == "unsafe"
+                    || matches!(
+                        typed.types.get(&id.name).map(|d| &d.body),
+                        Some(TypeBody::Sum(s)) if s.variants.iter().any(|v| v.name.name == method.name),
+                    );
+                if is_construct {
+                    errors.push(
+                        CompileError::new(
+                            "karn.context.external_construction",
+                            id.span.merge(method.span),
+                            format!(
+                                "cannot construct `{}.{}` here — `{}` is owned by context `{}`",
+                                id.name, method.name, id.name, ct.owning_context,
+                            ),
+                        )
+                        .with_note(
+                            "values of an externally-owned type can only be created inside the owning context",
+                        ),
+                    );
+                }
+            }
+            walk_expr_for_constraints(receiver, typed, consumed, local, errors);
+            for a in args {
+                walk_expr_for_constraints(a, typed, consumed, local, errors);
+            }
+        }
+        ExprKind::FieldAccess { receiver, field } => {
+            // For opaque-exported types from consumed contexts, field
+            // access is forbidden — but record types have field access
+            // anyway, so the visibility check applies only when the
+            // receiver's type is a consumed type. To do this rigorously,
+            // we'd consult the expr_types map. Easy path: peek at the
+            // receiver if it's an Ident referring to a binding whose
+            // declared type points to a consumed type.
+            // For v0.4 we use a simpler conservative rule: if the
+            // receiver is `T.X` syntax (FieldAccess from an Ident that's
+            // a type name) and `T` is consumed and opaque, reject it.
+            if let ExprKind::Ident(id) = &receiver.kind
+                && let Some(ct) = consumed.get(&id.name)
+                && ct.visibility == Visibility::Opaque
+                && typed
+                    .types
+                    .get(&id.name)
+                    .map(|d| matches!(d.body, TypeBody::Sum(_)))
+                    .unwrap_or(false)
+            {
+                errors.push(
+                    CompileError::new(
+                        "karn.context.opaque_inspection",
+                        id.span.merge(field.span),
+                        format!(
+                            "cannot inspect opaquely-exported type `{}` from outside context `{}`",
+                            id.name, ct.owning_context,
+                        ),
+                    )
+                    .with_note(
+                        "opaque exports hide the type's shape; the owning context did not expose variants or fields",
+                    ),
+                );
+            }
+            walk_expr_for_constraints(receiver, typed, consumed, local, errors);
+        }
+        ExprKind::Match { discriminant, arms } => {
+            // If the discriminant is typed as an opaquely-exported consumed
+            // type, the match is forbidden because we can't reveal the
+            // variants.
+            if let Some(ty) = typed.expr_types.get(&discriminant.span) {
+                let display = ty.display();
+                if let Some(ct) = consumed.get(&display)
+                    && ct.visibility == Visibility::Opaque
+                {
+                    errors.push(
+                        CompileError::new(
+                            "karn.context.opaque_inspection",
+                            discriminant.span,
+                            format!(
+                                "cannot `match` on opaquely-exported type `{}` from outside context `{}`",
+                                display, ct.owning_context,
+                            ),
+                        )
+                        .with_note(
+                            "opaque exports hide the type's shape; the owning context did not expose variants",
+                        ),
+                    );
+                }
+            }
+            walk_expr_for_constraints(discriminant, typed, consumed, local, errors);
+            for arm in arms {
+                match &arm.body {
+                    MatchBody::Expr(ex) => {
+                        walk_expr_for_constraints(ex, typed, consumed, local, errors);
+                    }
+                    MatchBody::Block(b) => {
+                        walk_block_for_constraints(b, typed, consumed, local, errors);
+                    }
+                }
+            }
+        }
+        ExprKind::Is { value, pattern: _ } => {
+            walk_expr_for_constraints(value, typed, consumed, local, errors);
+        }
+        ExprKind::Call(_, args) => {
+            for a in args {
+                walk_expr_for_constraints(a, typed, consumed, local, errors);
+            }
+        }
+        ExprKind::BinOp(_, l, r) => {
+            walk_expr_for_constraints(l, typed, consumed, local, errors);
+            walk_expr_for_constraints(r, typed, consumed, local, errors);
+        }
+        ExprKind::UnaryOp(_, i)
+        | ExprKind::Paren(i)
+        | ExprKind::Ok(i)
+        | ExprKind::Err(i)
+        | ExprKind::Some(i)
+        | ExprKind::Question(i) => {
+            walk_expr_for_constraints(i, typed, consumed, local, errors);
+        }
+        ExprKind::Block(b) => walk_block_for_constraints(b, typed, consumed, local, errors),
+        ExprKind::If {
+            cond,
+            then_block,
+            else_block,
+        } => {
+            walk_expr_for_constraints(cond, typed, consumed, local, errors);
+            walk_block_for_constraints(then_block, typed, consumed, local, errors);
+            walk_block_for_constraints(else_block, typed, consumed, local, errors);
+        }
+        ExprKind::Ident(_)
+        | ExprKind::IntLit(_)
+        | ExprKind::StrLit(_)
+        | ExprKind::BoolLit(_)
+        | ExprKind::None => {}
+    }
+}
+
 /// Context passed to the emitter so it can resolve cross-file and
-/// cross-commons references into TypeScript import statements.
+/// cross-unit references into TypeScript import statements.
 pub struct EmitProjectCtx {
     /// Source path of the file being emitted (relative to project root).
     pub source_path: PathBuf,
-    /// Joined name of the commons this file belongs to.
+    /// Joined name of the commons or context this file belongs to.
     pub commons_name: String,
-    /// Sibling files in the same commons (project-relative paths).
+    /// Sibling files in the same unit (project-relative paths).
     pub local_files: Vec<PathBuf>,
-    /// Which file declares each name in the local commons.
+    /// Which file declares each name in the local unit.
     pub file_decl_index: FileDeclIndex,
-    /// For each imported name, the joined name of the commons it came from.
+    /// For each imported name, the joined name of the unit it came from.
     pub imported_from: HashMap<String, String>,
-    /// For each imported commons, the file path that declares each name.
-    /// `imported_decl_paths[commons_name][decl_name] = source path of the
-    /// file in the *target* commons that declares `decl_name`.
+    /// For each imported name, the kind (commons vs context) of the source unit.
+    pub imported_from_kind: HashMap<String, UnitKind>,
+    /// For each imported unit, the file path that declares each name.
     pub imported_decl_paths: HashMap<String, HashMap<String, PathBuf>>,
-    /// The directory (project-relative) that holds this commons. Used for
-    /// computing relative paths to other commons in the same project.
+    /// The directory (project-relative) that holds this unit.
     pub commons_dir: PathBuf,
+    /// What kind of unit this is.
+    pub unit_kind: UnitKind,
+    /// For contexts: this context's qualified name (used as the brand for
+    /// rebranded mixed-in types and exported types).
+    pub owning_context: Option<String>,
+    /// For contexts: visibility of types declared in this context.
+    pub exports_local: HashMap<String, Visibility>,
+    /// For contexts: exports of each consumed context (so the emitter knows
+    /// which names to import and how).
+    pub exports_for_consumed: HashMap<String, HashMap<String, Visibility>>,
+    /// For contexts: types imported via `consumes` clauses with their
+    /// visibility and owning-context metadata.
+    pub consumed_types: HashMap<String, ConsumedType>,
 }
 
 impl EmitProjectCtx {
-    /// Where in the file tree is this commons rooted? Returns the relative
-    /// path to the commons's directory or file stem.
     pub fn commons_path(name: &str) -> PathBuf {
         commons_dir_for(name)
     }
 }
 
-/// Avoid stripping a single-file commons of its enclosing path component;
-/// the spec leaves the input format flexible.
 #[allow(dead_code)]
 fn _ensure_components_used(_p: &Path) {
     let _ = Component::CurDir;

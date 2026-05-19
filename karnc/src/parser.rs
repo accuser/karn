@@ -16,21 +16,42 @@ use crate::span::Span;
 /// - Brace form: `commons name { items... }` (v0–v0.2 compatible).
 /// - Fragment form: `commons name uses... items...` to EOF (v0.3).
 pub fn parse(tokens: &[Token], source: &str) -> Result<Commons, Vec<CompileError>> {
+    match parse_unit(tokens, source)? {
+        SourceUnit::Commons(c) => Ok(c),
+        SourceUnit::Context(ctx) => Err(vec![
+            CompileError::new(
+                "karn.parse.unexpected_context",
+                ctx.span,
+                "expected a `commons` declaration but found a `context` declaration",
+            )
+            .with_note(
+                "single-file compilation does not support contexts; use `compile_project` instead",
+            ),
+        ]),
+    }
+}
+
+/// Parse a token slice into a [`SourceUnit`] — either a commons or a context.
+///
+/// Each `.karn` file is exactly one declaration of one kind.
+pub fn parse_unit(tokens: &[Token], source: &str) -> Result<SourceUnit, Vec<CompileError>> {
     let mut warnings = Vec::new();
     let mut p = Parser::new(tokens, source, &mut warnings);
-    let result = match p.parse_commons() {
-        Ok(c) => {
+    let result = match p.parse_unit() {
+        Ok(u) => {
             if let Some(extra) = p.peek() {
                 Err(vec![
                     CompileError::new(
                         "karn.parse.extra_tokens",
                         extra.span,
-                        "unexpected token after commons declaration",
+                        "unexpected token after top-level declaration",
                     )
-                    .with_note("a commons file contains exactly one `commons` declaration"),
+                    .with_note(
+                        "a `.karn` file contains exactly one `commons` or `context` declaration",
+                    ),
                 ])
             } else {
-                Ok(c)
+                Ok(u)
             }
         }
         Err(e) => Err(vec![e]),
@@ -192,18 +213,65 @@ impl<'a> Parser<'a> {
         Some(content)
     }
 
-    fn parse_commons(&mut self) -> Result<Commons, CompileError> {
-        // Optional doc block describing the commons itself.
+    fn parse_unit(&mut self) -> Result<SourceUnit, CompileError> {
+        // Optional doc block describing the declaration itself.
         let leading_doc = self.take_doc_block();
-        let start = self.expect(TokenKind::Commons, "to start the commons declaration")?;
-        let commons_doc = self.finalize_doc(leading_doc, start.span);
-        let name = self.parse_qualified_name()?;
-
-        // Dispatch on the token after the commons name: `{` → brace form,
-        // anything else (or EOF) → fragment form.
         match self.peek_kind() {
-            Some(TokenKind::LBrace) => self.parse_commons_brace(start.span, name, commons_doc),
-            _ => self.parse_commons_fragment(start.span, name, commons_doc),
+            Some(TokenKind::Commons) => {
+                let start = self.expect(TokenKind::Commons, "to start the commons declaration")?;
+                let doc = self.finalize_doc(leading_doc, start.span);
+                let name = self.parse_qualified_name()?;
+                let c = match self.peek_kind() {
+                    Some(TokenKind::LBrace) => self.parse_commons_brace(start.span, name, doc)?,
+                    _ => self.parse_commons_fragment(start.span, name, doc)?,
+                };
+                Ok(SourceUnit::Commons(c))
+            }
+            Some(TokenKind::Context) => {
+                let start = self.expect(TokenKind::Context, "to start the context declaration")?;
+                let doc = self.finalize_doc(leading_doc, start.span);
+                let name = self.parse_qualified_name()?;
+                let c = match self.peek_kind() {
+                    Some(TokenKind::LBrace) => self.parse_context_brace(start.span, name, doc)?,
+                    _ => self.parse_context_fragment(start.span, name, doc)?,
+                };
+                Ok(SourceUnit::Context(c))
+            }
+            Some(_) => {
+                let t = self.peek().unwrap();
+                if let Some((_, doc_span)) = leading_doc {
+                    self.warnings.push(CompileError::new(
+                        "karn.parse.orphan_doc_block",
+                        doc_span,
+                        "documentation block has no following declaration to attach to",
+                    ));
+                }
+                Err(CompileError::new(
+                    "karn.parse.expected_unit_header",
+                    t.span,
+                    format!(
+                        "expected `commons` or `context` to start the file, found {}",
+                        t.kind.describe()
+                    ),
+                )
+                .with_note(
+                    "every `.karn` file begins with either a `commons` or a `context` declaration",
+                ))
+            }
+            None => {
+                if let Some((_, doc_span)) = leading_doc {
+                    self.warnings.push(CompileError::new(
+                        "karn.parse.orphan_doc_block",
+                        doc_span,
+                        "documentation block has no following declaration to attach to",
+                    ));
+                }
+                Err(CompileError::new(
+                    "karn.parse.unexpected_eof",
+                    self.eof_span(),
+                    "expected `commons` or `context` to start the file, found end of file",
+                ))
+            }
         }
     }
 
@@ -388,6 +456,307 @@ impl<'a> Parser<'a> {
         let target = self.parse_qualified_name()?;
         let span = kw.span.merge(target.span);
         Ok(UsesDecl { target, span })
+    }
+
+    fn parse_consumes_decl(&mut self) -> Result<ConsumesDecl, CompileError> {
+        let kw = self.expect(TokenKind::Consumes, "to start a `consumes` declaration")?;
+        let target = self.parse_qualified_name()?;
+        let span = kw.span.merge(target.span);
+        Ok(ConsumesDecl { target, span })
+    }
+
+    fn parse_exports_decl(&mut self) -> Result<ExportsDecl, CompileError> {
+        let kw = self.expect(TokenKind::Exports, "to start an `exports` declaration")?;
+        let visibility = match self.peek_kind() {
+            Some(TokenKind::Opaque) => {
+                self.bump();
+                Visibility::Opaque
+            }
+            Some(TokenKind::Transparent) => {
+                self.bump();
+                Visibility::Transparent
+            }
+            Some(_) => {
+                let t = self.peek().unwrap();
+                return Err(CompileError::new(
+                    "karn.parse.expected_visibility",
+                    t.span,
+                    format!(
+                        "expected `opaque` or `transparent` after `exports`, found {}",
+                        t.kind.describe()
+                    ),
+                )
+                .with_note(
+                    "exports clauses are `exports opaque { ... }` or `exports transparent { ... }`",
+                ));
+            }
+            None => {
+                return Err(CompileError::new(
+                    "karn.parse.unexpected_eof",
+                    self.eof_span(),
+                    "expected `opaque` or `transparent` after `exports`, found end of file",
+                ));
+            }
+        };
+        self.expect(TokenKind::LBrace, "to open the exports list")?;
+        let mut names = Vec::new();
+        while self.peek_kind() != Some(TokenKind::RBrace) {
+            names.push(self.expect_ident("as an exported type name")?);
+            if self.eat(TokenKind::Comma).is_none() {
+                break;
+            }
+        }
+        let close = self.expect(TokenKind::RBrace, "to close the exports list")?;
+        let span = kw.span.merge(close.span);
+        Ok(ExportsDecl {
+            visibility,
+            names,
+            span,
+        })
+    }
+
+    fn parse_context_brace(
+        &mut self,
+        start: Span,
+        name: QualifiedName,
+        documentation: Option<String>,
+    ) -> Result<Context, CompileError> {
+        self.expect(TokenKind::LBrace, "after the context name")?;
+        let mut items = Vec::new();
+        let mut uses = Vec::new();
+        let mut consumes = Vec::new();
+        let mut exports = Vec::new();
+        loop {
+            let item_doc = self.take_doc_block();
+            match self.peek_kind() {
+                Some(TokenKind::RBrace) => {
+                    if let Some((_, doc_span)) = item_doc {
+                        self.warnings.push(CompileError::new(
+                            "karn.parse.orphan_doc_block",
+                            doc_span,
+                            "documentation block has no following declaration to attach to",
+                        ));
+                    }
+                    break;
+                }
+                Some(TokenKind::Uses) => {
+                    if let Some((_, doc_span)) = item_doc {
+                        self.warnings.push(CompileError::new(
+                            "karn.parse.orphan_doc_block",
+                            doc_span,
+                            "documentation block before `uses` is not allowed; only `type` and `fn` declarations carry docs",
+                        ));
+                    }
+                    uses.push(self.parse_uses_decl()?);
+                }
+                Some(TokenKind::Consumes) => {
+                    if let Some((_, doc_span)) = item_doc {
+                        self.warnings.push(CompileError::new(
+                            "karn.parse.orphan_doc_block",
+                            doc_span,
+                            "documentation block before `consumes` is not allowed; only `type` and `fn` declarations carry docs",
+                        ));
+                    }
+                    consumes.push(self.parse_consumes_decl()?);
+                }
+                Some(TokenKind::Exports) => {
+                    if let Some((_, doc_span)) = item_doc {
+                        self.warnings.push(CompileError::new(
+                            "karn.parse.orphan_doc_block",
+                            doc_span,
+                            "documentation block before `exports` is not allowed; only `type` and `fn` declarations carry docs",
+                        ));
+                    }
+                    exports.push(self.parse_exports_decl()?);
+                }
+                Some(TokenKind::Type) => {
+                    let next_span = self.peek().unwrap().span;
+                    let doc = self.finalize_doc(item_doc, next_span);
+                    let mut t = self.parse_type_decl()?;
+                    t.documentation = doc;
+                    items.push(CommonsItem::Type(t));
+                }
+                Some(TokenKind::Fn) => {
+                    let next_span = self.peek().unwrap().span;
+                    let doc = self.finalize_doc(item_doc, next_span);
+                    let mut f = self.parse_fn_decl()?;
+                    f.documentation = doc;
+                    items.push(CommonsItem::Fn(f));
+                }
+                Some(_) => {
+                    let t = self.peek().unwrap();
+                    return Err(CompileError::new(
+                        "karn.parse.expected_item",
+                        t.span,
+                        format!(
+                            "expected `type`, `fn`, `uses`, `consumes`, or `exports` declaration, found {}",
+                            t.kind.describe()
+                        ),
+                    )
+                    .with_note(
+                        "the body of a context contains zero or more `type`, `fn`, `uses`, `consumes`, or `exports` declarations",
+                    ));
+                }
+                None => {
+                    return Err(CompileError::new(
+                        "karn.parse.unexpected_eof",
+                        self.eof_span(),
+                        "expected `}` to close the context body, found end of file",
+                    ));
+                }
+            }
+        }
+        let end = self.expect(TokenKind::RBrace, "to close the context body")?;
+        Ok(Context {
+            name,
+            items,
+            uses,
+            consumes,
+            exports,
+            documentation,
+            form: CommonsForm::Brace,
+            span: start.merge(end.span),
+        })
+    }
+
+    fn parse_context_fragment(
+        &mut self,
+        start: Span,
+        name: QualifiedName,
+        documentation: Option<String>,
+    ) -> Result<Context, CompileError> {
+        let mut items = Vec::new();
+        let mut uses = Vec::new();
+        let mut consumes = Vec::new();
+        let mut exports = Vec::new();
+        let mut last_span = start;
+        let mut seen_item = false;
+        loop {
+            let item_doc = self.take_doc_block();
+            match self.peek_kind() {
+                Some(TokenKind::Uses) => {
+                    if let Some((_, doc_span)) = item_doc {
+                        self.warnings.push(CompileError::new(
+                            "karn.parse.orphan_doc_block",
+                            doc_span,
+                            "documentation block before `uses` is not allowed; only `type` and `fn` declarations carry docs",
+                        ));
+                    }
+                    if seen_item {
+                        let t = self.peek().unwrap();
+                        return Err(CompileError::new(
+                            "karn.parse.uses_after_decls",
+                            t.span,
+                            "`uses` clauses must appear before any `type` or `fn` declaration in a fragment-form context",
+                        )
+                        .with_note(
+                            "move all `uses` lines to immediately after the `context` header",
+                        ));
+                    }
+                    let u = self.parse_uses_decl()?;
+                    last_span = u.span;
+                    uses.push(u);
+                }
+                Some(TokenKind::Consumes) => {
+                    if let Some((_, doc_span)) = item_doc {
+                        self.warnings.push(CompileError::new(
+                            "karn.parse.orphan_doc_block",
+                            doc_span,
+                            "documentation block before `consumes` is not allowed; only `type` and `fn` declarations carry docs",
+                        ));
+                    }
+                    if seen_item {
+                        let t = self.peek().unwrap();
+                        return Err(CompileError::new(
+                            "karn.parse.consumes_after_decls",
+                            t.span,
+                            "`consumes` clauses must appear before any `type` or `fn` declaration in a fragment-form context",
+                        )
+                        .with_note(
+                            "move all `consumes` lines to immediately after the `uses` clauses",
+                        ));
+                    }
+                    let c = self.parse_consumes_decl()?;
+                    last_span = c.span;
+                    consumes.push(c);
+                }
+                Some(TokenKind::Exports) => {
+                    if let Some((_, doc_span)) = item_doc {
+                        self.warnings.push(CompileError::new(
+                            "karn.parse.orphan_doc_block",
+                            doc_span,
+                            "documentation block before `exports` is not allowed; only `type` and `fn` declarations carry docs",
+                        ));
+                    }
+                    if seen_item {
+                        let t = self.peek().unwrap();
+                        return Err(CompileError::new(
+                            "karn.parse.exports_after_decls",
+                            t.span,
+                            "`exports` clauses must appear before any `type` or `fn` declaration in a fragment-form context",
+                        )
+                        .with_note(
+                            "move all `exports` lines to immediately after the `consumes` clauses",
+                        ));
+                    }
+                    let e = self.parse_exports_decl()?;
+                    last_span = e.span;
+                    exports.push(e);
+                }
+                Some(TokenKind::Type) => {
+                    let next_span = self.peek().unwrap().span;
+                    let doc = self.finalize_doc(item_doc, next_span);
+                    let mut t = self.parse_type_decl()?;
+                    t.documentation = doc;
+                    last_span = t.span;
+                    items.push(CommonsItem::Type(t));
+                    seen_item = true;
+                }
+                Some(TokenKind::Fn) => {
+                    let next_span = self.peek().unwrap().span;
+                    let doc = self.finalize_doc(item_doc, next_span);
+                    let mut f = self.parse_fn_decl()?;
+                    f.documentation = doc;
+                    last_span = f.span;
+                    items.push(CommonsItem::Fn(f));
+                    seen_item = true;
+                }
+                None => {
+                    if let Some((_, doc_span)) = item_doc {
+                        self.warnings.push(CompileError::new(
+                            "karn.parse.orphan_doc_block",
+                            doc_span,
+                            "documentation block has no following declaration to attach to",
+                        ));
+                    }
+                    break;
+                }
+                Some(_) => {
+                    let t = self.peek().unwrap();
+                    return Err(CompileError::new(
+                        "karn.parse.expected_item",
+                        t.span,
+                        format!(
+                            "expected `type`, `fn`, `uses`, `consumes`, or `exports` declaration, found {}",
+                            t.kind.describe()
+                        ),
+                    )
+                    .with_note(
+                        "in fragment-form context (no braces), the body is a sequence of `type`, `fn`, `uses`, `consumes`, or `exports` declarations to end of file",
+                    ));
+                }
+            }
+        }
+        Ok(Context {
+            name,
+            items,
+            uses,
+            consumes,
+            exports,
+            documentation,
+            form: CommonsForm::Fragment,
+            span: start.merge(last_span),
+        })
     }
 
     fn parse_qualified_name(&mut self) -> Result<QualifiedName, CompileError> {
@@ -1684,6 +2053,10 @@ fn is_reserved_keyword(kind: TokenKind) -> bool {
             | Is
             | Opaque
             | Uses
+            | Context
+            | Consumes
+            | Exports
+            | Transparent
     )
 }
 
@@ -1726,6 +2099,44 @@ mod tests {
         let c = parse_str("commons x\n\nuses other.lib\n").unwrap();
         assert_eq!(c.uses.len(), 1);
         assert_eq!(c.uses[0].target.joined(), "other.lib");
+    }
+
+    fn parse_unit_str(src: &str) -> Result<SourceUnit, Vec<CompileError>> {
+        let toks = tokenize(src).map_err(|e| vec![e])?;
+        parse_unit(&toks, src)
+    }
+
+    #[test]
+    fn minimal_context_parses() {
+        let u = parse_unit_str("context commerce.orders {}").unwrap();
+        let SourceUnit::Context(c) = u else {
+            panic!("expected context");
+        };
+        assert_eq!(c.name.joined(), "commerce.orders");
+        assert!(c.items.is_empty());
+    }
+
+    #[test]
+    fn context_consumes_and_exports_parse() {
+        let src = "context commerce.orders {\n  uses commerce.money\n  consumes commerce.payment\n  exports opaque { OrderId }\n  exports transparent { OrderError }\n  type OrderId = String where Matches(\"ORD-[0-9]+\")\n  type OrderError = enum { CartEmpty, BadInput }\n}";
+        let u = parse_unit_str(src).unwrap();
+        let SourceUnit::Context(c) = u else { panic!() };
+        assert_eq!(c.uses.len(), 1);
+        assert_eq!(c.consumes.len(), 1);
+        assert_eq!(c.exports.len(), 2);
+        assert_eq!(c.exports[0].visibility, Visibility::Opaque);
+        assert_eq!(c.exports[1].visibility, Visibility::Transparent);
+    }
+
+    #[test]
+    fn context_fragment_form_parses() {
+        let src = "context x.y\n\nuses other.lib\nconsumes other.ctx\nexports opaque { T }\n\ntype T = Int where NonNegative\n";
+        let u = parse_unit_str(src).unwrap();
+        let SourceUnit::Context(c) = u else { panic!() };
+        assert_eq!(c.form, CommonsForm::Fragment);
+        assert_eq!(c.uses.len(), 1);
+        assert_eq!(c.consumes.len(), 1);
+        assert_eq!(c.exports.len(), 1);
     }
 
     #[test]

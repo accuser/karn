@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 
 use crate::ast::*;
 use crate::checker::{NamedKind, Ty, TypedCommons};
-use crate::project::EmitProjectCtx;
+use crate::project::{EmitProjectCtx, UnitKind};
 
 const RUNTIME_IMPORT: &str = "./runtime.js";
 const INDENT_STEP: usize = 2;
@@ -29,12 +29,13 @@ const INDENT_STEP: usize = 2;
 /// Emit TypeScript source for the typed commons (single-file mode).
 pub fn emit(commons: &TypedCommons) -> String {
     let mut out = String::new();
-    write_header(&mut out, commons);
+    write_header_single(&mut out, commons);
     write_commons_doc(&mut out, commons);
+    let dummy_ctx = single_file_ctx();
     // Types come first (they define interfaces and namespaces).
     for item in &commons.commons.items {
         if let CommonsItem::Type(t) = item {
-            emit_type(&mut out, t, commons);
+            emit_type(&mut out, t, commons, &dummy_ctx);
         }
     }
     // Free functions afterward.
@@ -48,24 +49,55 @@ pub fn emit(commons: &TypedCommons) -> String {
     out
 }
 
+/// A no-op project context for single-file emission. Single-file mode never
+/// involves contexts or cross-unit imports, so most fields default to empty.
+fn single_file_ctx() -> EmitProjectCtx {
+    EmitProjectCtx {
+        source_path: PathBuf::new(),
+        commons_name: String::new(),
+        local_files: Vec::new(),
+        file_decl_index: crate::project::FileDeclIndex {
+            types: HashMap::new(),
+            fns: HashMap::new(),
+            methods: HashMap::new(),
+        },
+        imported_from: HashMap::new(),
+        imported_from_kind: HashMap::new(),
+        imported_decl_paths: HashMap::new(),
+        commons_dir: PathBuf::new(),
+        unit_kind: UnitKind::Commons,
+        owning_context: None,
+        exports_local: HashMap::new(),
+        exports_for_consumed: HashMap::new(),
+        consumed_types: HashMap::new(),
+    }
+}
+
 /// Emit TypeScript source for a single file inside a multi-file project,
 /// including cross-file and cross-commons imports computed from
 /// [`EmitProjectCtx`].
 pub fn emit_project(commons: &TypedCommons, ctx: &EmitProjectCtx) -> String {
     let mut out = String::new();
-    write_header(&mut out, commons);
+    write_header(&mut out, commons, ctx);
     // Compute which names this file actually references that live elsewhere
-    // (sibling file in the same commons, or a used commons).
+    // (sibling file in the same commons/context, or a used commons / consumed
+    // context).
     let references = collect_external_references(commons, ctx);
     emit_project_imports(&mut out, ctx, &references);
     if !references.is_empty() {
-        // A blank line between imports and declarations for readability.
         writeln!(out).unwrap();
+    }
+    // For contexts: emit per-context nominal rebrand aliases for each type
+    // imported via `uses` that this file references. The structural shape is
+    // inherited from the original commons type; the brand makes the
+    // rebranded type nominally distinct (v0.4 §6.2).
+    if ctx.unit_kind == UnitKind::Context {
+        emit_context_rebrands(&mut out, &references, ctx);
     }
     write_commons_doc(&mut out, commons);
     for item in &commons.commons.items {
         if let CommonsItem::Type(t) = item {
-            emit_type(&mut out, t, commons);
+            emit_type(&mut out, t, commons, ctx);
         }
     }
     for item in &commons.commons.items {
@@ -76,6 +108,40 @@ pub fn emit_project(commons: &TypedCommons, ctx: &EmitProjectCtx) -> String {
         }
     }
     out
+}
+
+/// For each type imported via `uses` that's referenced in this file, emit:
+/// 1. (Done in imports) an aliased import: `import { Money as __CommonsMoney } from ...`
+/// 2. A rebranded type alias: `export type Money = __CommonsMoney & { readonly __ctxBrand: "..." }`
+///
+/// The brand makes two contexts that both `uses` the same commons see distinct
+/// nominal `Money` types in their TypeScript output (v0.4 §3.4 / §6.2).
+fn emit_context_rebrands(out: &mut String, refs: &ExternalReferences, ctx: &EmitProjectCtx) {
+    let Some(owning) = &ctx.owning_context else {
+        return;
+    };
+    // Collect names imported via `uses` (kind == Commons in imported_from_kind).
+    let mut names: Vec<String> = Vec::new();
+    for set in refs.by_commons.values() {
+        for n in set {
+            if matches!(ctx.imported_from_kind.get(n), Some(UnitKind::Commons)) {
+                names.push(n.clone());
+            }
+        }
+    }
+    names.sort();
+    names.dedup();
+    if names.is_empty() {
+        return;
+    }
+    for name in &names {
+        writeln!(
+            out,
+            "export type {name} = __Commons{name} & {{ readonly __ctxBrand: \"{owning}\" }};",
+        )
+        .unwrap();
+    }
+    writeln!(out).unwrap();
 }
 
 /// Names that this file needs to import from elsewhere (sibling files of
@@ -346,7 +412,7 @@ fn record_name_ref(
 }
 
 fn emit_project_imports(out: &mut String, ctx: &EmitProjectCtx, refs: &ExternalReferences) {
-    // Sibling imports: relative path within the same commons directory.
+    // Sibling imports: relative path within the same commons/context directory.
     let mut sibling_paths: Vec<(&PathBuf, &HashSet<String>)> = refs.by_sibling.iter().collect();
     sibling_paths.sort_by(|a, b| a.0.cmp(b.0));
     for (path, names) in sibling_paths {
@@ -360,33 +426,36 @@ fn emit_project_imports(out: &mut String, ctx: &EmitProjectCtx, refs: &ExternalR
             .join(", ");
         writeln!(out, "import {{ {joined} }} from \"{import}\";").unwrap();
     }
-    // Cross-commons imports: group by *target file path* (a single used
-    // commons may span multiple files; we emit one import per target file).
-    let mut commons_names: Vec<(&String, &HashSet<String>)> = refs.by_commons.iter().collect();
-    commons_names.sort_by(|a, b| a.0.cmp(b.0));
-    for (commons, names) in commons_names {
-        // Bucket names by the file that declares them in the target commons.
-        let target_paths = ctx.imported_decl_paths.get(commons.as_str());
+    // Cross-unit imports: group by *target file path*.
+    let mut unit_names: Vec<(&String, &HashSet<String>)> = refs.by_commons.iter().collect();
+    unit_names.sort_by(|a, b| a.0.cmp(b.0));
+    for (unit_name, names) in unit_names {
+        let target_paths = ctx.imported_decl_paths.get(unit_name.as_str());
         let mut by_target: std::collections::BTreeMap<PathBuf, Vec<&String>> =
             std::collections::BTreeMap::new();
         for n in names {
             let path = target_paths
                 .and_then(|p| p.get(n))
                 .cloned()
-                .unwrap_or_else(|| {
-                    // Fallback: import from the commons's top-level path.
-                    EmitProjectCtx::commons_path(commons)
-                });
+                .unwrap_or_else(|| EmitProjectCtx::commons_path(unit_name));
             by_target.entry(path).or_default().push(n);
         }
         for (target, mut name_list) in by_target {
             name_list.sort();
-            let joined = name_list
-                .iter()
-                .map(|s| s.as_str())
-                .collect::<Vec<_>>()
-                .join(", ");
             let import = cross_commons_import_specifier_for_path(&ctx.source_path, &target);
+            // For context units, aliase commons-source imports so we can emit
+            // rebrand aliases of the same short name. Imports from consumed
+            // contexts keep their original name.
+            let mut parts: Vec<String> = Vec::new();
+            for n in &name_list {
+                let from_kind = ctx.imported_from_kind.get(n.as_str()).copied();
+                if ctx.unit_kind == UnitKind::Context && from_kind == Some(UnitKind::Commons) {
+                    parts.push(format!("{n} as __Commons{n}"));
+                } else {
+                    parts.push((*n).clone());
+                }
+            }
+            let joined = parts.join(", ");
             writeln!(out, "import {{ {joined} }} from \"{import}\";").unwrap();
         }
     }
@@ -441,7 +510,26 @@ fn relative_to(from: &Path, target: &Path) -> PathBuf {
     out
 }
 
-fn write_header(out: &mut String, commons: &TypedCommons) {
+fn write_header(out: &mut String, commons: &TypedCommons, ctx: &EmitProjectCtx) {
+    writeln!(out, "// Generated by karnc — do not edit by hand.").unwrap();
+    let kind = match ctx.unit_kind {
+        UnitKind::Commons => "commons",
+        UnitKind::Context => "context",
+    };
+    writeln!(out, "// {kind} {}", commons.commons.name.joined()).unwrap();
+    writeln!(out).unwrap();
+    if !commons.commons.items.is_empty() {
+        writeln!(
+            out,
+            "import {{ Ok, Err, Some, None, type Result, type Option, type ValidationError }} from \"{RUNTIME_IMPORT}\";",
+        )
+        .unwrap();
+        writeln!(out).unwrap();
+    }
+}
+
+/// Variant of write_header for single-file (no project context) emission.
+fn write_header_single(out: &mut String, commons: &TypedCommons) {
     writeln!(out, "// Generated by karnc — do not edit by hand.").unwrap();
     writeln!(out, "// commons {}", commons.commons.name.joined()).unwrap();
     writeln!(out).unwrap();
@@ -463,22 +551,26 @@ fn write_commons_doc(out: &mut String, commons: &TypedCommons) {
     }
 }
 
-fn emit_type(out: &mut String, t: &TypeDecl, commons: &TypedCommons) {
+fn emit_type(out: &mut String, t: &TypeDecl, commons: &TypedCommons, ctx: &EmitProjectCtx) {
     emit_doc_block(out, t.documentation.as_deref(), 0);
+    // For contexts, the per-type brand string is qualified by the context's
+    // name (so two contexts' locally-declared `Order` types have distinct
+    // brands at the TS level).
+    let brand_prefix = ctx
+        .owning_context
+        .as_deref()
+        .map(|c| format!("{c}."))
+        .unwrap_or_default();
     match &t.body {
         TypeBody::Refined {
             base, refinement, ..
-        } => emit_refined_type(out, t, *base, refinement.as_ref(), commons),
+        } => emit_refined_type(out, t, *base, refinement.as_ref(), commons, &brand_prefix),
         TypeBody::Opaque {
             base, refinement, ..
         } => {
             // Opaque types lower identically to refined types: a branded base
-            // type alias plus an `of`/`unsafe` constructor object. The
-            // representation hiding is enforced by the type checker, not the
-            // emitter — `.raw` access compiles to a `as base` assertion, but
-            // the checker rejects such accesses from outside the defining
-            // commons (and rejects record-literal construction of opaques).
-            emit_refined_type(out, t, *base, refinement.as_ref(), commons);
+            // type alias plus an `of`/`unsafe` constructor object.
+            emit_refined_type(out, t, *base, refinement.as_ref(), commons, &brand_prefix);
         }
         TypeBody::Record(r) => emit_record_type(out, t, r, commons),
         TypeBody::Sum(s) => emit_sum_type(out, t, s, commons),
@@ -508,13 +600,15 @@ fn emit_refined_type(
     base: BaseType,
     refinement: Option<&Refinement>,
     commons: &TypedCommons,
+    brand_prefix: &str,
 ) {
     let ts_base = ts_base(base);
     writeln!(
         out,
-        "export type {name} = {base} & {{ readonly __brand: \"{name}\" }};",
+        "export type {name} = {base} & {{ readonly __brand: \"{prefix}{name}\" }};",
         name = t.name.name,
         base = ts_base,
+        prefix = brand_prefix,
     )
     .unwrap();
     writeln!(out).unwrap();

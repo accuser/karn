@@ -1,0 +1,7 @@
+context commerce.orders {
+  consumes commerce.payment
+
+  exports opaque { OrderId }
+
+  type OrderId = String where Matches("ORD-[0-9]+")
+}

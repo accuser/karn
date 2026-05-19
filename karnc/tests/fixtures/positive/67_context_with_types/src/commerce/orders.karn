@@ -1,0 +1,9 @@
+context commerce.orders {
+  type OrderId = String where Matches("ORD-[0-9]+")
+
+  type OrderStatus = enum {
+    Pending,
+    Placed,
+    Cancelled,
+  }
+}

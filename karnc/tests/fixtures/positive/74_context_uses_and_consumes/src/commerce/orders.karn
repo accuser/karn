@@ -1,0 +1,10 @@
+context commerce.orders {
+  uses commerce.money
+  consumes commerce.payment
+
+  exports transparent { Order }
+
+  type Order = {
+    total: Money,
+  }
+}

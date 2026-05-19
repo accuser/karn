@@ -1,0 +1,6 @@
+commons commerce.money
+
+type Money = {
+  minorUnits: Int where NonNegative,
+  currency:   String where Length(3),
+}

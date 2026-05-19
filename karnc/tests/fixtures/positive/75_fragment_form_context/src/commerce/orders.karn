@@ -1,0 +1,8 @@
+context commerce.orders
+
+exports transparent { OrderError }
+
+type OrderError = enum {
+  EmptyCart,
+  TooManyItems,
+}

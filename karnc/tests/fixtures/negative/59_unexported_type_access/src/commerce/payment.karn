@@ -1,0 +1,10 @@
+context commerce.payment {
+  exports transparent { PaymentError }
+
+  type PaymentError = enum { Declined }
+
+  -- PrivateRecord is NOT exported.
+  type PrivateRecord = {
+    note: String,
+  }
+}

@@ -43,6 +43,82 @@ pub struct UsesDecl {
     pub span: Span,
 }
 
+/// A whole parsed context source file (v0.4 §3.1).
+///
+/// Contexts are the architectural-layer declaration kind. Like commons, a
+/// context may be split across multiple files in a directory.
+#[derive(Debug, Clone)]
+pub struct Context {
+    pub name: QualifiedName,
+    pub items: Vec<CommonsItem>,
+    /// `uses` clauses declared in this file.
+    pub uses: Vec<UsesDecl>,
+    /// `consumes` clauses declared in this file.
+    pub consumes: Vec<ConsumesDecl>,
+    /// `exports` clauses declared in this file.
+    pub exports: Vec<ExportsDecl>,
+    /// Optional documentation block attached to the context declaration.
+    pub documentation: Option<String>,
+    /// Surface form of the file: brace-delimited body or headerless fragment.
+    pub form: CommonsForm,
+    pub span: Span,
+}
+
+/// A `consumes other.context` declaration (v0.4 §3.2).
+#[derive(Debug, Clone)]
+pub struct ConsumesDecl {
+    pub target: QualifiedName,
+    pub span: Span,
+}
+
+/// An `exports visibility { names }` clause (v0.4 §3.3).
+#[derive(Debug, Clone)]
+pub struct ExportsDecl {
+    pub visibility: Visibility,
+    pub names: Vec<Ident>,
+    pub span: Span,
+}
+
+/// Visibility level for an exports clause (v0.4 §3.3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Visibility {
+    /// Token-only outside the context: hold, pass, compare; no inspect, no construct.
+    Opaque,
+    /// Readable shape outside the context: inspect fields, match variants; no construct.
+    Transparent,
+}
+
+/// Either a commons or a context — the two declaration kinds at the file
+/// level (v0.4 §3.1).
+#[derive(Debug, Clone)]
+pub enum SourceUnit {
+    Commons(Commons),
+    Context(Context),
+}
+
+impl SourceUnit {
+    pub fn name(&self) -> &QualifiedName {
+        match self {
+            SourceUnit::Commons(c) => &c.name,
+            SourceUnit::Context(c) => &c.name,
+        }
+    }
+
+    pub fn span(&self) -> Span {
+        match self {
+            SourceUnit::Commons(c) => c.span,
+            SourceUnit::Context(c) => c.span,
+        }
+    }
+
+    pub fn kind_name(&self) -> &'static str {
+        match self {
+            SourceUnit::Commons(_) => "commons",
+            SourceUnit::Context(_) => "context",
+        }
+    }
+}
+
 /// A dotted name like `fitness.units`.
 #[derive(Debug, Clone)]
 pub struct QualifiedName {

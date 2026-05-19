@@ -1,0 +1,10 @@
+context commerce.orders
+
+exports transparent { OrderError }
+
+type OrderError = enum {
+  EmptyCart,
+  TooManyItems,
+}
+
+type OrderId = String where Matches("ORD-[0-9]+")

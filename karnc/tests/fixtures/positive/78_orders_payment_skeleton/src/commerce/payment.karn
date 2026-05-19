@@ -1,0 +1,12 @@
+context commerce.payment {
+  uses commerce.money
+
+  exports opaque      { AuthId }
+  exports transparent { PaymentError }
+
+  type AuthId       = String where Matches("AUTH-[0-9]+")
+  type PaymentError = enum {
+    Declined,
+    InsufficientFunds,
+  }
+}

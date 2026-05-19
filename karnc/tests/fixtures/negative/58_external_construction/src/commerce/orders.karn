@@ -1,0 +1,7 @@
+context commerce.orders {
+  consumes commerce.payment
+
+  fn makeAuth(s: String) -> Result[AuthId, ValidationError] {
+    AuthId.of(s)
+  }
+}

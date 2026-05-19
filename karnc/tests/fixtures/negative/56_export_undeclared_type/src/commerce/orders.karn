@@ -1,0 +1,5 @@
+context commerce.orders {
+  exports opaque { NotDeclared }
+
+  type Order = Int where NonNegative
+}

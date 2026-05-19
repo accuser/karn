@@ -1,0 +1,34 @@
+---
+Orders context. Composes cart items, applies discounts, places orders.
+Depends on commerce.payment for authorisation (v0.5+).
+---
+context commerce.orders
+
+uses commerce.money
+uses commerce.identifiers
+consumes commerce.payment
+
+exports opaque      { Order }
+exports transparent { OrderError, OrderStatus }
+
+type OrderError = enum {
+  EmptyCart,
+  TooManyItems,
+  TotalExceedsLimit,
+}
+
+type OrderStatus = enum {
+  Pending,
+  Placed,
+  Cancelled,
+}
+
+---
+An order record. Carries items, status, customer, and timestamps.
+---
+type Order = {
+  id:       OrderId,
+  customer: CustomerId,
+  total:    Money,
+  status:   OrderStatus,
+}

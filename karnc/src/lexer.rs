@@ -76,6 +76,15 @@ pub enum TokenKind {
     Opaque,
     #[token("uses")]
     Uses,
+    // v0.4 keywords
+    #[token("context")]
+    Context,
+    #[token("consumes")]
+    Consumes,
+    #[token("exports")]
+    Exports,
+    #[token("transparent")]
+    Transparent,
 
     /// A documentation block: `---` line ... `---` line. The token's span
     /// covers the full block including both `---` markers. The body content
@@ -197,6 +206,10 @@ impl TokenKind {
             Is => "`is`",
             Opaque => "`opaque`",
             Uses => "`uses`",
+            Context => "`context`",
+            Consumes => "`consumes`",
+            Exports => "`exports`",
+            Transparent => "`transparent`",
             DocBlock => "documentation block",
             Ident => "identifier",
             IntLit => "integer literal",

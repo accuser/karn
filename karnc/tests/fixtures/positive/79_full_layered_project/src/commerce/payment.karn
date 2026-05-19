@@ -1,0 +1,27 @@
+---
+Payment context. Authorises monetary transactions and records auth IDs.
+---
+context commerce.payment
+
+uses commerce.money
+uses commerce.identifiers
+
+exports opaque      { AuthId }
+exports transparent { PaymentError }
+
+type AuthId = String where Matches("AUTH-[0-9]{8}")
+
+type PaymentError = enum {
+  Declined,
+  InsufficientFunds,
+  GatewayDown,
+}
+
+---
+A payment authorisation. Internal record paired with the public AuthId.
+---
+type Authorisation = {
+  id:       AuthId,
+  amount:   Money,
+  customer: CustomerId,
+}

@@ -1,0 +1,5 @@
+context commerce.orders
+
+fn OrderId.parse(value: String) -> Result[OrderId, ValidationError] {
+  OrderId.of(value)
+}

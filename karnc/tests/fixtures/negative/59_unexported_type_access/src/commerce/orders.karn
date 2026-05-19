@@ -1,0 +1,7 @@
+context commerce.orders {
+  consumes commerce.payment
+
+  fn take(r: PrivateRecord) -> String {
+    r.note
+  }
+}

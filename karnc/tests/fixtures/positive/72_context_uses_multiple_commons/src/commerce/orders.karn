@@ -1,0 +1,12 @@
+context commerce.orders {
+  uses commerce.money
+  uses commerce.identifiers
+
+  exports transparent { Order }
+
+  type Order = {
+    id:       OrderId,
+    customer: CustomerId,
+    total:    Money,
+  }
+}
