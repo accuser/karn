@@ -29,7 +29,9 @@ use std::path::Path;
 use ariadne::Source;
 
 pub use error::CompileError;
-pub use project::{CompiledFile, ProjectOutput, compile_project};
+pub use project::{
+    BuildTarget, CompiledFile, ProjectOutput, compile_project, compile_project_with_target,
+};
 
 /// Severity classification for [`Diagnostic`]. Mirrors LSP severity levels so
 /// the LSP server can map diagnostics to the protocol without reinterpreting

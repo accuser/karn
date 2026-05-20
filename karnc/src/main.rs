@@ -3,13 +3,33 @@
 use std::path::PathBuf;
 use std::process::{Command as ProcCommand, ExitCode, Stdio};
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
+use karnc::BuildTarget;
 
 #[derive(Parser, Debug)]
 #[command(name = "karnc", version, about = "Karn v0.3 compiler", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+enum CliTarget {
+    /// Single-bundle output (the default). Cross-context calls compile to
+    /// direct function invocation.
+    Bundle,
+    /// One Cloudflare Worker per context. Cross-context calls go over
+    /// Service Bindings using a JSON wire format.
+    Workers,
+}
+
+impl From<CliTarget> for BuildTarget {
+    fn from(t: CliTarget) -> Self {
+        match t {
+            CliTarget::Bundle => BuildTarget::Bundle,
+            CliTarget::Workers => BuildTarget::Workers,
+        }
+    }
 }
 
 #[derive(Subcommand, Debug)]
@@ -24,6 +44,11 @@ enum Command {
         /// directory (for project input).
         #[arg(short, long)]
         output: PathBuf,
+        /// Build target. `bundle` (default) produces a single deployment
+        /// unit; `workers` produces one Cloudflare Worker per context with
+        /// Service Binding plumbing (v0.8).
+        #[arg(long, value_enum, default_value = "bundle")]
+        target: CliTarget,
     },
     /// Type-check a `.karn` file or project without writing output.
     Check {
@@ -62,7 +87,11 @@ enum Command {
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
-        Command::Compile { input, output } => run_compile(input, output),
+        Command::Compile {
+            input,
+            output,
+            target,
+        } => run_compile(input, output, target.into()),
         Command::Check { input } => run_check(input),
         Command::Fmt { inputs, check } => run_fmt(inputs, check),
         Command::Test {
@@ -291,10 +320,10 @@ fn run_fmt(inputs: Vec<PathBuf>, check: bool) -> ExitCode {
     }
 }
 
-fn run_compile(input: PathBuf, output: PathBuf) -> ExitCode {
+fn run_compile(input: PathBuf, output: PathBuf, target: BuildTarget) -> ExitCode {
     if input.is_dir() {
         // Multi-file project compile.
-        match karnc::compile_project(&input) {
+        match karnc::compile_project_with_target(&input, target) {
             Ok(out) => {
                 for file in &out.files {
                     let target = output.join(&file.output_path);

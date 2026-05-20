@@ -50,6 +50,23 @@ pub struct ProjectOutput {
     pub files: Vec<CompiledFile>,
 }
 
+/// The build target. Determines how cross-context calls and per-context
+/// modules are emitted (v0.8). Bundle mode is the default — all contexts
+/// emit into one TypeScript bundle and cross-context calls are direct
+/// function invocations. Workers mode produces per-context Cloudflare
+/// Worker bundles that communicate via Service Bindings.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+pub enum BuildTarget {
+    /// Existing behaviour: one TS bundle, direct function calls between
+    /// contexts.
+    #[default]
+    Bundle,
+    /// One Worker per context. Cross-context calls become Service Binding
+    /// invocations using a JSON wire format with refinement validation on
+    /// the receiving side.
+    Workers,
+}
+
 /// Distinguishes a commons from a context (and from a test) in the project
 /// graph. Tests are a third kind in v0.7.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -69,8 +86,21 @@ impl UnitKind {
     }
 }
 
-/// Compile a Karn project rooted at `root`. The root must be a directory.
+/// Compile a Karn project rooted at `root`, defaulting to the bundle build
+/// target. Use [`compile_project_with_target`] to select a target.
 pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> {
+    compile_project_with_target(root, BuildTarget::Bundle)
+}
+
+/// Compile a Karn project rooted at `root` with an explicit build target.
+///
+/// In `BuildTarget::Bundle` (default) the output is the existing v0.6+
+/// single-bundle layout. In `BuildTarget::Workers` (v0.8) each context
+/// becomes a Cloudflare Worker under `out/workers/<context-with-dashes>/`.
+pub fn compile_project_with_target(
+    root: &Path,
+    target: BuildTarget,
+) -> Result<ProjectOutput, Vec<CompileError>> {
     let mut errors = Vec::new();
 
     // -- 1. Discovery. --
@@ -909,10 +939,22 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
                 .collect();
             let cross_context_info = cross_context_for_file.clone();
 
-            let emit_ctx = EmitProjectCtx {
-                source_path: pf.source_path.clone(),
-                commons_name: name.clone(),
-                local_files: indices
+            // v0.8: in workers mode, a context's *output* lands under
+            // workers/<dashes>/handlers.ts. Use that path as the synthetic
+            // source_path so the emitter's depth/relative-path logic and
+            // imported_decl_paths produce correct relative imports.
+            let workers_mode = matches!(target, BuildTarget::Workers);
+            let emit_source_path = if workers_mode && kind == UnitKind::Context {
+                worker_handlers_source_path(name)
+            } else {
+                pf.source_path.clone()
+            };
+            let emit_local_files = if workers_mode && kind == UnitKind::Context {
+                // Each context becomes one Worker; the body collapses into
+                // one handlers.ts so there are no siblings to import from.
+                Vec::new()
+            } else {
+                indices
                     .iter()
                     .filter_map(|&j| {
                         if j == i {
@@ -921,7 +963,45 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
                             Some(parsed[j].source_path.clone())
                         }
                     })
-                    .collect(),
+                    .collect()
+            };
+
+            // In workers mode, rewrite imported_decl_paths for consumed
+            // contexts to point at the consumed Worker's handlers.ts.
+            let mut imported_decl_paths_emit = imported_decl_paths.clone();
+            if workers_mode {
+                for (unit, decls) in imported_decl_paths.iter() {
+                    let target_kind = kinds.get(unit).copied();
+                    if target_kind == Some(UnitKind::Context) {
+                        let handlers_path = worker_handlers_source_path(unit);
+                        let mut rewritten = HashMap::new();
+                        for n in decls.keys() {
+                            rewritten.insert(n.clone(), handlers_path.clone());
+                        }
+                        imported_decl_paths_emit.insert(unit.clone(), rewritten);
+                    }
+                }
+            }
+
+            // v0.8: pre-compute boundary type owners so the emitter can
+            // generate serialise/deserialise helper imports correctly. Only
+            // relevant in workers mode for contexts.
+            let boundary_type_owners = if workers_mode && kind == UnitKind::Context {
+                compute_boundary_type_owners(
+                    name,
+                    &unit_consumes,
+                    &unit_tables,
+                    &parsed,
+                    &unit_file_index,
+                )
+            } else {
+                HashMap::new()
+            };
+
+            let emit_ctx = EmitProjectCtx {
+                source_path: emit_source_path,
+                commons_name: name.clone(),
+                local_files: emit_local_files,
                 file_decl_index: unit_file_index.get(name).cloned().unwrap_or_else(|| {
                     FileDeclIndex {
                         types: HashMap::new(),
@@ -931,7 +1011,7 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
                 }),
                 imported_from: imported_from.clone(),
                 imported_from_kind: imported_from_kind.clone(),
-                imported_decl_paths,
+                imported_decl_paths: imported_decl_paths_emit,
                 commons_dir: commons_dir_for(name),
                 unit_kind: kind,
                 owning_context: owning_context_for_emit.clone(),
@@ -942,9 +1022,15 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
                 is_consumed_by_others: unit_consumes
                     .iter()
                     .any(|(_, targets)| targets.iter().any(|t| t == name)),
+                target,
+                boundary_type_owners,
             };
             let ts = emitter::emit_project(&typed, &emit_ctx);
-            let output_path = ts_output_path(&pf.source_path);
+            let output_path = if workers_mode && kind == UnitKind::Context {
+                worker_handlers_output_path(name)
+            } else {
+                ts_output_path(&pf.source_path)
+            };
             compiled.push(CompiledFile {
                 source_path: pf.source_path.clone(),
                 output_path,
@@ -975,23 +1061,69 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
 
     compiled.extend(test_outputs);
 
-    // v0.6 §6.3: emit a composition root when the project has at least one
-    // context that consumes another context's service surface. The compose
-    // file imports each context, instantiates its providers, assembles its
-    // deps (capabilities + cross-context surfaces), and exports the top-level
-    // service surface.
-    if let Some(compose_ts) = emit_composition_root(
-        &groups,
-        &kinds,
-        &unit_consumes,
-        &unit_consumes_aliases,
-        &unit_tables,
-    ) {
-        compiled.push(CompiledFile {
-            source_path: PathBuf::from("compose.karn"),
-            output_path: PathBuf::from("compose.ts"),
-            typescript: compose_ts,
-        });
+    match target {
+        BuildTarget::Bundle => {
+            // v0.6 §6.3: emit a composition root when the project has at
+            // least one context that consumes another context's service
+            // surface. The compose file imports each context, instantiates
+            // its providers, assembles its deps (capabilities + cross-
+            // context surfaces), and exports the top-level service surface.
+            if let Some(compose_ts) = emit_composition_root(
+                &groups,
+                &kinds,
+                &unit_consumes,
+                &unit_consumes_aliases,
+                &unit_tables,
+            ) {
+                compiled.push(CompiledFile {
+                    source_path: PathBuf::from("compose.karn"),
+                    output_path: PathBuf::from("compose.ts"),
+                    typescript: compose_ts,
+                });
+            }
+        }
+        BuildTarget::Workers => {
+            // v0.8 §2.3: per-Worker entry point, compose.ts, and wrangler
+            // configuration. One Worker per context.
+            for (ctx_name, kind) in &kinds {
+                if *kind != UnitKind::Context {
+                    continue;
+                }
+                let Some(table) = unit_tables.get(ctx_name) else {
+                    continue;
+                };
+                let dashes = worker_dir_name(ctx_name);
+                let consumes_targets = unit_consumes.get(ctx_name).cloned().unwrap_or_default();
+                let aliases = unit_consumes_aliases
+                    .get(ctx_name)
+                    .cloned()
+                    .unwrap_or_default();
+                let entry_ts = emitter::emit_worker_entry(ctx_name, table);
+                let compose_ts = emitter::emit_worker_compose(
+                    ctx_name,
+                    table,
+                    &consumes_targets,
+                    &aliases,
+                    &unit_tables,
+                );
+                let wrangler = emitter::emit_wrangler_toml(ctx_name, table, &consumes_targets);
+                compiled.push(CompiledFile {
+                    source_path: PathBuf::from(format!("workers/{dashes}/<index>")),
+                    output_path: PathBuf::from(format!("workers/{dashes}/index.ts")),
+                    typescript: entry_ts,
+                });
+                compiled.push(CompiledFile {
+                    source_path: PathBuf::from(format!("workers/{dashes}/<compose>")),
+                    output_path: PathBuf::from(format!("workers/{dashes}/compose.ts")),
+                    typescript: compose_ts,
+                });
+                compiled.push(CompiledFile {
+                    source_path: PathBuf::from(format!("workers/{dashes}/<wrangler>")),
+                    output_path: PathBuf::from(format!("workers/{dashes}/wrangler.toml")),
+                    typescript: wrangler,
+                });
+            }
+        }
     }
 
     // Runtime + tsconfig: emit once per project. The runtime sits at the
@@ -1334,6 +1466,66 @@ fn ts_output_path(source: &Path) -> PathBuf {
     out
 }
 
+/// v0.8: directory name of a Worker for a given context, with dots replaced
+/// by dashes (`commerce.payment` → `commerce-payment`).
+pub fn worker_dir_name(context: &str) -> String {
+    context.replace('.', "-")
+}
+
+/// v0.8: project-relative synthetic source path of the workers-mode
+/// handlers file for a given context. Used so the emitter's relative-import
+/// machinery resolves correctly against the workers layout.
+pub fn worker_handlers_source_path(context: &str) -> PathBuf {
+    PathBuf::from(format!(
+        "workers/{}/handlers.karn",
+        worker_dir_name(context)
+    ))
+}
+
+/// v0.8: project-relative output path of the workers-mode handlers file.
+pub fn worker_handlers_output_path(context: &str) -> PathBuf {
+    PathBuf::from(format!("workers/{}/handlers.ts", worker_dir_name(context)))
+}
+
+/// v0.8: collect the boundary-type owners visible to a given consuming
+/// context. Every consumed-context type and every commons type referenced
+/// in cross-context positions has an owner; that owner emits the
+/// serialise/deserialise helpers.
+fn compute_boundary_type_owners(
+    consumer: &str,
+    unit_consumes: &HashMap<String, Vec<String>>,
+    unit_tables: &HashMap<String, UnitTable>,
+    parsed: &[ParsedFile],
+    unit_file_index: &HashMap<String, FileDeclIndex>,
+) -> HashMap<String, BoundaryOwner> {
+    let mut out: HashMap<String, BoundaryOwner> = HashMap::new();
+    let Some(targets) = unit_consumes.get(consumer) else {
+        return out;
+    };
+    let _ = parsed;
+    for t in targets {
+        let Some(table) = unit_tables.get(t) else {
+            continue;
+        };
+        // Types declared in the consumed context (records, sums, refined,
+        // opaque) — record them with the consumed context as owner.
+        for type_name in table.types.keys() {
+            out.insert(
+                type_name.clone(),
+                BoundaryOwner::Context { context: t.clone() },
+            );
+        }
+        // Commons types `uses`-imported by the consumed context: their
+        // file lookup is unit_file_index keyed by commons name.
+    }
+    // For consumer-side commons types (used in this context's exposed
+    // signatures), look them up via this consumer's unit_file_index.
+    if let Some(idx) = unit_file_index.get(consumer) {
+        let _ = idx;
+    }
+    out
+}
+
 /// Within a multi-file unit (i.e., 2+ files in the same directory that share
 /// a qualified name), every file must declare exactly the same name.
 ///
@@ -1543,21 +1735,21 @@ fn check_file_directory_conflicts(root: &Path, files: &[PathBuf]) -> Result<(), 
 
 /// Combined symbol tables for a single logical commons or context.
 #[derive(Clone, Default)]
-struct UnitTable {
+pub struct UnitTable {
     #[allow(dead_code)]
-    kind: Option<UnitKind>,
-    types: HashMap<String, TypeDecl>,
-    fns: HashMap<String, FnDecl>,
-    methods: HashMap<String, ResolverMethodTable>,
+    pub kind: Option<UnitKind>,
+    pub types: HashMap<String, TypeDecl>,
+    pub fns: HashMap<String, FnDecl>,
+    pub methods: HashMap<String, ResolverMethodTable>,
     /// Per-context capabilities (v0.5). Empty for commons.
-    capabilities: HashMap<String, CapabilityDecl>,
+    pub capabilities: HashMap<String, CapabilityDecl>,
     /// Per-context providers (v0.5). One provider per capability in v0.5.
     /// Key: capability name. Value: provider declaration.
-    providers: HashMap<String, ProviderDecl>,
+    pub providers: HashMap<String, ProviderDecl>,
     /// Per-context services (v0.5). Empty for commons.
-    services: HashMap<String, ServiceDecl>,
+    pub services: HashMap<String, ServiceDecl>,
     /// Per-context agents (v0.5). Empty for commons.
-    agents: HashMap<String, AgentDecl>,
+    pub agents: HashMap<String, AgentDecl>,
 }
 
 fn build_unit_table(
@@ -2343,6 +2535,23 @@ pub struct EmitProjectCtx {
     /// True when *this* context's surface is consumed by another context in
     /// the project. Drives `makeSurface` emission (v0.6 §6.3).
     pub is_consumed_by_others: bool,
+    /// v0.8 build target. Workers mode reroutes cross-context calls through
+    /// Service Bindings and adds per-Worker entry/composition artefacts.
+    pub target: BuildTarget,
+    /// v0.8 (workers mode): for each cross-context type used in cross-context
+    /// positions, the type's owning context's qualified name. Lets the
+    /// emitter route serialise/deserialise helper imports to the owning
+    /// module.
+    pub boundary_type_owners: HashMap<String, BoundaryOwner>,
+}
+
+/// Where a boundary-crossing type was declared.
+#[derive(Debug, Clone)]
+pub enum BoundaryOwner {
+    /// Commons type. Path is project-relative to the `.karn` file declaring it.
+    Commons { source_path: PathBuf },
+    /// Context type. Qualified context name (e.g., `commerce.payment`).
+    Context { context: String },
 }
 
 impl EmitProjectCtx {

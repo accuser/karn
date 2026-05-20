@@ -1,0 +1,19 @@
+context inventory
+
+type Sku = String where Matches("[A-Z]{3}-[0-9]{4}")
+
+type StockItem = {
+  sku: Sku,
+  quantity: Int where NonNegative,
+}
+
+type StockError = enum {
+  NotFound,
+  OutOfStock,
+}
+
+service check {
+  on call(sku: Sku) -> Effect[Result[StockItem, StockError]] {
+    Err(NotFound)
+  }
+}

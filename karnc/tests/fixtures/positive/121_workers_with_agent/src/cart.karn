@@ -1,0 +1,15 @@
+context cart
+
+type CartId = opaque String
+
+agent CartEntity {
+  key id: CartId
+
+  state {
+    items: Int,
+  }
+
+  on call total() -> Effect[Int] {
+    Effect.pure(self.state.items)
+  }
+}

@@ -21,7 +21,16 @@ use std::path::{Path, PathBuf};
 
 use crate::ast::*;
 use crate::checker::{NamedKind, Ty, TypedCommons};
-use crate::project::{EmitProjectCtx, UnitKind};
+use crate::project::{BuildTarget, EmitProjectCtx, UnitKind};
+
+pub mod serialisation;
+pub mod workers;
+pub mod workers_entry;
+pub mod wrangler;
+
+pub use workers::emit_worker_compose;
+pub use workers_entry::emit_worker_entry;
+pub use wrangler::emit_wrangler_toml;
 
 const INDENT_STEP: usize = 2;
 
@@ -107,6 +116,73 @@ export function makeTestState(name: string): DurableObjectState {
     storage: new InMemoryStorage(),
     id: { name },
   };
+}
+
+// v0.8: cross-Worker boundary protocol — JSON wire format and error types.
+
+export type JsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | JsonValue[]
+  | { [k: string]: JsonValue };
+
+export type BoundaryError =
+  | { readonly kind: "MalformedJson"; readonly details: string }
+  | {
+      readonly kind: "StructuralMismatch";
+      readonly path: string;
+      readonly expected: string;
+      readonly actual: string;
+    }
+  | {
+      readonly kind: "RefinementViolation";
+      readonly path: string;
+      readonly violation: ValidationError;
+    }
+  | { readonly kind: "Transport"; readonly status: number; readonly details: string };
+
+export function boundaryError(error: BoundaryError): Error {
+  const e = new Error(`BoundaryError: ${error.kind}`);
+  (e as any).boundaryError = error;
+  return e;
+}
+
+export interface ServiceBinding {
+  fetch(request: Request): Promise<Response>;
+}
+
+export async function callService<T, E>(
+  binding: ServiceBinding,
+  servicePath: string,
+  argsJson: JsonValue,
+  deserialiseResult: (json: JsonValue) => Result<Result<T, E>, BoundaryError>,
+): Promise<Result<T, E>> {
+  const request = new Request(`http://internal/${servicePath}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(argsJson),
+  });
+  const response = await binding.fetch(request);
+  if (!response.ok) {
+    throw boundaryError({
+      kind: "Transport",
+      status: response.status,
+      details: await response.text(),
+    });
+  }
+  let responseJson: JsonValue;
+  try {
+    responseJson = (await response.json()) as JsonValue;
+  } catch (e) {
+    throw boundaryError({ kind: "MalformedJson", details: String(e) });
+  }
+  const result = deserialiseResult(responseJson);
+  if (result.tag === "Err") {
+    throw boundaryError(result.error);
+  }
+  return result.value;
 }
 "#;
 
@@ -202,6 +278,8 @@ fn single_file_ctx() -> EmitProjectCtx {
         consumed_types: HashMap::new(),
         cross_context: crate::resolver::CrossContextInfo::default(),
         is_consumed_by_others: false,
+        target: BuildTarget::Bundle,
+        boundary_type_owners: HashMap::new(),
     }
 }
 
@@ -253,8 +331,9 @@ pub fn emit_project(commons: &TypedCommons, ctx: &EmitProjectCtx) -> String {
     }
     // v0.6: cross-context surface assembly. Emit `makeSurface` for any
     // context that declares services — the composition root references it
-    // for every such context, not just those consumed by others.
-    if ctx.unit_kind == UnitKind::Context {
+    // for every such context, not just those consumed by others. Skipped
+    // in workers mode where each Worker has its own `compose(env)` root.
+    if ctx.unit_kind == UnitKind::Context && matches!(ctx.target, BuildTarget::Bundle) {
         let has_services = commons
             .commons
             .items
@@ -264,7 +343,112 @@ pub fn emit_project(commons: &TypedCommons, ctx: &EmitProjectCtx) -> String {
             emit_make_surface(&mut out, commons);
         }
     }
+    // v0.8: in workers mode, the context module also exports per-type
+    // serialise/deserialise helpers for every type that crosses a
+    // boundary. The commons modules likewise carry helpers for their
+    // own commons-declared boundary types.
+    if matches!(ctx.target, BuildTarget::Workers) {
+        emit_boundary_helpers(&mut out, commons, ctx);
+    }
     out
+}
+
+/// Emit boundary serialise/deserialise helpers (v0.8 §3.4 / §5.2) for
+/// every named type declared in this file that flows through a
+/// cross-context call, plus the specialised generic helpers for any
+/// Result/Option instantiation used at the boundary.
+fn emit_boundary_helpers(out: &mut String, commons: &TypedCommons, ctx: &EmitProjectCtx) {
+    use serialisation::{
+        collect_boundary_types, collect_generic_instantiations, emit_generic_helpers,
+        emit_helpers_for_owner,
+    };
+
+    // For contexts: walk the local services to discover boundary types.
+    // For commons: walk every consumer's services that reference us
+    // (approximated as: emit for every type declared in this file).
+    let services: HashMap<String, ServiceDecl> = commons
+        .commons
+        .items
+        .iter()
+        .filter_map(|i| match i {
+            CommonsItem::Service(s) => Some((s.name.name.clone(), s.clone())),
+            _ => None,
+        })
+        .collect();
+
+    let locally_declared: HashSet<String> = ctx.file_decl_index.types.keys().cloned().collect();
+    if ctx.unit_kind == UnitKind::Context {
+        let boundary_types_all = collect_boundary_types(&commons.types, &services);
+        // Locally-declared boundary types get full helpers in this module.
+        let local_boundary: Vec<String> = boundary_types_all
+            .iter()
+            .filter(|n| locally_declared.contains(*n))
+            .cloned()
+            .collect();
+        emit_helpers_for_owner(
+            out,
+            &local_boundary,
+            &commons.types,
+            ctx.commons_name.as_str(),
+        );
+
+        // Re-export helpers for commons-owned boundary types so consumers
+        // can address them through this context's handlers.ts namespace
+        // (matching the namespace import they already use for cross-
+        // context types). Grouped by source commons.
+        let mut by_commons: HashMap<String, Vec<String>> = HashMap::new();
+        for n in &boundary_types_all {
+            if locally_declared.contains(n) {
+                continue;
+            }
+            if matches!(ctx.imported_from_kind.get(n), Some(UnitKind::Commons))
+                && let Some(commons_name) = ctx.imported_from.get(n)
+            {
+                by_commons
+                    .entry(commons_name.clone())
+                    .or_default()
+                    .push(n.clone());
+            }
+        }
+        let mut commons_keys: Vec<&String> = by_commons.keys().collect();
+        commons_keys.sort();
+        for commons_name in commons_keys {
+            let names = by_commons.get(commons_name).unwrap();
+            let mut sorted_names: Vec<String> = names.clone();
+            sorted_names.sort();
+            sorted_names.dedup();
+            let target_path = ctx
+                .imported_decl_paths
+                .get(commons_name)
+                .and_then(|m| sorted_names.iter().find_map(|n| m.get(n).cloned()))
+                .unwrap_or_else(|| EmitProjectCtx::commons_path(commons_name));
+            let import_spec =
+                cross_commons_import_specifier_for_path(&ctx.source_path, &target_path);
+            let mut parts: Vec<String> = Vec::new();
+            for n in &sorted_names {
+                parts.push(format!("serialise_{n}"));
+                parts.push(format!("deserialise_{n}"));
+            }
+            writeln!(
+                out,
+                "export {{ {} }} from \"{import_spec}\";",
+                parts.join(", ")
+            )
+            .unwrap();
+        }
+        if !by_commons.is_empty() {
+            writeln!(out).unwrap();
+        }
+
+        // Specialised Result_/Option_ helpers for the instantiations used.
+        let insts = collect_generic_instantiations(&services);
+        emit_generic_helpers(out, &insts);
+    } else {
+        // Commons: emit helpers for every type declared in this file.
+        let mut locally: Vec<String> = locally_declared.into_iter().collect();
+        locally.sort();
+        emit_helpers_for_owner(out, &locally, &commons.types, ctx.commons_name.as_str());
+    }
 }
 
 /// For each type imported via `uses` that's referenced in this file, emit:
@@ -789,19 +973,32 @@ fn write_header(out: &mut String, commons: &TypedCommons, ctx: &EmitProjectCtx) 
             .items
             .iter()
             .any(|i| matches!(i, CommonsItem::Agent(_)));
+        let workers = matches!(ctx.target, BuildTarget::Workers);
+        let mut parts: Vec<&str> = vec![
+            "Ok",
+            "Err",
+            "Some",
+            "None",
+            "type Result",
+            "type Option",
+            "type ValidationError",
+        ];
         if has_agent {
-            writeln!(
-                out,
-                "import {{ Ok, Err, Some, None, type Result, type Option, type ValidationError, type DurableObjectState }} from \"{runtime_import}\";",
-            )
-            .unwrap();
-        } else {
-            writeln!(
-                out,
-                "import {{ Ok, Err, Some, None, type Result, type Option, type ValidationError }} from \"{runtime_import}\";",
-            )
-            .unwrap();
+            parts.push("type DurableObjectState");
         }
+        if workers {
+            parts.push("type JsonValue");
+            parts.push("type BoundaryError");
+            parts.push("type ServiceBinding");
+            parts.push("callService");
+            parts.push("boundaryError");
+        }
+        writeln!(
+            out,
+            "import {{ {} }} from \"{runtime_import}\";",
+            parts.join(", ")
+        )
+        .unwrap();
         writeln!(out).unwrap();
     }
 }
@@ -1302,6 +1499,7 @@ fn emit_service(out: &mut String, s: &ServiceDecl, commons: &TypedCommons, ctx: 
             .iter()
             .map(|c| c.name.clone())
             .collect::<HashSet<_>>();
+        cx.target = ctx.target;
         let async_tail = is_effectful_return(&handler.return_type);
         emit_block_as_function_body(
             &mut body_out,
@@ -1312,7 +1510,8 @@ fn emit_service(out: &mut String, s: &ServiceDecl, commons: &TypedCommons, ctx: 
         );
         // Append the deps parameter (may include surface field if the body
         // made cross-context calls).
-        let deps_ty = build_deps_object_ty_with_surface(&handler.given, &cx, &ctx.cross_context);
+        let deps_ty =
+            build_deps_object_ty_with_surface(&handler.given, &cx, &ctx.cross_context, ctx.target);
         params.push(format!("deps: {deps_ty}"));
         let ret = ts_type_ref(&handler.return_type);
         let async_kw = if is_effectful_return(&handler.return_type) {
@@ -1338,18 +1537,44 @@ fn build_deps_object_ty_with_surface(
     given: &[Ident],
     cx: &LowerCtx<'_>,
     cross_context: &crate::resolver::CrossContextInfo,
+    target: BuildTarget,
 ) -> String {
     let mut parts: Vec<String> = given
         .iter()
         .map(|c| format!("{}: {}", c.name, c.name))
         .collect();
     if cx.cross_context_used {
-        parts.push(format!("surface: {}", surface_ty(cross_context)));
+        match target {
+            BuildTarget::Bundle => {
+                parts.push(format!("surface: {}", surface_ty(cross_context)));
+            }
+            BuildTarget::Workers => {
+                parts.push(format!("env: {}", workers_env_ty(cross_context)));
+            }
+        }
     }
     if parts.is_empty() {
         return "{}".to_string();
     }
     format!("{{ {} }}", parts.join("; "))
+}
+
+/// Workers-mode deps.env shape: one Service Binding per consumed context.
+fn workers_env_ty(cross_context: &crate::resolver::CrossContextInfo) -> String {
+    let mut consumed_sorted = cross_context.consumed_contexts.clone();
+    consumed_sorted.sort();
+    let entries: Vec<String> = consumed_sorted
+        .iter()
+        .map(|q| {
+            let bind = crate::emitter::wrangler::consumed_binding_name(q);
+            format!("{bind}: ServiceBinding")
+        })
+        .collect();
+    if entries.is_empty() {
+        "{}".to_string()
+    } else {
+        format!("{{ {} }}", entries.join("; "))
+    }
 }
 
 /// Build the TS type for the `surface` field in deps, naming each consumed
@@ -1452,6 +1677,126 @@ fn emit_make_surface(out: &mut String, commons: &TypedCommons) {
     writeln!(out, "  }};").unwrap();
     writeln!(out, "}}").unwrap();
     writeln!(out).unwrap();
+}
+
+/// Lower a cross-context call in workers mode to a `callService(...)`
+/// invocation. The argument types are looked up in the consumed context's
+/// service signature so we know which serialise/deserialise helpers to
+/// reference.
+fn lower_workers_cross_context_call(
+    consumed: &str,
+    method: &Ident,
+    args: &[Expr],
+    stmts: &mut Vec<String>,
+    cx: &mut LowerCtx<'_>,
+) -> String {
+    let info = cx.cross_context;
+    let consumed_ns = qualified_to_ns(consumed);
+    let binding = crate::emitter::wrangler::consumed_binding_name(consumed);
+
+    // Look up the service signature on the consumed context.
+    let svc = info
+        .consumed_services
+        .get(consumed)
+        .and_then(|map| map.get(&method.name));
+
+    // Build serialised-arg expression. If we know the parameter types, use
+    // the owning context's serialise_<T> helper; otherwise fall back to
+    // `value as JsonValue`.
+    let mut args_serialised: Vec<String> = Vec::new();
+    for (i, a) in args.iter().enumerate() {
+        let lowered = lower_expr(a, stmts, cx);
+        let param_ty = svc.and_then(|s| s.params.get(i)).map(|(_, t)| t);
+        let serialised = match param_ty {
+            Some(tr) => workers_serialise_expr(tr, &lowered, &consumed_ns),
+            None => format!("{lowered} as JsonValue"),
+        };
+        args_serialised.push(serialised);
+    }
+    let args_json = if args_serialised.len() == 1 {
+        args_serialised.into_iter().next().unwrap()
+    } else {
+        // Multi-arg: wrap into an object literal keyed by parameter names.
+        let pairs: Vec<String> = svc
+            .map(|s| {
+                s.params
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (name, _))| {
+                        let serialised = args_serialised
+                            .get(i)
+                            .cloned()
+                            .unwrap_or_else(|| "null".to_string());
+                        format!("{name}: {serialised}")
+                    })
+                    .collect()
+            })
+            .unwrap_or_else(|| {
+                args_serialised
+                    .iter()
+                    .cloned()
+                    .enumerate()
+                    .map(|(i, s)| format!("arg{i}: {s}"))
+                    .collect()
+            });
+        format!("{{ {} }}", pairs.join(", "))
+    };
+
+    // Deserialise the return value via the consumed context's helper.
+    let deser_ref = match svc {
+        Some(s) => workers_deserialise_ref(&s.return_type, &consumed_ns),
+        None => "((j: any) => ({ tag: \"Ok\", value: j }))".to_string(),
+    };
+
+    format!(
+        "callService(deps.env.{binding}, \"{}\", {args_json}, {deser_ref})",
+        method.name
+    )
+}
+
+fn workers_serialise_expr(tr: &TypeRef, value: &str, owning_ns: &str) -> String {
+    match tr {
+        TypeRef::Base(_, _) => format!("{value} as JsonValue"),
+        TypeRef::Named(id) => format!("{owning_ns}.serialise_{}({value})", id.name),
+        TypeRef::Result(_, _, _) | TypeRef::Option(_, _) => {
+            let inst = workers_inner_ts_name(tr);
+            format!("{owning_ns}.serialise_{inst}({value})")
+        }
+        TypeRef::Effect(inner, _) => workers_serialise_expr(inner, value, owning_ns),
+        _ => format!("{value} as JsonValue"),
+    }
+}
+
+fn workers_deserialise_ref(tr: &TypeRef, owning_ns: &str) -> String {
+    // Strip the Effect wrapper — the caller already awaits the Promise.
+    let inner = match tr {
+        TypeRef::Effect(t, _) => t.as_ref(),
+        other => other,
+    };
+    match inner {
+        TypeRef::Named(id) => format!("{owning_ns}.deserialise_{}", id.name),
+        TypeRef::Result(_, _, _) | TypeRef::Option(_, _) => {
+            let inst = workers_inner_ts_name(inner);
+            format!("{owning_ns}.deserialise_{inst}")
+        }
+        _ => "((j: any) => ({ tag: \"Ok\", value: j }))".to_string(),
+    }
+}
+
+fn workers_inner_ts_name(t: &TypeRef) -> String {
+    match t {
+        TypeRef::Base(b, _) => b.name().to_string(),
+        TypeRef::Named(id) => id.name.clone(),
+        TypeRef::Result(a, b, _) => format!(
+            "Result_{}_{}",
+            workers_inner_ts_name(a),
+            workers_inner_ts_name(b)
+        ),
+        TypeRef::Option(a, _) => format!("Option_{}", workers_inner_ts_name(a)),
+        TypeRef::Effect(a, _) => format!("Effect_{}", workers_inner_ts_name(a)),
+        TypeRef::ValidationError(_) => "ValidationError".to_string(),
+        TypeRef::Unit(_) => "Unit".to_string(),
+    }
 }
 
 /// If `receiver` is a dotted chain or single ident that matches one of the
@@ -1601,7 +1946,8 @@ fn emit_agent(out: &mut String, a: &AgentDecl, commons: &TypedCommons, ctx: &Emi
             .collect::<HashSet<_>>();
         let async_tail = is_effectful_return(&h.return_type);
         emit_block_as_function_body(&mut body_out, &h.body, &mut cx, INDENT_STEP * 2, async_tail);
-        let deps_ty = build_deps_object_ty_with_surface(&h.given, &cx, &ctx.cross_context);
+        let deps_ty =
+            build_deps_object_ty_with_surface(&h.given, &cx, &ctx.cross_context, ctx.target);
         params.push(format!("deps: {deps_ty}"));
         let ret = ts_type_ref(&h.return_type);
         let async_kw = if is_effectful_return(&h.return_type) {
@@ -1663,6 +2009,9 @@ struct LowerCtx<'a> {
     /// agent names. `<Agent>(<key>).method(args)` lowers to
     /// `new Agent(makeTestState(...)).method(args, {})`.
     pub test_agents: HashSet<String>,
+    /// v0.8 build target. In workers mode cross-context calls lower to
+    /// `callService(...)` instead of `deps.surface.<key>.<method>(...)`.
+    pub target: BuildTarget,
 }
 
 impl<'a> LowerCtx<'a> {
@@ -1681,6 +2030,7 @@ impl<'a> LowerCtx<'a> {
             cross_context_used: false,
             test_services: HashSet::new(),
             test_agents: HashSet::new(),
+            target: BuildTarget::Bundle,
         }
     }
     fn fresh(&mut self) -> String {
@@ -2105,25 +2455,35 @@ fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
             args,
         } => {
             // v0.6 cross-context service call: receiver is an alias or the
-            // dotted name of a consumed context. Lower to
-            // `deps.surface.<key>.<method>(args as <consumed_ns>.<T>)`. The
-            // call returns a Promise; the surrounding effect-let / await
-            // unwraps it.
+            // dotted name of a consumed context. In bundle mode, lower to
+            // `deps.surface.<key>.<method>(args as <consumed_ns>.<T>)`; in
+            // workers mode (v0.8), lower to
+            // `callService(deps.env.<BINDING>, "<method>", serialise...(args), deserialise_<R>)`.
             if let Some((consumed, key)) = cross_context_lowering_prefix(receiver, cx) {
                 cx.cross_context_used = true;
-                let args_lowered: Vec<String> = args
-                    .iter()
-                    .enumerate()
-                    .map(|(i, a)| {
-                        let lowered = lower_expr(a, stmts, cx);
-                        param_cast(&consumed, cx.cross_context, method, i, lowered)
-                    })
-                    .collect();
-                return format!(
-                    "deps.surface.{key}.{}({})",
-                    method.name,
-                    args_lowered.join(", ")
-                );
+                match cx.target {
+                    BuildTarget::Bundle => {
+                        let args_lowered: Vec<String> = args
+                            .iter()
+                            .enumerate()
+                            .map(|(i, a)| {
+                                let lowered = lower_expr(a, stmts, cx);
+                                param_cast(&consumed, cx.cross_context, method, i, lowered)
+                            })
+                            .collect();
+                        return format!(
+                            "deps.surface.{key}.{}({})",
+                            method.name,
+                            args_lowered.join(", ")
+                        );
+                    }
+                    BuildTarget::Workers => {
+                        let _ = key;
+                        return lower_workers_cross_context_call(
+                            &consumed, method, args, stmts, cx,
+                        );
+                    }
+                }
             }
             // Capability call: receiver is a bare ident naming a declared
             // capability in `given`. Lower to `deps.Capability.op(args)`.
@@ -2737,6 +3097,15 @@ mod runtime_tests {
         assert!(s.contains("\"target\": \"ES2022\""));
         assert!(s.contains("\"strict\": true"));
         assert!(s.contains("\"include\""));
+    }
+
+    #[test]
+    fn workers_dir_name_replaces_dots_with_dashes() {
+        assert_eq!(
+            crate::project::worker_dir_name("commerce.payment"),
+            "commerce-payment"
+        );
+        assert_eq!(crate::project::worker_dir_name("a.b.c"), "a-b-c");
     }
 
     #[test]

@@ -49,14 +49,29 @@ fn collect_expected_ts(expected_root: &Path) -> Vec<PathBuf> {
                 let p = entry.path();
                 if p.is_dir() {
                     stack.push(p);
-                } else if p.extension().and_then(|e| e.to_str()) == Some("ts") {
-                    out.push(p);
+                } else {
+                    let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("");
+                    if ext == "ts" || ext == "toml" {
+                        out.push(p);
+                    }
                 }
             }
         }
     }
     out.sort();
     out
+}
+
+/// Read the build target marker from a fixture root, if present.
+/// Defaults to bundle when no `target.txt` is present.
+fn fixture_target(dir: &Path) -> karnc::BuildTarget {
+    let marker = dir.join("target.txt");
+    if let Ok(s) = fs::read_to_string(&marker)
+        && s.trim() == "workers"
+    {
+        return karnc::BuildTarget::Workers;
+    }
+    karnc::BuildTarget::Bundle
 }
 
 #[test]
@@ -94,7 +109,8 @@ fn positive_fixtures() {
             }
         } else if src_dir.is_dir() {
             let expected_dir = dir.join("expected");
-            match karnc::compile_project(&src_dir) {
+            let target = fixture_target(&dir);
+            match karnc::compile_project_with_target(&src_dir, target) {
                 Ok(out) => {
                     // Build expected set by walking expected_dir.
                     let expected_files = collect_expected_ts(&expected_dir);
@@ -226,7 +242,8 @@ fn negative_fixtures() {
                 }
             }
         } else if src_dir.is_dir() {
-            match karnc::compile_project(&src_dir) {
+            let target = fixture_target(&dir);
+            match karnc::compile_project_with_target(&src_dir, target) {
                 Ok(_) => {
                     failures.push(format!(
                         "\n=== {} ===\nexpected compile failure but compilation succeeded",

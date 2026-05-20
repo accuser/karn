@@ -1,0 +1,7 @@
+context billing
+
+service ping {
+  on call() -> Effect[Result[(), ()]] {
+    Ok(())
+  }
+}
