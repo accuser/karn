@@ -41,6 +41,60 @@ pub struct ResolvedCommons {
     /// `uses`). Used by the checker to gate access to `.raw` and `.unsafe()`
     /// on opaque types.
     pub local_type_names: std::collections::HashSet<String>,
+    /// Cross-context call information for v0.6. None for commons and for
+    /// single-file mode. For contexts, supplies the set of consumed contexts
+    /// and any aliases introduced via `consumes ... as Alias`.
+    pub cross_context: CrossContextInfo,
+}
+
+/// Static information about the consuming context: the set of contexts it
+/// `consumes`, and any aliases introduced via `as Alias` clauses. Used by
+/// the resolver to recognise cross-context service calls and by the checker
+/// to type them (v0.6 §4.2).
+#[derive(Debug, Default, Clone)]
+pub struct CrossContextInfo {
+    /// The qualified name of the consuming context, if this unit is a context.
+    pub self_context: Option<String>,
+    /// Qualified names of every consumed context.
+    pub consumed_contexts: Vec<String>,
+    /// alias → consumed-context qualified name.
+    pub aliases: HashMap<String, String>,
+    /// For each consumed context, its service surface plus the structural
+    /// shapes of each service handler's params and return type (as seen
+    /// from the consumed context's own namespace). Populated by the project
+    /// driver; empty in single-file mode.
+    pub consumed_services: HashMap<String, HashMap<String, CrossContextService>>,
+    /// For each consumed context, its full type table (the consumed
+    /// context's local types, plus the types it brings in via `uses`).
+    /// Used by the checker for structural shape comparisons across the
+    /// boundary (v0.6 §4.3).
+    pub consumed_types: HashMap<String, HashMap<String, TypeDecl>>,
+}
+
+/// Snapshot of one service in a consumed context, as needed for v0.6
+/// cross-context type checking. The params and return type are expressed
+/// in the consumed context's own namespace.
+#[derive(Debug, Clone)]
+pub struct CrossContextService {
+    pub name: String,
+    /// Surface (parsed) type-refs of the `on call` handler's parameters.
+    pub params: Vec<(String, TypeRef)>,
+    pub return_type: TypeRef,
+    pub span: crate::span::Span,
+}
+
+impl CrossContextInfo {
+    /// Returns the qualified name of the consumed context this prefix refers
+    /// to, treating `prefix` as either an alias or a full qualified name.
+    pub fn resolve_prefix(&self, prefix: &str) -> Option<String> {
+        if let Some(q) = self.aliases.get(prefix) {
+            return Some(q.clone());
+        }
+        if self.consumed_contexts.iter().any(|c| c == prefix) {
+            return Some(prefix.to_string());
+        }
+        None
+    }
 }
 
 impl ResolvedCommons {
@@ -198,6 +252,7 @@ pub fn resolve(commons: Commons) -> Result<ResolvedCommons, Vec<CompileError>> {
             fns,
             methods,
             local_type_names,
+            cross_context: CrossContextInfo::default(),
         })
     } else {
         Err(errors)

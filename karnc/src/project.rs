@@ -250,6 +250,88 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
         unit_consumes.insert(name.clone(), consumes_targets);
     }
 
+    // -- 5b'. Collect `consumes` aliases (v0.6 §3.1). Each consuming context
+    //         has an alias map: alias → consumed-context qualified name.
+    //         Detect alias-alias conflicts here; alias-vs-local-decl conflicts
+    //         are checked once the local symbol tables are built (step 6+).
+    let mut unit_consumes_aliases: HashMap<String, HashMap<String, String>> = HashMap::new();
+    for (name, indices) in &groups {
+        let kind = *kinds.get(name).unwrap();
+        if kind != UnitKind::Context {
+            continue;
+        }
+        let mut aliases: HashMap<String, String> = HashMap::new();
+        let mut alias_spans: HashMap<String, Span> = HashMap::new();
+        for &i in indices {
+            for c in parsed[i].consumes() {
+                let Some(alias) = &c.alias else { continue };
+                let target = c.target.joined();
+                if !unit_tables.contains_key(&target) {
+                    // Already reported as unknown context above.
+                    continue;
+                }
+                if let Some(prev_span) = alias_spans.get(&alias.name) {
+                    errors.push(
+                        CompileError::new(
+                            "karn.consumes.alias_conflict",
+                            alias.span,
+                            format!(
+                                "alias `{}` is used by more than one `consumes` clause in context `{}`",
+                                alias.name, name
+                            ),
+                        )
+                        .with_label(*prev_span, "previously defined here")
+                        .with_note(
+                            "each `consumes` clause may introduce at most one alias, and aliases must be unique within a context",
+                        ),
+                    );
+                    continue;
+                }
+                aliases.insert(alias.name.clone(), target);
+                alias_spans.insert(alias.name.clone(), alias.span);
+            }
+        }
+        unit_consumes_aliases.insert(name.clone(), aliases);
+    }
+
+    // -- 5b''. Detect alias-vs-local-decl conflicts. An alias must not clash
+    //          with any locally declared type/fn/capability/service/agent.
+    for (name, aliases) in &unit_consumes_aliases {
+        let Some(local) = unit_tables.get(name) else {
+            continue;
+        };
+        for alias in aliases.keys() {
+            let alias_span = parsed_alias_span(&parsed, &groups[name], alias).unwrap_or_default();
+            let conflict_kind = if local.types.contains_key(alias) {
+                Some("type")
+            } else if local.fns.contains_key(alias) {
+                Some("function")
+            } else if local.capabilities.contains_key(alias) {
+                Some("capability")
+            } else if local.services.contains_key(alias) {
+                Some("service")
+            } else if local.agents.contains_key(alias) {
+                Some("agent")
+            } else {
+                None
+            };
+            if let Some(kind) = conflict_kind {
+                errors.push(
+                    CompileError::new(
+                        "karn.consumes.alias_conflict",
+                        alias_span,
+                        format!(
+                            "alias `{alias}` conflicts with a local {kind} of the same name in context `{name}`",
+                        ),
+                    )
+                    .with_note(
+                        "pick a different alias for the `consumes` clause, or rename the local declaration",
+                    ),
+                );
+            }
+        }
+    }
+
     // -- 5c. Detect `consumes` cycles. --
     detect_consumes_cycles(&unit_consumes, &mut errors);
 
@@ -714,12 +796,28 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
             // can drive the existing resolver/checker without duplication.
             let synthetic_commons = pf.as_synthetic_commons(emit_items);
 
+            // Cross-context info (v0.6) for contexts: consumed contexts,
+            // aliases, services, and types. Computed once below; reused
+            // for the resolver, checker, and emitter.
+            let cross_context_for_file = if kind == UnitKind::Context {
+                build_cross_context_info(
+                    name,
+                    &unit_consumes,
+                    &unit_consumes_aliases,
+                    &unit_uses,
+                    &unit_tables,
+                )
+            } else {
+                resolver::CrossContextInfo::default()
+            };
+
             let resolved = ResolvedCommons {
                 commons: synthetic_commons,
                 types: combined_types.clone(),
                 fns: combined_fns.clone(),
                 methods: combined_methods.clone(),
                 local_type_names: local_names.clone(),
+                cross_context: cross_context_for_file.clone(),
             };
             if let Err(errs) = resolver::resolve_file(&resolved) {
                 errors.extend(errs);
@@ -750,7 +848,7 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
             if kind == UnitKind::Context
                 && let Some(table) = unit_table_owned.as_ref()
             {
-                let v0_5_errs = check_v0_5_declarations(&mut typed, table);
+                let v0_5_errs = check_v0_5_declarations(&mut typed, table, &cross_context_for_file);
                 if !v0_5_errs.is_empty() {
                     errors.extend(v0_5_errs);
                     continue;
@@ -798,6 +896,7 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
                     )
                 })
                 .collect();
+            let cross_context_info = cross_context_for_file.clone();
 
             let emit_ctx = EmitProjectCtx {
                 source_path: pf.source_path.clone(),
@@ -828,6 +927,10 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
                 exports_local,
                 exports_for_consumed,
                 consumed_types: consumed_types.clone(),
+                cross_context: cross_context_info,
+                is_consumed_by_others: unit_consumes
+                    .iter()
+                    .any(|(_, targets)| targets.iter().any(|t| t == name)),
             };
             let ts = emitter::emit_project(&typed, &emit_ctx);
             let output_path = ts_output_path(&pf.source_path);
@@ -842,8 +945,179 @@ pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> 
     if !errors.is_empty() {
         return Err(errors);
     }
+
+    // v0.6 §6.3: emit a composition root when the project has at least one
+    // context that consumes another context's service surface. The compose
+    // file imports each context, instantiates its providers, assembles its
+    // deps (capabilities + cross-context surfaces), and exports the top-level
+    // service surface.
+    if let Some(compose_ts) = emit_composition_root(
+        &groups,
+        &kinds,
+        &unit_consumes,
+        &unit_consumes_aliases,
+        &unit_tables,
+    ) {
+        compiled.push(CompiledFile {
+            source_path: PathBuf::from("compose.karn"),
+            output_path: PathBuf::from("compose.ts"),
+            typescript: compose_ts,
+        });
+    }
+
     compiled.sort_by(|a, b| a.source_path.cmp(&b.source_path));
     Ok(ProjectOutput { files: compiled })
+}
+
+/// Build a project-level composition root that wires every context's
+/// providers and cross-context surfaces together. Returns `None` if the
+/// project has no cross-context wiring to glue.
+fn emit_composition_root(
+    groups: &HashMap<String, Vec<usize>>,
+    kinds: &HashMap<String, UnitKind>,
+    unit_consumes: &HashMap<String, Vec<String>>,
+    unit_consumes_aliases: &HashMap<String, HashMap<String, String>>,
+    unit_tables: &HashMap<String, UnitTable>,
+) -> Option<String> {
+    // Identify contexts that consume something whose surface has services.
+    let mut needs_compose = false;
+    for (name, targets) in unit_consumes {
+        if !targets.is_empty()
+            && let Some(UnitKind::Context) = kinds.get(name)
+        {
+            for t in targets {
+                if let Some(other) = unit_tables.get(t)
+                    && !other.services.is_empty()
+                {
+                    needs_compose = true;
+                }
+            }
+        }
+    }
+    if !needs_compose {
+        return None;
+    }
+
+    let mut contexts: Vec<&String> = groups
+        .keys()
+        .filter(|n| kinds.get(*n) == Some(&UnitKind::Context))
+        .collect();
+    contexts.sort();
+
+    let mut out = String::new();
+    out.push_str("// Generated by karnc — do not edit by hand.\n");
+    out.push_str("// composition root\n\n");
+
+    // Import every context as a namespace.
+    for ctx_name in &contexts {
+        let dir = commons_dir_for(ctx_name).to_string_lossy().to_string();
+        let ns = ctx_name.replace('.', "_");
+        out.push_str(&format!("import * as {ns} from \"./{dir}.js\";\n"));
+    }
+    out.push('\n');
+
+    out.push_str("export function composeApp() {\n");
+
+    // Build each context's deps and surface in dependency-respecting order:
+    // a context that consumes another must come after the consumed context,
+    // so its `surface` field can reference the already-built surface.
+    let mut ordered: Vec<String> = Vec::new();
+    let mut visited: HashSet<String> = HashSet::new();
+    fn visit(
+        node: &str,
+        unit_consumes: &HashMap<String, Vec<String>>,
+        visited: &mut HashSet<String>,
+        out: &mut Vec<String>,
+    ) {
+        if visited.contains(node) {
+            return;
+        }
+        visited.insert(node.to_string());
+        if let Some(targets) = unit_consumes.get(node) {
+            for t in targets {
+                visit(t, unit_consumes, visited, out);
+            }
+        }
+        out.push(node.to_string());
+    }
+    for c in &contexts {
+        visit(c, unit_consumes, &mut visited, &mut ordered);
+    }
+
+    for ctx_name in &ordered {
+        if kinds.get(ctx_name.as_str()) != Some(&UnitKind::Context) {
+            continue;
+        }
+        let Some(table) = unit_tables.get(ctx_name.as_str()) else {
+            continue;
+        };
+        let ns = ctx_name.replace('.', "_");
+
+        let mut deps_entries: Vec<String> = table
+            .providers
+            .iter()
+            .map(|(cap, p)| format!("{cap}: new {ns}.{}()", p.provider_name.name))
+            .collect();
+        deps_entries.sort();
+
+        let mut surface_entries: Vec<String> = Vec::new();
+        if let Some(targets) = unit_consumes.get(ctx_name.as_str()) {
+            let aliases = unit_consumes_aliases
+                .get(ctx_name.as_str())
+                .cloned()
+                .unwrap_or_default();
+            let mut alias_for: HashMap<String, String> = HashMap::new();
+            for (alias, target) in &aliases {
+                alias_for.insert(target.clone(), alias.clone());
+            }
+            let mut sorted_targets = targets.clone();
+            sorted_targets.sort();
+            for t in &sorted_targets {
+                let Some(other) = unit_tables.get(t) else {
+                    continue;
+                };
+                if other.services.is_empty() {
+                    continue;
+                }
+                let surface_key = alias_for
+                    .get(t)
+                    .cloned()
+                    .unwrap_or_else(|| t.rsplit('.').next().unwrap_or(t.as_str()).to_string());
+                surface_entries.push(format!("{surface_key}: {}Surface", t.replace('.', "_")));
+            }
+        }
+        if !surface_entries.is_empty() {
+            deps_entries.push(format!("surface: {{ {} }}", surface_entries.join(", ")));
+        }
+        out.push_str(&format!(
+            "  const {ns}Deps = {{ {} }};\n",
+            deps_entries.join(", ")
+        ));
+        if !table.services.is_empty() {
+            out.push_str(&format!(
+                "  const {ns}Surface = {ns}.makeSurface({ns}Deps);\n",
+            ));
+        }
+    }
+    out.push('\n');
+
+    // Export per-context surfaces under a top-level object.
+    out.push_str("  return {\n");
+    for ctx_name in &contexts {
+        let Some(table) = unit_tables.get(ctx_name.as_str()) else {
+            continue;
+        };
+        if table.services.is_empty() {
+            continue;
+        }
+        let ns = ctx_name.replace('.', "_");
+        let key = ctx_name.rsplit('.').next().unwrap_or(ctx_name.as_str());
+        out.push_str(&format!("    {key}: {ns}Surface,\n"));
+    }
+    out.push_str("  };\n");
+    out.push_str("}\n");
+
+    Some(out)
 }
 
 // -- internals --
@@ -1480,11 +1754,108 @@ fn uses_span_of(parsed: &[ParsedFile], indices: &[usize], target: &str) -> Optio
     None
 }
 
+/// Build the [`resolver::CrossContextInfo`] for a given consuming context.
+/// Used by both the resolver/checker (per-file processing) and the emitter
+/// (composition root + boundary casts).
+fn build_cross_context_info(
+    name: &str,
+    unit_consumes: &HashMap<String, Vec<String>>,
+    unit_consumes_aliases: &HashMap<String, HashMap<String, String>>,
+    unit_uses: &HashMap<String, Vec<String>>,
+    unit_tables: &HashMap<String, UnitTable>,
+) -> resolver::CrossContextInfo {
+    let consumed_contexts: Vec<String> = unit_consumes.get(name).cloned().unwrap_or_default();
+    let aliases: HashMap<String, String> =
+        unit_consumes_aliases.get(name).cloned().unwrap_or_default();
+    let mut consumed_services: HashMap<String, HashMap<String, resolver::CrossContextService>> =
+        HashMap::new();
+    let mut consumed_types: HashMap<String, HashMap<String, TypeDecl>> = HashMap::new();
+    for t in &consumed_contexts {
+        let other_types_combined = combined_types_for(t, unit_tables, unit_uses);
+        consumed_types.insert(t.clone(), other_types_combined.clone());
+        let Some(other_table) = unit_tables.get(t) else {
+            continue;
+        };
+        let mut svcs: HashMap<String, resolver::CrossContextService> = HashMap::new();
+        for (sname, sdecl) in &other_table.services {
+            let Some(handler) = sdecl
+                .handlers
+                .iter()
+                .find(|h| matches!(h.kind, HandlerKind::Call))
+            else {
+                continue;
+            };
+            let params: Vec<(String, TypeRef)> = handler
+                .params
+                .iter()
+                .map(|p| (p.name.name.clone(), p.type_ref.clone()))
+                .collect();
+            svcs.insert(
+                sname.clone(),
+                resolver::CrossContextService {
+                    name: sname.clone(),
+                    params,
+                    return_type: handler.return_type.clone(),
+                    span: sdecl.span,
+                },
+            );
+        }
+        consumed_services.insert(t.clone(), svcs);
+    }
+    resolver::CrossContextInfo {
+        self_context: Some(name.to_string()),
+        consumed_contexts,
+        aliases,
+        consumed_services,
+        consumed_types,
+    }
+}
+
+/// Build the combined type table for `unit`: its own types merged with the
+/// types of every commons it `uses`. Used by cross-context resolution so we
+/// can resolve a consumed context's service signatures against that context's
+/// own view of types (v0.6 §4.5).
+fn combined_types_for(
+    unit: &str,
+    unit_tables: &HashMap<String, UnitTable>,
+    unit_uses: &HashMap<String, Vec<String>>,
+) -> HashMap<String, TypeDecl> {
+    let mut out: HashMap<String, TypeDecl> = HashMap::new();
+    if let Some(table) = unit_tables.get(unit) {
+        for (n, d) in &table.types {
+            out.insert(n.clone(), d.clone());
+        }
+    }
+    if let Some(targets) = unit_uses.get(unit) {
+        for t in targets {
+            if let Some(used) = unit_tables.get(t) {
+                for (n, d) in &used.types {
+                    out.entry(n.clone()).or_insert_with(|| d.clone());
+                }
+            }
+        }
+    }
+    out
+}
+
 fn consumes_span_of(parsed: &[ParsedFile], indices: &[usize], target: &str) -> Option<Span> {
     for &i in indices {
         for c in parsed[i].consumes() {
             if c.target.joined() == target {
                 return Some(c.span);
+            }
+        }
+    }
+    None
+}
+
+fn parsed_alias_span(parsed: &[ParsedFile], indices: &[usize], alias: &str) -> Option<Span> {
+    for &i in indices {
+        for c in parsed[i].consumes() {
+            if let Some(a) = &c.alias
+                && a.name == alias
+            {
+                return Some(a.span);
             }
         }
     }
@@ -1887,6 +2258,13 @@ pub struct EmitProjectCtx {
     /// For contexts: types imported via `consumes` clauses with their
     /// visibility and owning-context metadata.
     pub consumed_types: HashMap<String, ConsumedType>,
+    /// For contexts: full cross-context information (consumed contexts,
+    /// aliases, consumed services and types). Mirrors what the resolver
+    /// and checker see (v0.6).
+    pub cross_context: resolver::CrossContextInfo,
+    /// True when *this* context's surface is consumed by another context in
+    /// the project. Drives `makeSurface` emission (v0.6 §6.3).
+    pub is_consumed_by_others: bool,
 }
 
 impl EmitProjectCtx {
@@ -1905,6 +2283,7 @@ fn _ensure_components_used(_p: &Path) {
 fn check_v0_5_declarations(
     typed: &mut checker::TypedCommons,
     table: &UnitTable,
+    cross_context: &resolver::CrossContextInfo,
 ) -> Vec<CompileError> {
     let mut errors = Vec::new();
 
@@ -1918,6 +2297,7 @@ fn check_v0_5_declarations(
         fns: typed.fns.clone(),
         methods: typed.methods.clone(),
         local_type_names,
+        cross_context: cross_context.clone(),
     };
 
     // Capability info from the table.
@@ -2051,6 +2431,7 @@ fn check_v0_5_declarations(
             fns: typed.fns.clone(),
             methods: typed.methods.clone(),
             local_type_names: local_names_for_handler,
+            cross_context: cross_context.clone(),
         };
         let state_ty = Ty::Named {
             name: agent_state_name.clone(),
@@ -2108,6 +2489,7 @@ fn check_v0_5_declarations(
             fns: typed.fns.clone(),
             methods: typed.methods.clone(),
             local_type_names: local_names_for_handler,
+            cross_context: cross_context.clone(),
         };
         self_scope.insert(
             "self".to_string(),

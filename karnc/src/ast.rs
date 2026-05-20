@@ -100,10 +100,12 @@ pub struct Context {
     pub trailing_comments: Vec<String>,
 }
 
-/// A `consumes other.context` declaration (v0.4 §3.2).
+/// A `consumes other.context` declaration (v0.4 §3.2). May optionally carry
+/// an alias introduced by `consumes other.context as Alias` (v0.6 §3.1).
 #[derive(Debug, Clone)]
 pub struct ConsumesDecl {
     pub target: QualifiedName,
+    pub alias: Option<Ident>,
     pub span: Span,
     pub trivia: Trivia,
 }

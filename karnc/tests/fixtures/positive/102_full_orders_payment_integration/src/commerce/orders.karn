@@ -1,0 +1,34 @@
+---
+Orders context. Places orders, calling payment for authorisation.
+---
+context commerce.orders
+
+uses commerce.money
+consumes commerce.payment as Payment
+
+exports transparent { OrderError }
+
+type OrderError = enum {
+  PaymentDeclined,
+  PaymentInsufficientFunds,
+  PaymentInfrastructureError,
+}
+
+service placeOrder {
+  ---
+  Place an order by authorising payment for the total amount. Maps
+  payment's error variants to orders' own OrderError shape (the
+  anti-corruption-layer pattern).
+  ---
+  on call(total: Money) -> Effect[Result[(), OrderError]] {
+    let auth <- Payment.authorise(total)
+    match auth {
+      Ok(_) => Effect.pure(Ok(()))
+      Err(error) => match error {
+        Declined          => Effect.pure(Err(PaymentDeclined))
+        InsufficientFunds => Effect.pure(Err(PaymentInsufficientFunds))
+        GatewayDown       => Effect.pure(Err(PaymentInfrastructureError))
+      }
+    }
+  }
+}

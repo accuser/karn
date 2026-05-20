@@ -1,0 +1,11 @@
+context commerce.payment
+
+exports opaque { AuthId }
+
+type AuthId = String where Matches("AUTH-[0-9]{8}")
+
+service authorise {
+  on call(amount: Int) -> Effect[Result[AuthId, Int]] {
+    Effect.pure(Err(0))
+  }
+}

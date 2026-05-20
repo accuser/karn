@@ -1,0 +1,4 @@
+context commerce.orders
+
+consumes commerce.payment as Foo
+consumes commerce.shipping as Foo

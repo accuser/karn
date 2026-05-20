@@ -87,6 +87,9 @@ pub enum TokenKind {
     Exports,
     #[token("transparent")]
     Transparent,
+    // v0.6 keywords
+    #[token("as")]
+    As,
     // v0.5 keywords
     #[token("agent")]
     Agent,
@@ -245,6 +248,7 @@ impl TokenKind {
             Consumes => "`consumes`",
             Exports => "`exports`",
             Transparent => "`transparent`",
+            As => "`as`",
             Agent => "`agent`",
             Capability => "`capability`",
             Commit => "`commit`",

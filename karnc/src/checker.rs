@@ -532,6 +532,18 @@ impl<'a> Ctx<'a> {
         None
     }
 
+    /// Returns the type of an expression's "root identifier" — for `a.b.c`
+    /// that's `a`; for a bare `a` it's `a`. Used to detect whether a chain's
+    /// outermost name shadows an alias / consumed-context prefix.
+    pub fn lookup_root_ident(&self, expr: &Expr) -> Option<Ty> {
+        match &expr.kind {
+            ExprKind::Ident(id) => self.lookup(&id.name),
+            ExprKind::FieldAccess { receiver, .. } => self.lookup_root_ident(receiver),
+            ExprKind::MethodCall { receiver, .. } => self.lookup_root_ident(receiver),
+            _ => None,
+        }
+    }
+
     pub fn push_scope(&mut self) {
         self.scopes.push(HashMap::new());
     }
@@ -2050,6 +2062,48 @@ fn check_method_call(
     span: Span,
     ctx: &mut Ctx,
 ) -> Option<Ty> {
+    // v0.6: cross-context service call. Two shapes:
+    //   - `Alias.service(args)`           where Alias is from `consumes X as Alias`
+    //   - `prefix.tail.service(args)`     where `prefix.tail` is a consumed context's
+    //                                     qualified name (parsed as nested FieldAccess).
+    // The full-qualified-name form must be checked before the bare-ident form
+    // (the prefix's first segment doesn't resolve as anything local).
+    if ctx.lookup_root_ident(receiver).is_none() {
+        if let Some(consumed) = cross_context_prefix(receiver, ctx) {
+            return check_cross_context_call(receiver, &consumed, method, args, span, ctx);
+        }
+        // Looks like a dotted prefix (no local binding for the root). If the
+        // chain matches the shape of a consumed-context call but the prefix
+        // isn't actually consumed, surface an explicit diagnostic so the user
+        // can fix the missing `consumes` clause rather than seeing a silent
+        // "no methods" error later.
+        if let ExprKind::FieldAccess { .. } = &receiver.kind
+            && let Some(chain) = flatten_ident_chain(receiver)
+            && chain.contains('.')
+        {
+            let info = &ctx.input.cross_context;
+            let in_context = info.self_context.is_some();
+            if in_context && info.resolve_prefix(&chain).is_none() {
+                ctx.errors.push(
+                    CompileError::new(
+                        "karn.resolve.unconsumed_context",
+                        receiver.span,
+                        format!(
+                            "`{chain}.{}` looks like a cross-context service call, but `{chain}` is not in this context's `consumes` clauses",
+                            method.name
+                        ),
+                    )
+                    .with_note(
+                        "add a `consumes {chain}` clause at the top of the context, or use an alias and call it through the alias",
+                    ),
+                );
+                for a in args {
+                    let _ = type_of(a, None, ctx);
+                }
+                return None;
+            }
+        }
+    }
     // Detect capability call (v0.5): receiver is a bare Ident naming a
     // capability declared in the context (in scope via `given`, or declared
     // but undeclared in `given` — the static-call path emits the error).
@@ -2508,6 +2562,414 @@ fn gather_pattern_bindings(
 struct VariantInfo {
     name: String,
     payload: Vec<(String, Ty)>,
+}
+
+/// If `receiver` resolves to a consumed-context prefix (an alias or a
+/// dotted qualified name appearing in `consumes`), return the consumed
+/// context's qualified name. Otherwise None. Local bindings, types, and
+/// capabilities take precedence — those are checked at the call site.
+fn cross_context_prefix(receiver: &Expr, ctx: &Ctx) -> Option<String> {
+    let info = &ctx.input.cross_context;
+    if info.consumed_contexts.is_empty() && info.aliases.is_empty() {
+        return None;
+    }
+    // Walk the receiver to assemble a candidate dotted name. Supports:
+    //   Ident(X)                                 -> "X"
+    //   FieldAccess { Ident(A), B }              -> "A.B"
+    //   FieldAccess { FieldAccess { Ident(A), B }, C } -> "A.B.C"
+    let candidate = flatten_ident_chain(receiver)?;
+    let head = candidate.split('.').next().unwrap_or("");
+    // The head must not shadow a local binding / capability / declared type.
+    if ctx.lookup(head).is_some() {
+        return None;
+    }
+    if ctx.capabilities.contains_key(head) || ctx.declared_capabilities.contains_key(head) {
+        return None;
+    }
+    // If the head is a known local type, only an alias whose name happens to
+    // collide could redirect this; aliases conflicting with types are an
+    // error in project.rs, so a clash here is impossible at this point.
+    info.resolve_prefix(candidate.as_str())
+}
+
+/// Flatten an `Ident`/`FieldAccess` chain into its dotted name, or None if
+/// any segment isn't a bare identifier.
+fn flatten_ident_chain(expr: &Expr) -> Option<String> {
+    match &expr.kind {
+        ExprKind::Ident(id) => Some(id.name.clone()),
+        ExprKind::FieldAccess { receiver, field } => {
+            let head = flatten_ident_chain(receiver)?;
+            Some(format!("{head}.{}", field.name))
+        }
+        _ => None,
+    }
+}
+
+/// Type-check a cross-context service call (v0.6 §4.2). `receiver` carries
+/// the prefix's source span for diagnostics. `consumed` is the resolved
+/// qualified name of the consumed context.
+fn check_cross_context_call(
+    receiver: &Expr,
+    consumed: &str,
+    method: &Ident,
+    args: &[Expr],
+    _span: Span,
+    ctx: &mut Ctx,
+) -> Option<Ty> {
+    // The consuming context must be effectful at this call site (services
+    // and agent handlers are; pure free fns are not).
+    if !ctx.effectful {
+        ctx.errors.push(
+            CompileError::new(
+                "karn.effect.cross_context_in_pure_context",
+                method.span,
+                format!(
+                    "cross-context service call `{}.{}` can only be made inside an effectful body (one returning `Effect[T]`)",
+                    consumed, method.name
+                ),
+            )
+            .with_label(receiver.span, "consumed context prefix"),
+        );
+    }
+    let info = &ctx.input.cross_context;
+    let Some(svcs) = info.consumed_services.get(consumed) else {
+        ctx.errors.push(
+            CompileError::new(
+                "karn.consumes.unknown_context",
+                receiver.span,
+                format!("context `{consumed}` is not in scope here"),
+            )
+            .with_note(
+                "add a `consumes` clause for the target context at the top of the consuming context",
+            ),
+        );
+        for a in args {
+            let _ = type_of(a, None, ctx);
+        }
+        return None;
+    };
+    let Some(service) = svcs.get(&method.name).cloned() else {
+        ctx.errors.push(
+            CompileError::new(
+                "karn.consumes.unknown_service",
+                method.span,
+                format!(
+                    "context `{consumed}` has no service named `{}`",
+                    method.name
+                ),
+            )
+            .with_note(
+                "cross-context calls require an `on call` service handler in the consumed context",
+            ),
+        );
+        for a in args {
+            let _ = type_of(a, None, ctx);
+        }
+        return None;
+    };
+
+    if service.params.len() != args.len() {
+        ctx.errors.push(
+            CompileError::new(
+                "karn.consumes.service_arity",
+                method.span,
+                format!(
+                    "cross-context service `{consumed}.{}` expects {} argument(s), but {} were given",
+                    method.name,
+                    service.params.len(),
+                    args.len()
+                ),
+            )
+            .with_label(service.span, "service declared here"),
+        );
+        for a in args {
+            let _ = type_of(a, None, ctx);
+        }
+        return None;
+    }
+
+    // Resolve the consumed-context types so we can describe parameter shapes.
+    let consumed_types = info
+        .consumed_types
+        .get(consumed)
+        .cloned()
+        .unwrap_or_default();
+
+    // Walk each argument, checking structural compatibility (Phase 4).
+    let mut all_ok = true;
+    for (i, ((pname, ptype_ref), arg)) in service.params.iter().zip(args.iter()).enumerate() {
+        let param_ty = resolve_type_ref(ptype_ref, &consumed_types).unwrap_or(Ty::Unit);
+        // Type-check the argument in the caller's context.
+        let arg_ty = type_of(arg, None, ctx);
+        let Some(arg_ty) = arg_ty else {
+            all_ok = false;
+            continue;
+        };
+        if !structurally_compatible(&arg_ty, &param_ty, &ctx.input.types, &consumed_types) {
+            ctx.errors.push(
+                CompileError::new(
+                    "karn.boundary.structural_mismatch",
+                    arg.span,
+                    format!(
+                        "cross-context argument {} to `{consumed}.{}` has type `{}` in `{}`, but parameter `{pname}` expects `{}` in `{}`",
+                        i + 1,
+                        method.name,
+                        arg_ty.display(),
+                        ctx.input
+                            .cross_context
+                            .self_context
+                            .as_deref()
+                            .unwrap_or("?"),
+                        param_ty.display(),
+                        consumed,
+                    ),
+                )
+                .with_label(service.span, "service declared here")
+                .with_note(
+                    "values crossing a context boundary must have structurally compatible types (same commons-derived type, or identical record/sum shape)",
+                ),
+            );
+            all_ok = false;
+        }
+    }
+    if !all_ok {
+        return None;
+    }
+
+    // Return type rebrand: project the consumed context's return type into
+    // the calling context's namespace by renaming named types whose unqualified
+    // name appears in the caller's type table (v0.6 §4.5).
+    let raw_ret = resolve_type_ref(&service.return_type, &consumed_types).unwrap_or(Ty::Unit);
+    let rebranded = rebrand_return_type(&raw_ret, &ctx.input.types);
+    Some(rebranded)
+}
+
+/// Project a return type produced in the consumed context's namespace into
+/// the caller's namespace by re-resolving named types that exist on both
+/// sides. The structural shape stays the same; the brand changes.
+fn rebrand_return_type(t: &Ty, caller_types: &HashMap<String, TypeDecl>) -> Ty {
+    match t {
+        Ty::Named { name, kind } => {
+            // If the caller's namespace has the same name, prefer the caller's
+            // view (it carries the caller's brand at emission time). Otherwise
+            // keep the consumed-context name; the caller can hold it opaquely.
+            if let Some(decl) = caller_types.get(name) {
+                named_ty(decl)
+            } else {
+                Ty::Named {
+                    name: name.clone(),
+                    kind: kind.clone(),
+                }
+            }
+        }
+        Ty::Result(t, e) => Ty::Result(
+            Box::new(rebrand_return_type(t, caller_types)),
+            Box::new(rebrand_return_type(e, caller_types)),
+        ),
+        Ty::Option(t) => Ty::Option(Box::new(rebrand_return_type(t, caller_types))),
+        Ty::Effect(t) => Ty::Effect(Box::new(rebrand_return_type(t, caller_types))),
+        Ty::Base(_) | Ty::ValidationError | Ty::Unit => t.clone(),
+    }
+}
+
+/// Structural compatibility check for values crossing a context boundary
+/// (v0.6 §4.3). The two types may be expressed in different namespaces
+/// (caller-side / callee-side type tables), so we walk them in parallel
+/// against their respective tables.
+fn structurally_compatible(
+    arg: &Ty,
+    param: &Ty,
+    arg_types: &HashMap<String, TypeDecl>,
+    param_types: &HashMap<String, TypeDecl>,
+) -> bool {
+    structurally_compatible_inner(arg, param, arg_types, param_types, &mut HashSet::new())
+}
+
+fn structurally_compatible_inner(
+    arg: &Ty,
+    param: &Ty,
+    arg_types: &HashMap<String, TypeDecl>,
+    param_types: &HashMap<String, TypeDecl>,
+    visited: &mut HashSet<(String, String)>,
+) -> bool {
+    match (arg, param) {
+        (Ty::Base(a), Ty::Base(b)) => a == b,
+        (Ty::ValidationError, Ty::ValidationError) => true,
+        (Ty::Unit, Ty::Unit) => true,
+        (Ty::Result(t1, e1), Ty::Result(t2, e2)) => {
+            structurally_compatible_inner(t1, t2, arg_types, param_types, visited)
+                && structurally_compatible_inner(e1, e2, arg_types, param_types, visited)
+        }
+        (Ty::Option(a), Ty::Option(b)) => {
+            structurally_compatible_inner(a, b, arg_types, param_types, visited)
+        }
+        (Ty::Effect(a), Ty::Effect(b)) => {
+            structurally_compatible_inner(a, b, arg_types, param_types, visited)
+        }
+        (Ty::Named { name: an, .. }, Ty::Named { name: bn, .. }) => {
+            // Cycle break: once we've started comparing (an, bn) we trust
+            // the recursive case to succeed.
+            let key = (an.clone(), bn.clone());
+            if !visited.insert(key.clone()) {
+                return true;
+            }
+            let ok = structural_compare_named(an, bn, arg_types, param_types, visited);
+            visited.remove(&key);
+            ok
+        }
+        // Refined-named widens to its base; tolerate one-sided widening only
+        // when comparing within the same nominal name (handled above) or when
+        // the param accepts a plain base.
+        (
+            Ty::Named {
+                kind: NamedKind::Refined(b),
+                ..
+            },
+            Ty::Base(target),
+        ) => b == target,
+        _ => false,
+    }
+}
+
+fn structural_compare_named(
+    arg_name: &str,
+    param_name: &str,
+    arg_types: &HashMap<String, TypeDecl>,
+    param_types: &HashMap<String, TypeDecl>,
+    visited: &mut HashSet<(String, String)>,
+) -> bool {
+    // The "same nominal name" case is the most common: both sides derive
+    // the same commons type. Compare their structural shapes.
+    let Some(arg_decl) = arg_types.get(arg_name) else {
+        return false;
+    };
+    let Some(param_decl) = param_types.get(param_name) else {
+        return false;
+    };
+    match (&arg_decl.body, &param_decl.body) {
+        (
+            TypeBody::Refined {
+                base: ab,
+                refinement: ar,
+                ..
+            },
+            TypeBody::Refined {
+                base: bb,
+                refinement: br,
+                ..
+            },
+        ) => {
+            if ab != bb {
+                return false;
+            }
+            refinements_match(ar.as_ref(), br.as_ref())
+        }
+        (
+            TypeBody::Opaque {
+                base: ab,
+                refinement: ar,
+                ..
+            },
+            TypeBody::Opaque {
+                base: bb,
+                refinement: br,
+                ..
+            },
+        ) => {
+            // Opaque types must share a name to be compatible (a context's
+            // opaque cannot be reinterpreted as a different context's opaque).
+            if arg_name != param_name {
+                return false;
+            }
+            if ab != bb {
+                return false;
+            }
+            refinements_match(ar.as_ref(), br.as_ref())
+        }
+        (TypeBody::Record(a), TypeBody::Record(b)) => {
+            if a.fields.len() != b.fields.len() {
+                return false;
+            }
+            for af in &a.fields {
+                let Some(bf) = b.fields.iter().find(|f| f.name.name == af.name.name) else {
+                    return false;
+                };
+                let at = resolve_type_ref(&af.type_ref, arg_types);
+                let bt = resolve_type_ref(&bf.type_ref, param_types);
+                let (Some(at), Some(bt)) = (at, bt) else {
+                    return false;
+                };
+                if !structurally_compatible_inner(&at, &bt, arg_types, param_types, visited) {
+                    return false;
+                }
+            }
+            true
+        }
+        (TypeBody::Sum(a), TypeBody::Sum(b)) => {
+            if a.variants.len() != b.variants.len() {
+                return false;
+            }
+            for av in &a.variants {
+                let Some(bv) = b.variants.iter().find(|v| v.name.name == av.name.name) else {
+                    return false;
+                };
+                if av.payload.len() != bv.payload.len() {
+                    return false;
+                }
+                for (af, bf) in av.payload.iter().zip(bv.payload.iter()) {
+                    if af.name.name != bf.name.name {
+                        return false;
+                    }
+                    let at = resolve_type_ref(&af.type_ref, arg_types);
+                    let bt = resolve_type_ref(&bf.type_ref, param_types);
+                    let (Some(at), Some(bt)) = (at, bt) else {
+                        return false;
+                    };
+                    if !structurally_compatible_inner(&at, &bt, arg_types, param_types, visited) {
+                        return false;
+                    }
+                }
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
+fn refinements_match(a: Option<&Refinement>, b: Option<&Refinement>) -> bool {
+    match (a, b) {
+        (None, None) => true,
+        (Some(_), None) => true, // sending side is more restrictive — receiving is more permissive
+        (None, Some(_)) => false,
+        (Some(a), Some(b)) => {
+            if a.predicates.len() != b.predicates.len() {
+                return false;
+            }
+            // Exact match required (per spec §4.3 conservative rule).
+            // Predicate order matters here; refinements are conventionally
+            // written in a fixed order.
+            for (pa, pb) in a.predicates.iter().zip(b.predicates.iter()) {
+                if !predicate_eq(&pa.kind, &pb.kind) {
+                    return false;
+                }
+            }
+            true
+        }
+    }
+}
+
+fn predicate_eq(a: &PredKind, b: &PredKind) -> bool {
+    match (a, b) {
+        (PredKind::Matches(x), PredKind::Matches(y)) => x == y,
+        (PredKind::InRange(a1, a2), PredKind::InRange(b1, b2)) => a1 == b1 && a2 == b2,
+        (PredKind::MinLength(a), PredKind::MinLength(b)) => a == b,
+        (PredKind::MaxLength(a), PredKind::MaxLength(b)) => a == b,
+        (PredKind::Length(a), PredKind::Length(b)) => a == b,
+        (PredKind::NonNegative, PredKind::NonNegative) => true,
+        (PredKind::Positive, PredKind::Positive) => true,
+        (PredKind::NonEmpty, PredKind::NonEmpty) => true,
+        _ => false,
+    }
 }
 
 fn variants_of(ty: &Ty, types: &HashMap<String, TypeDecl>) -> Option<Vec<VariantInfo>> {

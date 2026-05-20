@@ -826,9 +826,18 @@ impl<'a> Parser<'a> {
     fn parse_consumes_decl(&mut self) -> Result<ConsumesDecl, CompileError> {
         let kw = self.expect(TokenKind::Consumes, "to start a `consumes` declaration")?;
         let target = self.parse_qualified_name()?;
-        let span = kw.span.merge(target.span);
+        let mut span = kw.span.merge(target.span);
+        let alias = if self.peek_kind() == Some(TokenKind::As) {
+            self.bump();
+            let id = self.expect_ident("as an alias for the consumed context")?;
+            span = span.merge(id.span);
+            Some(id)
+        } else {
+            None
+        };
         Ok(ConsumesDecl {
             target,
+            alias,
             span,
             trivia: Trivia::default(),
         })
@@ -3227,6 +3236,7 @@ fn is_reserved_keyword(kind: TokenKind) -> bool {
             | Exports
             | Transparent
             | Agent
+            | As
             | Capability
             | Commit
             | Effect

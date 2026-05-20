@@ -1,0 +1,15 @@
+context commerce.orders
+
+consumes commerce.payment as Payment
+
+type LocalAmount = {
+  pence:    Int,
+  iso:      String,
+}
+
+service placeOrder {
+  on call(value: LocalAmount) -> Effect[Result[Int, Int]] {
+    let _ <- Payment.authorise(value)
+    Effect.pure(Ok(0))
+  }
+}

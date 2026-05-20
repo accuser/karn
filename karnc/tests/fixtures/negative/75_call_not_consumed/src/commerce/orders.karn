@@ -1,0 +1,8 @@
+context commerce.orders
+
+service placeOrder {
+  on call(total: Int) -> Effect[Result[Int, Int]] {
+    let _ <- commerce.payment.authorise(total)
+    Effect.pure(Ok(total))
+  }
+}

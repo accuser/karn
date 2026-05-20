@@ -1,0 +1,5 @@
+context commerce.shipping
+
+exports opaque { ShipmentId }
+
+type ShipmentId = String where Matches("SHP-[0-9]{8}")

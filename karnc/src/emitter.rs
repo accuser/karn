@@ -70,6 +70,8 @@ fn single_file_ctx() -> EmitProjectCtx {
         exports_local: HashMap::new(),
         exports_for_consumed: HashMap::new(),
         consumed_types: HashMap::new(),
+        cross_context: crate::resolver::CrossContextInfo::default(),
+        is_consumed_by_others: false,
     }
 }
 
@@ -87,6 +89,8 @@ pub fn emit_project(commons: &TypedCommons, ctx: &EmitProjectCtx) -> String {
     if !references.is_empty() {
         writeln!(out).unwrap();
     }
+    // v0.6: namespace imports for each consumed context that exposes services.
+    emit_cross_context_namespace_imports(&mut out, ctx);
     // For contexts: emit per-context nominal rebrand aliases for each type
     // imported via `uses` that this file references. The structural shape is
     // inherited from the original commons type; the brand makes the
@@ -111,11 +115,16 @@ pub fn emit_project(commons: &TypedCommons, ctx: &EmitProjectCtx) -> String {
     for item in &commons.commons.items {
         match item {
             CommonsItem::Capability(c) => emit_capability(&mut out, c),
-            CommonsItem::Provider(p) => emit_provider(&mut out, p, commons),
-            CommonsItem::Service(s) => emit_service(&mut out, s, commons),
-            CommonsItem::Agent(a) => emit_agent(&mut out, a, commons),
+            CommonsItem::Provider(p) => emit_provider(&mut out, p, commons, ctx),
+            CommonsItem::Service(s) => emit_service(&mut out, s, commons, ctx),
+            CommonsItem::Agent(a) => emit_agent(&mut out, a, commons, ctx),
             _ => {}
         }
+    }
+    // v0.6: cross-context surface assembly. Only emit `makeSurface` when
+    // another context consumes this one.
+    if ctx.unit_kind == UnitKind::Context && ctx.is_consumed_by_others {
+        emit_make_surface(&mut out, commons);
     }
     out
 }
@@ -481,6 +490,47 @@ fn record_name_ref(
             .or_default()
             .insert(name.to_string());
     }
+}
+
+/// Emit `import * as <ns> from "..."` for each consumed context that
+/// exposes services (so the consuming file can reference its `makeSurface`
+/// return type and brand the cross-context call arguments).
+fn emit_cross_context_namespace_imports(out: &mut String, ctx: &EmitProjectCtx) {
+    let info = &ctx.cross_context;
+    if info.consumed_services.is_empty() {
+        return;
+    }
+    let mut consumed_with_services: Vec<&String> = info
+        .consumed_services
+        .iter()
+        .filter(|(_, svcs)| !svcs.is_empty())
+        .map(|(q, _)| q)
+        .collect();
+    consumed_with_services.sort();
+    if consumed_with_services.is_empty() {
+        return;
+    }
+    for q in &consumed_with_services {
+        // Pick the first known file path for the consumed context as the
+        // import target. (The composition root lives in the consumed
+        // context's directory; any of its files would work as an import
+        // target since they're all in the same module namespace, but we
+        // currently emit one file per .karn source so a single import per
+        // consumed name suffices for the surface contract.)
+        let target_paths = ctx.imported_decl_paths.get(q.as_str());
+        let target = target_paths
+            .and_then(|m| m.values().next().cloned())
+            .unwrap_or_else(|| {
+                // Fall back to <last-segment>.karn if no specific path is known.
+                let mut p = EmitProjectCtx::commons_path(q);
+                p.set_extension("karn");
+                p
+            });
+        let import = cross_commons_import_specifier_for_path(&ctx.source_path, &target);
+        let ns = qualified_to_ns(q);
+        writeln!(out, "import * as {ns} from \"{import}\";").unwrap();
+    }
+    writeln!(out).unwrap();
 }
 
 fn emit_project_imports(out: &mut String, ctx: &EmitProjectCtx, refs: &ExternalReferences) {
@@ -961,7 +1011,8 @@ fn emit_method(
         ret = ts_type_ref(&f.return_type),
     )
     .unwrap();
-    let mut cx = LowerCtx::new(commons);
+    let empty = crate::resolver::CrossContextInfo::default();
+    let mut cx = LowerCtx::new(commons, &empty);
     emit_block_as_function_body(out, &f.body, &mut cx, INDENT_STEP * 2);
     writeln!(out, "  }},").unwrap();
 }
@@ -989,7 +1040,8 @@ fn emit_free_fn(out: &mut String, f: &FnDecl, commons: &TypedCommons) {
         ret = ts_type_ref(&f.return_type),
     )
     .unwrap();
-    let mut cx = LowerCtx::new(commons);
+    let empty = crate::resolver::CrossContextInfo::default();
+    let mut cx = LowerCtx::new(commons, &empty);
     emit_block_as_function_body(out, &f.body, &mut cx, INDENT_STEP);
     writeln!(out, "}}").unwrap();
     writeln!(out).unwrap();
@@ -1032,7 +1084,7 @@ fn emit_capability(out: &mut String, c: &CapabilityDecl) {
     writeln!(out).unwrap();
 }
 
-fn emit_provider(out: &mut String, p: &ProviderDecl, commons: &TypedCommons) {
+fn emit_provider(out: &mut String, p: &ProviderDecl, commons: &TypedCommons, ctx: &EmitProjectCtx) {
     emit_doc_block(out, p.documentation.as_deref(), 0);
     writeln!(
         out,
@@ -1060,7 +1112,7 @@ fn emit_provider(out: &mut String, p: &ProviderDecl, commons: &TypedCommons) {
             ret = ts_type_ref(&op.return_type),
         )
         .unwrap();
-        let mut cx = LowerCtx::new(commons);
+        let mut cx = LowerCtx::new(commons, &ctx.cross_context);
         emit_block_as_function_body(out, &op.body, &mut cx, INDENT_STEP * 2);
         writeln!(out, "  }}").unwrap();
     }
@@ -1076,7 +1128,7 @@ fn emit_provider(out: &mut String, p: &ProviderDecl, commons: &TypedCommons) {
     writeln!(out).unwrap();
 }
 
-fn emit_service(out: &mut String, s: &ServiceDecl, commons: &TypedCommons) {
+fn emit_service(out: &mut String, s: &ServiceDecl, commons: &TypedCommons, ctx: &EmitProjectCtx) {
     emit_doc_block(out, s.documentation.as_deref(), 0);
     writeln!(out, "export const {name} = {{", name = s.name.name).unwrap();
     for handler in &s.handlers {
@@ -1092,8 +1144,19 @@ fn emit_service(out: &mut String, s: &ServiceDecl, commons: &TypedCommons) {
             .iter()
             .map(|p| format!("{}: {}", p.name.name, ts_type_ref(&p.type_ref)))
             .collect();
-        // Append the deps parameter.
-        let deps_ty = build_deps_object_ty(&handler.given);
+        // Lower the body first so we can detect cross-context usage and
+        // adjust the deps shape accordingly.
+        let mut body_out = String::new();
+        let mut cx = LowerCtx::new(commons, &ctx.cross_context);
+        cx.capabilities = handler
+            .given
+            .iter()
+            .map(|c| c.name.clone())
+            .collect::<HashSet<_>>();
+        emit_block_as_function_body(&mut body_out, &handler.body, &mut cx, INDENT_STEP * 2);
+        // Append the deps parameter (may include surface field if the body
+        // made cross-context calls).
+        let deps_ty = build_deps_object_ty_with_surface(&handler.given, &cx, &ctx.cross_context);
         params.push(format!("deps: {deps_ty}"));
         let ret = ts_type_ref(&handler.return_type);
         let async_kw = if is_effectful_return(&handler.return_type) {
@@ -1108,19 +1171,208 @@ fn emit_service(out: &mut String, s: &ServiceDecl, commons: &TypedCommons) {
             params = params.join(", "),
         )
         .unwrap();
-        let mut cx = LowerCtx::new(commons);
-        cx.capabilities = handler
-            .given
-            .iter()
-            .map(|c| c.name.clone())
-            .collect::<HashSet<_>>();
-        emit_block_as_function_body(out, &handler.body, &mut cx, INDENT_STEP * 2);
+        out.push_str(&body_out);
         writeln!(out, "  }},").unwrap();
     }
     writeln!(out, "}};").unwrap();
     writeln!(out).unwrap();
 }
 
+fn build_deps_object_ty_with_surface(
+    given: &[Ident],
+    cx: &LowerCtx<'_>,
+    cross_context: &crate::resolver::CrossContextInfo,
+) -> String {
+    let mut parts: Vec<String> = given
+        .iter()
+        .map(|c| format!("{}: {}", c.name, c.name))
+        .collect();
+    if cx.cross_context_used {
+        parts.push(format!("surface: {}", surface_ty(cross_context)));
+    }
+    if parts.is_empty() {
+        return "{}".to_string();
+    }
+    format!("{{ {} }}", parts.join("; "))
+}
+
+/// Build the TS type for the `surface` field in deps, naming each consumed
+/// context by its surface key plus the consumed context's makeSurface type.
+fn surface_ty(cross_context: &crate::resolver::CrossContextInfo) -> String {
+    let mut entries: Vec<(String, String)> = Vec::new();
+    // Use alias if present, else the last segment of the qualified name.
+    // Order: stable (sorted) so the diff is deterministic.
+    let mut consumed_sorted = cross_context.consumed_contexts.clone();
+    consumed_sorted.sort();
+    // Reverse lookup: consumed-context qualified name → alias.
+    let mut alias_for: HashMap<String, String> = HashMap::new();
+    for (alias, target) in &cross_context.aliases {
+        alias_for.insert(target.clone(), alias.clone());
+    }
+    for q in &consumed_sorted {
+        let key = alias_for
+            .get(q)
+            .cloned()
+            .unwrap_or_else(|| q.rsplit('.').next().unwrap_or(q.as_str()).to_string());
+        let ns = qualified_to_ns(q);
+        entries.push((key, format!("ReturnType<typeof {ns}.makeSurface>")));
+    }
+    if entries.is_empty() {
+        return "{}".to_string();
+    }
+    let body = entries
+        .into_iter()
+        .map(|(k, v)| format!("{k}: {v}"))
+        .collect::<Vec<_>>()
+        .join("; ");
+    format!("{{ {body} }}")
+}
+
+/// Turn a qualified context name (e.g. `commerce.payment`) into the JS
+/// namespace ident used in `import * as <ns>` (`commerce_payment`).
+fn qualified_to_ns(q: &str) -> String {
+    q.replace('.', "_")
+}
+
+/// Emit the `makeSurface(deps)` function for a context that exposes
+/// services to other contexts (v0.6 §6.3 / §6.4).
+fn emit_make_surface(out: &mut String, commons: &TypedCommons) {
+    let services: Vec<&ServiceDecl> = commons
+        .commons
+        .items
+        .iter()
+        .filter_map(|i| match i {
+            CommonsItem::Service(s) => Some(s),
+            _ => None,
+        })
+        .collect();
+    if services.is_empty() {
+        return;
+    }
+    writeln!(
+        out,
+        "export function makeSurface(deps: Parameters<typeof {svc}.call>[1]) {{",
+        svc = services[0].name.name,
+    )
+    .unwrap();
+    writeln!(out, "  return {{").unwrap();
+    for s in &services {
+        // For each handler kind currently only `call`. We bind it as a
+        // method on the surface with the deps captured.
+        let handler = s
+            .handlers
+            .iter()
+            .find(|h| matches!(h.kind, HandlerKind::Call));
+        let Some(h) = handler else { continue };
+        let async_kw = if is_effectful_return(&h.return_type) {
+            "async "
+        } else {
+            ""
+        };
+        let param_decls: Vec<String> = h
+            .params
+            .iter()
+            .map(|p| format!("{}: {}", p.name.name, ts_type_ref(&p.type_ref)))
+            .collect();
+        let param_args: Vec<String> = h.params.iter().map(|p| p.name.name.clone()).collect();
+        let ret = ts_type_ref(&h.return_type);
+        writeln!(
+            out,
+            "    {async_kw}{sname}({params}): {ret} {{",
+            sname = s.name.name,
+            params = param_decls.join(", "),
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "      return {svc}.call({args}{sep}deps);",
+            svc = s.name.name,
+            args = param_args.join(", "),
+            sep = if param_args.is_empty() { "" } else { ", " },
+        )
+        .unwrap();
+        writeln!(out, "    }},").unwrap();
+    }
+    writeln!(out, "  }};").unwrap();
+    writeln!(out, "}}").unwrap();
+    writeln!(out).unwrap();
+}
+
+/// If `receiver` is a dotted chain or single ident that matches one of the
+/// current context's `consumes` clauses (by alias or qualified name), return
+/// the consumed context's qualified name plus the surface key used to access
+/// it through `deps.surface.<key>`.
+fn cross_context_lowering_prefix(receiver: &Expr, cx: &LowerCtx<'_>) -> Option<(String, String)> {
+    let chain = flatten_emit_ident_chain(receiver)?;
+    let info = cx.cross_context;
+    if info.consumed_contexts.is_empty() && info.aliases.is_empty() {
+        return None;
+    }
+    let consumed = info.resolve_prefix(&chain)?;
+    // Surface key: prefer the alias if there is one, else the last segment.
+    let mut alias_for: HashMap<String, String> = HashMap::new();
+    for (alias, target) in &info.aliases {
+        alias_for.insert(target.clone(), alias.clone());
+    }
+    let key = alias_for.get(&consumed).cloned().unwrap_or_else(|| {
+        consumed
+            .rsplit('.')
+            .next()
+            .unwrap_or(consumed.as_str())
+            .to_string()
+    });
+    Some((consumed, key))
+}
+
+fn flatten_emit_ident_chain(e: &Expr) -> Option<String> {
+    match &e.kind {
+        ExprKind::Ident(id) => Some(id.name.clone()),
+        ExprKind::FieldAccess { receiver, field } => {
+            let head = flatten_emit_ident_chain(receiver)?;
+            Some(format!("{head}.{}", field.name))
+        }
+        _ => None,
+    }
+}
+
+/// Cast an argument crossing a context boundary to the consumed context's
+/// type. For named types we emit `arg as <ns>.<TypeName>`. For other types
+/// (base, ()), no cast is needed. The structural compatibility check at the
+/// karn layer guarantees the cast is sound.
+fn param_cast(
+    consumed: &str,
+    info: &crate::resolver::CrossContextInfo,
+    method: &Ident,
+    idx: usize,
+    arg: String,
+) -> String {
+    let Some(svcs) = info.consumed_services.get(consumed) else {
+        return arg;
+    };
+    let Some(service) = svcs.get(&method.name) else {
+        return arg;
+    };
+    let Some((_, ptype_ref)) = service.params.get(idx) else {
+        return arg;
+    };
+    if let Some(name) = type_ref_named_root(ptype_ref) {
+        let ns = qualified_to_ns(consumed);
+        return format!("({arg} as {ns}.{name})");
+    }
+    arg
+}
+
+/// If the type-ref names a single user type at its root, return that name.
+/// (For generics like `Result[T, E]`, we don't emit a cast at the outer
+/// layer — TypeScript handles the variance through the intersection.)
+fn type_ref_named_root(r: &TypeRef) -> Option<&str> {
+    match r {
+        TypeRef::Named(id) => Some(id.name.as_str()),
+        _ => None,
+    }
+}
+
+#[allow(dead_code)]
 fn build_deps_object_ty(given: &[Ident]) -> String {
     if given.is_empty() {
         return "{}".to_string();
@@ -1132,7 +1384,7 @@ fn build_deps_object_ty(given: &[Ident]) -> String {
     format!("{{ {} }}", parts.join("; "))
 }
 
-fn emit_agent(out: &mut String, a: &AgentDecl, commons: &TypedCommons) {
+fn emit_agent(out: &mut String, a: &AgentDecl, commons: &TypedCommons, ctx: &EmitProjectCtx) {
     emit_doc_block(out, a.documentation.as_deref(), 0);
     let state_ty = format!("{}State", a.name.name);
     // 1) State record type.
@@ -1179,7 +1431,20 @@ fn emit_agent(out: &mut String, a: &AgentDecl, commons: &TypedCommons) {
             .iter()
             .map(|p| format!("{}: {}", p.name.name, ts_type_ref(&p.type_ref)))
             .collect();
-        let deps_ty = build_deps_object_ty(&h.given);
+        // Lower body into a buffer so we can detect cross-context usage and
+        // shape the deps type accordingly.
+        let mut body_out = String::new();
+        let mut cx = LowerCtx::new(commons, &ctx.cross_context);
+        cx.in_agent_handler = true;
+        cx.agent_state_var = Some("currentState".to_string());
+        cx.agent_key_field = Some(a.key_name.name.clone());
+        cx.capabilities = h
+            .given
+            .iter()
+            .map(|c| c.name.clone())
+            .collect::<HashSet<_>>();
+        emit_block_as_function_body(&mut body_out, &h.body, &mut cx, INDENT_STEP * 2);
+        let deps_ty = build_deps_object_ty_with_surface(&h.given, &cx, &ctx.cross_context);
         params.push(format!("deps: {deps_ty}"));
         let ret = ts_type_ref(&h.return_type);
         let async_kw = if is_effectful_return(&h.return_type) {
@@ -1204,16 +1469,7 @@ fn emit_agent(out: &mut String, a: &AgentDecl, commons: &TypedCommons) {
         // (We bind a local `currentState` for the body and provide `self`
         // through ID substitution at lowering time.)
         writeln!(out, "    const currentState = await this.loadState();").unwrap();
-        let mut cx = LowerCtx::new(commons);
-        cx.in_agent_handler = true;
-        cx.agent_state_var = Some("currentState".to_string());
-        cx.agent_key_field = Some(a.key_name.name.clone());
-        cx.capabilities = h
-            .given
-            .iter()
-            .map(|c| c.name.clone())
-            .collect::<HashSet<_>>();
-        emit_block_as_function_body(out, &h.body, &mut cx, INDENT_STEP * 2);
+        out.push_str(&body_out);
         writeln!(out, "  }}").unwrap();
         writeln!(out).unwrap();
     }
@@ -1236,10 +1492,18 @@ struct LowerCtx<'a> {
     agent_state_var: Option<String>,
     /// The name of the agent's `key id` field (so `self.<id>` resolves).
     agent_key_field: Option<String>,
+    /// Cross-context info for v0.6 cross-context call lowering.
+    cross_context: &'a crate::resolver::CrossContextInfo,
+    /// True if the current handler made at least one cross-context call
+    /// (drives whether `deps` gets a `surface` field type).
+    cross_context_used: bool,
 }
 
 impl<'a> LowerCtx<'a> {
-    fn new(commons: &'a TypedCommons) -> Self {
+    fn new(
+        commons: &'a TypedCommons,
+        cross_context: &'a crate::resolver::CrossContextInfo,
+    ) -> Self {
         Self {
             next_tmp: 0,
             commons,
@@ -1247,6 +1511,8 @@ impl<'a> LowerCtx<'a> {
             in_agent_handler: false,
             agent_state_var: None,
             agent_key_field: None,
+            cross_context,
+            cross_context_used: false,
         }
     }
     fn fresh(&mut self) -> String {
@@ -1554,6 +1820,27 @@ fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
             method,
             args,
         } => {
+            // v0.6 cross-context service call: receiver is an alias or the
+            // dotted name of a consumed context. Lower to
+            // `deps.surface.<key>.<method>(args as <consumed_ns>.<T>)`. The
+            // call returns a Promise; the surrounding effect-let / await
+            // unwraps it.
+            if let Some((consumed, key)) = cross_context_lowering_prefix(receiver, cx) {
+                cx.cross_context_used = true;
+                let args_lowered: Vec<String> = args
+                    .iter()
+                    .enumerate()
+                    .map(|(i, a)| {
+                        let lowered = lower_expr(a, stmts, cx);
+                        param_cast(&consumed, cx.cross_context, method, i, lowered)
+                    })
+                    .collect();
+                return format!(
+                    "deps.surface.{key}.{}({})",
+                    method.name,
+                    args_lowered.join(", ")
+                );
+            }
             // Capability call: receiver is a bare ident naming a declared
             // capability in `given`. Lower to `deps.Capability.op(args)`.
             if let ExprKind::Ident(id) = &receiver.kind

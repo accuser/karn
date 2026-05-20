@@ -1,0 +1,5 @@
+context commerce.orders
+
+consumes commerce.payment as Money
+
+type Money = Int where NonNegative

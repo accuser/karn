@@ -328,7 +328,12 @@ impl<'a> Formatter<'a> {
         }
         for c in consumes {
             self.emit_leading_comments(&c.trivia.leading);
-            self.push(&format!("consumes {}", c.target.joined()));
+            match &c.alias {
+                Some(alias) => {
+                    self.push(&format!("consumes {} as {}", c.target.joined(), alias.name))
+                }
+                None => self.push(&format!("consumes {}", c.target.joined())),
+            }
             self.emit_trailing_comment(c.trivia.trailing.as_deref());
             if c.trivia.trailing.is_none() {
                 self.newline();
