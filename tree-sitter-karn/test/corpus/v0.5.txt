@@ -12,12 +12,15 @@ context billing {
 
 (source_file
   (context_decl
-    name: (qualified_name (identifier))
+    name: (qualified_name
+      (identifier))
     (capability_decl
       name: (identifier)
       (capability_op
         name: (identifier)
-        (param name: (identifier) type: "String")
+        (param
+          name: (identifier)
+          type: (base_type))
         return_type: (unit_type)))))
 
 ==========================
@@ -38,21 +41,27 @@ context billing {
 
 (source_file
   (context_decl
-    name: (qualified_name (identifier))
+    name: (qualified_name
+      (identifier))
     (capability_decl
       name: (identifier)
       (capability_op
         name: (identifier)
-        (param name: (identifier) type: "String")
+        (param
+          name: (identifier)
+          type: (base_type))
         return_type: (unit_type)))
     (provider_decl
       capability: (identifier)
       provider: (identifier)
       (provider_op
         name: (identifier)
-        (param name: (identifier) type: "String")
+        (param
+          name: (identifier)
+          type: (base_type))
         return_type: (unit_type)
-        body: (block tail: (unit_literal))))))
+        body: (block
+          tail: (unit_literal))))))
 
 ==========================
 service handler with given
@@ -74,20 +83,29 @@ context billing {
 
 (source_file
   (context_decl
-    name: (qualified_name (identifier))
+    name: (qualified_name
+      (identifier))
     (capability_decl
       name: (identifier)
       (capability_op
         name: (identifier)
-        (param name: (identifier) type: "String")
+        (param
+          name: (identifier)
+          type: (base_type))
         return_type: (unit_type)))
     (service_decl
       name: (identifier)
       (handler
-        method: (identifier)
-        return_type: (generic_type_ref name: (builtin_type) arg: "Bool")
-        given: (given_clause capability: (identifier))
-        body: (block tail: (effect_pure_expr (boolean_literal)))))))
+        (call_handler
+          method: (identifier)
+          return_type: (generic_type_ref
+            name: (builtin_type)
+            arg: (base_type))
+          given: (given_clause
+            capability: (identifier))
+          body: (block
+            tail: (effect_pure_expr
+              (boolean_literal))))))))
 
 ==========================
 agent with state and commit
@@ -112,19 +130,40 @@ context shop {
 
 (source_file
   (context_decl
-    name: (qualified_name (identifier))
+    name: (qualified_name
+      (identifier))
     (agent_decl
       name: (identifier)
-      key: (key_decl name: (identifier) type: "Int")
+      key: (key_decl
+        name: (identifier)
+        type: (base_type))
       state: (state_decl
-        (record_field name: (identifier) type: "Int"))
+        (record_field
+          name: (identifier)
+          type: (base_type)))
       (handler
-        method: (identifier)
-        (param name: (identifier) type: "Int")
-        return_type: (generic_type_ref name: (builtin_type) arg: (unit_type))
-        body: (block
-          (commit_stmt
-            value: (record_spread
-              base: (field_access receiver: (self_expr) field: (identifier))
-              (field_init name: (identifier) value: (binary_expr (field_access receiver: (field_access receiver: (self_expr) field: (identifier)) field: (identifier)) (identifier)))))
-          tail: (effect_pure_expr (unit_literal)))))))
+        (call_handler
+          method: (identifier)
+          (param
+            name: (identifier)
+            type: (base_type))
+          return_type: (generic_type_ref
+            name: (builtin_type)
+            arg: (unit_type))
+          body: (block
+            (commit_stmt
+              value: (record_spread
+                base: (field_access
+                  receiver: (self_expr)
+                  field: (identifier))
+                (field_init
+                  name: (identifier)
+                  value: (binary_expr
+                    (field_access
+                      receiver: (field_access
+                        receiver: (self_expr)
+                        field: (identifier))
+                      field: (identifier))
+                    (identifier)))))
+            tail: (effect_pure_expr
+              (unit_literal))))))))

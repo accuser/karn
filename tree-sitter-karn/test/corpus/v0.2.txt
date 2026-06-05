@@ -11,17 +11,27 @@ commons geom {
 
 (source_file
   (commons_decl
-    name: (qualified_name (identifier))
+    name: (qualified_name
+      (identifier))
     (type_decl
       name: (identifier)
       body: (record_type
-        (record_field name: (identifier) type: "Int")
-        (record_field name: (identifier) type: "Int")))
+        (record_field
+          name: (identifier)
+          type: (base_type))
+        (record_field
+          name: (identifier)
+          type: (base_type))))
     (fn_decl
       name: (identifier)
-      (param name: (identifier) type: (identifier))
-      return_type: "Int"
-      body: (block tail: (field_access receiver: (identifier) field: (identifier))))))
+      (param
+        name: (identifier)
+        type: (identifier))
+      return_type: (base_type)
+      body: (block
+        tail: (field_access
+          receiver: (identifier)
+          field: (identifier))))))
 
 ==========================
 sum type pipe form
@@ -37,14 +47,18 @@ commons orders {
 
 (source_file
   (commons_decl
-    name: (qualified_name (identifier))
+    name: (qualified_name
+      (identifier))
     (type_decl
       name: (identifier)
       body: (sum_type
-        (sum_variant name: (constant_name))
+        (sum_variant
+          name: (constant_name))
         (sum_variant
           name: (constant_name)
-          (variant_payload_field name: (identifier) type: "Int"))))))
+          (variant_payload_field
+            name: (identifier)
+            type: (base_type)))))))
 
 ==========================
 match expression
@@ -64,18 +78,29 @@ commons logic {
 
 (source_file
   (commons_decl
-    name: (qualified_name (identifier))
+    name: (qualified_name
+      (identifier))
     (type_decl
       name: (identifier)
       body: (sum_type
-        (sum_variant name: (constant_name))
-        (sum_variant name: (constant_name))))
+        (sum_variant
+          name: (constant_name))
+        (sum_variant
+          name: (constant_name))))
     (fn_decl
       name: (identifier)
-      (param name: (identifier) type: (identifier))
-      return_type: "Bool"
+      (param
+        name: (identifier)
+        type: (identifier))
+      return_type: (base_type)
       body: (block
         tail: (match_expr
           disc: (identifier)
-          (match_arm pattern: (variant_pattern variant: (constant_name)) body: (boolean_literal))
-          (match_arm pattern: (variant_pattern variant: (constant_name)) body: (boolean_literal)))))))
+          (match_arm
+            pattern: (variant_pattern
+              variant: (identifier))
+            body: (boolean_literal))
+          (match_arm
+            pattern: (variant_pattern
+              variant: (identifier))
+            body: (boolean_literal)))))))

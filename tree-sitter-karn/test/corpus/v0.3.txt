@@ -10,13 +10,16 @@ commons commerce.money {
 
 (source_file
   (commons_decl
-    name: (qualified_name (identifier) (identifier))
+    name: (qualified_name
+      (identifier)
+      (identifier))
     (type_decl
       name: (identifier)
       body: (opaque_type
-        base: "Int"
+        base: (base_type)
         refinement: (refinement
-          (pred_atom (predicate_name)))))))
+          (pred_atom
+            (predicate_name)))))))
 
 ==========================
 doc block attached to type
@@ -33,13 +36,16 @@ commons units {
 
 (source_file
   (commons_decl
-    name: (qualified_name (identifier))
+    name: (qualified_name
+      (identifier))
     (doc_block)
     (type_decl
       name: (identifier)
       body: (refined_type
-        base: "Int"
-        refinement: (refinement (pred_atom (predicate_name)))))))
+        base: (base_type)
+        refinement: (refinement
+          (pred_atom
+            (predicate_name)))))))
 
 ==========================
 uses clause and fragment-form commons
@@ -55,10 +61,17 @@ type Tag = String where NonEmpty
 
 (source_file
   (commons_decl
-    name: (qualified_name (identifier) (identifier))
-    (uses_decl target: (qualified_name (identifier) (identifier)))
+    name: (qualified_name
+      (identifier)
+      (identifier))
+    (uses_decl
+      target: (qualified_name
+        (identifier)
+        (identifier)))
     (type_decl
       name: (identifier)
       body: (refined_type
-        base: "String"
-        refinement: (refinement (pred_atom (predicate_name)))))))
+        base: (base_type)
+        refinement: (refinement
+          (pred_atom
+            (predicate_name)))))))

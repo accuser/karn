@@ -14,11 +14,18 @@ context commerce.payment {
 
 (source_file
   (context_decl
-    name: (qualified_name (identifier) (identifier))
-    (uses_decl target: (qualified_name (identifier) (identifier)))
-    (consumes_decl target: (qualified_name (identifier) (identifier)))
+    name: (qualified_name
+      (identifier)
+      (identifier))
+    (uses_decl
+      target: (qualified_name
+        (identifier)
+        (identifier)))
+    (consumes_decl
+      target: (qualified_name
+        (identifier)
+        (identifier)))
     (exports_decl
-      visibility: "opaque"
       name: (identifier))))
 
 ==========================
@@ -33,8 +40,8 @@ context catalog {
 
 (source_file
   (context_decl
-    name: (qualified_name (identifier))
+    name: (qualified_name
+      (identifier))
     (exports_decl
-      visibility: "transparent"
       name: (identifier)
       name: (identifier))))

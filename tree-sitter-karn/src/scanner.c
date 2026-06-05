@@ -75,11 +75,14 @@ bool tree_sitter_karn_external_scanner_scan(void *payload, TSLexer *lexer,
         return false;
     }
     // The lexer's position when external scanners run can include leading
-    // whitespace; we must skip horizontal whitespace and verify that we
-    // are at the start of a line. tree-sitter calls the external scanner
-    // at any position where one of its tokens is valid; we accept doc
-    // blocks anywhere they begin.
-    while (lexer->lookahead == ' ' || lexer->lookahead == '\t' || lexer->lookahead == '\r') {
+    // whitespace — and, crucially, the scanner is frequently invoked at the
+    // newline *before* the marker line (after the preceding item). We must
+    // skip whitespace *including newlines* to reach the opening marker;
+    // otherwise the internal lexer's `--` line-comment rule consumes the
+    // `---` first. Skipped bytes are only committed if we ultimately return a
+    // doc block, so over-skipping past a non-marker is harmless (we bail).
+    while (lexer->lookahead == ' ' || lexer->lookahead == '\t' ||
+           lexer->lookahead == '\r' || lexer->lookahead == '\n') {
         skip(lexer);
     }
     if (lexer->lookahead != '-') {

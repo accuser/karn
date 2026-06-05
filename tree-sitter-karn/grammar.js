@@ -1,14 +1,17 @@
 /**
- * @file Tree-sitter grammar for Karn (v0–v0.5).
+ * @file Tree-sitter grammar for Karn (v0–v0.9).
  *
  * Covers the syntactic surface defined by karn-mvp-grammar.md and the
- * v0.1–v0.5 deltas. Implements the highlighting / structural shape the
+ * v0.1–v0.9.1 deltas. Implements the highlighting / structural shape the
  * editor needs; semantic rules (type checking, exhaustiveness, effect
  * propagation, `given` matching) are intentionally left to the LSP.
  *
  * The grammar is permissive in the places where the type checker would
  * reject code anyway — e.g., `capability` declarations parse inside any
  * declaration body; the LSP surfaces the placement error.
+ *
+ * Validated by parsing the karnc fixture corpus (tests/fixtures) to zero
+ * ERROR/MISSING nodes.
  *
  * @author Karn project
  * @license see project root
@@ -18,15 +21,16 @@
 // @ts-check
 
 const PREC = {
+  assert: 0,
   or: 1,
   and: 2,
-  cmp: 3,
-  rel: 4,
-  add: 5,
-  mul: 6,
-  unary: 7,
-  postfix: 8,
-  is: 4,
+  is: 3,
+  cmp: 4,
+  rel: 5,
+  add: 6,
+  mul: 7,
+  unary: 8,
+  postfix: 9,
 };
 
 module.exports = grammar({
@@ -40,12 +44,20 @@ module.exports = grammar({
   // tokens; we declare keywords so they take precedence over `identifier`.
   word: ($) => $.identifier,
 
-  conflicts: ($) => [],
+  conflicts: ($) => [
+    // `match e { … }` / `if e { … }` / `commit e`: after a bare identifier `e`,
+    // the `{` is ambiguous between opening the match/if body and opening a
+    // record construction/spread `e { … }`. Keep all parses alive; the body
+    // content (match arms / block statements vs field inits) decides which one
+    // survives at parse time.
+    [$.record_construction, $.record_spread, $._primary],
+  ],
 
   rules: {
     // -- Top level --
 
-    source_file: ($) => choice($.commons_decl, $.context_decl),
+    source_file: ($) =>
+      repeat1(choice($.commons_decl, $.context_decl, $.test_decl)),
 
     commons_decl: ($) =>
       seq(
@@ -53,7 +65,8 @@ module.exports = grammar({
         field("name", $.qualified_name),
         choice(
           seq("{", repeat($._commons_body_item), "}"),
-          // Fragment form: header followed by items to EOF.
+          // Fragment form: header followed by items to EOF (or the next
+          // top-level header).
           repeat($._commons_body_item),
         ),
       ),
@@ -65,6 +78,22 @@ module.exports = grammar({
         choice(
           seq("{", repeat($._context_body_item), "}"),
           repeat($._context_body_item),
+        ),
+      ),
+
+    // v0.7: test unit targeting a commons or context. Brace or fragment form
+    // (a test case is `test "string" …`, so it never collides with a new
+    // `test <qualified_name>` unit — but the disambiguation needs one extra
+    // token of lookahead, handled by a declared conflict).
+    test_decl: ($) =>
+      prec.right(
+        seq(
+          "test",
+          field("target", $.qualified_name),
+          choice(
+            seq("{", repeat($._test_body_item), "}"),
+            repeat($._test_body_item),
+          ),
         ),
       ),
 
@@ -96,11 +125,19 @@ module.exports = grammar({
         $.agent_decl,
       ),
 
+    _test_body_item: ($) =>
+      choice($.uses_decl, $.consumes_decl, $.mocks_decl, $.test_case),
+
     // -- Headers / clauses --
 
     uses_decl: ($) => seq("uses", field("target", $.qualified_name)),
     consumes_decl: ($) =>
-      seq("consumes", field("target", $.qualified_name)),
+      seq(
+        "consumes",
+        field("target", $.qualified_name),
+        // v0.4: `consumes a.b as Alias`.
+        optional(seq("as", field("alias", $.identifier))),
+      ),
     exports_decl: ($) =>
       seq(
         "exports",
@@ -236,6 +273,8 @@ module.exports = grammar({
             alias("Result", $.builtin_type),
             alias("Option", $.builtin_type),
             alias("Effect", $.builtin_type),
+            // v0.9: HTTP result type.
+            alias("HttpResult", $.builtin_type),
           ),
         ),
         "[",
@@ -348,7 +387,9 @@ module.exports = grammar({
         "}",
       ),
 
-    handler: ($) =>
+    // v0.5 `on call` and v0.9 `on http METHOD "path"` handlers.
+    handler: ($) => choice($.call_handler, $.http_handler),
+    call_handler: ($) =>
       seq(
         "on",
         "call",
@@ -362,20 +403,57 @@ module.exports = grammar({
         optional(field("given", $.given_clause)),
         field("body", $.block),
       ),
+    http_handler: ($) =>
+      seq(
+        "on",
+        "http",
+        field("method", $.http_method),
+        field("path", $.string_literal),
+        "(",
+        optional(sep1($.param, ",")),
+        optional(","),
+        ")",
+        "->",
+        field("return_type", $._type_ref),
+        optional(field("given", $.given_clause)),
+        field("body", $.block),
+      ),
+    http_method: () => choice("GET", "POST", "PUT", "PATCH", "DELETE"),
     given_clause: ($) =>
       seq("given", sep1(field("capability", $.identifier), ",")),
 
+    // -- v0.7: test bodies --
+
+    mocks_decl: ($) =>
+      seq(
+        "mocks",
+        field("capability", $.identifier),
+        "=",
+        field("impl", $.identifier),
+        "{",
+        repeat($.provider_op),
+        "}",
+      ),
+    test_case: ($) =>
+      seq("test", field("name", $.string_literal), field("body", $.block)),
+
     // -- Block & statements --
 
+    // A block is a run of statements ending in a tail expression (the block's
+    // value). The tail is optional because a test body may end in a statement
+    // such as a bare `assert`.
     block: ($) =>
-      seq("{", repeat($._statement), field("tail", $._expression), "}"),
+      seq("{", repeat($._statement), optional(field("tail", $._expression)), "}"),
 
-    _statement: ($) => choice($.let_stmt, $.effect_let_stmt, $.commit_stmt),
+    // `assert` is an expression (v0.9.1) but also appears in statement
+    // position within a test body (an expression-statement of type `()`).
+    _statement: ($) =>
+      choice($.let_stmt, $.effect_let_stmt, $.commit_stmt, prec(1, $.assert_expr)),
 
     let_stmt: ($) =>
       seq(
         "let",
-        field("name", $.identifier),
+        field("name", $._binding_name),
         optional(seq(":", field("type", $._type_ref))),
         "=",
         field("value", $._expression),
@@ -383,12 +461,15 @@ module.exports = grammar({
     effect_let_stmt: ($) =>
       seq(
         "let",
-        field("name", $.identifier),
+        field("name", $._binding_name),
         optional(seq(":", field("type", $._type_ref))),
         "<-",
         field("value", $._expression),
       ),
     commit_stmt: ($) => seq("commit", field("value", $._expression)),
+
+    // A let/effect-let may bind the discard name `_`.
+    _binding_name: ($) => choice($.identifier, alias("_", $.wildcard)),
 
     // -- Expressions --
 
@@ -397,10 +478,15 @@ module.exports = grammar({
         $.if_expr,
         $.match_expr,
         $.is_expr,
+        $.assert_expr,
         $.binary_expr,
         $.unary_expr,
         $._primary,
       ),
+
+    // v0.9.1: `assert` is an expression of type `()`.
+    assert_expr: ($) =>
+      prec.right(PREC.assert, seq("assert", field("cond", $._expression))),
 
     if_expr: ($) =>
       seq(
@@ -419,24 +505,32 @@ module.exports = grammar({
         repeat($.match_arm),
         "}",
       ),
+    // Arms are newline-separated; a trailing comma is permitted but not
+    // required.
     match_arm: ($) =>
-      prec(
-        1,
+      prec.right(
         seq(
           field("pattern", $._pattern),
           "=>",
-          field("body", choice($.block, $._expression)),
-          ",",
+          // `_expression` already includes `block` via `_primary`, so a
+          // `{ … }` arm body is covered without a separate alternative.
+          field("body", $._expression),
+          optional(","),
         ),
       ),
 
     _pattern: ($) => choice($.wildcard_pattern, $.variant_pattern),
     wildcard_pattern: () => "_",
+    // The variant name is an `identifier`, not `constant_name`: because
+    // `word` unifies all word-shaped lexemes to `identifier`, a `constant_name`
+    // here can never out-lex `identifier` after `is`/`=>`, which previously
+    // mis-parsed `x is Miss` as a `type.` prefix awaiting a dot. Capitalisation
+    // is recovered in the highlight query, not the grammar.
     variant_pattern: ($) =>
       prec.right(
         seq(
           optional(seq(field("type", $.identifier), ".")),
-          field("variant", $.constant_name),
+          field("variant", $.identifier),
           optional(
             seq(
               "(",
@@ -483,7 +577,6 @@ module.exports = grammar({
         $.paren_expr,
         $.method_call,
         $.field_access,
-        $.constructor_call,
         $.call,
         $.record_construction,
         $.record_spread,
@@ -504,9 +597,13 @@ module.exports = grammar({
 
     paren_expr: ($) => seq("(", $._expression, ")"),
 
+    // Higher precedence than `field_access`: when a `(` follows `recv.name`,
+    // shift into the call; when it doesn't, fall back to field access. This is
+    // what lets `Reps.of(n)` be a call while `p.x` is a field access.
+    // `method_call` also subsumes the old `constructor_call` (`Type.method(…)`).
     method_call: ($) =>
       prec.left(
-        PREC.postfix,
+        PREC.postfix + 1,
         seq(
           field("receiver", $._primary),
           ".",
@@ -524,20 +621,6 @@ module.exports = grammar({
         seq(field("receiver", $._primary), ".", field("field", $.identifier)),
       ),
 
-    constructor_call: ($) =>
-      prec.left(
-        PREC.postfix,
-        seq(
-          field("type", $.identifier),
-          ".",
-          field("method", choice($.identifier, $.constant_name)),
-          "(",
-          optional(sep1(field("arg", $._expression), ",")),
-          optional(","),
-          ")",
-        ),
-      ),
-
     call: ($) =>
       prec.left(
         PREC.postfix,
@@ -551,15 +634,12 @@ module.exports = grammar({
       ),
 
     record_construction: ($) =>
-      prec(
-        2,
-        seq(
-          field("type", $.identifier),
-          "{",
-          optional(sep1($.field_init, ",")),
-          optional(","),
-          "}",
-        ),
+      seq(
+        field("type", $.identifier),
+        "{",
+        optional(sep1($.field_init, ",")),
+        optional(","),
+        "}",
       ),
     field_init: ($) =>
       choice(

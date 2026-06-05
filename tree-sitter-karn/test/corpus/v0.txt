@@ -8,7 +8,9 @@ commons fitness.units {}
 
 (source_file
   (commons_decl
-    name: (qualified_name (identifier) (identifier))))
+    name: (qualified_name
+      (identifier)
+      (identifier))))
 
 ==========================
 refined int with NonNegative
@@ -22,13 +24,16 @@ commons fitness.units {
 
 (source_file
   (commons_decl
-    name: (qualified_name (identifier) (identifier))
+    name: (qualified_name
+      (identifier)
+      (identifier))
     (type_decl
       name: (identifier)
       body: (refined_type
-        base: "Int"
+        base: (base_type)
         refinement: (refinement
-          (pred_atom (predicate_name)))))))
+          (pred_atom
+            (predicate_name)))))))
 
 ==========================
 function with arithmetic body
@@ -42,11 +47,18 @@ commons math {
 
 (source_file
   (commons_decl
-    name: (qualified_name (identifier))
+    name: (qualified_name
+      (identifier))
     (fn_decl
       name: (identifier)
-      (param name: (identifier) type: "Int")
-      (param name: (identifier) type: "Int")
-      return_type: "Int"
+      (param
+        name: (identifier)
+        type: (base_type))
+      (param
+        name: (identifier)
+        type: (base_type))
+      return_type: (base_type)
       body: (block
-        tail: (binary_expr (identifier) (identifier))))))
+        tail: (binary_expr
+          (identifier)
+          (identifier))))))

@@ -13,18 +13,25 @@ commons sample {
 
 (source_file
   (commons_decl
-    name: (qualified_name (identifier))
+    name: (qualified_name
+      (identifier))
     (fn_decl
       name: (identifier)
-      (param name: (identifier) type: "Int")
-      return_type: (identifier)
+      (param
+        name: (identifier)
+        type: (base_type))
+      return_type: (base_type)
       body: (block
         (let_stmt
           name: (identifier)
           value: (if_expr
-            cond: (binary_expr (identifier) (number_literal))
-            then: (block tail: (string_literal))
-            else: (block tail: (string_literal))))
+            cond: (binary_expr
+              (identifier)
+              (number_literal))
+            then: (block
+              tail: (string_literal))
+            else: (block
+              tail: (string_literal))))
         tail: (identifier)))))
 
 ==========================
@@ -42,16 +49,22 @@ commons demo {
 
 (source_file
   (commons_decl
-    name: (qualified_name (identifier))
+    name: (qualified_name
+      (identifier))
     (fn_decl
       name: (identifier)
-      (param name: (identifier) type: "Int")
+      (param
+        name: (identifier)
+        type: (base_type))
       return_type: (generic_type_ref
         name: (builtin_type)
-        arg: "Int"
+        arg: (base_type)
         arg: (validation_error_type))
       body: (block
         (let_stmt
           name: (identifier)
-          value: (question_expr (ok_expr (identifier))))
-        tail: (ok_expr (identifier))))))
+          value: (question_expr
+            (ok_expr
+              (identifier))))
+        tail: (ok_expr
+          (identifier))))))

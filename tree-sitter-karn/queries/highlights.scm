@@ -12,14 +12,17 @@
   "match"
   "is"
   "commit"
+  "assert"
   "on"
   "given"
   "call"
+  "http"
 ] @keyword
 
 [
   "uses"
   "consumes"
+  "as"
 ] @keyword.import
 
 [
@@ -34,6 +37,8 @@
   "state"
   "exports"
   "key"
+  "test"
+  "mocks"
 ] @keyword.declaration
 
 [
@@ -45,13 +50,15 @@
   "where"
   "and"
   "enum"
-  "record"
 ] @keyword.operator
+
+; HTTP method on `on http METHOD "path"` handlers.
+(http_method) @keyword
 
 ; -- Types --
 
 (base_type) @type.builtin
-"ValidationError" @type.builtin
+(validation_error_type) @type.builtin
 
 (builtin_type) @type.builtin
 
@@ -63,7 +70,6 @@
 (variant_payload_field type: (identifier) @type)
 (param type: (identifier) @type)
 (method_name type: (identifier) @type)
-(constructor_call type: (identifier) @type)
 (record_construction type: (identifier) @type)
 (record_spread type: (identifier) @type)
 (variant_pattern type: (identifier) @type)
@@ -75,12 +81,12 @@
 (fn_decl name: (method_name method: (identifier) @function.method))
 (call name: (identifier) @function)
 (method_call method: (identifier) @function.method)
-(constructor_call method: (identifier) @function.method)
 (capability_op name: (identifier) @function.method)
 (provider_op name: (identifier) @function.method)
-(handler method: (identifier) @function.method)
+(call_handler method: (identifier) @function.method)
 
-["Ok" "Err" "Some" "None"] @function.builtin
+["Ok" "Err" "Some"] @function.builtin
+(none_expr) @constant.builtin
 (effect_pure_expr "Effect" @type.builtin
                   "pure" @function.builtin)
 
@@ -105,7 +111,12 @@
 
 ; -- Variants & constants --
 
+; Sum/enum variant declarations keep the dedicated `constant_name` node.
 (constant_name) @constant
+; Variant names in patterns are plain identifiers; treat a capitalised
+; pattern variant as a constant.
+((variant_pattern variant: (identifier) @constant)
+ (#match? @constant "^[A-Z]"))
 (boolean_literal) @constant.builtin
 
 ; -- Literals --
@@ -123,6 +134,7 @@
 (qualified_name (identifier) @module)
 (uses_decl target: (qualified_name) @module)
 (consumes_decl target: (qualified_name) @module)
+(test_decl target: (qualified_name) @module)
 
 ; -- Operators & punctuation --
 
