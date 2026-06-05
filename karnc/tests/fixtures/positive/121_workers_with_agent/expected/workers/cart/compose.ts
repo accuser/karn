@@ -11,7 +11,7 @@ export interface Env {
 type DurableObjectNamespace = { idFromName(name: string): { toString(): string }; get(id: any): any };
 
 export function compose(env: Env) {
-  const deps = {  };
+  const deps = { env };
   return {
   };
 }

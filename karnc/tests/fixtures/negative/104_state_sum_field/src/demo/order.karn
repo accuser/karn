@@ -1,0 +1,20 @@
+context demo.order
+
+type Status = enum {
+	Open,
+	Closed,
+}
+
+type Id = String where Matches("[a-z0-9]{1,8}")
+
+agent Order {
+	key id: Id
+
+	state {
+		status: Status,
+	}
+
+	on call current() -> Effect[Status] {
+		self.state.status
+	}
+}

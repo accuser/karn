@@ -17,7 +17,11 @@ export const compute = {
   },
 };
 
-export function makeSurface(deps: Parameters<typeof compute.call>[1]) {
+export interface DemoSvcDeps {
+  readonly Counter: Counter;
+}
+
+export function makeSurface(deps: DemoSvcDeps) {
   return {
     async compute(start: number): Promise<number> {
       return compute.call(start, deps);

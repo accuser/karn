@@ -71,8 +71,9 @@ pub fn emit_worker_compose(
         let provider_ts = &provider.provider_name.name;
         deps_entries.push(format!("{cap}: new handlers.{provider_ts}()"));
     }
-    // env passes through so handlers' cross-context calls can use it.
-    if !sorted_consumes.is_empty() {
+    // env passes through so handlers' cross-context calls (Service Bindings)
+    // and agent instantiations (Durable Object namespaces) can reach it.
+    if !sorted_consumes.is_empty() || !table.agents.is_empty() {
         deps_entries.push("env".to_string());
     }
     let _ = writeln!(out, "  const deps = {{ {} }};", deps_entries.join(", "));

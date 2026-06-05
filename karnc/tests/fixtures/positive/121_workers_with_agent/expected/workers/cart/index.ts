@@ -5,6 +5,8 @@ import { Ok, Err, type Result, type JsonValue, type BoundaryError, boundaryError
 import { compose, type Env } from "./compose.js";
 import * as handlers from "./handlers.js";
 
+export { CartEntity } from "./handlers.js";
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);

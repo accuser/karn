@@ -9,7 +9,10 @@ export const echo = {
   },
 };
 
-export function makeSurface(deps: Parameters<typeof echo.call>[1]) {
+export interface DemoSvcDeps {
+}
+
+export function makeSurface(deps: DemoSvcDeps) {
   return {
     async echo(message: string): Promise<string> {
       return echo.call(message, deps);

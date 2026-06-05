@@ -1371,6 +1371,46 @@ fn check_call(name: &Ident, args: &[Expr], span: Span, ctx: &mut Ctx) -> Option<
         let owner = owners.into_iter().next().unwrap();
         return check_variant_construction(&owner, &name.name, args, span, ctx);
     }
+    // Agent instantiation: `AgentName(key)` constructs an instance keyed by
+    // `key`. The result type carries the agent's name so subsequent
+    // `agent_instance.method(args)` lookups can find the agent's handler set.
+    if let Some(agent) = ctx.input.agents.get(&name.name).cloned() {
+        let key_ty = resolve_type_ref(&agent.key_type, &ctx.input.types);
+        if args.len() != 1 {
+            ctx.errors.push(CompileError::new(
+                "karn.agent.construction_arity",
+                span,
+                format!(
+                    "agent `{}` is constructed with one key argument, but {} were given",
+                    name.name,
+                    args.len()
+                ),
+            ));
+            for a in args {
+                let _ = type_of(a, None, ctx);
+            }
+            return None;
+        }
+        let arg_ty = type_of(&args[0], key_ty.as_ref(), ctx);
+        if let (Some(a), Some(k)) = (arg_ty.as_ref(), key_ty.as_ref())
+            && !compatible(a, k)
+        {
+            ctx.errors.push(CompileError::new(
+                "karn.agent.key_mismatch",
+                args[0].span,
+                format!(
+                    "agent `{}` key is `{}`, but a value of type `{}` was given",
+                    name.name,
+                    k.display(),
+                    a.display()
+                ),
+            ));
+        }
+        return Some(Ty::Named {
+            name: name.name.clone(),
+            kind: NamedKind::Record,
+        });
+    }
     let _ = span;
     None
 }
@@ -2508,6 +2548,51 @@ fn check_method_call(
             return None;
         }
     };
+    // Agent handler dispatch: when the receiver is an agent instance, look
+    // up the method against the agent's declared `on call` handlers and
+    // resolve to the handler's return type.
+    if let Some(agent) = ctx.input.agents.get(&type_name).cloned() {
+        let Some(handler) = agent.handlers.iter().find(|h| {
+            h.method_name
+                .as_ref()
+                .is_some_and(|n| n.name == method.name)
+        }) else {
+            ctx.errors.push(CompileError::new(
+                "karn.agent.handler_not_found",
+                method.span,
+                format!(
+                    "agent `{}` has no handler named `{}`",
+                    type_name, method.name
+                ),
+            ));
+            for a in args {
+                let _ = type_of(a, None, ctx);
+            }
+            return None;
+        };
+        if handler.params.len() != args.len() {
+            ctx.errors.push(CompileError::new(
+                "karn.agent.handler_arity",
+                method.span,
+                format!(
+                    "agent handler `{}.{}` expects {} argument(s), but {} were given",
+                    type_name,
+                    method.name,
+                    handler.params.len(),
+                    args.len()
+                ),
+            ));
+            for a in args {
+                let _ = type_of(a, None, ctx);
+            }
+            return None;
+        }
+        for (p, arg) in handler.params.iter().zip(args.iter()) {
+            let pty = resolve_type_ref(&p.type_ref, &ctx.input.types);
+            let _ = type_of(arg, pty.as_ref(), ctx);
+        }
+        return resolve_type_ref(&handler.return_type, &ctx.input.types);
+    }
     let table = ctx
         .input
         .methods
@@ -3411,5 +3496,123 @@ fn variants_of(ty: &Ty, types: &HashMap<String, TypeDecl>) -> Option<Vec<Variant
                 .collect(),
         ),
         _ => None,
+    }
+}
+
+// ── v0.9.2: agent state-field zeroability ──────────────────────────────────
+//
+// Fresh agent state is the zero-value record (finding #10): a never-seen key
+// reads `0` / `false` / `""` / `None` rather than `undefined`. A type is
+// *zeroable* when it has a defined zero; agent state fields must be zeroable,
+// since a fresh key has no committed value to load. Non-zeroable fields (a
+// non-Option sum, an opaque type, or a refined type whose refinement excludes
+// the underlying zero) are a compile error until explicit-initialiser syntax
+// lands.
+
+/// The TypeScript zero-value expression for `type_ref` (with an optional
+/// inline field refinement), or `None` if the type is not zeroable.
+pub fn zero_value_ts(
+    type_ref: &TypeRef,
+    inline: Option<&Refinement>,
+    types: &HashMap<String, TypeDecl>,
+) -> Option<String> {
+    match type_ref {
+        TypeRef::Base(b, _) => {
+            if refinement_admits_zero(*b, inline) {
+                zero_of_base(*b)
+            } else {
+                None
+            }
+        }
+        // Option's zero is None, regardless of the inner type.
+        TypeRef::Option(_, _) => Some("None".to_string()),
+        TypeRef::Named(id) => {
+            let decl = types.get(&id.name)?;
+            match &decl.body {
+                TypeBody::Refined {
+                    base, refinement, ..
+                } => {
+                    if refinement_admits_zero(*base, refinement.as_ref()) {
+                        zero_of_base(*base)
+                    } else {
+                        None
+                    }
+                }
+                TypeBody::Record(rec) => agent_state_zero_record(&rec.fields, types),
+                // Non-Option sum types and opaque types have no defined zero.
+                TypeBody::Sum(_) | TypeBody::Opaque { .. } => None,
+            }
+        }
+        // Result / Effect / HttpResult / ValidationError / Unit are not
+        // admissible state-field types and have no zero.
+        _ => None,
+    }
+}
+
+/// The zero record `{ f₁: z₁, …, fₙ: zₙ }` for a set of fields, or `None` if
+/// any field is not zeroable.
+pub fn agent_state_zero_record(
+    fields: &[RecordField],
+    types: &HashMap<String, TypeDecl>,
+) -> Option<String> {
+    let mut parts = Vec::new();
+    for f in fields {
+        let z = zero_value_ts(&f.type_ref, f.refinement.as_ref(), types)?;
+        parts.push(format!("{}: {}", f.name.name, z));
+    }
+    Some(format!("{{ {} }}", parts.join(", ")))
+}
+
+fn zero_of_base(b: BaseType) -> Option<String> {
+    Some(
+        match b {
+            BaseType::Int => "0",
+            BaseType::Bool => "false",
+            BaseType::String => "\"\"",
+        }
+        .to_string(),
+    )
+}
+
+/// Whether the zero value of `base` satisfies every predicate in `refinement`.
+/// Conservative: any predicate we cannot prove admits the zero returns false,
+/// surfacing the `non_zeroable_state_field` diagnostic rather than risking an
+/// invalid fresh state.
+fn refinement_admits_zero(base: BaseType, refinement: Option<&Refinement>) -> bool {
+    let Some(r) = refinement else {
+        return true;
+    };
+    r.predicates.iter().all(|p| pred_admits_zero(base, &p.kind))
+}
+
+fn pred_admits_zero(base: BaseType, k: &PredKind) -> bool {
+    match base {
+        BaseType::Int => match k {
+            PredKind::NonNegative => true,
+            PredKind::Positive => false,
+            PredKind::InRange(lo, hi) => *lo <= 0 && 0 <= *hi,
+            // Length/Matches predicates don't apply to Int; reject conservatively.
+            _ => false,
+        },
+        BaseType::String => match k {
+            PredKind::Matches(p) => regex_matches_empty(p),
+            PredKind::MinLength(n) => *n <= 0,
+            PredKind::MaxLength(n) => *n >= 0,
+            PredKind::Length(n) => *n == 0,
+            PredKind::NonEmpty => false,
+            // Numeric predicates don't apply to String; reject conservatively.
+            _ => false,
+        },
+        // The only Bool zero is `false`; no Bool refinement predicates exist.
+        BaseType::Bool => true,
+    }
+}
+
+/// Does the refinement pattern match the empty string? Anchored exactly as the
+/// emitted refined-type constructor anchors it (`^(?:pattern)$`).
+fn regex_matches_empty(pattern: &str) -> bool {
+    match Regex::new(&format!("^(?:{pattern})$")) {
+        Ok(re) => re.is_match(""),
+        Err(_) => false,
     }
 }

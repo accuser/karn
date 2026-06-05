@@ -9,7 +9,10 @@ export const authorise = {
   },
 };
 
-export function makeSurface(deps: Parameters<typeof authorise.call>[1]) {
+export interface CommercePaymentDeps {
+}
+
+export function makeSurface(deps: CommercePaymentDeps) {
   return {
     async authorise(amount: number): Promise<Result<number, number>> {
       return authorise.call(amount, deps);

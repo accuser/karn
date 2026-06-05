@@ -283,6 +283,123 @@ export function httpResultToResponse<T>(
       });
   }
 }
+
+// v0.9.2: agent instantiation + per-key state lifecycle.
+//
+// An agent keyed by some value lowers to a *lookup-or-create* of the durable
+// state for that key. In bundle mode the per-agent `StateRegistry` holds an
+// in-memory `DurableObjectState` per serialised key (same key → same state
+// within a session; reset per test). In workers mode the agent is a Durable
+// Object: `makeWorkersAgent` returns a typed proxy over the DO stub whose
+// method calls route through `callDurableObjectMethod`. `makeAgent` picks the
+// path: a present binding means workers, an absent one means bundle.
+
+// A minimal structural view of the Cloudflare Durable Object namespace/stub
+// surface. The real runtime is richer but structurally compatible.
+export interface DurableObjectStub {
+  fetch(input: string, init?: unknown): Promise<Response>;
+}
+
+export interface DurableObjectNamespace {
+  idFromName(name: string): unknown;
+  get(id: unknown): DurableObjectStub;
+}
+
+// Serialise an agent key to a stable string. Two semantically-equal keys must
+// serialise identically: a string is itself, a primitive is its JSON form, a
+// record is canonical JSON with sorted fields.
+export function serialiseAgentKey(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || value === null) {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return JSON.stringify(value.map((v) => serialiseAgentKey(v)));
+  }
+  if (typeof value === "object") {
+    const obj = value as { [k: string]: unknown };
+    const keys = Object.keys(obj).sort();
+    return JSON.stringify(keys.map((k) => [k, serialiseAgentKey(obj[k])]));
+  }
+  return JSON.stringify(value);
+}
+
+// Per-agent registry: serialised key → in-memory durable state. Used in bundle
+// mode (and in `karnc test`). `reset()` clears every state so a fresh test
+// sees a clean slate.
+export class StateRegistry<K> {
+  private states = new Map<string, DurableObjectState>();
+
+  getOrCreate(key: K): DurableObjectState {
+    const sk = serialiseAgentKey(key);
+    let state = this.states.get(sk);
+    if (state === undefined) {
+      state = makeTestState(sk);
+      this.states.set(sk, state);
+    }
+    return state;
+  }
+
+  reset(): void {
+    this.states.clear();
+  }
+}
+
+// Workers-mode agent method call: route through the DO stub's `fetch` under
+// the `/_karn/agent/<method>` wire protocol.
+export async function callDurableObjectMethod<R>(
+  stub: DurableObjectStub,
+  method: string,
+  args: unknown[],
+  deps: unknown,
+): Promise<R> {
+  const response = await stub.fetch(`https://_karn/_karn/agent/${method}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ args, deps }),
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return (await response.json()) as R;
+}
+
+// Workers-mode agent: a typed proxy over the DO stub. Each method access
+// returns a function that splits its final argument off as `deps` and routes
+// the rest as method args through `callDurableObjectMethod`. The `as C` cast
+// gives call sites the agent's real method signatures, so user code reads
+// identically to bundle mode.
+export function makeWorkersAgent<C>(binding: DurableObjectNamespace, key: unknown): C {
+  const stub = binding.get(binding.idFromName(serialiseAgentKey(key)));
+  const proxy = new Proxy(
+    {},
+    {
+      get(_target, prop: string | symbol) {
+        if (typeof prop !== "string") return undefined;
+        return (...callArgs: unknown[]) => {
+          const deps = callArgs.length > 0 ? callArgs[callArgs.length - 1] : {};
+          const args = callArgs.length > 0 ? callArgs.slice(0, -1) : [];
+          return callDurableObjectMethod(stub, prop, args, deps);
+        };
+      },
+    },
+  );
+  return proxy as C;
+}
+
+// Single agent-construction helper. A present DO binding selects the workers
+// path; otherwise the bundle registry path. Call sites are identical across
+// targets.
+export function makeAgent<C>(
+  registry: StateRegistry<unknown>,
+  binding: DurableObjectNamespace | undefined,
+  key: unknown,
+  constructBundle: (state: DurableObjectState) => C,
+): C {
+  if (binding !== undefined) {
+    return makeWorkersAgent<C>(binding, key);
+  }
+  const state = registry.getOrCreate(key);
+  return constructBundle(state);
+}
 "#;
 
 /// Emit the contents of `out/tsconfig.json`. The CLI uses `tsc -p` against
@@ -379,6 +496,7 @@ fn single_file_ctx() -> EmitProjectCtx {
         is_consumed_by_others: false,
         target: BuildTarget::Bundle,
         boundary_type_owners: HashMap::new(),
+        local_agents: HashSet::new(),
     }
 }
 
@@ -403,7 +521,7 @@ pub fn emit_project(commons: &TypedCommons, ctx: &EmitProjectCtx) -> String {
     // inherited from the original commons type; the brand makes the
     // rebranded type nominally distinct (v0.4 §6.2).
     if ctx.unit_kind == UnitKind::Context {
-        emit_context_rebrands(&mut out, &references, ctx);
+        emit_context_rebrands(&mut out, &references, commons, ctx);
     }
     write_commons_doc(&mut out, commons);
     for item in &commons.commons.items {
@@ -428,6 +546,26 @@ pub fn emit_project(commons: &TypedCommons, ctx: &EmitProjectCtx) -> String {
             _ => {}
         }
     }
+    // v0.9.2: per-test registry reset. The test runner calls this before each
+    // test so a fresh test sees clean agent state (finding #10's "fresh per
+    // test" half).
+    let agent_names: Vec<&str> = commons
+        .commons
+        .items
+        .iter()
+        .filter_map(|i| match i {
+            CommonsItem::Agent(a) => Some(a.name.name.as_str()),
+            _ => None,
+        })
+        .collect();
+    if !agent_names.is_empty() {
+        writeln!(out, "export function __resetAgents(): void {{").unwrap();
+        for name in &agent_names {
+            writeln!(out, "  {}.reset();", agent_registry_name(name)).unwrap();
+        }
+        writeln!(out, "}}").unwrap();
+        writeln!(out).unwrap();
+    }
     // v0.6: cross-context surface assembly. Emit `makeSurface` for any
     // context that declares services — the composition root references it
     // for every such context, not just those consumed by others. Skipped
@@ -439,7 +577,7 @@ pub fn emit_project(commons: &TypedCommons, ctx: &EmitProjectCtx) -> String {
             .iter()
             .any(|i| matches!(i, CommonsItem::Service(_)));
         if has_services {
-            emit_make_surface(&mut out, commons);
+            emit_make_surface(&mut out, commons, ctx);
         }
     }
     // v0.8: in workers mode, the context module also exports per-type
@@ -563,7 +701,12 @@ fn emit_boundary_helpers(out: &mut String, commons: &TypedCommons, ctx: &EmitPro
 ///
 /// The brand makes two contexts that both `uses` the same commons see distinct
 /// nominal `Money` types in their TypeScript output (v0.4 §3.4 / §6.2).
-fn emit_context_rebrands(out: &mut String, refs: &ExternalReferences, ctx: &EmitProjectCtx) {
+fn emit_context_rebrands(
+    out: &mut String,
+    refs: &ExternalReferences,
+    commons: &TypedCommons,
+    ctx: &EmitProjectCtx,
+) {
     let Some(owning) = &ctx.owning_context else {
         return;
     };
@@ -587,8 +730,38 @@ fn emit_context_rebrands(out: &mut String, refs: &ExternalReferences, ctx: &Emit
             "export type {name} = __Commons{name} & {{ readonly __ctxBrand: \"{owning}\" }};",
         )
         .unwrap();
+        // v0.9.2: a commons refined/opaque type carries a value-side
+        // constructor (`.of` / `.unsafe`). Re-export it under the rebranded
+        // name so a context calling `ShortCode.of(...)` resolves to a value —
+        // delegating to the imported commons constructor but reporting the
+        // context-branded type. (Without this, `ShortCode` is type-only in the
+        // context and `.of` fails to resolve.)
+        if let Some(base) = commons.types.get(name).and_then(refined_or_opaque_base) {
+            let ts_base = ts_base(base);
+            writeln!(out, "export const {name} = {{").unwrap();
+            writeln!(
+                out,
+                "  of(value: {ts_base}): Result<{name}, ValidationError> {{ return __Commons{name}.of(value) as unknown as Result<{name}, ValidationError>; }},",
+            )
+            .unwrap();
+            writeln!(
+                out,
+                "  unsafe(value: {ts_base}): {name} {{ return __Commons{name}.unsafe(value) as unknown as {name}; }},",
+            )
+            .unwrap();
+            writeln!(out, "}};").unwrap();
+        }
     }
     writeln!(out).unwrap();
+}
+
+/// If a type declaration is a refined or opaque base type, return its base
+/// (both lower to a branded base with a `.of` / `.unsafe` constructor object).
+fn refined_or_opaque_base(decl: &TypeDecl) -> Option<BaseType> {
+    match &decl.body {
+        TypeBody::Refined { base, .. } | TypeBody::Opaque { base, .. } => Some(*base),
+        _ => None,
+    }
 }
 
 /// Names that this file needs to import from elsewhere (sibling files of
@@ -1101,7 +1274,13 @@ fn write_header(out: &mut String, commons: &TypedCommons, ctx: &EmitProjectCtx) 
             "type ValidationError",
         ];
         if has_agent {
+            // v0.9.2: agent-declaring files lower instantiation through the
+            // `makeAgent` helper and a per-agent `StateRegistry`, and the
+            // generated factory's signature names `DurableObjectNamespace`.
             parts.push("type DurableObjectState");
+            parts.push("type DurableObjectNamespace");
+            parts.push("StateRegistry");
+            parts.push("makeAgent");
         }
         if has_http {
             // `HttpResult` is both a value (the constructor namespace) and a
@@ -1612,6 +1791,7 @@ fn emit_provider(out: &mut String, p: &ProviderDecl, commons: &TypedCommons, ctx
         )
         .unwrap();
         let mut cx = LowerCtx::new(commons, &ctx.cross_context);
+        cx.local_agents = ctx.local_agents.clone();
         let async_tail = is_effectful_return(&op.return_type);
         emit_block_as_function_body(out, &op.body, &mut cx, INDENT_STEP * 2, async_tail);
         writeln!(out, "  }}").unwrap();
@@ -1654,6 +1834,7 @@ fn emit_service(out: &mut String, s: &ServiceDecl, commons: &TypedCommons, ctx: 
             .iter()
             .map(|c| c.name.clone())
             .collect::<HashSet<_>>();
+        cx.local_agents = ctx.local_agents.clone();
         cx.target = ctx.target;
         let async_tail = is_effectful_return(&handler.return_type);
         emit_block_as_function_body(
@@ -1698,13 +1879,24 @@ fn build_deps_object_ty_with_surface(
         .iter()
         .map(|c| format!("{}: {}", c.name, c.name))
         .collect();
-    if cx.cross_context_used {
-        match target {
-            BuildTarget::Bundle => {
+    match target {
+        BuildTarget::Bundle => {
+            if cx.cross_context_used {
                 parts.push(format!("surface: {}", surface_ty(cross_context)));
             }
-            BuildTarget::Workers => {
-                parts.push(format!("env: {}", workers_env_ty(cross_context)));
+        }
+        BuildTarget::Workers => {
+            // v0.9.2: in workers mode `env` carries both consumed-context
+            // Service Bindings and the local agents' Durable Object namespaces.
+            // It is threaded into deps whenever the handler makes a
+            // cross-context call or instantiates an agent.
+            if cx.cross_context_used || cx.agents_instantiated {
+                let agents = if cx.agents_instantiated {
+                    sorted_local_agents(cx)
+                } else {
+                    Vec::new()
+                };
+                parts.push(format!("env: {}", workers_env_ty(cross_context, &agents)));
             }
         }
     }
@@ -1714,17 +1906,39 @@ fn build_deps_object_ty_with_surface(
     format!("{{ {} }}", parts.join("; "))
 }
 
-/// Workers-mode deps.env shape: one Service Binding per consumed context.
-fn workers_env_ty(cross_context: &crate::resolver::CrossContextInfo) -> String {
+/// Local agent names in this commons, sorted — the DO bindings `env` exposes
+/// in workers mode.
+fn sorted_local_agents(cx: &LowerCtx<'_>) -> Vec<String> {
+    let mut names: Vec<String> = cx
+        .commons
+        .commons
+        .items
+        .iter()
+        .filter_map(|i| match i {
+            CommonsItem::Agent(a) => Some(a.name.name.clone()),
+            _ => None,
+        })
+        .collect();
+    names.sort();
+    names
+}
+
+/// Workers-mode deps.env shape: one Service Binding per consumed context and
+/// one Durable Object namespace per local agent.
+fn workers_env_ty(cross_context: &crate::resolver::CrossContextInfo, agents: &[String]) -> String {
     let mut consumed_sorted = cross_context.consumed_contexts.clone();
     consumed_sorted.sort();
-    let entries: Vec<String> = consumed_sorted
+    let mut entries: Vec<String> = consumed_sorted
         .iter()
         .map(|q| {
             let bind = crate::emitter::wrangler::consumed_binding_name(q);
             format!("{bind}: ServiceBinding")
         })
         .collect();
+    for agent in agents {
+        let bind = crate::emitter::wrangler::agent_binding_name(agent);
+        entries.push(format!("{bind}: DurableObjectNamespace"));
+    }
     if entries.is_empty() {
         "{}".to_string()
     } else {
@@ -1770,9 +1984,57 @@ fn qualified_to_ns(q: &str) -> String {
     q.replace('.', "_")
 }
 
+/// The PascalCase name a context uses for its generated `Deps` interface:
+/// `shortener.links` → `ShortenerLinks`.
+fn context_pascal(name: &str) -> String {
+    name.split('.')
+        .map(|seg| {
+            let mut chars = seg.chars();
+            match chars.next() {
+                Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect()
+}
+
+/// Emit the per-context `<Ctx>Deps` interface (v0.9.2 §4): the providers the
+/// context contributes plus the surfaces of any consumed contexts. Replaces
+/// the fragile `Parameters<typeof svc.call>[1]` indexing, which only resolved
+/// correctly for single-argument service operations.
+fn emit_context_deps_interface(
+    out: &mut String,
+    commons: &TypedCommons,
+    ctx: &EmitProjectCtx,
+) -> String {
+    let deps_name = format!("{}Deps", context_pascal(&commons.commons.name.joined()));
+    let mut fields: Vec<String> = commons
+        .commons
+        .items
+        .iter()
+        .filter_map(|i| match i {
+            CommonsItem::Capability(c) => Some(format!("  readonly {n}: {n};", n = c.name.name)),
+            _ => None,
+        })
+        .collect();
+    if !ctx.cross_context.consumed_contexts.is_empty() {
+        fields.push(format!(
+            "  readonly surface: {};",
+            surface_ty(&ctx.cross_context)
+        ));
+    }
+    writeln!(out, "export interface {deps_name} {{").unwrap();
+    for f in &fields {
+        writeln!(out, "{f}").unwrap();
+    }
+    writeln!(out, "}}").unwrap();
+    writeln!(out).unwrap();
+    deps_name
+}
+
 /// Emit the `makeSurface(deps)` function for a context that exposes
 /// services to other contexts (v0.6 §6.3 / §6.4).
-fn emit_make_surface(out: &mut String, commons: &TypedCommons) {
+fn emit_make_surface(out: &mut String, commons: &TypedCommons, ctx: &EmitProjectCtx) {
     let services: Vec<&ServiceDecl> = commons
         .commons
         .items
@@ -1785,12 +2047,8 @@ fn emit_make_surface(out: &mut String, commons: &TypedCommons) {
     if services.is_empty() {
         return;
     }
-    writeln!(
-        out,
-        "export function makeSurface(deps: Parameters<typeof {svc}.call>[1]) {{",
-        svc = services[0].name.name,
-    )
-    .unwrap();
+    let deps_name = emit_context_deps_interface(out, commons, ctx);
+    writeln!(out, "export function makeSurface(deps: {deps_name}) {{").unwrap();
     writeln!(out, "  return {{").unwrap();
     for s in &services {
         // For each handler kind currently only `call`. We bind it as a
@@ -2063,6 +2321,19 @@ fn emit_agent(out: &mut String, a: &AgentDecl, commons: &TypedCommons, ctx: &Emi
     }
     writeln!(out, "}}").unwrap();
     writeln!(out).unwrap();
+    // v0.9.2: per-agent state registry (bundle mode + `karnc test`) and the
+    // zero-value factory used to initialise a fresh key's state.
+    let registry = agent_registry_name(&a.name.name);
+    let zero_fn = format!("__zeroOf{}State", a.name.name);
+    writeln!(out, "const {registry} = new StateRegistry();").unwrap();
+    let zero_record = crate::checker::agent_state_zero_record(&a.state_fields, &commons.types)
+        .unwrap_or_else(|| "{}".to_string());
+    writeln!(
+        out,
+        "function {zero_fn}(): {state_ty} {{ return {zero_record}; }}"
+    )
+    .unwrap();
+    writeln!(out).unwrap();
     // 2) Durable Object class.
     writeln!(out, "export class {name} {{", name = a.name.name).unwrap();
     writeln!(out, "  state: DurableObjectState;").unwrap();
@@ -2073,9 +2344,10 @@ fn emit_agent(out: &mut String, a: &AgentDecl, commons: &TypedCommons, ctx: &Emi
     writeln!(out, "  private async loadState(): Promise<{state_ty}> {{").unwrap();
     writeln!(
         out,
-        "    return (await this.state.storage.get<{state_ty}>(\"state\"))!;"
+        "    const stored = await this.state.storage.get<{state_ty}>(\"state\");"
     )
     .unwrap();
+    writeln!(out, "    return stored ?? {zero_fn}();").unwrap();
     writeln!(out, "  }}").unwrap();
     writeln!(out).unwrap();
     writeln!(
@@ -2106,6 +2378,7 @@ fn emit_agent(out: &mut String, a: &AgentDecl, commons: &TypedCommons, ctx: &Emi
             .iter()
             .map(|c| c.name.clone())
             .collect::<HashSet<_>>();
+        cx.local_agents = ctx.local_agents.clone();
         let async_tail = is_effectful_return(&h.return_type);
         emit_block_as_function_body(&mut body_out, &h.body, &mut cx, INDENT_STEP * 2, async_tail);
         let deps_ty =
@@ -2139,8 +2412,79 @@ fn emit_agent(out: &mut String, a: &AgentDecl, commons: &TypedCommons, ctx: &Emi
         writeln!(out, "  }}").unwrap();
         writeln!(out).unwrap();
     }
+    // v0.9.2: workers-mode DO dispatch. Method calls arrive as `fetch` requests
+    // under `/_karn/agent/<method>`; decode `{ args, deps }`, invoke the
+    // handler with deps as the trailing argument, and serialise the result.
+    if matches!(ctx.target, BuildTarget::Workers) {
+        writeln!(out, "  async fetch(request: Request): Promise<Response> {{").unwrap();
+        writeln!(out, "    const url = new URL(request.url);").unwrap();
+        writeln!(
+            out,
+            "    if (url.pathname.startsWith(\"/_karn/agent/\")) {{"
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "      const methodName = url.pathname.slice(\"/_karn/agent/\".length);"
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "      const {{ args, deps }} = (await request.json()) as {{ args: unknown[]; deps: unknown }};"
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "      const result = await (this as any)[methodName](...args, deps);"
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "      return new Response(JSON.stringify(result), {{ headers: {{ \"content-type\": \"application/json\" }} }});"
+        )
+        .unwrap();
+        writeln!(out, "    }}").unwrap();
+        writeln!(
+            out,
+            "    return new Response(\"Not Found\", {{ status: 404 }});"
+        )
+        .unwrap();
+        writeln!(out, "  }}").unwrap();
+        writeln!(out).unwrap();
+    }
     writeln!(out, "}}").unwrap();
     writeln!(out).unwrap();
+    // v0.9.2: agent-construction factory. Lowering of `AgentName(key)` calls
+    // this. A present DO binding (workers) routes through `makeWorkersAgent`;
+    // otherwise the bundle registry path is taken. The single `makeAgent`
+    // helper keeps the call site target-agnostic.
+    let key_ts = ts_type_ref(&a.key_type);
+    let bind = crate::emitter::wrangler::agent_binding_name(&a.name.name);
+    writeln!(
+        out,
+        "export function {factory}(key: {key_ts}, env?: {{ {bind}?: DurableObjectNamespace }}): {agent} {{",
+        factory = agent_factory_name(&a.name.name),
+        agent = a.name.name,
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "  return makeAgent({registry}, env?.{bind}, key, (state) => new {agent}(state));",
+        agent = a.name.name,
+    )
+    .unwrap();
+    writeln!(out, "}}").unwrap();
+    writeln!(out).unwrap();
+}
+
+/// The module-level state-registry constant name for an agent class.
+fn agent_registry_name(agent: &str) -> String {
+    format!("__{agent}Registry")
+}
+
+/// The exported agent-construction factory name for an agent class.
+pub fn agent_factory_name(agent: &str) -> String {
+    format!("__make{agent}")
 }
 
 /// Per-function lowering context: fresh-temp counter + typed-commons handle
@@ -2172,9 +2516,24 @@ struct LowerCtx<'a> {
     /// agent names. `<Agent>(<key>).method(args)` lowers to
     /// `new Agent(makeTestState(...)).method(args, {})`.
     pub test_agents: HashSet<String>,
+    /// Agent names declared in the surrounding context. Drives lowering of
+    /// `Agent(key)` (to `new Agent(makeTestState(String(key)))`) and of
+    /// `agent_instance.method(args)` (to `instance.method(args, deps)`) in
+    /// service and agent-handler bodies. Populated by the caller for non-test
+    /// emission and from `test_agents` in test emission.
+    pub local_agents: HashSet<String>,
+    /// Variable bindings that point at agent instances. Updated by the
+    /// statement emitter when it sees `let x = AgentName(key)`. Used by
+    /// the method-call lowering so `x.method(args)` resolves through
+    /// the agent's class rather than via the receiver-namespace lookup.
+    pub local_agent_vars: HashMap<String, String>,
     /// v0.8 build target. In workers mode cross-context calls lower to
     /// `callService(...)` instead of `deps.surface.<key>.<method>(...)`.
     pub target: BuildTarget,
+    /// v0.9.2: set when the body instantiates a local agent. In workers mode
+    /// this drives `env` (carrying the DO namespaces) into the handler's deps
+    /// type so the agent factory can reach its Durable Object binding.
+    pub agents_instantiated: bool,
 }
 
 impl<'a> LowerCtx<'a> {
@@ -2193,7 +2552,22 @@ impl<'a> LowerCtx<'a> {
             cross_context_used: false,
             test_services: HashSet::new(),
             test_agents: HashSet::new(),
+            local_agents: HashSet::new(),
+            local_agent_vars: HashMap::new(),
             target: BuildTarget::Bundle,
+            agents_instantiated: false,
+        }
+    }
+    /// v0.9.2: lower an agent instantiation `AgentName(key)` to its factory
+    /// call. Bundle/test mode passes only the key; workers mode also threads
+    /// `deps.env` so the factory can reach the agent's DO namespace.
+    fn agent_construct(&mut self, agent: &str, key_expr: &str) -> String {
+        self.agents_instantiated = true;
+        let factory = agent_factory_name(agent);
+        if matches!(self.target, BuildTarget::Workers) {
+            format!("{factory}({key_expr}, deps.env)")
+        } else {
+            format!("{factory}({key_expr})")
         }
     }
     fn fresh(&mut self) -> String {
@@ -2267,6 +2641,7 @@ pub fn lower_test_case_body(
     let mut out = String::new();
     let mut cx = LowerCtx::new(typed, cross_context);
     cx.test_services = test_services;
+    cx.local_agents = test_agents.clone();
     cx.test_agents = test_agents;
     for stmt in &block.statements {
         emit_statement(&mut out, stmt, &mut cx, 0);
@@ -2365,6 +2740,16 @@ fn lower_tail_expr(
 fn emit_statement(out: &mut String, stmt: &Statement, cx: &mut LowerCtx, indent: usize) {
     match stmt {
         Statement::Let(l) => {
+            // Track `let x = AgentName(key)` so subsequent `x.method(args)`
+            // calls can dispatch through the agent class.
+            if l.name.name != "_"
+                && let ExprKind::Call(name, ctor_args) = &l.value.kind
+                && cx.local_agents.contains(&name.name)
+                && ctor_args.len() == 1
+            {
+                cx.local_agent_vars
+                    .insert(l.name.name.clone(), name.name.clone());
+            }
             let mut stmts = Vec::new();
             let value = lower_expr(&l.value, &mut stmts, cx);
             for s in &stmts {
@@ -2490,6 +2875,15 @@ fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
                 && http_variant(&name.name).is_some()
             {
                 return format!("HttpResult.{}({})", name.name, args_lowered.join(", "));
+            }
+            // v0.9.2: agent instantiation `AgentName(key)` lowers to the
+            // generated `__makeAgentName(key)` factory, which obtains the
+            // instance for this key (lookup-or-create against the registry in
+            // bundle mode, or a typed DO proxy in workers mode). Skipped when
+            // this Call is the receiver of a MethodCall — that path folds
+            // construction and the method invocation together.
+            if cx.local_agents.contains(&name.name) && args_lowered.len() == 1 {
+                return cx.agent_construct(&name.name, &args_lowered[0]);
             }
             if let Some(Ty::Named {
                 kind: NamedKind::Sum,
@@ -2718,29 +3112,42 @@ fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
                 all.push("deps".to_string());
                 return format!("{}.{}({})", id.name, method.name, all.join(", "));
             }
-            // v0.7: agent invocation inside a test case body. Source form is
+            // v0.9.2: inline agent invocation. Source form is
             // `Agent(<key>).method(args)`; receiver parses as
             // `Call(Agent, [<key>])`. Lower to
-            // `new Agent(makeTestState(<key>)).method(args, {})` so the test
-            // can drive an agent without a real DurableObject runtime.
+            // `__makeAgent(<key>).method(args, deps)`. Works in service and
+            // agent-handler bodies (deps is the handler's deps parameter) and
+            // test bodies (deps is the locally-built makeTestDeps record).
             if let ExprKind::Call(name, ctor_args) = &receiver.kind
-                && cx.test_agents.contains(&name.name)
+                && cx.local_agents.contains(&name.name)
             {
                 let key_arg = ctor_args
                     .first()
                     .map(|a| lower_expr(a, stmts, cx))
                     .unwrap_or_else(|| "\"default\"".to_string());
+                let instance = cx.agent_construct(&name.name, &key_arg);
                 let args_lowered: Vec<String> =
                     args.iter().map(|a| lower_expr(a, stmts, cx)).collect();
                 let mut all = args_lowered;
-                all.push("{}".to_string());
+                all.push("deps".to_string());
                 return format!(
-                    "new {agent}(makeTestState(String({key}))).{method}({args})",
-                    agent = name.name,
-                    key = key_arg,
+                    "{instance}.{method}({args})",
                     method = method.name,
                     args = all.join(", ")
                 );
+            }
+            // Let-bound agent invocation. `let x = Agent(key); x.method(args)`
+            // — the statement emitter recorded `x` as an agent variable when
+            // it lowered the let. Method calls on `x` go straight to the
+            // class instance with `deps` threaded through.
+            if let ExprKind::Ident(id) = &receiver.kind
+                && cx.local_agent_vars.contains_key(&id.name)
+            {
+                let args_lowered: Vec<String> =
+                    args.iter().map(|a| lower_expr(a, stmts, cx)).collect();
+                let mut all = args_lowered;
+                all.push("deps".to_string());
+                return format!("{}.{}({})", id.name, method.name, all.join(", "));
             }
             // Instance call: UFCS lowering with the receiver as first arg.
             let ns = cx
@@ -3047,7 +3454,7 @@ fn lower_match_as_iife(discriminant: &Expr, arms: &[MatchArm], cx: &mut LowerCtx
     // Pre-statements need to be evaluated before the IIFE; lift them into
     // a sequence: `(prestmt1, prestmt2, iife)`. Since TS doesn't let us
     // evaluate statements inline, we wrap in another arrow.
-    let inner_iife = build_match_iife(&disc, &disc_ty, arms, cx);
+    let inner_iife = maybe_async_iife(build_match_iife(&disc, &disc_ty, arms, cx));
     if stmts.is_empty() {
         iife.push_str(&inner_iife);
     } else {
@@ -3069,8 +3476,28 @@ fn lower_match_as_iife(discriminant: &Expr, arms: &[MatchArm], cx: &mut LowerCtx
             iife.push(' ');
         }
         iife.push_str("})()");
+        iife = maybe_async_iife(iife);
     }
     iife
+}
+
+/// v0.9.2: a match lowered to an IIFE in *expression* position may have arms
+/// that `await` (an effectful `let x <- …` or an effectful tail). A synchronous
+/// arrow can't host `await`, so when the lowered body contains one, make the
+/// outermost arrow `async` and `await` its call. Nested matches that already
+/// did this surface their own `await`, which propagates the transform outward.
+fn maybe_async_iife(iife: String) -> String {
+    if !iife.contains("await ") {
+        return iife;
+    }
+    let async_iife = if let Some(rest) = iife.strip_prefix("((__d) =>") {
+        format!("(async (__d) =>{rest}")
+    } else if let Some(rest) = iife.strip_prefix("(() => {") {
+        format!("(async () => {{{rest}")
+    } else {
+        return iife;
+    };
+    format!("await {async_iife}")
 }
 
 fn build_match_iife(
@@ -3105,6 +3532,18 @@ fn build_match_iife(
     out
 }
 
+/// Whether an expression lowers to a stable reference TypeScript can narrow
+/// across a `switch` (a variable or a property path rooted in one). Calls and
+/// other computed expressions are not narrowable and must be bound to a temp.
+fn is_narrowable_path(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Ident(_) => true,
+        ExprKind::FieldAccess { receiver, .. } => is_narrowable_path(receiver),
+        ExprKind::Paren(inner) => is_narrowable_path(inner),
+        _ => false,
+    }
+}
+
 fn emit_match_tail(
     out: &mut String,
     discriminant: &Expr,
@@ -3114,10 +3553,20 @@ fn emit_match_tail(
     async_tail: bool,
 ) {
     let mut pre = Vec::new();
-    let disc = lower_expr(discriminant, &mut pre, cx);
+    let mut disc = lower_expr(discriminant, &mut pre, cx);
     let disc_ty = cx.commons.expr_types.get(&discriminant.span).cloned();
     for s in &pre {
         write_line(out, indent, s);
+    }
+    // v0.9.2: a statement-position `switch` narrows the scrutinee only when it
+    // is a stable reference (a variable or property path). A call discriminant
+    // such as `ShortCode.of(raw)` is re-evaluated per arm and TypeScript cannot
+    // narrow it (and re-evaluation could repeat side effects), so bind it to a
+    // fresh temp once and switch on that.
+    if !is_narrowable_path(discriminant) {
+        let tmp = cx.fresh();
+        write_line(out, indent, &format!("const {tmp} = {disc};"));
+        disc = tmp;
     }
     write_line(out, indent, &format!("switch ({disc}.tag) {{"));
     for arm in arms {

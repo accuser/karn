@@ -22,9 +22,10 @@ function makeTestDeps() {
 
 async function test_agent_place_reports_Ok() {
   try {
+    commerce_orders.__resetAgents();
     const deps = makeTestDeps();
-    const { Order, OrderError, OrderId } = commerce_orders as any;
-    const r = await new Order(makeTestState(String(OrderId.unsafe("ORD-1")))).place(50, {});
+    const { Order, OrderError, OrderId, __makeOrder } = commerce_orders as any;
+    const r = await __makeOrder(OrderId.unsafe("ORD-1")).place(50, deps);
     if (!(r.tag === "Ok")) { throw __karnAssertionFailure("offset 122", 122, 132); }
     return { pass: true };
   } catch (e) {
@@ -37,9 +38,10 @@ async function test_agent_place_reports_Ok() {
 
 async function test_agent_place_reports_NotPlaced_for_zero() {
   try {
+    commerce_orders.__resetAgents();
     const deps = makeTestDeps();
-    const { Order, OrderError, OrderId } = commerce_orders as any;
-    const r = await new Order(makeTestState(String(OrderId.unsafe("ORD-2")))).place(0, {});
+    const { Order, OrderError, OrderId, __makeOrder } = commerce_orders as any;
+    const r = await __makeOrder(OrderId.unsafe("ORD-2")).place(0, deps);
     if (!(r.tag === "Err")) { throw __karnAssertionFailure("offset 252", 252, 263); }
     return { pass: true };
   } catch (e) {

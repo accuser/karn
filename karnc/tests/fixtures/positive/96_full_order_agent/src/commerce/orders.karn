@@ -33,11 +33,11 @@ agent Order {
   key id: OrderId
 
   state {
-    status: OrderStatus,
+    status: Option[OrderStatus],
     items:  Int,
   }
 
-  on call status() -> Effect[OrderStatus] {
+  on call status() -> Effect[Option[OrderStatus]] {
     self.state.status
   }
 

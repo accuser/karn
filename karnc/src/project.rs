@@ -983,6 +983,7 @@ fn compile_project_inner(
                 methods: combined_methods.clone(),
                 local_type_names: local_names.clone(),
                 cross_context: cross_context_for_file.clone(),
+                agents: HashMap::new(),
             };
             if let Err(errs) = resolver::resolve_file(&resolved) {
                 errors.extend(errs);
@@ -1148,6 +1149,10 @@ fn compile_project_inner(
                     .any(|(_, targets)| targets.iter().any(|t| t == name)),
                 target,
                 boundary_type_owners,
+                local_agents: unit_tables
+                    .get(name)
+                    .map(|t| t.agents.keys().cloned().collect())
+                    .unwrap_or_default(),
             };
             let ts = emitter::emit_project(&typed, &emit_ctx);
             let output_path = if workers_mode && kind == UnitKind::Context {
@@ -2721,6 +2726,10 @@ pub struct EmitProjectCtx {
     /// emitter route serialise/deserialise helper imports to the owning
     /// module.
     pub boundary_type_owners: HashMap<String, BoundaryOwner>,
+    /// Agent names declared in this unit. The body lowering uses this set
+    /// to recognise `Agent(key)` construction and `agent_instance.method(...)`
+    /// dispatch.
+    pub local_agents: HashSet<String>,
 }
 
 /// Where a boundary-crossing type was declared.
@@ -2763,6 +2772,7 @@ fn check_v0_5_declarations(
         methods: typed.methods.clone(),
         local_type_names,
         cross_context: cross_context.clone(),
+        agents: table.agents.clone(),
     };
 
     // Capability info from the table.
@@ -2896,6 +2906,33 @@ fn check_v0_5_declarations(
 
     // Check agent handlers.
     for agent in table.agents.values() {
+        // v0.9.2: every state field must be zeroable. A fresh agent key has no
+        // committed state; `loadState` synthesises the zero-value record, so a
+        // field whose type has no defined zero (a non-Option sum, an opaque
+        // type, or a refinement that excludes the underlying zero) cannot be
+        // initialised and is rejected pending explicit-initialiser syntax.
+        for field in &agent.state_fields {
+            if checker::zero_value_ts(&field.type_ref, field.refinement.as_ref(), &typed.types)
+                .is_none()
+            {
+                errors.push(
+                    CompileError::new(
+                        "karn.agents.non_zeroable_state_field",
+                        field.span,
+                        format!(
+                            "agent `{}` state field `{}` has no defined zero value, so a \
+                             fresh key cannot be initialised",
+                            agent.name.name, field.name.name
+                        ),
+                    )
+                    .with_note(
+                        "agent state must zero-initialise for a never-seen key; wrap the field \
+                         in `Option[…]` (None means \"never set\"), or wait for \
+                         explicit-initialiser syntax",
+                    ),
+                );
+            }
+        }
         // Build the agent's state type as a synthetic record. We expose it
         // under the name `<AgentName>State` in the type table so the body
         // can reference it.
@@ -2926,6 +2963,7 @@ fn check_v0_5_declarations(
             methods: typed.methods.clone(),
             local_type_names: local_names_for_handler,
             cross_context: cross_context.clone(),
+            agents: table.agents.clone(),
         };
         let state_ty = Ty::Named {
             name: agent_state_name.clone(),
@@ -2984,6 +3022,7 @@ fn check_v0_5_declarations(
             methods: typed.methods.clone(),
             local_type_names: local_names_for_handler,
             cross_context: cross_context.clone(),
+            agents: table.agents.clone(),
         };
         self_scope.insert(
             "self".to_string(),
@@ -3911,6 +3950,10 @@ fn build_privileged_resolved(
         trivia: Trivia::default(),
         trailing_comments: Vec::new(),
     };
+    let agents_for_resolved = unit_tables
+        .get(owning_unit)
+        .map(|t| t.agents.clone())
+        .unwrap_or_default();
     let resolved = crate::resolver::ResolvedCommons {
         commons: synthetic_commons,
         types,
@@ -3918,6 +3961,7 @@ fn build_privileged_resolved(
         methods,
         local_type_names,
         cross_context,
+        agents: agents_for_resolved,
     };
     Some((resolved, ()))
 }
@@ -4003,8 +4047,12 @@ fn emit_test_module(
     // Assertion helper used by lowered `assert` statements.
     out.push_str(&assertion_runtime_helpers());
 
-    // Emit mock implementations.
-    for mock in mocks.values() {
+    // Emit mock implementations. Sort by target name so emission is
+    // deterministic regardless of the mock map's hash iteration order (a test
+    // with more than one mock would otherwise flake).
+    let mut sorted_mocks: Vec<(&String, &ResolvedMock)> = mocks.iter().collect();
+    sorted_mocks.sort_by(|a, b| a.0.cmp(b.0));
+    for (_, mock) in sorted_mocks {
         out.push_str(&emit_mock_class(
             mock,
             target_name,
@@ -4138,10 +4186,20 @@ fn emit_mock_class(
         MockTarget::ConsumedContext { qualified, .. } => qualified.clone(),
     };
     let scope_ns = owning_unit.replace('.', "_");
-    let scope_type_names: HashSet<String> = unit_tables
+    let mut scope_type_names: HashSet<String> = unit_tables
         .get(&owning_unit)
         .map(|t| t.types.keys().cloned().collect())
         .unwrap_or_default();
+    // v0.9.2: the owning context re-exports the commons types it `uses` under
+    // its own namespace (branded), so a mock signature that names one — e.g.
+    // `track(code: ShortCode)` — must qualify it to `<ns>.ShortCode` too.
+    if let Some(used) = unit_uses.get(&owning_unit) {
+        for u in used {
+            if let Some(table) = unit_tables.get(u) {
+                scope_type_names.extend(table.types.keys().cloned());
+            }
+        }
+    }
     let scope_names: Vec<String> = if let Some(table) = unit_tables.get(&owning_unit) {
         let mut v: Vec<String> = table
             .types
@@ -4219,7 +4277,7 @@ fn emit_mock_op_body(
     };
     // Run the type checker first so the lowering knows the type of each
     // expression (notably: variant constructor references).
-    let mut typed = synthetic_typed_commons_for_target(&owning_unit, unit_tables);
+    let mut typed = synthetic_typed_commons_for_target(&owning_unit, unit_tables, unit_uses);
     if let Some((resolved, _)) = build_privileged_resolved(
         &owning_unit,
         unit_tables,
@@ -4250,8 +4308,42 @@ fn emit_mock_op_body(
 fn synthetic_typed_commons_for_target(
     target_name: &str,
     unit_tables: &HashMap<String, UnitTable>,
+    unit_uses: &HashMap<String, Vec<String>>,
 ) -> checker::TypedCommons {
     let table = unit_tables.get(target_name).cloned().unwrap_or_default();
+    let mut types = table.types;
+    let mut fns = table.fns;
+    let mut methods = table.methods;
+    // Pull in names that come into scope via the target's `uses` clauses, so
+    // the test-body lowering's static-call check (`<Type>.of(...)` etc.)
+    // resolves against the same set of names the source can mention.
+    if let Some(used) = unit_uses.get(target_name) {
+        for u in used {
+            if let Some(t) = unit_tables.get(u) {
+                for (n, d) in &t.types {
+                    types.entry(n.clone()).or_insert_with(|| d.clone());
+                }
+                for (n, f) in &t.fns {
+                    fns.entry(n.clone()).or_insert_with(|| f.clone());
+                }
+                for (n, mt) in &t.methods {
+                    let entry = methods.entry(n.clone()).or_default();
+                    for (m, decl) in &mt.instance {
+                        entry
+                            .instance
+                            .entry(m.clone())
+                            .or_insert_with(|| decl.clone());
+                    }
+                    for (m, decl) in &mt.statics {
+                        entry
+                            .statics
+                            .entry(m.clone())
+                            .or_insert_with(|| decl.clone());
+                    }
+                }
+            }
+        }
+    }
     checker::TypedCommons {
         commons: Commons {
             name: QualifiedName {
@@ -4272,9 +4364,9 @@ fn synthetic_typed_commons_for_target(
             trivia: Trivia::default(),
             trailing_comments: Vec::new(),
         },
-        types: table.types,
-        fns: table.fns,
-        methods: table.methods,
+        types,
+        fns,
+        methods,
         expr_types: HashMap::new(),
     }
 }
@@ -4294,7 +4386,11 @@ fn emit_test_deps(
         && let Some(table) = unit_tables.get(target_name)
     {
         let ns = target_name.replace('.', "_");
-        for cap in table.capabilities.keys() {
+        // Sorted so `makeTestDeps` field order is deterministic across the
+        // capability map's hash iteration order.
+        let mut caps: Vec<&String> = table.capabilities.keys().collect();
+        caps.sort();
+        for cap in caps {
             // Find a mock for this capability, otherwise fall back to the
             // declared provider.
             let entry = match mocks.get(cap) {
@@ -4368,6 +4464,14 @@ fn emit_test_case_function(
     let target_ns = target_name.replace('.', "_");
     out.push_str(&format!("async function {runner_name}() {{\n"));
     out.push_str("  try {\n");
+    // v0.9.2: reset the target context's agent registries so each test sees a
+    // fresh per-key state (finding #10's "fresh per test" half).
+    let target_has_agents = unit_tables
+        .get(target_name)
+        .is_some_and(|t| !t.agents.is_empty());
+    if target_has_agents {
+        out.push_str(&format!("    {target_ns}.__resetAgents();\n"));
+    }
     if target_kind == UnitKind::Context {
         out.push_str("    const deps = makeTestDeps();\n");
     } else {
@@ -4377,10 +4481,25 @@ fn emit_test_case_function(
     // body can reference them unqualified. The target's types and fns are
     // exported from its namespace by the production emitter.
     if let Some(table) = unit_tables.get(target_name) {
-        let mut names: Vec<&String> = table.types.keys().chain(table.fns.keys()).collect();
+        let mut names: Vec<String> = table
+            .types
+            .keys()
+            .chain(table.fns.keys())
+            .cloned()
+            .collect();
         // For contexts, also bring services and providers into scope.
-        let extras: Vec<&String> = table.services.keys().chain(table.agents.keys()).collect();
+        let extras: Vec<String> = table
+            .services
+            .keys()
+            .chain(table.agents.keys())
+            .cloned()
+            .collect();
         names.extend(extras);
+        // v0.9.2: bring each agent's construction factory into scope so a test
+        // body's `AgentName(key)` lowers to `__makeAgentName(key)`.
+        for agent in table.agents.keys() {
+            names.push(crate::emitter::agent_factory_name(agent));
+        }
         names.sort();
         names.dedup();
         if !names.is_empty() {
@@ -4442,7 +4561,7 @@ fn emit_test_case_function(
             ));
         }
     }
-    let mut typed = synthetic_typed_commons_for_target(target_name, unit_tables);
+    let mut typed = synthetic_typed_commons_for_target(target_name, unit_tables, unit_uses);
     let cross = crate::resolver::CrossContextInfo::default();
     let test_services: HashSet<String> = unit_tables
         .get(target_name)

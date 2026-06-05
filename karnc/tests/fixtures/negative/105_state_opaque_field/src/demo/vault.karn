@@ -1,0 +1,17 @@
+context demo.vault
+
+type Secret = opaque String
+
+type Id = String where Matches("[a-z0-9]{1,8}")
+
+agent Vault {
+	key id: Id
+
+	state {
+		secret: Secret,
+	}
+
+	on call reveal() -> Effect[Secret] {
+		self.state.secret
+	}
+}

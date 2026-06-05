@@ -1,0 +1,32 @@
+---
+Tests for the counter context: instantiation + method call round-trip, and
+per-key state persistence within a session.
+---
+test demo.counter
+
+test "a fresh counter reads zero" {
+	match CounterId.of("c1") {
+		Err(_) => assert false
+		Ok(id) => {
+			let total <- read.call(id)
+			match total {
+				Ok(n)  => assert n == 0
+				Err(_) => assert false
+			}
+		}
+	}
+}
+
+test "bumping twice accumulates" {
+	match CounterId.of("c2") {
+		Err(_) => assert false
+		Ok(id) => {
+			let _ <- bump.call(id)
+			let second <- bump.call(id)
+			match second {
+				Ok(n)  => assert n == 2
+				Err(_) => assert false
+			}
+		}
+	}
+}

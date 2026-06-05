@@ -69,6 +69,22 @@ pub fn emit_worker_entry(context: &str, table: &UnitTable) -> String {
     let _ = writeln!(out, "import * as handlers from \"./handlers.js\";");
     writeln!(out).unwrap();
 
+    // v0.9.2: re-export each agent's Durable Object class from the Worker
+    // entry. Cloudflare resolves a `class_name` binding against the named
+    // exports of the Worker's `main`, so the DO classes declared in
+    // `handlers.ts` must be visible here.
+    let mut agent_names: Vec<&String> = table.agents.keys().collect();
+    agent_names.sort();
+    if !agent_names.is_empty() {
+        let joined = agent_names
+            .iter()
+            .map(|n| n.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let _ = writeln!(out, "export {{ {joined} }} from \"./handlers.js\";");
+        writeln!(out).unwrap();
+    }
+
     let _ = writeln!(out, "export default {{");
     let _ = writeln!(
         out,

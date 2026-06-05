@@ -216,6 +216,86 @@ fn positive_fixtures() {
     }
 }
 
+/// Regenerate the `expected/` snapshot of every project-form positive fixture
+/// from the current emitter. Gated behind `KARN_BLESS=1` so it never runs in a
+/// normal `cargo test`. Use after an intentional emission change, then review
+/// the resulting `git diff` to confirm the changes are what you meant.
+#[test]
+fn bless_positive_fixtures() {
+    if std::env::var("KARN_BLESS").is_err() {
+        return;
+    }
+    for dir in fixture_dirs("positive") {
+        let src_dir = dir.join("src");
+        if !src_dir.is_dir() {
+            continue;
+        }
+        let target = fixture_target(&dir);
+        let out = match compile_fixture(&dir, target) {
+            Ok(out) => out,
+            Err(errors) => {
+                panic!(
+                    "bless: {} failed to compile:\n{}",
+                    dir.display(),
+                    karnc::render_project_errors(&errors)
+                );
+            }
+        };
+        let expected_dir = dir.join("expected");
+        let _ = fs::remove_dir_all(&expected_dir);
+        for f in &out.files {
+            let p = f.output_path.to_string_lossy();
+            // Mirror the comparison's skip list: project-wide boilerplate is
+            // unit-tested separately and excluded from per-fixture snapshots.
+            if p == "runtime.ts" || p == "tsconfig.json" {
+                continue;
+            }
+            let target_path = expected_dir.join(&f.output_path);
+            if let Some(parent) = target_path.parent() {
+                fs::create_dir_all(parent).unwrap();
+            }
+            fs::write(&target_path, &f.typescript).unwrap();
+        }
+    }
+}
+
+/// The `/* unknown */` placeholder must never reach emitted output. It is the
+/// signature of an unresolved lowering path (historically the agent
+/// method-call regression). This guard compiles every positive fixture and
+/// fails if any emitted file contains the marker — the regression backstop the
+/// v0.7 fix lacked.
+#[test]
+fn no_unknown_placeholder_in_emitted_output() {
+    const MARKER: &str = "/* unknown */";
+    let mut offenders = Vec::new();
+    for dir in fixture_dirs("positive") {
+        let input = dir.join("input.karn");
+        let src_dir = dir.join("src");
+        if input.exists() {
+            let source = read(&input);
+            if let Ok(actual) = karnc::compile(&source, &input.display().to_string())
+                && actual.contains(MARKER)
+            {
+                offenders.push(dir.display().to_string());
+            }
+        } else if src_dir.is_dir() {
+            let target = fixture_target(&dir);
+            if let Ok(out) = compile_fixture(&dir, target) {
+                for f in &out.files {
+                    if f.typescript.contains(MARKER) {
+                        offenders.push(format!("{} :: {}", dir.display(), f.output_path.display()));
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        offenders.is_empty(),
+        "emitted output contains the `/* unknown */` placeholder in:\n{}",
+        offenders.join("\n"),
+    );
+}
+
 #[test]
 fn negative_fixtures() {
     let dirs = fixture_dirs("negative");

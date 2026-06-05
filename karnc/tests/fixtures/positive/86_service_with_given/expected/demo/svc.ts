@@ -16,7 +16,11 @@ export const announce = {
   },
 };
 
-export function makeSurface(deps: Parameters<typeof announce.call>[1]) {
+export interface DemoSvcDeps {
+  readonly Logger: Logger;
+}
+
+export function makeSurface(deps: DemoSvcDeps) {
   return {
     async announce(message: string): Promise<void> {
       return announce.call(message, deps);

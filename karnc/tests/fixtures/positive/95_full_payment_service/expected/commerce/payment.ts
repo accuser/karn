@@ -72,7 +72,12 @@ export const authorise = {
   },
 };
 
-export function makeSurface(deps: Parameters<typeof authorise.call>[1]) {
+export interface CommercePaymentDeps {
+  readonly Payments: Payments;
+  readonly Logger: Logger;
+}
+
+export function makeSurface(deps: CommercePaymentDeps) {
   return {
     async authorise(amount: Money): Promise<Result<AuthId, PaymentError>> {
       return authorise.call(amount, deps);

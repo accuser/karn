@@ -26,7 +26,11 @@ export const totalise = {
   },
 };
 
-export function makeSurface(deps: Parameters<typeof totalise.call>[1]) {
+export interface DemoSvcDeps {
+  readonly Source: Source;
+}
+
+export function makeSurface(deps: DemoSvcDeps) {
   return {
     async totalise(id: number): Promise<Result<number, Failure>> {
       return totalise.call(id, deps);

@@ -1,0 +1,35 @@
+---
+A fresh `Slot` key must read `value == None`: Option state zero-initialises.
+---
+context demo.slot
+
+exports transparent { SlotError }
+
+type Label = String where Matches("[a-z0-9]{1,16}")
+
+type SlotError = enum {
+	Empty,
+}
+
+agent Slot {
+	key id: Label
+
+	state {
+		value: Option[Int],
+	}
+
+	on call resolve() -> Effect[Result[Int, SlotError]] {
+		match self.state.value {
+			Some(v) => Ok(v)
+			None    => Err(Empty)
+		}
+	}
+}
+
+service resolve {
+	on call(id: Label) -> Effect[Result[Int, SlotError]] {
+		let slot = Slot(id)
+		let outcome <- slot.resolve()
+		outcome
+	}
+}

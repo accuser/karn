@@ -1,0 +1,27 @@
+---
+Exercises a multi-arg service through its deps so the deps-type derivation is
+checked end to end.
+---
+test demo.registry
+
+mocks Clock = TestClock {
+	fn now() -> Effect[Int] {
+		7
+	}
+}
+
+test "create accepts two args and threads deps" {
+	match Code.of("abc123") {
+		Err(_) => assert false
+		Ok(code) => match Target.of("https://example.com") {
+			Err(_) => assert false
+			Ok(target) => {
+				let outcome <- create.call(code, target)
+				match outcome {
+					Ok(t)  => assert t == 7
+					Err(_) => assert false
+				}
+			}
+		}
+	}
+}

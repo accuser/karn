@@ -45,6 +45,10 @@ pub struct ResolvedCommons {
     /// single-file mode. For contexts, supplies the set of consumed contexts
     /// and any aliases introduced via `consumes ... as Alias`.
     pub cross_context: CrossContextInfo,
+    /// Agents declared in this context. Used to recognise the `Agent(key)`
+    /// construction shape and the `agent_instance.handler(args)` method-call
+    /// shape in handler bodies that mention other agents.
+    pub agents: HashMap<String, AgentDecl>,
 }
 
 /// Static information about the consuming context: the set of contexts it
@@ -253,6 +257,7 @@ pub fn resolve(commons: Commons) -> Result<ResolvedCommons, Vec<CompileError>> {
             methods,
             local_type_names,
             cross_context: CrossContextInfo::default(),
+            agents: HashMap::new(),
         })
     } else {
         Err(errors)

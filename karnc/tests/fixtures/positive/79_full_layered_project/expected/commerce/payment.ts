@@ -7,6 +7,10 @@ import { CustomerId as __CommonsCustomerId } from "./identifiers.js";
 import { Money as __CommonsMoney } from "./money.js";
 
 export type CustomerId = __CommonsCustomerId & { readonly __ctxBrand: "commerce.payment" };
+export const CustomerId = {
+  of(value: string): Result<CustomerId, ValidationError> { return __CommonsCustomerId.of(value) as unknown as Result<CustomerId, ValidationError>; },
+  unsafe(value: string): CustomerId { return __CommonsCustomerId.unsafe(value) as unknown as CustomerId; },
+};
 export type Money = __CommonsMoney & { readonly __ctxBrand: "commerce.payment" };
 
 /**

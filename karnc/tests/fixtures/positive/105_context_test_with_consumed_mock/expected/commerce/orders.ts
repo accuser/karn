@@ -30,7 +30,11 @@ export const place = {
   },
 };
 
-export function makeSurface(deps: Parameters<typeof place.call>[1]) {
+export interface CommerceOrdersDeps {
+  readonly surface: { Payment: ReturnType<typeof commerce_payment.makeSurface> };
+}
+
+export function makeSurface(deps: CommerceOrdersDeps) {
   return {
     async place(amount: number): Promise<Result<AuthId, OrderError>> {
       return place.call(amount, deps);

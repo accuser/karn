@@ -1,0 +1,32 @@
+---
+A fresh `Tally` key must read `count == 0`: Int state zero-initialises.
+---
+context demo.tally
+
+exports transparent { TallyError }
+
+type TallyId = String where Matches("[a-z0-9]{1,16}")
+
+type TallyError = enum {
+	Missing,
+}
+
+agent Tally {
+	key id: TallyId
+
+	state {
+		count: Int,
+	}
+
+	on call current() -> Effect[Result[Int, TallyError]] {
+		Ok(self.state.count)
+	}
+}
+
+service read {
+	on call(id: TallyId) -> Effect[Result[Int, TallyError]] {
+		let tally = Tally(id)
+		let total <- tally.current()
+		total
+	}
+}

@@ -1,0 +1,39 @@
+---
+A fresh `Meter` key reads a nested record of zeros: every field of a zeroable
+record zero-initialises recursively.
+---
+context demo.meter
+
+exports transparent { MeterError }
+
+type MeterId = String where Matches("[a-z0-9]{1,16}")
+
+type Totals = {
+	hits:  Int,
+	bytes: Int,
+}
+
+type MeterError = enum {
+	Missing,
+}
+
+agent Meter {
+	key id: MeterId
+
+	state {
+		totals: Totals,
+		active: Bool,
+	}
+
+	on call hits() -> Effect[Result[Int, MeterError]] {
+		Ok(self.state.totals.hits)
+	}
+}
+
+service hits {
+	on call(id: MeterId) -> Effect[Result[Int, MeterError]] {
+		let meter = Meter(id)
+		let total <- meter.hits()
+		total
+	}
+}

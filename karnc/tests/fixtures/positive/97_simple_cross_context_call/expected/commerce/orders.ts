@@ -12,7 +12,11 @@ export const placeOrder = {
   },
 };
 
-export function makeSurface(deps: Parameters<typeof placeOrder.call>[1]) {
+export interface CommerceOrdersDeps {
+  readonly surface: { payment: ReturnType<typeof commerce_payment.makeSurface> };
+}
+
+export function makeSurface(deps: CommerceOrdersDeps) {
   return {
     async placeOrder(total: number): Promise<Result<number, number>> {
       return placeOrder.call(total, deps);
