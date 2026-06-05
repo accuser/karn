@@ -266,7 +266,14 @@ fn bless_positive_fixtures() {
 /// v0.7 fix lacked.
 #[test]
 fn no_unknown_placeholder_in_emitted_output() {
-    const MARKER: &str = "/* unknown */";
+    // Every emitter placeholder is the signature of an unresolved lowering path
+    // that would otherwise ship invalid TypeScript. `/* unknown */` is the
+    // instance-method-call fallback (the historical v0.7 regression);
+    // `complex is-receiver` is the `is`-pattern receiver fallback. Markers use
+    // distinct text, so the guard checks for each one explicitly — add new
+    // markers here as they are introduced.
+    const MARKERS: &[&str] = &["/* unknown */", "complex is-receiver"];
+    let hit = |s: &str| MARKERS.iter().any(|m| s.contains(m));
     let mut offenders = Vec::new();
     for dir in fixture_dirs("positive") {
         let input = dir.join("input.karn");
@@ -274,7 +281,7 @@ fn no_unknown_placeholder_in_emitted_output() {
         if input.exists() {
             let source = read(&input);
             if let Ok(actual) = karnc::compile(&source, &input.display().to_string())
-                && actual.contains(MARKER)
+                && hit(&actual)
             {
                 offenders.push(dir.display().to_string());
             }
@@ -282,7 +289,7 @@ fn no_unknown_placeholder_in_emitted_output() {
             let target = fixture_target(&dir);
             if let Ok(out) = compile_fixture(&dir, target) {
                 for f in &out.files {
-                    if f.typescript.contains(MARKER) {
+                    if hit(&f.typescript) {
                         offenders.push(format!("{} :: {}", dir.display(), f.output_path.display()));
                     }
                 }
@@ -291,7 +298,7 @@ fn no_unknown_placeholder_in_emitted_output() {
     }
     assert!(
         offenders.is_empty(),
-        "emitted output contains the `/* unknown */` placeholder in:\n{}",
+        "emitted output contains an emitter placeholder ({MARKERS:?}) in:\n{}",
         offenders.join("\n"),
     );
 }

@@ -1,0 +1,30 @@
+commons demo.parsing
+
+type Outcome =
+  | Hit(score: Int)
+  | Miss
+
+fn classify(n: Int) -> Outcome {
+  if n == 0 {
+    Miss
+  } else {
+    Hit(n)
+  }
+}
+
+-- `classify(n)` is a call, so the `is` receiver is a complex expression. It
+-- must be evaluated once into a temp shared by the `.tag` check and the
+-- `score` binding, rather than re-emitting the call at each reference.
+fn label(n: Int) -> Int {
+  if classify(n) is Hit(score) {
+    score
+  } else {
+    0
+  }
+}
+
+-- Same complex receiver through the `&&` binding-flow path: `score` is bound
+-- on the truthy side and used in the right-hand operand.
+fn highScore(n: Int) -> Bool {
+  classify(n) is Hit(score) && score > 100
+}

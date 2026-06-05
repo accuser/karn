@@ -2534,6 +2534,13 @@ struct LowerCtx<'a> {
     /// this drives `env` (carrying the DO namespaces) into the handler's deps
     /// type so the agent factory can reach its Durable Object binding.
     pub agents_instantiated: bool,
+    /// When an `is` receiver is not a simple, repeatable lvalue (e.g. a call
+    /// like `parse(x) is Ok(n)`), it is evaluated once into a temp; the temp
+    /// name is cached here keyed by the receiver expression's span so the
+    /// `.tag` check and every pattern binding reference the *same* single
+    /// evaluation. Simple receivers (idents / field chains) are never cached
+    /// and continue to be rendered inline as before.
+    is_receiver_temps: HashMap<crate::span::Span, String>,
 }
 
 impl<'a> LowerCtx<'a> {
@@ -2556,6 +2563,7 @@ impl<'a> LowerCtx<'a> {
             local_agent_vars: HashMap::new(),
             target: BuildTarget::Bundle,
             agents_instantiated: false,
+            is_receiver_temps: HashMap::new(),
         }
     }
     /// v0.9.2: lower an agent instantiation `AgentName(key)` to its factory
@@ -2574,6 +2582,38 @@ impl<'a> LowerCtx<'a> {
         let n = self.next_tmp;
         self.next_tmp += 1;
         format!("__r{n}")
+    }
+    /// Return a stable textual reference to an `is` receiver, used by the
+    /// `.tag` check in `lower_is`. A simple, repeatable lvalue is lowered
+    /// inline exactly as before (preserving rewrites such as `self.state` or
+    /// capability access). A complex receiver (anything `value_text_for_is`
+    /// could not render — e.g. a call) is evaluated once into a fresh temp
+    /// emitted into `stmts` and cached by span, so the bindings gathered later
+    /// reference the same evaluation rather than re-running the expression.
+    fn is_receiver_ref(&mut self, value: &Expr, stmts: &mut Vec<String>) -> String {
+        if let Some(t) = self.is_receiver_temps.get(&value.span) {
+            return t.clone();
+        }
+        let lowered = lower_expr(value, stmts, self);
+        if is_simple_is_receiver(value) {
+            return lowered;
+        }
+        let tmp = self.fresh();
+        stmts.push(format!("const {tmp} = {lowered};"));
+        self.is_receiver_temps.insert(value.span, tmp.clone());
+        tmp
+    }
+    /// Read-only counterpart for the binding gatherer (which has no `stmts`
+    /// and cannot lift). If the receiver was already lifted to a temp during
+    /// condition lowering, reuse that temp; otherwise it must be a simple
+    /// repeatable lvalue, rendered inline. The "lower the condition before
+    /// gathering its bindings" ordering in `emit_if_tail` / `lower_and_with_is`
+    /// guarantees the temp exists before this is called for complex receivers.
+    fn is_receiver_text(&self, value: &Expr) -> String {
+        if let Some(t) = self.is_receiver_temps.get(&value.span) {
+            return t.clone();
+        }
+        value_text_for_is(value)
     }
     fn receiver_namespace(&self, e: &Expr) -> Option<String> {
         let ty = self.commons.expr_types.get(&e.span)?;
@@ -3214,13 +3254,23 @@ fn lower_and_with_is(
     stmts: &mut Vec<String>,
     cx: &mut LowerCtx,
 ) -> Option<(Vec<String>, String, String)> {
+    // Probe structurally (no lowering) so a `&&` without an `is` falls through
+    // to the caller's ordinary lowering untouched. This mirrors exactly the
+    // shapes `gather_is_bindings_for_emit` walks (`&&` and parens), preserving
+    // the original "Some iff lhs contains an `is`" behaviour.
+    if !cond_contains_is(lhs) {
+        return None;
+    }
+    // Lower lhs *before* gathering its bindings. Lowering lifts any complex
+    // `is` receiver (e.g. a call) into a shared temp recorded on `cx`; the
+    // binding gatherer below then references that temp via `is_receiver_text`
+    // instead of re-emitting the receiver. For simple receivers nothing is
+    // cached and the output is byte-identical to before.
+    let lhs_expr = lower_expr(lhs, stmts, cx);
     let mut bindings = Vec::new();
     let mut found = false;
     gather_is_bindings_for_emit(lhs, cx, &mut bindings, &mut found);
-    if !found {
-        return None;
-    }
-    let lhs_expr = lower_expr(lhs, stmts, cx);
+    let _ = found; // guaranteed true by the `cond_contains_is` guard above
     // We lower rhs ourselves (not into the outer stmts), so that any
     // statement-style prefix from rhs is folded into the IIFE properly.
     let mut rhs_stmts = Vec::new();
@@ -3241,7 +3291,7 @@ fn gather_is_bindings_for_emit(e: &Expr, cx: &LowerCtx, out: &mut Vec<String>, f
     match &e.kind {
         ExprKind::Is { value, pattern } => {
             *found = true;
-            let value_text = value_text_for_is(value);
+            let value_text = cx.is_receiver_text(value);
             let disc_ty = cx.commons.expr_types.get(&value.span).cloned();
             if let Pattern::Variant {
                 variant, bindings, ..
@@ -3283,10 +3333,26 @@ fn gather_is_bindings_for_emit(e: &Expr, cx: &LowerCtx, out: &mut Vec<String>, f
     }
 }
 
-/// Render the receiver of an `is` expression for use in binding lookups.
-/// Only simple expressions are sound — for arbitrary call expressions we'd
-/// need to lift to a temporary. The checker should reject anything that
-/// makes this dangerous; for now we handle ident and member-access cases.
+/// True when an `is` receiver is a simple, side-effect-free, repeatable
+/// lvalue — an identifier or a field-access chain ending at one (optionally
+/// parenthesised). Such receivers can be referenced textually as many times
+/// as there are pattern bindings without re-evaluation. Anything else (calls,
+/// matches, arithmetic, …) must be lifted to a temp before use; see
+/// `LowerCtx::is_receiver_ref`.
+fn is_simple_is_receiver(value: &Expr) -> bool {
+    match &value.kind {
+        ExprKind::Ident(_) => true,
+        ExprKind::FieldAccess { receiver, .. } => is_simple_is_receiver(receiver),
+        ExprKind::Paren(inner) => is_simple_is_receiver(inner),
+        _ => false,
+    }
+}
+
+/// Render a *simple* `is` receiver (see `is_simple_is_receiver`) as a textual
+/// reference for binding lookups. Complex receivers never reach this function
+/// — they are lifted to a temp and resolved via the span cache in
+/// `LowerCtx::is_receiver_text` — so the final arm is a defensive backstop the
+/// `no_unknown_placeholder_in_emitted_output` test also guards against.
 fn value_text_for_is(value: &Expr) -> String {
     match &value.kind {
         ExprKind::Ident(id) => id.name.clone(),
@@ -3349,6 +3415,19 @@ fn lower_if(
         }
         iife.push_str("})()");
         iife
+    }
+}
+
+/// True if `e` contains an `is` test reachable through `&&` and parentheses —
+/// matching exactly the shapes `gather_is_bindings_for_emit` walks (note: it
+/// does *not* descend into `||`). Used by `lower_and_with_is` to decide whether
+/// the `is`-binding flow applies before doing any lowering.
+fn cond_contains_is(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Is { .. } => true,
+        ExprKind::BinOp(BinOp::And, l, r) => cond_contains_is(l) || cond_contains_is(r),
+        ExprKind::Paren(inner) => cond_contains_is(inner),
+        _ => false,
     }
 }
 
@@ -3651,7 +3730,7 @@ fn emit_match_body(
 }
 
 fn lower_is(value: &Expr, pattern: &Pattern, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
-    let v = lower_expr(value, stmts, cx);
+    let v = cx.is_receiver_ref(value, stmts);
     match pattern {
         Pattern::Wildcard(_) => "true".to_string(),
         Pattern::Variant { variant, .. } => {
