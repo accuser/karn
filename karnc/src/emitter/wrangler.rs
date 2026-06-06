@@ -51,6 +51,25 @@ pub fn emit_wrangler_toml(context: &str, table: &UnitTable, consumes: &[String])
         writeln!(out).unwrap();
     }
 
+    // v0.10a: cron triggers. Cloudflare uses a single `[triggers]` table with a
+    // `crons` array aggregating every `on cron` schedule in the context.
+    let mut crons: Vec<&String> = Vec::new();
+    for service in table.services.values() {
+        for handler in &service.handlers {
+            if let crate::ast::HandlerKind::Cron { expr } = &handler.kind {
+                crons.push(expr);
+            }
+        }
+    }
+    crons.sort();
+    crons.dedup();
+    if !crons.is_empty() {
+        let quoted: Vec<String> = crons.iter().map(|e| format!("\"{e}\"")).collect();
+        let _ = writeln!(out, "[triggers]");
+        let _ = writeln!(out, "crons = [{}]", quoted.join(", "));
+        writeln!(out).unwrap();
+    }
+
     out
 }
 

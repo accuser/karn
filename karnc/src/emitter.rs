@@ -1722,6 +1722,16 @@ pub(crate) fn http_handler_method_name(method: HttpMethod, path: &str) -> String
     s
 }
 
+/// Synthesise a TypeScript-safe method name for an `on cron` handler (v0.10a):
+/// `cron_<service>_<index>`, where `index` is the handler's position among the
+/// service's cron handlers in declaration order. The same key is computed at
+/// each emission site (the `handlers` method, the `compose` surface wrapper,
+/// and the `scheduled` dispatcher) by walking handlers in the same order, so it
+/// is collision-free and stable without encoding the schedule expression.
+pub(crate) fn cron_handler_method_name(service: &str, index: usize) -> String {
+    format!("cron_{service}_{index}")
+}
+
 fn sanitise_path_segment(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for ch in s.chars() {
@@ -1816,11 +1826,17 @@ fn emit_provider(out: &mut String, p: &ProviderDecl, commons: &TypedCommons, ctx
 fn emit_service(out: &mut String, s: &ServiceDecl, commons: &TypedCommons, ctx: &EmitProjectCtx) {
     emit_doc_block(out, s.documentation.as_deref(), 0);
     writeln!(out, "export const {name} = {{", name = s.name.name).unwrap();
+    let mut cron_idx = 0usize;
     for handler in &s.handlers {
         emit_doc_block(out, handler.documentation.as_deref(), INDENT_STEP);
         let kind_name = match &handler.kind {
             HandlerKind::Call => "call".to_string(),
             HandlerKind::Http { method, path } => http_handler_method_name(*method, path),
+            HandlerKind::Cron { .. } => {
+                let name = cron_handler_method_name(&s.name.name, cron_idx);
+                cron_idx += 1;
+                name
+            }
         };
         // For service handlers the operation name is the handler kind
         // (e.g. `call`). v0.5 has only one handler kind, so the service is a
@@ -2401,7 +2417,9 @@ fn emit_agent(out: &mut String, a: &AgentDecl, commons: &TypedCommons, ctx: &Emi
             .map(|m| m.name.clone())
             .unwrap_or_else(|| match &h.kind {
                 HandlerKind::Call => "call".to_string(),
-                HandlerKind::Http { .. } => "call".to_string(),
+                // HTTP/cron handlers are service-only (rejected in agents by the
+                // parser); these arms are defensive and unreachable here.
+                HandlerKind::Http { .. } | HandlerKind::Cron { .. } => "call".to_string(),
             });
         writeln!(
             out,

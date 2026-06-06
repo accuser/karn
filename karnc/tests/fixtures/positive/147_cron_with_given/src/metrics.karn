@@ -1,0 +1,18 @@
+context metrics
+
+capability Pinger {
+  fn ping() -> Effect[()]
+}
+
+provides Pinger = StubPinger {
+  fn ping() -> Effect[()] {
+    Effect.pure(())
+  }
+}
+
+service ticker {
+  on cron("0 * * * *") () -> Effect[Result[(), String]] given Pinger {
+    let _ <- Pinger.ping()
+    Ok(())
+  }
+}

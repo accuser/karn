@@ -370,6 +370,9 @@ pub enum HandlerKind {
     Call,
     /// `on http METHOD "path"` — external-facing HTTP route (v0.9).
     Http { method: HttpMethod, path: String },
+    /// `on cron "expr"` — scheduled task; `expr` is a 5-field cron
+    /// expression (v0.10a).
+    Cron { expr: String },
 }
 
 /// HTTP methods supported by `on http` handlers (v0.9).

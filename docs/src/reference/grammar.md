@@ -55,10 +55,11 @@ service_decl ::= "service" identifier "{" handler* "}"
 agent_decl ::= "agent" identifier "{" key_decl state_decl handler* "}"
 key_decl ::= "key" identifier ":" _type_ref
 state_decl ::= "state" "{" (record_field ("," record_field)*)? ","? "}"
-handler ::= call_handler | http_handler
+handler ::= call_handler | http_handler | cron_handler
 call_handler ::= "on" "call" identifier? "(" (param ("," param)*)? ","? ")" "->" _type_ref given_clause? block
 http_handler ::= "on" "http" http_method string_literal "(" (param ("," param)*)? ","? ")" "->" _type_ref given_clause? block
 http_method ::= "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
+cron_handler ::= "on" "cron" "(" string_literal ")" "(" (param ("," param)*)? ","? ")" "->" _type_ref given_clause? block
 given_clause ::= "given" identifier ("," identifier)*
 mocks_decl ::= "mocks" identifier "=" identifier "{" provider_op* "}"
 test_case ::= "test" string_literal block

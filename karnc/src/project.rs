@@ -2860,6 +2860,34 @@ fn check_v0_5_declarations(
         }
     }
 
+    // v0.10a: validate `on cron` handler shape and check for duplicate
+    // schedules across all services in this context (the generated
+    // `scheduled` dispatcher routes on `event.cron`, so duplicates are
+    // ambiguous).
+    let mut schedule_first_span: HashMap<String, Span> = HashMap::new();
+    for service in table.services.values() {
+        for handler in &service.handlers {
+            let HandlerKind::Cron { expr } = &handler.kind else {
+                continue;
+            };
+            validate_cron_handler(handler, expr, &mut errors);
+            if let Some(prev) = schedule_first_span.get(expr).copied() {
+                errors.push(
+                    CompileError::new(
+                        "karn.cron.duplicate_schedule",
+                        handler.span,
+                        format!(
+                            "duplicate cron schedule: another handler already declares `{expr}`",
+                        ),
+                    )
+                    .with_label(prev, "previously declared here"),
+                );
+            } else {
+                schedule_first_span.insert(expr.clone(), handler.span);
+            }
+        }
+    }
+
     // Check service handlers.
     for service in table.services.values() {
         for handler in &service.handlers {
@@ -3225,6 +3253,57 @@ fn validate_http_handler(
             handler.return_type.span(),
             format!(
                 "`on http` handler must return `Effect[HttpResult[T]]`, but got `{}`",
+                ts_type_ref_display(&handler.return_type),
+            ),
+        ));
+    }
+}
+
+/// Validate an `on cron "expr" () -> Effect[Result[(), E]]` handler (v0.10a §4.1):
+/// no parameters, a structurally well-formed schedule, and the unit-Result
+/// return shape. The service-only rule is enforced earlier, in the parser
+/// (`karn.parse.cron_in_agent`).
+fn validate_cron_handler(handler: &Handler, expr: &str, errors: &mut Vec<CompileError>) {
+    // Cron handlers take no input.
+    if let Some(first) = handler.params.first() {
+        errors.push(
+            CompileError::new(
+                "karn.cron.has_params",
+                first.span,
+                "`on cron` handlers take no parameters",
+            )
+            .with_note("a scheduled trigger carries no payload; use the `Clock` capability if you need the time"),
+        );
+    }
+    // The schedule must be five whitespace-separated fields (light structural
+    // check; per-field validation is deferred — v0.10 §4.1, [DECISION 4]).
+    let fields = expr.split_whitespace().count();
+    if fields != 5 {
+        errors.push(
+            CompileError::new(
+                "karn.cron.invalid_schedule",
+                handler.span,
+                format!(
+                    "cron expression `{expr}` must have exactly five whitespace-separated fields (got {fields})",
+                ),
+            )
+            .with_note("the fields are: minute hour day-of-month month day-of-week"),
+        );
+    }
+    // The return type must be `Effect[Result[(), E]]`.
+    let return_ok = match &handler.return_type {
+        TypeRef::Effect(inner, _) => match inner.as_ref() {
+            TypeRef::Result(ok, _err, _) => matches!(ok.as_ref(), TypeRef::Unit(_)),
+            _ => false,
+        },
+        _ => false,
+    };
+    if !return_ok {
+        errors.push(CompileError::new(
+            "karn.cron.return_not_effect_result",
+            handler.return_type.span(),
+            format!(
+                "`on cron` handler must return `Effect[Result[(), E]]`, but got `{}`",
                 ts_type_ref_display(&handler.return_type),
             ),
         ));

@@ -17,6 +17,7 @@
   "given"
   "call"
   "http"
+  "cron"
 ] @keyword
 
 [

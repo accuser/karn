@@ -34,6 +34,7 @@ pub const KEYWORDS: &[KeywordInfo] = &[
     k("commons", "Declare a pure, stateless module of types and functions."),
     k("consumes", "Declare a dependency on another context's services."),
     k("context", "Declare a deployable context (services, agents, capabilities)."),
+    k("cron", "Declare a scheduled handler (`on cron`)."),
     k("else", "The alternative branch of an `if` expression."),
     k("enum", "Declare a payloadless sum type (`enum { A, B }`)."),
     k("expect", "Reserved keyword."),

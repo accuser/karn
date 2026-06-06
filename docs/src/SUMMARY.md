@@ -34,6 +34,8 @@
     - [Build a stateful agent](how-to/agents/stateful-agent.md)
   - [HTTP](how-to/http/index.md)
     - [Handle an HTTP request](how-to/http/handle-request.md)
+  - [Cron](how-to/cron/index.md)
+    - [Run a task on a schedule](how-to/cron/handle-cron-trigger.md)
   - [Testing](how-to/testing/index.md)
     - [Write tests and mock collaborators](how-to/testing/write-tests.md)
   - [Projects](how-to/projects/index.md)
@@ -46,6 +48,7 @@
     - [`karn.refine.literal_violates`](how-to/troubleshooting/refine-literal-violates.md)
     - [`karn.agents.non_zeroable_state_field`](how-to/troubleshooting/agents-non-zeroable-state-field.md)
     - [`karn.mock.*` errors](how-to/troubleshooting/mock-errors.md)
+    - [`karn.cron.*` errors](how-to/troubleshooting/cron-errors.md)
 
 # Reference
 
@@ -57,6 +60,7 @@
   - [Operators & built-ins](reference/operators.md)
   - [Agents](reference/agents.md)
   - [HTTP](reference/http.md)
+  - [Cron](reference/cron.md)
   - [Testing](reference/testing.md)
   - [`karn.toml` manifest](reference/manifest.md)
   - [CLI (`karnc`)](reference/cli.md)

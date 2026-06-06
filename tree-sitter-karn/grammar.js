@@ -387,8 +387,9 @@ module.exports = grammar({
         "}",
       ),
 
-    // v0.5 `on call` and v0.9 `on http METHOD "path"` handlers.
-    handler: ($) => choice($.call_handler, $.http_handler),
+    // v0.5 `on call`, v0.9 `on http METHOD "path"`, and v0.10a
+    // `on cron("expr")` handlers.
+    handler: ($) => choice($.call_handler, $.http_handler, $.cron_handler),
     call_handler: ($) =>
       seq(
         "on",
@@ -419,6 +420,23 @@ module.exports = grammar({
         field("body", $.block),
       ),
     http_method: () => choice("GET", "POST", "PUT", "PATCH", "DELETE"),
+    // v0.10a: `on cron("<expr>") () -> Effect[Result[(), E]] { … }`.
+    cron_handler: ($) =>
+      seq(
+        "on",
+        "cron",
+        "(",
+        field("schedule", $.string_literal),
+        ")",
+        "(",
+        optional(sep1($.param, ",")),
+        optional(","),
+        ")",
+        "->",
+        field("return_type", $._type_ref),
+        optional(field("given", $.given_clause)),
+        field("body", $.block),
+      ),
     given_clause: ($) =>
       seq("given", sep1(field("capability", $.identifier), ",")),
 

@@ -890,18 +890,27 @@ impl<'a> Formatter<'a> {
         if let Some(doc) = &h.documentation {
             self.emit_doc(doc);
         }
-        let method = match &h.method_name {
-            Some(m) => format!(" {}", m.name),
-            None => String::new(),
-        };
-        self.push(&format!("on call{} ", method));
-        // For handlers, "call" is followed by params (no fn name).
-        // Rewind: we have "on call <method> " with extra space; correct it.
-        // Actually we want "on call(params)" or "on call methodName(params)".
-        // Recompose properly:
-        // Remove trailing space we added when there is no method
-        if h.method_name.is_none() {
-            self.out.pop(); // remove the trailing space
+        // The handler kind prefix: `on call`, `on http METHOD "path"`, or
+        // `on cron("expr")`. Agent `on call` handlers carry a method name.
+        match &h.kind {
+            HandlerKind::Call => {
+                self.push("on call");
+                if let Some(m) = &h.method_name {
+                    self.push(&format!(" {}", m.name));
+                }
+            }
+            HandlerKind::Http { method, path } => {
+                // Trailing space: the path string is followed by the param list,
+                // which reads better separated (`… "/path" (params)`).
+                self.push(&format!(
+                    "on http {} \"{}\" ",
+                    method.as_str(),
+                    escape_string(path)
+                ));
+            }
+            HandlerKind::Cron { expr } => {
+                self.push(&format!("on cron(\"{}\") ", escape_string(expr)));
+            }
         }
         self.format_params(&h.params, false);
         self.push(" -> ");

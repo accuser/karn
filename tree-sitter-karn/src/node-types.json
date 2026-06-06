@@ -951,6 +951,78 @@
     }
   },
   {
+    "type": "cron_handler",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "given": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "given_clause",
+            "named": true
+          }
+        ]
+      },
+      "return_type": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "base_type",
+            "named": true
+          },
+          {
+            "type": "generic_type_ref",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "unit_type",
+            "named": true
+          },
+          {
+            "type": "validation_error_type",
+            "named": true
+          }
+        ]
+      },
+      "schedule": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "param",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "effect_let_stmt",
     "named": true,
     "fields": {
@@ -1758,6 +1830,10 @@
       "types": [
         {
           "type": "call_handler",
+          "named": true
+        },
+        {
+          "type": "cron_handler",
           "named": true
         },
         {
@@ -4723,6 +4799,10 @@
   },
   {
     "type": "context",
+    "named": false
+  },
+  {
+    "type": "cron",
     "named": false
   },
   {

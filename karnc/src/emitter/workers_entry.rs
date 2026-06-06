@@ -46,6 +46,26 @@ pub fn emit_worker_entry(context: &str, table: &UnitTable) -> String {
             .then_with(|| a.path.cmp(&b.path))
     });
 
+    // v0.10a: collect cron handlers across all services, carrying the per-service
+    // declaration index (the method-name key) and sorting by schedule expression
+    // for deterministic switch output.
+    let mut cron_routes: Vec<CronRoute> = Vec::new();
+    for sname in &service_names {
+        let service = table.services.get(*sname).unwrap();
+        let mut cron_idx = 0usize;
+        for h in &service.handlers {
+            if let HandlerKind::Cron { expr } = &h.kind {
+                cron_routes.push(CronRoute {
+                    service: (*sname).clone(),
+                    index: cron_idx,
+                    expr: expr.clone(),
+                });
+                cron_idx += 1;
+            }
+        }
+    }
+    cron_routes.sort_by(|a, b| a.expr.cmp(&b.expr));
+
     let has_http = !http_routes.is_empty();
 
     let mut imports: Vec<&str> = vec![
@@ -146,9 +166,46 @@ pub fn emit_worker_entry(context: &str, table: &UnitTable) -> String {
     );
     let _ = writeln!(out, "    }}");
     let _ = writeln!(out, "  }},");
+
+    // v0.10a: scheduled (cron) entry point. Dispatches on `event.cron`. A
+    // failing run has no retry channel, so an `Err` is logged and the run
+    // completes (v0.10 §5.1, [DECISION 3]).
+    if !cron_routes.is_empty() {
+        emit_scheduled_handler(&mut out, &cron_routes);
+    }
+
     let _ = writeln!(out, "}};");
 
     out
+}
+
+/// Emit the Worker `scheduled` handler aggregating every `on cron` handler in
+/// the context. `event` is typed structurally (`{ cron: string }`) to avoid a
+/// dependency on `@cloudflare/workers-types`, matching how the rest of the
+/// emitter hand-declares the minimal ambient shapes it needs.
+fn emit_scheduled_handler(out: &mut String, cron_routes: &[CronRoute]) {
+    let _ = writeln!(
+        out,
+        "  async scheduled(event: {{ readonly cron: string }}, env: Env): Promise<void> {{"
+    );
+    let _ = writeln!(out, "    const surface = compose(env);");
+    let _ = writeln!(out, "    switch (event.cron) {{");
+    for route in cron_routes {
+        let method_key = crate::emitter::cron_handler_method_name(&route.service, route.index);
+        let expr_lit = route.expr.replace('\\', "\\\\").replace('"', "\\\"");
+        let _ = writeln!(out, "      case \"{expr_lit}\": {{");
+        let _ = writeln!(out, "        const result = await surface.{method_key}();");
+        let _ = writeln!(
+            out,
+            "        if (result.tag === \"Err\") console.error(\"cron {expr_lit} failed\", result.error);"
+        );
+        let _ = writeln!(out, "        return;");
+        let _ = writeln!(out, "      }}");
+    }
+    let _ = writeln!(out, "      default:");
+    let _ = writeln!(out, "        return;");
+    let _ = writeln!(out, "    }}");
+    let _ = writeln!(out, "  }},");
 }
 
 /// Count the number of `:param` segments in a path pattern.
@@ -164,6 +221,15 @@ struct HttpRoute {
     method: HttpMethod,
     path: String,
     handler: Handler,
+}
+
+/// One `on cron` handler, identified by its service and per-service declaration
+/// index (which together form its `cron_<service>_<index>` method key).
+#[derive(Debug, Clone)]
+struct CronRoute {
+    service: String,
+    index: usize,
+    expr: String,
 }
 
 /// Generate the per-route dispatch block for one `on http` handler. The

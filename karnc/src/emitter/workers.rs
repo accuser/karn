@@ -85,6 +85,7 @@ pub fn emit_worker_compose(
     let _ = writeln!(out, "  return {{");
     for sname in &service_names {
         let service = table.services.get(*sname).unwrap();
+        let mut cron_idx = 0usize;
         for h in &service.handlers {
             match &h.kind {
                 HandlerKind::Call => {
@@ -92,6 +93,10 @@ pub fn emit_worker_compose(
                 }
                 HandlerKind::Http { method, path } => {
                     emit_http_wrapper(&mut out, sname, h, *method, path);
+                }
+                HandlerKind::Cron { .. } => {
+                    emit_cron_wrapper(&mut out, sname, cron_idx);
+                    cron_idx += 1;
                 }
             }
         }
@@ -116,6 +121,14 @@ fn emit_call_wrapper(out: &mut String, sname: &str, h: &Handler) {
         param_args.join(", "),
         if param_args.is_empty() { "" } else { ", " },
     );
+    let _ = writeln!(out, "    }},");
+}
+
+fn emit_cron_wrapper(out: &mut String, sname: &str, cron_idx: usize) {
+    let method_key = crate::emitter::cron_handler_method_name(sname, cron_idx);
+    // Cron handlers take no parameters; the wrapper just binds deps.
+    let _ = writeln!(out, "    async {method_key}() {{");
+    let _ = writeln!(out, "      return handlers.{sname}.{method_key}(deps);");
     let _ = writeln!(out, "    }},");
 }
 

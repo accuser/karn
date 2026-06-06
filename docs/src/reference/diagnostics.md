@@ -6,7 +6,7 @@
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../how-to/troubleshooting/index.md).
 
-There are **203** codes in total.
+There are **208** codes in total.
 
 ## Agents
 
@@ -69,6 +69,15 @@ There are **203** codes in total.
 | `karn.context.consumes_cycle` | Contexts form a `consumes` dependency cycle. |
 | `karn.context.external_construction` | A context-owned type was constructed from outside that context. |
 | `karn.context.opaque_inspection` | An opaquely-exported type was inspected from outside its context. |
+
+## Cron
+
+| Code | Summary |
+|---|---|
+| `karn.cron.duplicate_schedule` | Two `on cron` handlers declare the same schedule. |
+| `karn.cron.has_params` | An `on cron` handler declares parameters (it takes none). |
+| `karn.cron.invalid_schedule` | A cron expression is not five whitespace-separated fields. |
+| `karn.cron.return_not_effect_result` | An `on cron` handler does not return `Effect[Result[(), E]]`. |
 
 ## Effects
 
@@ -141,6 +150,7 @@ There are **203** codes in total.
 | Code | Summary |
 |---|---|
 | `karn.parse.consumes_after_decls` | `consumes` appears after other declarations. |
+| `karn.parse.cron_in_agent` | An `on cron` handler was declared in an agent. |
 | `karn.parse.empty_agent` | An `agent` body is empty. |
 | `karn.parse.empty_capability` | A `capability` body is empty. |
 | `karn.parse.empty_match` | A `match` has no arms. |

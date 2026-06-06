@@ -1,0 +1,67 @@
+================================================================================
+on cron handler
+================================================================================
+
+context reaper
+
+service sweeper {
+  on cron("*/5 * * * *") () -> Effect[Result[(), String]] {
+    Ok(())
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (context_decl
+    (qualified_name
+      (identifier))
+    (service_decl
+      (identifier)
+      (handler
+        (cron_handler
+          (string_literal)
+          (generic_type_ref
+            (builtin_type)
+            (generic_type_ref
+              (builtin_type)
+              (unit_type)
+              (base_type)))
+          (block
+            (ok_expr
+              (unit_literal))))))))
+
+================================================================================
+on cron handler with given
+================================================================================
+
+context metrics
+
+service ticker {
+  on cron("0 * * * *") () -> Effect[Result[(), String]] given Pinger {
+    Ok(())
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (context_decl
+    (qualified_name
+      (identifier))
+    (service_decl
+      (identifier)
+      (handler
+        (cron_handler
+          (string_literal)
+          (generic_type_ref
+            (builtin_type)
+            (generic_type_ref
+              (builtin_type)
+              (unit_type)
+              (base_type)))
+          (given_clause
+            (identifier))
+          (block
+            (ok_expr
+              (unit_literal))))))))

@@ -6,7 +6,7 @@
 
 Every reserved keyword, with a one-line description. Reserved words cannot be used as identifiers.
 
-There are **46** reserved keywords.
+There are **47** reserved keywords.
 
 | Keyword | Meaning |
 |---|---|
@@ -30,6 +30,7 @@ There are **46** reserved keywords.
 | `commons` | Declare a pure, stateless module of types and functions. |
 | `consumes` | Declare a dependency on another context's services. |
 | `context` | Declare a deployable context (services, agents, capabilities). |
+| `cron` | Declare a scheduled handler (`on cron`). |
 | `else` | The alternative branch of an `if` expression. |
 | `enum` | Declare a payloadless sum type (`enum { A, B }`). |
 | `expect` | Reserved keyword. |

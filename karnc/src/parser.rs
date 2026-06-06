@@ -3550,6 +3550,26 @@ impl<'a> Parser<'a> {
             )?;
             let path = parse_string_literal(self.slice(path_tok.span), path_tok.span)?;
             HandlerKind::Http { method, path }
+        } else if self.peek_kind() == Some(TokenKind::Cron) {
+            let cron_tok = self.bump().unwrap();
+            if is_agent {
+                return Err(CompileError::new(
+                    "karn.parse.cron_in_agent",
+                    cron_tok.span,
+                    "`on cron` handlers are only valid inside `service` declarations, not `agent`",
+                )
+                .with_note(
+                    "agents persist state and respond to `on call`; scheduled tasks belong on services",
+                ));
+            }
+            self.expect(TokenKind::LParen, "before the cron expression")?;
+            let expr_tok = self.expect(
+                TokenKind::StrLit,
+                "expected a cron expression string literal after `on cron(`",
+            )?;
+            let expr = parse_string_literal(self.slice(expr_tok.span), expr_tok.span)?;
+            self.expect(TokenKind::RParen, "after the cron expression")?;
+            HandlerKind::Cron { expr }
         } else {
             let kind_ident = self.expect_ident("expected handler kind (e.g. `call`) after `on`")?;
             match kind_ident.name.as_str() {
@@ -3559,11 +3579,11 @@ impl<'a> Parser<'a> {
                         "karn.parse.unknown_handler_kind",
                         kind_ident.span,
                         format!(
-                            "unknown handler kind `{other}` — supported kinds are `call` and `http`"
+                            "unknown handler kind `{other}` — supported kinds are `call`, `http`, and `cron`"
                         ),
                     )
                     .with_note(
-                        "queue and cron handlers come in v0.10; for now use `on call(...)` or `on http METHOD \"/path\" (...)`",
+                        "queue handlers come in v0.10b; for now use `on call(...)`, `on http METHOD \"/path\" (...)`, or `on cron \"expr\" (...)`",
                     ));
                 }
             }
