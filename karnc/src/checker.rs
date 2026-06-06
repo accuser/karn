@@ -370,10 +370,7 @@ fn eval_predicate(pred: &PredKind, lit: &ConstLit) -> bool {
 }
 
 /// The first predicate the literal fails, or `None` if it satisfies them all.
-fn first_failed_predicate<'a>(
-    refinement: &'a Refinement,
-    lit: &ConstLit,
-) -> Option<&'a PredKind> {
+fn first_failed_predicate<'a>(refinement: &'a Refinement, lit: &ConstLit) -> Option<&'a PredKind> {
     for p in &refinement.predicates {
         if !eval_predicate(&p.kind, lit) {
             return Some(&p.kind);
@@ -1303,88 +1300,158 @@ fn check_mock(type_ref: &TypeRef, args: &[Expr], span: Span, ctx: &mut Ctx) -> O
             return None;
         }
     };
-    let (name, base) = match &ty {
+    match &ty {
+        // Refined types: bare (generate a default) or a single literal pin.
         Ty::Named {
             name,
             kind: NamedKind::Refined(base),
-        } => (name.clone(), *base),
-        _ => {
-            ctx.errors.push(
-                CompileError::new(
-                    "karn.mock.unsupported_kind",
-                    span,
-                    format!(
-                        "`Mock` is not yet supported for type `{}` — this increment covers refined types only",
-                        ty.display()
-                    ),
-                )
-                .with_note("Mock for sum, record, and opaque types comes in a later increment"),
-            );
-            return Some(ty);
-        }
-    };
-    let decl = ctx.input.types.get(&name)?.clone();
-    let refinement = type_decl_refinement(&decl);
-    match args {
-        [] => {
-            if let Some(r) = refinement
-                && refinement_needs_pin(r)
-            {
-                ctx.errors.push(
-                    CompileError::new(
-                        "karn.mock.needs_pin",
-                        span,
-                        format!(
-                            "bare `Mock[{name}]` cannot generate a value for a `Matches` refinement"
-                        ),
-                    )
-                    .with_note("provide an explicit value, e.g. `Mock[T](\"...\")`"),
-                );
-            }
-        }
-        [arg] => {
-            type_of(arg, Some(&Ty::Base(base)), ctx);
-            match const_literal(arg) {
-                Some(lit) if literal_matches_base(&lit, base) => {
-                    if let Some(r) = refinement
-                        && let Some(failed) = first_failed_predicate(r, &lit)
-                    {
-                        ctx.errors.push(CompileError::new(
-                            "karn.mock.literal_violates",
-                            arg.span,
-                            format!(
-                                "literal {} does not satisfy `{}` required by type `{}`",
-                                lit.display(),
-                                failed.name(),
-                                name
-                            ),
-                        ));
+        } => {
+            let name = name.clone();
+            let base = *base;
+            let decl = match ctx.input.types.get(&name) {
+                Some(d) => d.clone(),
+                // Unreachable: the type already resolved above.
+                None => return None,
+            };
+            let refinement = type_decl_refinement(&decl);
+            match args {
+                [] => {
+                    if refinement.is_some_and(refinement_needs_pin) {
+                        ctx.errors.push(
+                            CompileError::new(
+                                "karn.mock.needs_pin",
+                                span,
+                                format!(
+                                    "bare `Mock[{name}]` cannot generate a value for a `Matches` refinement"
+                                ),
+                            )
+                            .with_note("provide an explicit value, e.g. `Mock[T](\"...\")`"),
+                        );
+                    }
+                }
+                [arg] => {
+                    type_of(arg, Some(&Ty::Base(base)), ctx);
+                    match const_literal(arg) {
+                        Some(lit) if literal_matches_base(&lit, base) => {
+                            if let Some(r) = refinement
+                                && let Some(failed) = first_failed_predicate(r, &lit)
+                            {
+                                ctx.errors.push(CompileError::new(
+                                    "karn.mock.literal_violates",
+                                    arg.span,
+                                    format!(
+                                        "literal {} does not satisfy `{}` required by type `{}`",
+                                        lit.display(),
+                                        failed.name(),
+                                        name
+                                    ),
+                                ));
+                            }
+                        }
+                        _ => {
+                            ctx.errors.push(CompileError::new(
+                                "karn.mock.pin_not_literal",
+                                arg.span,
+                                format!(
+                                    "`Mock[{name}](...)` requires a literal `{}` value",
+                                    base.name()
+                                ),
+                            ));
+                        }
                     }
                 }
                 _ => {
                     ctx.errors.push(CompileError::new(
-                        "karn.mock.pin_not_literal",
-                        arg.span,
+                        "karn.mock.arity",
+                        span,
                         format!(
-                            "`Mock[{name}](...)` requires a literal `{}` value",
-                            base.name()
+                            "`Mock[{name}]` takes at most one pin argument, but {} were given",
+                            args.len()
                         ),
                     ));
                 }
             }
         }
+        // v0.9.4 slice 2: opaque / sum / record — bare generation only. Pins for
+        // these kinds (variant pins, record overrides) are a later increment.
+        Ty::Named {
+            name,
+            kind: NamedKind::Opaque(_) | NamedKind::Sum | NamedKind::Record,
+        } => {
+            let name = name.clone();
+            if !args.is_empty() {
+                ctx.errors.push(
+                    CompileError::new(
+                        "karn.mock.pin_unsupported",
+                        span,
+                        format!(
+                            "pinned `Mock[{name}](...)` is not yet supported for this kind of type — use bare `Mock[{name}]`"
+                        ),
+                    )
+                    .with_note("literal pins are currently supported for refined types only"),
+                );
+            } else if !can_mock_bare(&ty, &ctx.input.types, MOCK_DEPTH) {
+                ctx.errors.push(
+                    CompileError::new(
+                        "karn.mock.needs_pin",
+                        span,
+                        format!(
+                            "bare `Mock[{name}]` cannot generate a value — it (transitively) needs a `Matches` refinement or is recursively unbounded"
+                        ),
+                    )
+                    .with_note("provide an explicit value in the test instead"),
+                );
+            }
+        }
         _ => {
             ctx.errors.push(CompileError::new(
-                "karn.mock.arity",
+                "karn.mock.unsupported_kind",
                 span,
-                format!(
-                    "`Mock[{name}]` takes at most one pin argument, but {} were given",
-                    args.len()
-                ),
+                format!("`Mock` is not a value type: `{}`", ty.display()),
             ));
         }
     }
     Some(ty)
+}
+
+/// v0.9.4 slice 2 recursion depth cap for bare `Mock` generation — guards
+/// against recursively-unbounded types (a sum whose first variant re-enters the
+/// type). Beyond it, bare generation is refused.
+const MOCK_DEPTH: u32 = 12;
+
+/// Whether a bare `Mock[T]` can generate a value for `ty`: refined types must
+/// not carry a `Matches` predicate (no default), and sums/records must have
+/// every (first-variant / field) component recursively mockable within the
+/// depth cap.
+fn can_mock_bare(ty: &Ty, types: &HashMap<String, TypeDecl>, depth: u32) -> bool {
+    if depth == 0 {
+        return false;
+    }
+    match ty {
+        Ty::Base(_) => true,
+        Ty::Named { name, .. } => {
+            let Some(decl) = types.get(name) else {
+                return false;
+            };
+            match &decl.body {
+                TypeBody::Refined { refinement, .. } => {
+                    !refinement.as_ref().is_some_and(refinement_needs_pin)
+                }
+                TypeBody::Opaque { .. } => true,
+                TypeBody::Sum(s) => s.variants.first().is_some_and(|v| {
+                    v.payload.iter().all(|f| {
+                        resolve_type_ref(&f.type_ref, types)
+                            .is_some_and(|t| can_mock_bare(&t, types, depth - 1))
+                    })
+                }),
+                TypeBody::Record(r) => r.fields.iter().all(|f| {
+                    resolve_type_ref(&f.type_ref, types)
+                        .is_some_and(|t| can_mock_bare(&t, types, depth - 1))
+                }),
+            }
+        }
+        _ => false,
+    }
 }
 
 fn check_assert(inner: &Expr, span: Span, ctx: &mut Ctx) -> Option<Ty> {

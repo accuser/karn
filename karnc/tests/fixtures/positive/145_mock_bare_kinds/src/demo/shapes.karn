@@ -1,0 +1,12 @@
+commons demo.shapes
+
+type OrderId = opaque String
+
+type Status =
+  | Active(since: Int)
+  | Closed
+
+type Cart = {
+  id: OrderId,
+  count: Int,
+}

@@ -950,8 +950,19 @@ impl<'a> Formatter<'a> {
                 }
             }
             f.emit_leading_comments(&b.tail_leading_comments);
-            f.format_expr(&b.tail);
-            f.newline();
+            // v0.7: a block whose last statement is `assert` carries an implicit
+            // `()` tail that the parser synthesises. Don't print it — Karn has
+            // no statement terminators, so a printed `()` on the next line would
+            // re-attach to the assert's expression on re-parse (`x == y` `()` →
+            // `x == y()`), breaking idempotency. The parser re-derives the
+            // implicit unit tail, so omitting it is loss-free.
+            let implicit_unit_after_assert = matches!(b.tail.kind, ExprKind::UnitLit)
+                && matches!(b.statements.last(), Some(Statement::Assert(_)))
+                && b.tail_leading_comments.is_empty();
+            if !implicit_unit_after_assert {
+                f.format_expr(&b.tail);
+                f.newline();
+            }
         });
         self.push("}");
     }
@@ -1268,9 +1279,16 @@ fn format_block_oneline(b: &Block) -> String {
             out.push_str(&stmt_to_string(stmt));
             out.push('\n');
         }
-        out.push('\t');
-        out.push_str(&expr_with_prec(&b.tail, 0));
-        out.push_str("\n}");
+        // Omit the implicit `()` tail after a trailing `assert` (see
+        // `format_block`) — printing it breaks round-trip idempotency.
+        let implicit_unit_after_assert = matches!(b.tail.kind, ExprKind::UnitLit)
+            && matches!(b.statements.last(), Some(Statement::Assert(_)));
+        if !implicit_unit_after_assert {
+            out.push('\t');
+            out.push_str(&expr_with_prec(&b.tail, 0));
+            out.push('\n');
+        }
+        out.push('}');
         out
     }
 }

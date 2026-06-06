@@ -3283,7 +3283,7 @@ fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
             let span_end = inner.span.end;
             format!("__karnAssert(({value}), \"offset {display}\", {span_start}, {span_end})")
         }
-        ExprKind::Mock { args, .. } => lower_mock(args, e.span, stmts, cx),
+        ExprKind::Mock { type_ref, args } => lower_mock(type_ref, args, stmts, cx),
     }
 }
 
@@ -3292,7 +3292,9 @@ fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
 /// (a `Matches` refinement — the checker rejects bare `Mock` for those).
 fn refined_default(decl: &TypeDecl) -> Option<String> {
     let (base, refinement) = match &decl.body {
-        TypeBody::Refined { base, refinement, .. } => (*base, refinement.as_ref()),
+        TypeBody::Refined {
+            base, refinement, ..
+        } => (*base, refinement.as_ref()),
         _ => return None,
     };
     match base {
@@ -3334,32 +3336,108 @@ fn refined_default(decl: &TypeDecl) -> Option<String> {
 /// v0.9.4 Part B (slice 1): lower a refined-type `Mock[T]` / `Mock[T](lit)` to
 /// the branded `unsafe` constructor. The checker has already validated this is a
 /// refined type in a test body, and recorded the refined type at `span`.
+/// v0.9.4 slice 2 recursion cap for bare `Mock` generation (mirrors the
+/// checker's `MOCK_DEPTH`).
+const MOCK_DEPTH: u32 = 12;
+
+/// A TypeScript base-literal default for an opaque type's underlying base. Not
+/// distinct per call in this increment — per-call distinctness via a runtime
+/// counter is a follow-up.
+fn base_default_ts(base: BaseType) -> String {
+    match base {
+        BaseType::Int => "0".to_string(),
+        BaseType::String => "\"mock\"".to_string(),
+        BaseType::Bool => "true".to_string(),
+    }
+}
+
+/// Generate a TypeScript expression for a bare `Mock` of `ty` (v0.9.4 Part B,
+/// slice 2). Recurses through sum payloads and record fields; refined types use
+/// `refined_default`, opaque types wrap a base default, bare bases use 0/""/true.
+fn mock_value(ty: &Ty, cx: &LowerCtx, depth: u32) -> String {
+    if depth == 0 {
+        return "undefined".to_string();
+    }
+    match ty {
+        Ty::Base(BaseType::Int) => "0".to_string(),
+        Ty::Base(BaseType::String) => "\"\"".to_string(),
+        Ty::Base(BaseType::Bool) => "true".to_string(),
+        Ty::Named { name, .. } => {
+            let Some(decl) = cx.commons.types.get(name) else {
+                return "undefined".to_string();
+            };
+            match &decl.body {
+                TypeBody::Refined { .. } => {
+                    let d = refined_default(decl).unwrap_or_else(|| "0".to_string());
+                    format!("{name}.unsafe({d})")
+                }
+                TypeBody::Opaque { base, .. } => {
+                    format!("{name}.unsafe({})", base_default_ts(*base))
+                }
+                TypeBody::Sum(s) => match s.variants.first() {
+                    None => "undefined".to_string(),
+                    Some(v) if v.payload.is_empty() => format!("{name}.{}", v.name.name),
+                    Some(v) => {
+                        let args: Vec<String> = v
+                            .payload
+                            .iter()
+                            .map(|f| {
+                                crate::checker::resolve_type_ref(&f.type_ref, &cx.commons.types)
+                                    .map(|t| mock_value(&t, cx, depth - 1))
+                                    .unwrap_or_else(|| "undefined".to_string())
+                            })
+                            .collect();
+                        format!("{name}.{}({})", v.name.name, args.join(", "))
+                    }
+                },
+                TypeBody::Record(r) => {
+                    let parts: Vec<String> = r
+                        .fields
+                        .iter()
+                        .map(|f| {
+                            let fv =
+                                crate::checker::resolve_type_ref(&f.type_ref, &cx.commons.types)
+                                    .map(|t| mock_value(&t, cx, depth - 1))
+                                    .unwrap_or_else(|| "undefined".to_string());
+                            format!("{}: {}", f.name.name, fv)
+                        })
+                        .collect();
+                    format!("{{ {} }}", parts.join(", "))
+                }
+            }
+        }
+        _ => "undefined".to_string(),
+    }
+}
+
 fn lower_mock(
+    type_ref: &TypeRef,
     args: &[Expr],
-    span: crate::span::Span,
     stmts: &mut Vec<String>,
     cx: &mut LowerCtx,
 ) -> String {
-    let name = match cx.commons.expr_types.get(&span) {
-        Some(Ty::Named {
+    // Resolve the mocked type straight from the AST node rather than the
+    // checker's `expr_types` side-table — the static type table is always
+    // populated, whereas a test body's per-expression types may not be visible
+    // to the emitter.
+    let ty = match crate::checker::resolve_type_ref(type_ref, &cx.commons.types) {
+        Some(t) => t,
+        None => return "undefined /* mock: unresolved type */".to_string(),
+    };
+    // Refined literal pin → `T.unsafe(<literal>)`.
+    if let (
+        Some(arg),
+        Ty::Named {
             name,
             kind: NamedKind::Refined(_),
-        }) => name.clone(),
-        // Unreachable once the checker has accepted the program (it errors on
-        // unsupported kinds); emit a value that fails `tsc` loudly rather than
-        // silently.
-        _ => return "undefined /* mock: unsupported type */".to_string(),
-    };
-    let raw = if let Some(arg) = args.first() {
-        lower_const_literal_raw(arg).unwrap_or_else(|| lower_expr(arg, stmts, cx))
-    } else {
-        cx.commons
-            .types
-            .get(&name)
-            .and_then(refined_default)
-            .unwrap_or_else(|| "undefined".to_string())
-    };
-    format!("{name}.unsafe({raw})")
+        },
+    ) = (args.first(), &ty)
+    {
+        let raw = lower_const_literal_raw(arg).unwrap_or_else(|| lower_expr(arg, stmts, cx));
+        return format!("{name}.unsafe({raw})");
+    }
+    // Bare mock (refined / opaque / sum / record).
+    mock_value(&ty, cx, MOCK_DEPTH)
 }
 
 /// When we encounter `lhs && rhs`, see if lhs is an `is` (possibly wrapped
