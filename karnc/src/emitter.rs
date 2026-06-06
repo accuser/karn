@@ -952,6 +952,11 @@ fn collect_refs_in_expr(
         ExprKind::Assert(inner) => {
             collect_refs_in_expr(inner, local_to_file, ctx, out);
         }
+        ExprKind::Mock { args, .. } => {
+            for a in args {
+                collect_refs_in_expr(a, local_to_file, ctx, out);
+            }
+        }
         ExprKind::RecordSpread {
             type_name,
             base,
@@ -2878,6 +2883,20 @@ fn write_line(out: &mut String, indent: usize, line: &str) {
     out.push('\n');
 }
 
+/// True when a bare `Call` whose result type is the sum `sum_name` is actually a
+/// variant constructor of that sum (e.g. `Won(prize)` for `Outcome`), as opposed
+/// to an ordinary function that merely *returns* the sum (e.g.
+/// `classify(n) -> Outcome`). Only the former is qualified to `Sum.Variant(...)`.
+fn call_is_sum_variant(cx: &LowerCtx, sum_name: &str, call_name: &str) -> bool {
+    if let Some(decl) = cx.commons.types.get(sum_name)
+        && let TypeBody::Sum(s) = &decl.body
+    {
+        s.variants.iter().any(|v| v.name.name == call_name)
+    } else {
+        false
+    }
+}
+
 /// The raw TypeScript form of a compile-time literal that v0.9.4 may admit as a
 /// refined type (int or string). `None` for anything else.
 fn lower_const_literal_raw(e: &Expr) -> Option<String> {
@@ -2952,6 +2971,7 @@ fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
                 name: type_name,
             }) = cx.commons.expr_types.get(&e.span)
                 && type_name != &name.name
+                && call_is_sum_variant(cx, type_name, &name.name)
             {
                 return format!("{}.{}({})", type_name, name.name, args_lowered.join(", "));
             }
@@ -3263,7 +3283,83 @@ fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
             let span_end = inner.span.end;
             format!("__karnAssert(({value}), \"offset {display}\", {span_start}, {span_end})")
         }
+        ExprKind::Mock { args, .. } => lower_mock(args, e.span, stmts, cx),
     }
+}
+
+/// A default base-type literal (as TypeScript source) that satisfies a refined
+/// type's predicates, for bare `Mock[T]`. `None` when no default can be derived
+/// (a `Matches` refinement — the checker rejects bare `Mock` for those).
+fn refined_default(decl: &TypeDecl) -> Option<String> {
+    let (base, refinement) = match &decl.body {
+        TypeBody::Refined { base, refinement, .. } => (*base, refinement.as_ref()),
+        _ => return None,
+    };
+    match base {
+        BaseType::Int => {
+            let mut lo: i64 = 0;
+            if let Some(r) = refinement {
+                for p in &r.predicates {
+                    match p.kind {
+                        PredKind::Positive => lo = lo.max(1),
+                        PredKind::NonNegative => lo = lo.max(0),
+                        PredKind::InRange(a, _) => lo = lo.max(a),
+                        _ => {}
+                    }
+                }
+            }
+            Some(lo.to_string())
+        }
+        BaseType::String => {
+            let mut len: i64 = 0;
+            if let Some(r) = refinement {
+                for p in &r.predicates {
+                    match p.kind {
+                        PredKind::NonEmpty => len = len.max(1),
+                        PredKind::MinLength(k) | PredKind::Length(k) => len = len.max(k),
+                        PredKind::Matches(_) => return None,
+                        _ => {}
+                    }
+                }
+            }
+            if len < 1 {
+                len = 1;
+            }
+            Some(format!("\"{}\"", "x".repeat(len as usize)))
+        }
+        BaseType::Bool => Some("true".to_string()),
+    }
+}
+
+/// v0.9.4 Part B (slice 1): lower a refined-type `Mock[T]` / `Mock[T](lit)` to
+/// the branded `unsafe` constructor. The checker has already validated this is a
+/// refined type in a test body, and recorded the refined type at `span`.
+fn lower_mock(
+    args: &[Expr],
+    span: crate::span::Span,
+    stmts: &mut Vec<String>,
+    cx: &mut LowerCtx,
+) -> String {
+    let name = match cx.commons.expr_types.get(&span) {
+        Some(Ty::Named {
+            name,
+            kind: NamedKind::Refined(_),
+        }) => name.clone(),
+        // Unreachable once the checker has accepted the program (it errors on
+        // unsupported kinds); emit a value that fails `tsc` loudly rather than
+        // silently.
+        _ => return "undefined /* mock: unsupported type */".to_string(),
+    };
+    let raw = if let Some(arg) = args.first() {
+        lower_const_literal_raw(arg).unwrap_or_else(|| lower_expr(arg, stmts, cx))
+    } else {
+        cx.commons
+            .types
+            .get(&name)
+            .and_then(refined_default)
+            .unwrap_or_else(|| "undefined".to_string())
+    };
+    format!("{name}.unsafe({raw})")
 }
 
 /// When we encounter `lhs && rhs`, see if lhs is an `is` (possibly wrapped

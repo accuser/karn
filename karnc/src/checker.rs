@@ -1221,6 +1221,7 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
             ctx,
         ),
         ExprKind::Assert(inner) => check_assert(inner, expr.span, ctx),
+        ExprKind::Mock { type_ref, args } => check_mock(type_ref, args, expr.span, ctx),
     };
     if let Some(ty) = &ty {
         ctx.expr_types.insert(expr.span, ty.clone());
@@ -1266,6 +1267,126 @@ fn check_ident(id: &Ident, ctx: &mut Ctx) -> Option<Ty> {
 
 /// v0.9.1: `assert e` as an expression. Test-privileged. Requires `e : Bool`.
 /// Always yields type `()`.
+/// True if a refinement cannot be satisfied by a generated default value — i.e.
+/// it contains a `Matches` predicate, where bare `Mock[T]` must be given an
+/// explicit pin instead.
+fn refinement_needs_pin(refinement: &Refinement) -> bool {
+    refinement
+        .predicates
+        .iter()
+        .any(|p| matches!(p.kind, PredKind::Matches(_)))
+}
+
+/// v0.9.4 Part B (slice 1): `Mock[T]` / `Mock[T](literal)` for refined types,
+/// valid only in test bodies. Sum/record/opaque types are not yet supported.
+fn check_mock(type_ref: &TypeRef, args: &[Expr], span: Span, ctx: &mut Ctx) -> Option<Ty> {
+    if !ctx.in_test_body {
+        ctx.errors.push(
+            CompileError::new(
+                "karn.mock.outside_test",
+                span,
+                "`Mock[T]` is only valid inside a test case body",
+            )
+            .with_note(
+                "Mock values are test-time construction; use them only inside `test \"...\" { ... }` blocks",
+            ),
+        );
+    }
+    let ty = match resolve_type_ref(type_ref, &ctx.input.types) {
+        Some(t) => t,
+        None => {
+            ctx.errors.push(CompileError::new(
+                "karn.mock.unknown_type",
+                span,
+                "`Mock[T]` refers to a type that does not resolve",
+            ));
+            return None;
+        }
+    };
+    let (name, base) = match &ty {
+        Ty::Named {
+            name,
+            kind: NamedKind::Refined(base),
+        } => (name.clone(), *base),
+        _ => {
+            ctx.errors.push(
+                CompileError::new(
+                    "karn.mock.unsupported_kind",
+                    span,
+                    format!(
+                        "`Mock` is not yet supported for type `{}` — this increment covers refined types only",
+                        ty.display()
+                    ),
+                )
+                .with_note("Mock for sum, record, and opaque types comes in a later increment"),
+            );
+            return Some(ty);
+        }
+    };
+    let decl = ctx.input.types.get(&name)?.clone();
+    let refinement = type_decl_refinement(&decl);
+    match args {
+        [] => {
+            if let Some(r) = refinement
+                && refinement_needs_pin(r)
+            {
+                ctx.errors.push(
+                    CompileError::new(
+                        "karn.mock.needs_pin",
+                        span,
+                        format!(
+                            "bare `Mock[{name}]` cannot generate a value for a `Matches` refinement"
+                        ),
+                    )
+                    .with_note("provide an explicit value, e.g. `Mock[T](\"...\")`"),
+                );
+            }
+        }
+        [arg] => {
+            type_of(arg, Some(&Ty::Base(base)), ctx);
+            match const_literal(arg) {
+                Some(lit) if literal_matches_base(&lit, base) => {
+                    if let Some(r) = refinement
+                        && let Some(failed) = first_failed_predicate(r, &lit)
+                    {
+                        ctx.errors.push(CompileError::new(
+                            "karn.mock.literal_violates",
+                            arg.span,
+                            format!(
+                                "literal {} does not satisfy `{}` required by type `{}`",
+                                lit.display(),
+                                failed.name(),
+                                name
+                            ),
+                        ));
+                    }
+                }
+                _ => {
+                    ctx.errors.push(CompileError::new(
+                        "karn.mock.pin_not_literal",
+                        arg.span,
+                        format!(
+                            "`Mock[{name}](...)` requires a literal `{}` value",
+                            base.name()
+                        ),
+                    ));
+                }
+            }
+        }
+        _ => {
+            ctx.errors.push(CompileError::new(
+                "karn.mock.arity",
+                span,
+                format!(
+                    "`Mock[{name}]` takes at most one pin argument, but {} were given",
+                    args.len()
+                ),
+            ));
+        }
+    }
+    Some(ty)
+}
+
 fn check_assert(inner: &Expr, span: Span, ctx: &mut Ctx) -> Option<Ty> {
     if !ctx.in_test_body {
         ctx.errors.push(

@@ -2639,6 +2639,33 @@ impl<'a> Parser<'a> {
         Ok(e)
     }
 
+    /// `Mock '[' type ']' ( '(' args? ')' )?` — v0.9.4 test-context value
+    /// construction. The leading `Mock` identifier and the `[` lookahead have
+    /// already been confirmed by the caller; `kw_span` is the `Mock` span.
+    fn parse_mock_expr(&mut self, kw_span: Span) -> Result<Expr, CompileError> {
+        self.expect(TokenKind::LBracket, "after `Mock`")?;
+        let type_ref = self.parse_type_ref("as the type argument of `Mock[T]`")?;
+        let close_b = self.expect(TokenKind::RBracket, "to close `Mock[T]`")?;
+        let mut args = Vec::new();
+        let mut end = close_b.span;
+        if self.peek_kind() == Some(TokenKind::LParen) {
+            self.bump();
+            if self.peek_kind() != Some(TokenKind::RParen) {
+                args.push(self.parse_expr()?);
+                while self.eat(TokenKind::Comma).is_some() {
+                    args.push(self.parse_expr()?);
+                }
+            }
+            end = self
+                .expect(TokenKind::RParen, "to close the `Mock` arguments")?
+                .span;
+        }
+        Ok(Expr {
+            kind: ExprKind::Mock { type_ref, args },
+            span: kw_span.merge(end),
+        })
+    }
+
     fn parse_primary(&mut self) -> Result<Expr, CompileError> {
         let t = self.peek().ok_or_else(|| {
             CompileError::new(
@@ -2734,6 +2761,10 @@ impl<'a> Parser<'a> {
                     name: self.slice(t.span).to_string(),
                     span: t.span,
                 };
+                // v0.9.4: `Mock[T]` / `Mock[T](args)` — test-context construction.
+                if ident.name == "Mock" && self.peek_kind() == Some(TokenKind::LBracket) {
+                    return self.parse_mock_expr(ident.span);
+                }
                 if self.peek_kind() == Some(TokenKind::LParen) {
                     self.bump();
                     let mut args = Vec::new();

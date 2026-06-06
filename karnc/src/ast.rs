@@ -871,6 +871,14 @@ pub enum ExprKind {
     /// Valid only inside test bodies. Evaluates `expr` (must be Bool); if
     /// false, the surrounding test case fails.
     Assert(Box<Expr>),
+    /// `Mock[T]`, `Mock[T](args)` — test-context value construction (v0.9.4).
+    /// `args` is empty for the bare form and holds the pin arguments for
+    /// `Mock[T](...)`. The record-override form `Mock[T] { ... }` is not yet
+    /// parsed. Valid only inside test bodies; has type `T`.
+    Mock {
+        type_ref: TypeRef,
+        args: Vec<Expr>,
+    },
 }
 
 /// One field-initialiser inside a record construction expression:

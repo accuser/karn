@@ -592,6 +592,13 @@ fn check_expr_references(
                 inner, params, in_method, scopes, types, fns, methods, errors,
             );
         }
+        ExprKind::Mock { args, .. } => {
+            // v0.9.4: the mocked type is validated by the checker; resolve any
+            // pin-argument references here.
+            for a in args {
+                check_expr_references(a, params, in_method, scopes, types, fns, methods, errors);
+            }
+        }
         ExprKind::RecordSpread {
             type_name,
             base,

@@ -2666,6 +2666,11 @@ fn walk_expr_for_constraints(
         ExprKind::Assert(inner) => {
             walk_expr_for_constraints(inner, typed, consumed, local, errors);
         }
+        ExprKind::Mock { args, .. } => {
+            for a in args {
+                walk_expr_for_constraints(a, typed, consumed, local, errors);
+            }
+        }
         ExprKind::RecordSpread {
             base, overrides, ..
         } => {

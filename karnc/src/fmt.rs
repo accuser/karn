@@ -1210,6 +1210,19 @@ fn expr_with_prec(e: &Expr, parent_prec: u8) -> String {
         }
         ExprKind::EffectPure(v) => format!("Effect.pure({})", expr_with_prec(v, 0)),
         ExprKind::Assert(v) => format!("assert {}", expr_with_prec(v, 0)),
+        ExprKind::Mock { type_ref, args } => {
+            let t = type_ref_to_string(type_ref);
+            if args.is_empty() {
+                format!("Mock[{t}]")
+            } else {
+                let a = args
+                    .iter()
+                    .map(|x| expr_with_prec(x, 0))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("Mock[{t}]({a})")
+            }
+        }
     }
 }
 
