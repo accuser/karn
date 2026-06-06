@@ -6,6 +6,9 @@ target/
 **/*.pending-snap
 **/snapshots/*.snap.new
 
+# mdBook build output
+docs/book/
+
 # Editor / OS
 .DS_Store
 .idea/
