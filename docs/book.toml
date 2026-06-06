@@ -14,6 +14,10 @@ renderers = ["html"]
 [output.html]
 default-theme = "rust"
 preferred-dark-theme = "ayu"
+# The project's GitHub Pages sub-path. Makes absolute links (notably the
+# generated 404 page) resolve correctly when hosted at accuser.github.io/karn/.
+# Note: this also prefixes paths during local `mdbook serve`.
+site-url = "/karn/"
 git-repository-url = "https://github.com/accuser/karn"
 edit-url-template = "https://github.com/accuser/karn/edit/main/docs/{path}"
 additional-css = ["theme/karn-highlight.css"]
