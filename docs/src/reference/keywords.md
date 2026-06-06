@@ -6,7 +6,7 @@
 
 Every reserved keyword, with a one-line description. Reserved words cannot be used as identifiers.
 
-There are **47** reserved keywords.
+There are **48** reserved keywords.
 
 | Keyword | Meaning |
 |---|---|
@@ -47,6 +47,7 @@ There are **47** reserved keywords.
 | `on` | Begin a handler declaration (`on call`, `on http`). |
 | `opaque` | Declare an opaque type, or export a type opaquely. |
 | `provides` | Provide an implementation of a capability. |
+| `queue` | Declare a queue-consumer handler (`on queue`). |
 | `record` | Reserved keyword (records are written `type X = { … }`). |
 | `self` | The current agent instance, inside a handler. |
 | `service` | Declare a service (a group of handlers) in a context. |

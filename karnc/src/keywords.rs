@@ -51,6 +51,7 @@ pub const KEYWORDS: &[KeywordInfo] = &[
     k("on", "Begin a handler declaration (`on call`, `on http`)."),
     k("opaque", "Declare an opaque type, or export a type opaquely."),
     k("provides", "Provide an implementation of a capability."),
+    k("queue", "Declare a queue-consumer handler (`on queue`)."),
     k("record", "Reserved keyword (records are written `type X = { … }`)."),
     k("self", "The current agent instance, inside a handler."),
     k("service", "Declare a service (a group of handlers) in a context."),

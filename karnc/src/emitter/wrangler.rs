@@ -70,6 +70,25 @@ pub fn emit_wrangler_toml(context: &str, table: &UnitTable, consumes: &[String])
         writeln!(out).unwrap();
     }
 
+    // v0.10b: queue consumers. Each `on queue "name"` becomes a
+    // `[[queues.consumers]]` binding.
+    let mut queues: Vec<&String> = Vec::new();
+    for service in table.services.values() {
+        for handler in &service.handlers {
+            if let crate::ast::HandlerKind::Queue { name } = &handler.kind {
+                queues.push(name);
+            }
+        }
+    }
+    queues.sort();
+    queues.dedup();
+    for name in &queues {
+        let _ = writeln!(out, "[[queues.consumers]]");
+        let _ = writeln!(out, "queue = \"{name}\"");
+        let _ = writeln!(out, "max_batch_size = 10");
+        writeln!(out).unwrap();
+    }
+
     out
 }
 

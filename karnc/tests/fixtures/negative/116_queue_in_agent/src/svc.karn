@@ -1,0 +1,13 @@
+context svc
+
+agent Worker {
+  key id: String
+
+  state {
+    count: Int,
+  }
+
+  on queue "q" (message: String) -> Effect[Result[(), String]] {
+    Ok(())
+  }
+}

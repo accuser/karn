@@ -3568,6 +3568,24 @@ impl<'a> Parser<'a> {
             )?;
             let expr = parse_string_literal(self.slice(expr_tok.span), expr_tok.span)?;
             HandlerKind::Cron { expr }
+        } else if self.peek_kind() == Some(TokenKind::Queue) {
+            let queue_tok = self.bump().unwrap();
+            if is_agent {
+                return Err(CompileError::new(
+                    "karn.parse.queue_in_agent",
+                    queue_tok.span,
+                    "`on queue` handlers are only valid inside `service` declarations, not `agent`",
+                )
+                .with_note(
+                    "agents persist state and respond to `on call`; queue consumers belong on services",
+                ));
+            }
+            let name_tok = self.expect(
+                TokenKind::StrLit,
+                "expected a queue name string literal after `on queue`",
+            )?;
+            let name = parse_string_literal(self.slice(name_tok.span), name_tok.span)?;
+            HandlerKind::Queue { name }
         } else {
             let kind_ident = self.expect_ident("expected handler kind (e.g. `call`) after `on`")?;
             match kind_ident.name.as_str() {
@@ -3577,11 +3595,11 @@ impl<'a> Parser<'a> {
                         "karn.parse.unknown_handler_kind",
                         kind_ident.span,
                         format!(
-                            "unknown handler kind `{other}` — supported kinds are `call`, `http`, and `cron`"
+                            "unknown handler kind `{other}` — supported kinds are `call`, `http`, `cron`, and `queue`"
                         ),
                     )
                     .with_note(
-                        "queue handlers come in v0.10b; for now use `on call(...)`, `on http METHOD \"/path\" (...)`, or `on cron \"expr\" (...)`",
+                        "use `on call(...)`, `on http METHOD \"/path\" (...)`, `on cron \"expr\" (...)`, or `on queue \"name\" (message: T)`",
                     ));
                 }
             }

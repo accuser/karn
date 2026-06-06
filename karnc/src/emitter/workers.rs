@@ -86,6 +86,7 @@ pub fn emit_worker_compose(
     for sname in &service_names {
         let service = table.services.get(*sname).unwrap();
         let mut cron_idx = 0usize;
+        let mut queue_idx = 0usize;
         for h in &service.handlers {
             match &h.kind {
                 HandlerKind::Call => {
@@ -97,6 +98,10 @@ pub fn emit_worker_compose(
                 HandlerKind::Cron { .. } => {
                     emit_cron_wrapper(&mut out, sname, cron_idx, h);
                     cron_idx += 1;
+                }
+                HandlerKind::Queue { .. } => {
+                    emit_queue_wrapper(&mut out, sname, queue_idx, h);
+                    queue_idx += 1;
                 }
             }
         }
@@ -128,6 +133,25 @@ fn emit_cron_wrapper(out: &mut String, sname: &str, cron_idx: usize, h: &Handler
     let method_key = crate::emitter::cron_handler_method_name(sname, cron_idx);
     // A cron handler takes an optional scheduled-time parameter; forward it (if
     // any) to the bound handler, with deps trailing.
+    let param_decls: Vec<String> = h
+        .params
+        .iter()
+        .map(|p| format!("{}: any", p.name.name))
+        .collect();
+    let param_args: Vec<String> = h.params.iter().map(|p| p.name.name.clone()).collect();
+    let _ = writeln!(out, "    async {method_key}({}) {{", param_decls.join(", "));
+    let _ = writeln!(
+        out,
+        "      return handlers.{sname}.{method_key}({}{}deps);",
+        param_args.join(", "),
+        if param_args.is_empty() { "" } else { ", " },
+    );
+    let _ = writeln!(out, "    }},");
+}
+
+fn emit_queue_wrapper(out: &mut String, sname: &str, queue_idx: usize, h: &Handler) {
+    let method_key = crate::emitter::queue_handler_method_name(sname, queue_idx);
+    // The queue handler takes its message parameter; forward it with deps.
     let param_decls: Vec<String> = h
         .params
         .iter()

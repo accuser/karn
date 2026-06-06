@@ -68,3 +68,39 @@ service ticker {
           (block
             (ok_expr
               (unit_literal))))))))
+
+================================================================================
+on queue handler
+================================================================================
+
+context mailer
+
+service outbox {
+  on queue "outbound-email" (message: EmailJob) -> Effect[Result[(), String]] {
+    Ok(())
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (context_decl
+    (qualified_name
+      (identifier))
+    (service_decl
+      (identifier)
+      (handler
+        (queue_handler
+          (string_literal)
+          (param
+            (identifier)
+            (identifier))
+          (generic_type_ref
+            (builtin_type)
+            (generic_type_ref
+              (builtin_type)
+              (unit_type)
+              (base_type)))
+          (block
+            (ok_expr
+              (unit_literal))))))))

@@ -6,7 +6,7 @@
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../how-to/troubleshooting/index.md).
 
-There are **208** codes in total.
+There are **213** codes in total.
 
 ## Agents
 
@@ -174,6 +174,7 @@ There are **208** codes in total.
 | `karn.parse.http_in_agent` | An `on http` handler was declared in an agent. |
 | `karn.parse.non_associative` | A non-associative operator was chained (e.g. `a == b == c`). |
 | `karn.parse.orphan_doc_block` | A documentation block is not attached to a declaration (warning). |
+| `karn.parse.queue_in_agent` | An `on queue` handler was declared in an agent. |
 | `karn.parse.reserved_keyword` | A reserved keyword was used as an identifier. |
 | `karn.parse.reserved_syntax` | Use of syntax reserved for a future version (e.g. `[` for generics). |
 | `karn.parse.self_outside_method` | `self` used outside a method or handler. |
@@ -207,6 +208,15 @@ There are **208** codes in total.
 | `karn.provider.outside_context` | `provides` was declared outside a context. |
 | `karn.provider.signature_mismatch` | A `provides` operation's signature does not match the capability. |
 | `karn.provider.unknown_capability` | `provides` names a capability that does not exist. |
+
+## Queue
+
+| Code | Summary |
+|---|---|
+| `karn.queue.bad_params` | An `on queue` handler does not take exactly one `message` parameter. |
+| `karn.queue.duplicate_consumer` | Two `on queue` handlers consume the same queue. |
+| `karn.queue.invalid_name` | An `on queue` handler has an empty queue name. |
+| `karn.queue.return_not_effect_result` | An `on queue` handler does not return `Effect[Result[(), E]]`. |
 
 ## Record spread
 

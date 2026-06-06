@@ -118,6 +118,9 @@ pub enum TokenKind {
     // v0.10a keyword
     #[token("cron")]
     Cron,
+    // v0.10b keyword
+    #[token("queue")]
+    Queue,
     #[token("provides")]
     Provides,
     #[token("service")]
@@ -276,6 +279,7 @@ impl TokenKind {
             On => "`on`",
             Http => "`http`",
             Cron => "`cron`",
+            Queue => "`queue`",
             Provides => "`provides`",
             Service => "`service`",
             State => "`state`",

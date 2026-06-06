@@ -373,6 +373,8 @@ pub enum HandlerKind {
     /// `on cron "expr"` — scheduled task; `expr` is a 5-field cron
     /// expression (v0.10a).
     Cron { expr: String },
+    /// `on queue "name"` — queue consumer bound to the named queue (v0.10b).
+    Queue { name: String },
 }
 
 /// HTTP methods supported by `on http` handlers (v0.9).

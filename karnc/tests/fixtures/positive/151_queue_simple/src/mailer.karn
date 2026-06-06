@@ -1,0 +1,12 @@
+context mailer
+
+type EmailJob = {
+  to:      String,
+  subject: String,
+}
+
+service outbox {
+  on queue "outbound-email" (message: EmailJob) -> Effect[Result[(), String]] {
+    Ok(())
+  }
+}

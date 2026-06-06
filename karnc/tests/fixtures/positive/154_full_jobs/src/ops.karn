@@ -1,0 +1,17 @@
+context ops
+
+type Notification = {
+  to: String,
+}
+
+service sweeper {
+  on cron "*/5 * * * *" () -> Effect[Result[(), String]] {
+    Ok(())
+  }
+}
+
+service notifier {
+  on queue "notifications" (message: Notification) -> Effect[Result[(), String]] {
+    Ok(())
+  }
+}

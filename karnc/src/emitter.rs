@@ -1732,6 +1732,15 @@ pub(crate) fn cron_handler_method_name(service: &str, index: usize) -> String {
     format!("cron_{service}_{index}")
 }
 
+/// Method name for an `on queue` handler (v0.10b): `queue_<service>_<index>`,
+/// by the handler's position among the service's queue handlers. Computed
+/// identically at the `handlers` method, the `compose` surface wrapper, and the
+/// `queue` dispatcher (queue names are unique context-wide, but the index keeps
+/// the key identifier-safe without sanitising the name).
+pub(crate) fn queue_handler_method_name(service: &str, index: usize) -> String {
+    format!("queue_{service}_{index}")
+}
+
 fn sanitise_path_segment(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for ch in s.chars() {
@@ -1827,6 +1836,7 @@ fn emit_service(out: &mut String, s: &ServiceDecl, commons: &TypedCommons, ctx: 
     emit_doc_block(out, s.documentation.as_deref(), 0);
     writeln!(out, "export const {name} = {{", name = s.name.name).unwrap();
     let mut cron_idx = 0usize;
+    let mut queue_idx = 0usize;
     for handler in &s.handlers {
         emit_doc_block(out, handler.documentation.as_deref(), INDENT_STEP);
         let kind_name = match &handler.kind {
@@ -1835,6 +1845,11 @@ fn emit_service(out: &mut String, s: &ServiceDecl, commons: &TypedCommons, ctx: 
             HandlerKind::Cron { .. } => {
                 let name = cron_handler_method_name(&s.name.name, cron_idx);
                 cron_idx += 1;
+                name
+            }
+            HandlerKind::Queue { .. } => {
+                let name = queue_handler_method_name(&s.name.name, queue_idx);
+                queue_idx += 1;
                 name
             }
         };
@@ -2417,9 +2432,11 @@ fn emit_agent(out: &mut String, a: &AgentDecl, commons: &TypedCommons, ctx: &Emi
             .map(|m| m.name.clone())
             .unwrap_or_else(|| match &h.kind {
                 HandlerKind::Call => "call".to_string(),
-                // HTTP/cron handlers are service-only (rejected in agents by the
-                // parser); these arms are defensive and unreachable here.
-                HandlerKind::Http { .. } | HandlerKind::Cron { .. } => "call".to_string(),
+                // HTTP/cron/queue handlers are service-only (rejected in agents
+                // by the parser); these arms are defensive and unreachable here.
+                HandlerKind::Http { .. } | HandlerKind::Cron { .. } | HandlerKind::Queue { .. } => {
+                    "call".to_string()
+                }
             });
         writeln!(
             out,

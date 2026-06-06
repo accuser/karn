@@ -1,0 +1,22 @@
+context notifier
+
+type Notification = {
+  body: String,
+}
+
+capability Sender {
+  fn send(text: String) -> Effect[()]
+}
+
+provides Sender = StubSender {
+  fn send(text: String) -> Effect[()] {
+    Effect.pure(())
+  }
+}
+
+service notify {
+  on queue "notifications" (message: Notification) -> Effect[Result[(), String]] given Sender {
+    let _ <- Sender.send(message.body)
+    Ok(())
+  }
+}

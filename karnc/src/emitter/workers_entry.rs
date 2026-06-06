@@ -67,6 +67,27 @@ pub fn emit_worker_entry(context: &str, table: &UnitTable) -> String {
     }
     cron_routes.sort_by(|a, b| a.expr.cmp(&b.expr));
 
+    // v0.10b: collect queue consumers across all services, carrying the
+    // per-service declaration index and sorting by queue name.
+    let mut queue_routes: Vec<QueueRoute> = Vec::new();
+    for sname in &service_names {
+        let service = table.services.get(*sname).unwrap();
+        let mut queue_idx = 0usize;
+        for h in &service.handlers {
+            if let HandlerKind::Queue { name } = &h.kind {
+                let msg_type = h.params.first().map(|p| p.type_ref.clone());
+                queue_routes.push(QueueRoute {
+                    service: (*sname).clone(),
+                    index: queue_idx,
+                    name: name.clone(),
+                    msg_type,
+                });
+                queue_idx += 1;
+            }
+        }
+    }
+    queue_routes.sort_by(|a, b| a.name.cmp(&b.name));
+
     let has_http = !http_routes.is_empty();
 
     let mut imports: Vec<&str> = vec![
@@ -175,6 +196,13 @@ pub fn emit_worker_entry(context: &str, table: &UnitTable) -> String {
         emit_scheduled_handler(&mut out, &cron_routes);
     }
 
+    // v0.10b: queue (consumer) entry point. Dispatches on `batch.queue`,
+    // deserialises each message, invokes the handler, and acks on `Ok` /
+    // retries on `Err` (a deserialisation failure also retries).
+    if !queue_routes.is_empty() {
+        emit_queue_handler(&mut out, &queue_routes);
+    }
+
     let _ = writeln!(out, "}};");
 
     out
@@ -201,11 +229,66 @@ fn emit_scheduled_handler(out: &mut String, cron_routes: &[CronRoute]) {
             ""
         };
         let _ = writeln!(out, "      case \"{expr_lit}\": {{");
-        let _ = writeln!(out, "        const result = await surface.{method_key}({arg});");
+        let _ = writeln!(
+            out,
+            "        const result = await surface.{method_key}({arg});"
+        );
         let _ = writeln!(
             out,
             "        if (result.tag === \"Err\") console.error(\"cron {expr_lit} failed\", result.error);"
         );
+        let _ = writeln!(out, "        return;");
+        let _ = writeln!(out, "      }}");
+    }
+    let _ = writeln!(out, "      default:");
+    let _ = writeln!(out, "        return;");
+    let _ = writeln!(out, "    }}");
+    let _ = writeln!(out, "  }},");
+}
+
+/// Emit the Worker `queue` handler aggregating every `on queue` consumer in the
+/// context. Dispatches on `batch.queue`; for each message it deserialises the
+/// body (v0.8 wire-format), invokes the handler, and acks on `Ok` / retries on
+/// `Err`. A deserialisation failure or a thrown error also retries. `batch` is
+/// typed structurally to avoid a `@cloudflare/workers-types` dependency.
+fn emit_queue_handler(out: &mut String, queue_routes: &[QueueRoute]) {
+    let _ = writeln!(
+        out,
+        "  async queue(batch: {{ readonly queue: string; readonly messages: ReadonlyArray<{{ readonly body: unknown; ack(): void; retry(): void }}> }}, env: Env): Promise<void> {{"
+    );
+    let _ = writeln!(out, "    const surface = compose(env);");
+    let _ = writeln!(out, "    switch (batch.queue) {{");
+    for route in queue_routes {
+        let method_key = crate::emitter::queue_handler_method_name(&route.service, route.index);
+        let name_lit = route.name.replace('\\', "\\\\").replace('"', "\\\"");
+        let dser = match &route.msg_type {
+            Some(t) => deserialise_call(t, "(msg.body as JsonValue)", "$"),
+            None => "Ok(msg.body as any) as Result<any, BoundaryError>".to_string(),
+        };
+        let _ = writeln!(out, "      case \"{name_lit}\": {{");
+        let _ = writeln!(out, "        for (const msg of batch.messages) {{");
+        let _ = writeln!(out, "          try {{");
+        let _ = writeln!(out, "            const __r = {dser};");
+        let _ = writeln!(
+            out,
+            "            if (__r.tag === \"Err\") {{ console.error(\"queue {name_lit} deserialise failed\", __r.error); msg.retry(); continue; }}"
+        );
+        let _ = writeln!(
+            out,
+            "            const result = await surface.{method_key}(__r.value);"
+        );
+        let _ = writeln!(out, "            if (result.tag === \"Ok\") msg.ack();");
+        let _ = writeln!(
+            out,
+            "            else {{ console.error(\"queue {name_lit} failed\", result.error); msg.retry(); }}"
+        );
+        let _ = writeln!(out, "          }} catch (e) {{");
+        let _ = writeln!(
+            out,
+            "            console.error(\"queue {name_lit} threw\", e); msg.retry();"
+        );
+        let _ = writeln!(out, "          }}");
+        let _ = writeln!(out, "        }}");
         let _ = writeln!(out, "        return;");
         let _ = writeln!(out, "      }}");
     }
@@ -239,6 +322,17 @@ struct CronRoute {
     expr: String,
     /// Whether the handler declares the optional scheduled-time parameter.
     has_param: bool,
+}
+
+/// One `on queue` consumer, identified by its service and per-service
+/// declaration index (its `queue_<service>_<index>` method key), plus the
+/// message parameter's type for wire-format deserialisation.
+#[derive(Debug, Clone)]
+struct QueueRoute {
+    service: String,
+    index: usize,
+    name: String,
+    msg_type: Option<TypeRef>,
 }
 
 /// Generate the per-route dispatch block for one `on http` handler. The

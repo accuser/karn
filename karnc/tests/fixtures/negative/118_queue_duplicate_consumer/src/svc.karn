@@ -1,0 +1,11 @@
+context svc
+
+service worker {
+  on queue "q" (message: String) -> Effect[Result[(), String]] {
+    Ok(())
+  }
+
+  on queue "q" (message: String) -> Effect[Result[(), String]] {
+    Ok(())
+  }
+}

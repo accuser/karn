@@ -911,6 +911,9 @@ impl<'a> Formatter<'a> {
             HandlerKind::Cron { expr } => {
                 self.push(&format!("on cron \"{}\" ", escape_string(expr)));
             }
+            HandlerKind::Queue { name } => {
+                self.push(&format!("on queue \"{}\" ", escape_string(name)));
+            }
         }
         self.format_params(&h.params, false);
         self.push(" -> ");

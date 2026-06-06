@@ -2888,6 +2888,34 @@ fn check_v0_5_declarations(
         }
     }
 
+    // v0.10b: validate `on queue` handler shape and check for duplicate
+    // consumers across all services in this context (the generated `queue`
+    // dispatcher routes on `batch.queue`, so two consumers of the same queue
+    // are ambiguous).
+    let mut consumer_first_span: HashMap<String, Span> = HashMap::new();
+    for service in table.services.values() {
+        for handler in &service.handlers {
+            let HandlerKind::Queue { name } = &handler.kind else {
+                continue;
+            };
+            validate_queue_handler(handler, name, &mut errors);
+            if let Some(prev) = consumer_first_span.get(name).copied() {
+                errors.push(
+                    CompileError::new(
+                        "karn.queue.duplicate_consumer",
+                        handler.span,
+                        format!(
+                            "duplicate queue consumer: another handler already consumes `{name}`",
+                        ),
+                    )
+                    .with_label(prev, "previously declared here"),
+                );
+            } else {
+                consumer_first_span.insert(name.clone(), handler.span);
+            }
+        }
+    }
+
     // Check service handlers.
     for service in table.services.values() {
         for handler in &service.handlers {
@@ -3320,6 +3348,53 @@ fn validate_cron_handler(handler: &Handler, expr: &str, errors: &mut Vec<Compile
             handler.return_type.span(),
             format!(
                 "`on cron` handler must return `Effect[Result[(), E]]`, but got `{}`",
+                ts_type_ref_display(&handler.return_type),
+            ),
+        ));
+    }
+}
+
+/// Validate an `on queue "name" (message: T) -> Effect[Result[(), E]]` handler
+/// (v0.10b §4.2): a non-empty queue name, exactly one parameter (the message,
+/// any wire-deserialisable type), and the unit-Result return shape. `Ok(())`
+/// acknowledges the message at emission; `Err` retries it. The service-only
+/// rule is enforced earlier, in the parser (`karn.parse.queue_in_agent`).
+fn validate_queue_handler(handler: &Handler, name: &str, errors: &mut Vec<CompileError>) {
+    if name.is_empty() {
+        errors.push(CompileError::new(
+            "karn.queue.invalid_name",
+            handler.span,
+            "`on queue` requires a non-empty queue name",
+        ));
+    }
+    // Exactly one parameter — the message. (Conventionally named `message`.)
+    if handler.params.len() != 1 {
+        errors.push(
+            CompileError::new(
+                "karn.queue.bad_params",
+                handler.span,
+                format!(
+                    "`on queue` handlers take exactly one parameter (the message), got {}",
+                    handler.params.len(),
+                ),
+            )
+            .with_note("a queue consumer processes one message per invocation"),
+        );
+    }
+    // The return type must be `Effect[Result[(), E]]`.
+    let return_ok = match &handler.return_type {
+        TypeRef::Effect(inner, _) => match inner.as_ref() {
+            TypeRef::Result(ok, _err, _) => matches!(ok.as_ref(), TypeRef::Unit(_)),
+            _ => false,
+        },
+        _ => false,
+    };
+    if !return_ok {
+        errors.push(CompileError::new(
+            "karn.queue.return_not_effect_result",
+            handler.return_type.span(),
+            format!(
+                "`on queue` handler must return `Effect[Result[(), E]]`, but got `{}`",
                 ts_type_ref_display(&handler.return_type),
             ),
         ));

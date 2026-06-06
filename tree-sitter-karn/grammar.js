@@ -418,9 +418,10 @@ module.exports = grammar({
         "}",
       ),
 
-    // v0.5 `on call`, v0.9 `on http METHOD "path"`, and v0.10a
-    // `on cron("expr")` handlers.
-    handler: ($) => choice($.call_handler, $.http_handler, $.cron_handler),
+    // v0.5 `on call`, v0.9 `on http METHOD "path"`, v0.10a `on cron "expr"`,
+    // and v0.10b `on queue "name"` handlers.
+    handler: ($) =>
+      choice($.call_handler, $.http_handler, $.cron_handler, $.queue_handler),
     call_handler: ($) =>
       seq(
         "on",
@@ -458,6 +459,21 @@ module.exports = grammar({
         "on",
         "cron",
         field("schedule", $.string_literal),
+        "(",
+        optional(sep1($.param, ",")),
+        optional(","),
+        ")",
+        "->",
+        field("return_type", $._type_ref),
+        optional(field("given", $.given_clause)),
+        field("body", $.block),
+      ),
+    // v0.10b: `on queue "<name>" (message: T) -> Effect[Result[(), E]] { … }`.
+    queue_handler: ($) =>
+      seq(
+        "on",
+        "queue",
+        field("name", $.string_literal),
         "(",
         optional(sep1($.param, ",")),
         optional(","),

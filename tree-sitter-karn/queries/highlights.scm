@@ -18,6 +18,7 @@
   "call"
   "http"
   "cron"
+  "queue"
 ] @keyword
 
 [
