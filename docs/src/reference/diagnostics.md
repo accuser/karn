@@ -6,7 +6,7 @@
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../how-to/troubleshooting/index.md).
 
-There are **216** codes in total.
+There are **219** codes in total.
 
 ## Agents
 
@@ -93,15 +93,18 @@ There are **216** codes in total.
 
 | Code | Summary |
 |---|---|
+| `karn.exports.capability_not_provided` | An exported capability has no provider in its context. |
 | `karn.exports.conflicting_visibility` | A type is exported with conflicting visibilities. |
 | `karn.exports.duplicate_export` | The same name is exported more than once. |
 | `karn.exports.duplicate_in_clause` | A name appears twice in one `exports` clause. |
+| `karn.exports.undeclared_capability` | `exports capability` names a capability that is not declared. |
 | `karn.exports.undeclared_type` | `exports` names a type that is not declared. |
 
 ## Given capabilities
 
 | Code | Summary |
 |---|---|
+| `karn.given.cross_context_unknown_capability` | `given B.Cap` names a capability the consumed context does not export. |
 | `karn.given.undeclared_capability` | A handler uses a capability it did not declare with `given`. |
 | `karn.given.unknown_capability` | `given` names a capability that does not exist. |
 | `karn.given.unused_capability` | A `given` capability is never used (warning). |

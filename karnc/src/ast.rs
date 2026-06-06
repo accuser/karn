@@ -110,13 +110,24 @@ pub struct ConsumesDecl {
     pub trivia: Trivia,
 }
 
-/// An `exports visibility { names }` clause (v0.4 §3.3).
+/// An `exports visibility { names }` clause (v0.4 §3.3) or, v0.15, an
+/// `exports capability { names }` clause.
 #[derive(Debug, Clone)]
 pub struct ExportsDecl {
-    pub visibility: Visibility,
+    pub kind: ExportKind,
     pub names: Vec<Ident>,
     pub span: Span,
     pub trivia: Trivia,
+}
+
+/// What an `exports` clause exposes: types (with a visibility) or, v0.15,
+/// capabilities offered for cross-context consumption.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportKind {
+    /// `exports opaque { ... }` / `exports transparent { ... }` — type exports.
+    Type(Visibility),
+    /// `exports capability { ... }` — capabilities offered to consumers (v0.15).
+    Capability,
 }
 
 /// Visibility level for an exports clause (v0.4 §3.3).
@@ -226,6 +237,37 @@ pub struct TestCase {
     pub trivia: Trivia,
 }
 
+/// A capability reference in a `given` clause (v0.15 §3.2). A bare name is a
+/// local capability (`given Cap`); a dotted name refers to a capability a
+/// consumed context provides (`given B.Cap` / `given Alias.Cap`).
+#[derive(Debug, Clone)]
+pub struct CapRef {
+    /// `None` for a local capability; `Some(prefix)` for a cross-context
+    /// reference where `prefix` is a consumed-context qualified name or alias.
+    pub context: Option<QualifiedName>,
+    /// The capability's simple name (also the local deps key).
+    pub name: Ident,
+    pub span: Span,
+}
+
+impl CapRef {
+    /// The local deps key / capability simple name (e.g. `Clock`).
+    pub fn key(&self) -> &str {
+        &self.name.name
+    }
+
+    /// True when this references a capability provided by a consumed context.
+    pub fn is_cross_context(&self) -> bool {
+        self.context.is_some()
+    }
+
+    /// The cross-context prefix (consumed-context qualified name or alias) as
+    /// a dotted string, if any.
+    pub fn prefix(&self) -> Option<String> {
+        self.context.as_ref().map(|q| q.joined())
+    }
+}
+
 /// A dotted name like `fitness.units`.
 #[derive(Debug, Clone)]
 pub struct QualifiedName {
@@ -302,8 +344,9 @@ pub struct ProviderDecl {
     /// The provider's identifier (used in tests/config to select impls).
     pub provider_name: Ident,
     /// v0.12: capabilities this provider depends on (`provides X = Impl given
-    /// Y, Z { … }`). The provider's operation bodies may use these.
-    pub given: Vec<Ident>,
+    /// Y, Z { … }`). The provider's operation bodies may use these. v0.15:
+    /// a dependency may be a cross-context capability (`given B.Cap`).
+    pub given: Vec<CapRef>,
     pub ops: Vec<ProviderOp>,
     pub documentation: Option<String>,
     pub span: Span,
@@ -360,7 +403,7 @@ pub struct Handler {
     pub method_name: Option<Ident>,
     pub params: Vec<Param>,
     pub return_type: TypeRef,
-    pub given: Vec<Ident>,
+    pub given: Vec<CapRef>,
     pub body: Block,
     pub documentation: Option<String>,
     pub span: Span,

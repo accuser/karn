@@ -172,7 +172,8 @@ module.exports = grammar({
     exports_decl: ($) =>
       seq(
         "exports",
-        field("visibility", choice("opaque", "transparent")),
+        // v0.15: `capability` joins the type-visibility keywords here.
+        field("kind", choice("opaque", "transparent", "capability")),
         "{",
         optional(sep1(field("name", $.identifier), ",")),
         optional(","),
@@ -489,7 +490,9 @@ module.exports = grammar({
         field("body", $.block),
       ),
     given_clause: ($) =>
-      seq("given", sep1(field("capability", $.identifier), ",")),
+      // v0.15: a capability may be a bare local name or a dotted cross-context
+      // reference (`B.Cap` / `platform.time.Clock`).
+      seq("given", sep1(field("capability", $.qualified_name), ",")),
 
     // -- v0.7: test bodies --
 

@@ -64,7 +64,8 @@ service ticker {
               (unit_type)
               (base_type)))
           (given_clause
-            (identifier))
+            (qualified_name
+              (identifier)))
           (block
             (ok_expr
               (unit_literal))))))))

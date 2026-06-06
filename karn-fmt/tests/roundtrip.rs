@@ -172,3 +172,40 @@ fn round_trip_preserves_injected_comments() {
         parse_unit(&tokens, &twice).expect("re-parse");
     }
 }
+
+/// v0.15: the formatter must preserve `exports capability { … }` and dotted
+/// cross-context `given` references verbatim. Idempotency alone would not
+/// catch a clause being silently dropped (a regression class seen before),
+/// so assert the round-tripped source still carries them.
+#[test]
+fn round_trip_preserves_cross_context_capability_syntax() {
+    let opts = FormatOptions::default();
+    let src = "context ops.metrics\n\n\
+        consumes platform.time\n\n\
+        exports capability { Stamp }\n\n\
+        capability Stamp {\n\
+        \x20 fn make() -> Effect[Int]\n\
+        }\n\n\
+        provides Stamp = ClockStamp given platform.time.Clock {\n\
+        \x20 fn make() -> Effect[Int] {\n\
+        \x20   let t <- platform.time.Clock.now()\n\
+        \x20   t\n\
+        \x20 }\n\
+        }\n\n\
+        service report {\n\
+        \x20 on call() -> Effect[Int] given Stamp {\n\
+        \x20   let s <- Stamp.make()\n\
+        \x20   s\n\
+        \x20 }\n\
+        }\n";
+    let out = format_source(src, &opts).expect("format must succeed");
+    for needle in [
+        "exports capability { Stamp }",
+        "provides Stamp = ClockStamp given platform.time.Clock {",
+        "given Stamp {",
+    ] {
+        assert!(out.contains(needle), "formatter dropped `{needle}`:\n{out}");
+    }
+    let twice = format_source(&out, &opts).expect("second format must succeed");
+    assert_eq!(out, twice, "formatter not idempotent");
+}

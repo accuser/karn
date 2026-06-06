@@ -156,6 +156,7 @@ pub fn check_handler_body(
     agent_state_ty: Option<Ty>,
     agent_self_scope: Option<HashMap<String, Ty>>,
     given_declared: Vec<String>,
+    report_unused: bool,
 ) {
     let Some(return_ty) = resolve_type_ref(return_type, &input.types) else {
         return;
@@ -213,6 +214,9 @@ pub fn check_handler_body(
     //    test harness can match it.
     let declared: HashSet<String> = given_declared.iter().cloned().collect();
     for c in &declared {
+        if !report_unused {
+            break;
+        }
         if !ctx.given_used.contains(c) {
             ctx.errors.push(
                 CompileError::new(
@@ -2869,6 +2873,16 @@ fn check_method_call(
     // The full-qualified-name form must be checked before the bare-ident form
     // (the prefix's first segment doesn't resolve as anything local).
     if ctx.lookup_root_ident(receiver).is_none() {
+        // v0.15: cross-context capability call — `B.Cap.op(args)` /
+        // `Alias.Cap.op(args)`. Checked before the service-call shape because
+        // the receiver carries an extra (capability) segment.
+        if let Some(chain) = flatten_ident_chain(receiver)
+            && let Some((consumed, cap)) = ctx.input.cross_context.resolve_cross_capability(&chain)
+        {
+            return check_cross_context_capability_call(
+                receiver, &consumed, &cap, method, args, span, ctx,
+            );
+        }
         if let Some(consumed) = cross_context_prefix(receiver, ctx) {
             return check_cross_context_call(receiver, &consumed, method, args, span, ctx);
         }
@@ -3522,6 +3536,124 @@ fn flatten_ident_chain(expr: &Expr) -> Option<String> {
 /// Type-check a cross-context service call (v0.6 §4.2). `receiver` carries
 /// the prefix's source span for diagnostics. `consumed` is the resolved
 /// qualified name of the consumed context.
+/// v0.15: type-check a cross-context capability call `B.Cap.op(args)` /
+/// `Alias.Cap.op(args)`. The capability operation signatures are carried in
+/// `consumed_capabilities` (in the providing context's namespace); the
+/// capability must be listed in the handler/provider's `given` clause.
+fn check_cross_context_capability_call(
+    receiver: &Expr,
+    consumed: &str,
+    cap: &str,
+    method: &Ident,
+    args: &[Expr],
+    _span: Span,
+    ctx: &mut Ctx,
+) -> Option<Ty> {
+    // Capability calls require an effectful body (same rule as local ones).
+    if !ctx.effectful {
+        ctx.errors.push(CompileError::new(
+            "karn.effect.capability_in_pure_context",
+            method.span,
+            format!(
+                "capability `{consumed}.{cap}` can only be called inside an effectful body (one returning `Effect[T]`)"
+            ),
+        ));
+    }
+    // The capability must be declared in this handler/provider's `given`.
+    // The local deps key is the capability's simple name.
+    if !ctx.given_remaining.contains(cap) {
+        ctx.errors.push(
+            CompileError::new(
+                "karn.given.undeclared_capability",
+                receiver.span,
+                format!(
+                    "capability `{consumed}.{cap}` is used but not listed in the `given` clause"
+                ),
+            )
+            .with_note(
+                "add `{consumed}.{cap}` to the handler's `given` clause so the dependency surface is visible at the declaration site",
+            ),
+        );
+        for a in args {
+            let _ = type_of(a, None, ctx);
+        }
+        return None;
+    }
+    ctx.given_used.insert(cap.to_string());
+
+    let info = &ctx.input.cross_context;
+    let op = info
+        .consumed_capabilities
+        .get(consumed)
+        .and_then(|caps| caps.get(cap))
+        .and_then(|c| c.ops.iter().find(|o| o.name == method.name))
+        .cloned();
+    let Some(op) = op else {
+        ctx.errors.push(CompileError::new(
+            "karn.capability.unknown_operation",
+            method.span,
+            format!(
+                "capability `{consumed}.{cap}` has no operation named `{}`",
+                method.name
+            ),
+        ));
+        for a in args {
+            let _ = type_of(a, None, ctx);
+        }
+        return None;
+    };
+    if op.params.len() != args.len() {
+        ctx.errors.push(CompileError::new(
+            "karn.capability.op_arity",
+            method.span,
+            format!(
+                "capability operation `{consumed}.{cap}.{}` expects {} argument(s), but {} were given",
+                method.name,
+                op.params.len(),
+                args.len()
+            ),
+        ));
+        for a in args {
+            let _ = type_of(a, None, ctx);
+        }
+        return None;
+    }
+
+    // Resolve parameter / return types in the consumed context's namespace.
+    let consumed_types = info
+        .consumed_types
+        .get(consumed)
+        .cloned()
+        .unwrap_or_default();
+    let mut all_ok = true;
+    for (i, ((pname, ptype_ref), arg)) in op.params.iter().zip(args.iter()).enumerate() {
+        let param_ty = resolve_type_ref(ptype_ref, &consumed_types).unwrap_or(Ty::Unit);
+        let Some(arg_ty) = type_of(arg, None, ctx) else {
+            all_ok = false;
+            continue;
+        };
+        if !structurally_compatible(&arg_ty, &param_ty, &ctx.input.types, &consumed_types) {
+            ctx.errors.push(CompileError::new(
+                "karn.boundary.structural_mismatch",
+                arg.span,
+                format!(
+                    "cross-context argument {} to `{consumed}.{cap}.{}` has type `{}`, but parameter `{pname}` expects `{}`",
+                    i + 1,
+                    method.name,
+                    arg_ty.display(),
+                    param_ty.display(),
+                ),
+            ));
+            all_ok = false;
+        }
+    }
+    if !all_ok {
+        return None;
+    }
+    let raw_ret = resolve_type_ref(&op.return_type, &consumed_types).unwrap_or(Ty::Unit);
+    Some(rebrand_return_type(&raw_ret, &ctx.input.types))
+}
+
 fn check_cross_context_call(
     receiver: &Expr,
     consumed: &str,

@@ -102,7 +102,8 @@ context billing {
             name: (builtin_type)
             arg: (base_type))
           given: (given_clause
-            capability: (identifier))
+            capability: (qualified_name
+              (identifier)))
           body: (block
             tail: (effect_pure_expr
               (boolean_literal))))))))

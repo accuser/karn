@@ -515,7 +515,8 @@ pub fn emit_project(commons: &TypedCommons, ctx: &EmitProjectCtx) -> String {
         writeln!(out).unwrap();
     }
     // v0.6: namespace imports for each consumed context that exposes services.
-    emit_cross_context_namespace_imports(&mut out, ctx);
+    // v0.15: also for consumed contexts whose capabilities this context uses.
+    emit_cross_context_namespace_imports(&mut out, commons, ctx);
     // For contexts: emit per-context nominal rebrand aliases for each type
     // imported via `uses` that this file references. The structural shape is
     // inherited from the original commons type; the brand makes the
@@ -1108,21 +1109,25 @@ fn record_name_ref(
 /// Emit `import * as <ns> from "..."` for each consumed context that
 /// exposes services (so the consuming file can reference its `makeSurface`
 /// return type and brand the cross-context call arguments).
-fn emit_cross_context_namespace_imports(out: &mut String, ctx: &EmitProjectCtx) {
+fn emit_cross_context_namespace_imports(
+    out: &mut String,
+    commons: &TypedCommons,
+    ctx: &EmitProjectCtx,
+) {
     let info = &ctx.cross_context;
-    if info.consumed_services.is_empty() {
-        return;
-    }
-    let mut consumed_with_services: Vec<&String> = info
+    // Consumed contexts that expose services (v0.6) plus, v0.15, those whose
+    // capabilities this context references via `given B.Cap`.
+    let mut needed: std::collections::BTreeSet<String> = info
         .consumed_services
         .iter()
         .filter(|(_, svcs)| !svcs.is_empty())
-        .map(|(q, _)| q)
+        .map(|(q, _)| q.clone())
         .collect();
-    consumed_with_services.sort();
-    if consumed_with_services.is_empty() {
+    needed.extend(cross_context_cap_namespaces(commons, info));
+    if needed.is_empty() {
         return;
     }
+    let consumed_with_services: Vec<&String> = needed.iter().collect();
     for q in &consumed_with_services {
         // Pick the first known file path for the consumed context as the
         // import target. (The composition root lives in the consumed
@@ -1134,10 +1139,18 @@ fn emit_cross_context_namespace_imports(out: &mut String, ctx: &EmitProjectCtx) 
         let target = target_paths
             .and_then(|m| m.values().next().cloned())
             .unwrap_or_else(|| {
-                // Fall back to <last-segment>.karn if no specific path is known.
-                let mut p = EmitProjectCtx::commons_path(q);
-                p.set_extension("karn");
-                p
+                // No imported declaration pins the path (e.g. a capability-only
+                // consumed context, v0.15). Fall back to the context's own
+                // module: its per-Worker handlers in workers mode, or its
+                // <segment>.karn source in bundle mode.
+                match ctx.target {
+                    BuildTarget::Workers => crate::project::worker_handlers_source_path(q),
+                    BuildTarget::Bundle => {
+                        let mut p = EmitProjectCtx::commons_path(q);
+                        p.set_extension("karn");
+                        p
+                    }
+                }
             });
         let import = cross_commons_import_specifier_for_path(&ctx.source_path, &target);
         let ns = qualified_to_ns(q);
@@ -1754,7 +1767,8 @@ pub(crate) fn topo_order_providers(
             let mut deps: Vec<&str> = p
                 .given
                 .iter()
-                .map(|d| d.name.as_str())
+                .filter(|d| !d.is_cross_context())
+                .map(|d| d.key())
                 .filter(|n| providers.contains_key(*n))
                 .collect();
             deps.sort_unstable();
@@ -1844,7 +1858,7 @@ fn emit_provider(out: &mut String, p: &ProviderDecl, commons: &TypedCommons, ctx
         let deps_ty = p
             .given
             .iter()
-            .map(|c| format!("{}: {}", c.name, c.name))
+            .map(|c| format!("{}: {}", c.key(), cap_ref_ty(c, &ctx.cross_context)))
             .collect::<Vec<_>>()
             .join("; ");
         writeln!(out, "  constructor(private deps: {{ {deps_ty} }}) {{}}").unwrap();
@@ -1873,7 +1887,7 @@ fn emit_provider(out: &mut String, p: &ProviderDecl, commons: &TypedCommons, ctx
         cx.target = ctx.target;
         // The provider's `given` capabilities are in scope in its bodies, and
         // resolve against the injected `this.deps`.
-        cx.capabilities = p.given.iter().map(|c| c.name.clone()).collect();
+        cx.capabilities = p.given.iter().map(|c| c.key().to_string()).collect();
         if !p.given.is_empty() {
             cx.cap_deps_expr = "this.deps".to_string();
         }
@@ -1934,7 +1948,7 @@ fn emit_service(out: &mut String, s: &ServiceDecl, commons: &TypedCommons, ctx: 
         cx.capabilities = handler
             .given
             .iter()
-            .map(|c| c.name.clone())
+            .map(|c| c.key().to_string())
             .collect::<HashSet<_>>();
         cx.local_agents = ctx.local_agents.clone();
         cx.target = ctx.target;
@@ -1971,15 +1985,84 @@ fn emit_service(out: &mut String, s: &ServiceDecl, commons: &TypedCommons, ctx: 
     writeln!(out).unwrap();
 }
 
+/// v0.15: the TypeScript deps-field type for a `given` capability reference.
+/// A local capability uses its bare interface name; a cross-context one is
+/// qualified with the providing context's import namespace
+/// (`platform_time.Clock`).
+fn cap_ref_ty(c: &CapRef, info: &crate::resolver::CrossContextInfo) -> String {
+    match c.prefix().and_then(|p| info.resolve_prefix(&p)) {
+        Some(consumed) => format!("{}.{}", qualified_to_ns(&consumed), c.key()),
+        None => c.key().to_string(),
+    }
+}
+
+/// v0.15: collect the cross-context capabilities a context's **handlers**
+/// (service + agent) reference via `given B.Cap`, as `(deps_key,
+/// consumed_context)` pairs, deduplicated by key and sorted. These become
+/// top-level deps fields (handlers access them as `deps.<key>`). Capabilities
+/// used only by a provider are injected into that provider's constructor
+/// instead, so they are excluded here.
+pub(crate) fn cross_context_caps_used(
+    commons: &TypedCommons,
+    info: &crate::resolver::CrossContextInfo,
+) -> Vec<(String, String)> {
+    let mut seen: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+    for item in &commons.commons.items {
+        let handlers = match item {
+            CommonsItem::Service(s) => &s.handlers,
+            CommonsItem::Agent(a) => &a.handlers,
+            _ => continue,
+        };
+        for h in handlers {
+            for c in &h.given {
+                if let Some(prefix) = c.prefix()
+                    && let Some(consumed) = info.resolve_prefix(&prefix)
+                {
+                    seen.entry(c.key().to_string()).or_insert(consumed);
+                }
+            }
+        }
+    }
+    seen.into_iter().collect()
+}
+
+/// v0.15: the set of consumed contexts whose capabilities this context
+/// references anywhere (handlers *or* providers), so their namespaces are
+/// imported for the capability interface types.
+fn cross_context_cap_namespaces(
+    commons: &TypedCommons,
+    info: &crate::resolver::CrossContextInfo,
+) -> std::collections::BTreeSet<String> {
+    let mut out = std::collections::BTreeSet::new();
+    let mut collect = |given: &[CapRef]| {
+        for c in given {
+            if let Some(prefix) = c.prefix()
+                && let Some(consumed) = info.resolve_prefix(&prefix)
+            {
+                out.insert(consumed);
+            }
+        }
+    };
+    for item in &commons.commons.items {
+        match item {
+            CommonsItem::Service(s) => s.handlers.iter().for_each(|h| collect(&h.given)),
+            CommonsItem::Agent(a) => a.handlers.iter().for_each(|h| collect(&h.given)),
+            CommonsItem::Provider(p) => collect(&p.given),
+            _ => {}
+        }
+    }
+    out
+}
+
 fn build_deps_object_ty_with_surface(
-    given: &[Ident],
+    given: &[CapRef],
     cx: &LowerCtx<'_>,
     cross_context: &crate::resolver::CrossContextInfo,
     target: BuildTarget,
 ) -> String {
     let mut parts: Vec<String> = given
         .iter()
-        .map(|c| format!("{}: {}", c.name, c.name))
+        .map(|c| format!("{}: {}", c.key(), cap_ref_ty(c, cross_context)))
         .collect();
     match target {
         BuildTarget::Bundle => {
@@ -2048,13 +2131,30 @@ fn workers_env_ty(cross_context: &crate::resolver::CrossContextInfo, agents: &[S
     }
 }
 
+/// v0.15: true when at least one consumed context exposes services (and thus
+/// a `makeSurface`). A context may now consume another purely for its
+/// capabilities, in which case there is no surface to thread.
+fn has_consumed_service(cross_context: &crate::resolver::CrossContextInfo) -> bool {
+    cross_context
+        .consumed_services
+        .values()
+        .any(|svcs| !svcs.is_empty())
+}
+
 /// Build the TS type for the `surface` field in deps, naming each consumed
 /// context by its surface key plus the consumed context's makeSurface type.
+/// Only service-bearing consumed contexts contribute (a capability-only
+/// consumed context has no `makeSurface`).
 fn surface_ty(cross_context: &crate::resolver::CrossContextInfo) -> String {
     let mut entries: Vec<(String, String)> = Vec::new();
     // Use alias if present, else the last segment of the qualified name.
     // Order: stable (sorted) so the diff is deterministic.
-    let mut consumed_sorted = cross_context.consumed_contexts.clone();
+    let mut consumed_sorted: Vec<String> = cross_context
+        .consumed_services
+        .iter()
+        .filter(|(_, svcs)| !svcs.is_empty())
+        .map(|(q, _)| q.clone())
+        .collect();
     consumed_sorted.sort();
     // Reverse lookup: consumed-context qualified name → alias.
     let mut alias_for: HashMap<String, String> = HashMap::new();
@@ -2119,7 +2219,15 @@ fn emit_context_deps_interface(
             _ => None,
         })
         .collect();
-    if !ctx.cross_context.consumed_contexts.is_empty() {
+    // v0.15: cross-context capabilities the context consumes appear in deps,
+    // typed against the providing context's namespace.
+    for (key, consumed) in cross_context_caps_used(commons, &ctx.cross_context) {
+        fields.push(format!(
+            "  readonly {key}: {ns}.{key};",
+            ns = qualified_to_ns(&consumed)
+        ));
+    }
+    if !ctx.cross_context.consumed_contexts.is_empty() && has_consumed_service(&ctx.cross_context) {
         fields.push(format!(
             "  readonly surface: {};",
             surface_ty(&ctx.cross_context)
@@ -2508,7 +2616,7 @@ fn emit_agent(out: &mut String, a: &AgentDecl, commons: &TypedCommons, ctx: &Emi
         cx.capabilities = h
             .given
             .iter()
-            .map(|c| c.name.clone())
+            .map(|c| c.key().to_string())
             .collect::<HashSet<_>>();
         cx.local_agents = ctx.local_agents.clone();
         let async_tail = is_effectful_return(&h.return_type);
@@ -3299,6 +3407,24 @@ fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
                 let args_lowered: Vec<String> =
                     args.iter().map(|a| lower_expr(a, stmts, cx)).collect();
                 return format!("HttpResult.{}({})", method.name, args_lowered.join(", "));
+            }
+            // v0.15 cross-context capability call: `B.Cap.op(args)` /
+            // `Alias.Cap.op(args)`. The provider is instantiated locally in
+            // the composition root, so this lowers to an in-process
+            // `<deps>.<Cap>.op(args)` exactly like a local capability call —
+            // the consumed-context prefix is resolved away.
+            if let Some(chain) = flatten_emit_ident_chain(receiver)
+                && let Some((_consumed, cap)) = cx.cross_context.resolve_cross_capability(&chain)
+            {
+                let args_lowered: Vec<String> =
+                    args.iter().map(|a| lower_expr(a, stmts, cx)).collect();
+                return format!(
+                    "{}.{}.{}({})",
+                    cx.cap_deps_expr,
+                    cap,
+                    method.name,
+                    args_lowered.join(", ")
+                );
             }
             // v0.6 cross-context service call: receiver is an alias or the
             // dotted name of a consumed context. In bundle mode, lower to

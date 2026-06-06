@@ -1,0 +1,21 @@
+context ops.metrics
+
+consumes platform.time
+
+capability Stamp {
+  fn make() -> Effect[Int]
+}
+
+provides Stamp = ClockStamp given platform.time.Clock {
+  fn make() -> Effect[Int] {
+    let t <- platform.time.Clock.now()
+    t
+  }
+}
+
+service report {
+  on call() -> Effect[Int] given Stamp {
+    let s <- Stamp.make()
+    s
+  }
+}

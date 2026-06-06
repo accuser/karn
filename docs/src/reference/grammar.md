@@ -21,7 +21,7 @@ _context_body_item ::= uses_decl | consumes_decl | exports_decl | type_decl | fn
 _test_body_item ::= uses_decl | consumes_decl | mocks_decl | test_case
 uses_decl ::= "uses" qualified_name
 consumes_decl ::= "consumes" qualified_name ("as" identifier)?
-exports_decl ::= "exports" ("opaque" | "transparent") "{" (identifier ("," identifier)*)? ","? "}"
+exports_decl ::= "exports" ("opaque" | "transparent" | "capability") "{" (identifier ("," identifier)*)? ","? "}"
 type_decl ::= "type" identifier "=" _type_body
 _type_body ::= opaque_type | refined_type | record_type | sum_type | enum_type
 opaque_type ::= "opaque" _base_type ("where" refinement)?
@@ -63,7 +63,7 @@ http_handler ::= "on" "http" http_method string_literal "(" (param ("," param)*)
 http_method ::= "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
 cron_handler ::= "on" "cron" string_literal "(" (param ("," param)*)? ","? ")" "->" _type_ref given_clause? block
 queue_handler ::= "on" "queue" string_literal "(" (param ("," param)*)? ","? ")" "->" _type_ref given_clause? block
-given_clause ::= "given" identifier ("," identifier)*
+given_clause ::= "given" qualified_name ("," qualified_name)*
 mocks_decl ::= "mocks" identifier "=" identifier "{" provider_op* "}"
 test_case ::= "test" string_literal block
 block ::= "{" _statement* _expression? "}"

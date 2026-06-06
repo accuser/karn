@@ -1,0 +1,10 @@
+context ops.jobs
+
+consumes platform.time
+
+service tick {
+  on call() -> Effect[Int] given platform.time.Clock {
+    let t <- platform.time.Clock.now()
+    t
+  }
+}

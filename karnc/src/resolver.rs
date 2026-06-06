@@ -73,6 +73,36 @@ pub struct CrossContextInfo {
     /// Used by the checker for structural shape comparisons across the
     /// boundary (v0.6 §4.3).
     pub consumed_types: HashMap<String, HashMap<String, TypeDecl>>,
+    /// v0.15: for each consumed context, the capabilities it `exports
+    /// capability { … }` — keyed by capability name. Used to resolve and
+    /// type-check `given B.Cap` references and `B.Cap.op(…)` calls, and by
+    /// the emitter to instantiate the provider locally.
+    pub consumed_capabilities: HashMap<String, HashMap<String, CrossContextCapability>>,
+}
+
+/// Snapshot of one exported capability in a consumed context, as needed for
+/// v0.15 cross-context capability resolution. Operation signatures are
+/// expressed in the consumed context's own namespace (resolved against
+/// `consumed_types` at the call site, mirroring [`CrossContextService`]).
+#[derive(Debug, Clone)]
+pub struct CrossContextCapability {
+    pub name: String,
+    /// Each operation's parameter type-refs and return type-ref.
+    pub ops: Vec<CrossContextCapabilityOp>,
+    /// The provider that implements this capability in the providing context
+    /// (its generated class name), so the consumer can instantiate it.
+    pub provider_name: String,
+    /// The provider's own `given` capabilities (intra-providing-context),
+    /// needed to wire the provider's constructor when instantiated locally.
+    pub provider_given: Vec<String>,
+    pub span: crate::span::Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct CrossContextCapabilityOp {
+    pub name: String,
+    pub params: Vec<(String, TypeRef)>,
+    pub return_type: TypeRef,
 }
 
 /// Snapshot of one service in a consumed context, as needed for v0.6
@@ -98,6 +128,22 @@ impl CrossContextInfo {
             return Some(prefix.to_string());
         }
         None
+    }
+
+    /// v0.15: resolve a dotted receiver chain like `platform.time.Clock` or
+    /// `Time.Clock` to `(consumed_context, capability)` when the leading
+    /// segments name a consumed context (or alias) that exports the trailing
+    /// capability. Returns `None` if the chain is not a cross-context
+    /// capability reference.
+    pub fn resolve_cross_capability(&self, chain: &str) -> Option<(String, String)> {
+        let (prefix, cap) = chain.rsplit_once('.')?;
+        let ctx = self.resolve_prefix(prefix)?;
+        let caps = self.consumed_capabilities.get(&ctx)?;
+        if caps.contains_key(cap) {
+            Some((ctx, cap.to_string()))
+        } else {
+            None
+        }
     }
 }
 

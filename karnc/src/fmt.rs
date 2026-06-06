@@ -473,9 +473,10 @@ impl<'a> Formatter<'a> {
     }
 
     fn format_exports(&mut self, e: &ExportsDecl) {
-        let vis = match e.visibility {
-            Visibility::Opaque => "opaque",
-            Visibility::Transparent => "transparent",
+        let vis = match e.kind {
+            ExportKind::Type(Visibility::Opaque) => "opaque",
+            ExportKind::Type(Visibility::Transparent) => "transparent",
+            ExportKind::Capability => "capability",
         };
         if e.names.is_empty() {
             self.push(&format!("exports {} {{}}", vis));
@@ -803,7 +804,7 @@ impl<'a> Formatter<'a> {
         ));
         if !p.given.is_empty() {
             self.push(" given ");
-            let names: Vec<&str> = p.given.iter().map(|i| i.name.as_str()).collect();
+            let names: Vec<String> = p.given.iter().map(cap_ref_src).collect();
             self.push(&names.join(", "));
         }
         self.push(" {");
@@ -934,7 +935,7 @@ impl<'a> Formatter<'a> {
         self.format_type_ref(&h.return_type);
         if !h.given.is_empty() {
             self.push(" given ");
-            let names: Vec<&str> = h.given.iter().map(|i| i.name.as_str()).collect();
+            let names: Vec<String> = h.given.iter().map(cap_ref_src).collect();
             self.push(&names.join(", "));
         }
         self.push(" ");
@@ -1032,6 +1033,15 @@ impl<'a> Formatter<'a> {
 }
 
 /// Borrow the trivia attached to a statement variant.
+/// Render a `given`-clause capability reference back to source: a bare name
+/// for a local capability, or `prefix.Name` for a cross-context one (v0.15).
+fn cap_ref_src(c: &CapRef) -> String {
+    match &c.context {
+        Some(prefix) => format!("{}.{}", prefix.joined(), c.name.name),
+        None => c.name.name.clone(),
+    }
+}
+
 fn statement_trivia(s: &Statement) -> &Trivia {
     match s {
         Statement::Let(l) | Statement::EffectLet(l) => &l.trivia,

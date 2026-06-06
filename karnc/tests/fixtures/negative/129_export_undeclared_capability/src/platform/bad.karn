@@ -1,0 +1,13 @@
+context platform.bad
+
+exports capability { Nope }
+
+capability Clock {
+  fn now() -> Effect[Int]
+}
+
+provides Clock = SystemClock {
+  fn now() -> Effect[Int] {
+    0
+  }
+}

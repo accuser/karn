@@ -20,7 +20,8 @@ provides Greeter = PoliteGreeter given Logger {
       (identifier)
       (identifier)
       (given_clause
-        (identifier))
+        (qualified_name
+          (identifier)))
       (provider_op
         (identifier)
         (generic_type_ref

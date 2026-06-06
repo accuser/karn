@@ -2,7 +2,7 @@
 
 Karn is pre-1.0 and developed in small, spec-first increments (see
 [Versioning & roadmap](../explanation/versioning-and-roadmap.md)). This book is
-written against **v0.13**.
+written against **v0.15**.
 
 This page is a high-level summary of notable increments, not an exhaustive
 per-commit history. While Karn is pre-1.0, increments may change behaviour.
@@ -11,6 +11,7 @@ per-commit history. While Karn is pre-1.0, increments may change behaviour.
 
 | Version | Highlights |
 |---|---|
+| **v0.15** | Cross-context capability resolution — a context `exports capability { … }`; a consumer depends on it via a qualified `given B.Cap` and its provider is instantiated locally (in-process). The platform/framework-context pattern. |
 | **v0.13** | Refinement narrowing — `value is RefinedType` checks the refinement at runtime and narrows the value to that type in the branch (flow-sensitive counterpart to `.of`). |
 | **v0.12** | Provider composition (`provides … given`) — a provider may depend on other capabilities; the composition root wires the dependency graph in topological order. |
 | **v0.11** | Agent state-field initialisers (`state { status: OrderStatus = Pending }`), enabling sum-typed **state machines** (and opaque/refined state) — no more `Option`-wrapping. |

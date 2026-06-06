@@ -570,6 +570,11 @@ fn compile_project_inner(
                 continue;
             };
             for clause in &ctx.exports {
+                // v0.15: `exports capability { ... }` clauses are validated
+                // separately (§4.1); 6b handles only type exports.
+                let ExportKind::Type(clause_vis) = clause.kind else {
+                    continue;
+                };
                 let mut within: HashMap<String, Span> = HashMap::new();
                 for n in &clause.names {
                     if let Some(prev) = within.get(&n.name) {
@@ -606,7 +611,7 @@ fn compile_project_inner(
                     }
 
                     if let Some((prev_vis, prev_span)) = seen.get(&n.name) {
-                        if *prev_vis == clause.visibility {
+                        if *prev_vis == clause_vis {
                             errors.push(
                                 CompileError::new(
                                     "karn.exports.duplicate_export",
@@ -630,7 +635,7 @@ fn compile_project_inner(
                         }
                         continue;
                     }
-                    seen.insert(n.name.clone(), (clause.visibility, n.span));
+                    seen.insert(n.name.clone(), (clause_vis, n.span));
                 }
             }
         }
@@ -639,6 +644,71 @@ fn compile_project_inner(
             visibility_map.insert(n, v);
         }
         exports_visibility.insert(name.clone(), visibility_map);
+    }
+
+    // -- 6b'. Validate `exports capability { … }` clauses (v0.15 §4.1): each
+    //          name must be a capability the context declares *and* provides. --
+    for (name, indices) in &groups {
+        if kinds.get(name) != Some(&UnitKind::Context) {
+            continue;
+        }
+        let local = unit_tables.get(name).unwrap();
+        let mut seen: HashMap<String, Span> = HashMap::new();
+        for &i in indices {
+            let Some(ctx) = parsed[i].context() else {
+                continue;
+            };
+            for clause in &ctx.exports {
+                if !matches!(clause.kind, ExportKind::Capability) {
+                    continue;
+                }
+                for n in &clause.names {
+                    if let Some(prev) = seen.get(&n.name) {
+                        errors.push(
+                            CompileError::new(
+                                "karn.exports.duplicate_export",
+                                n.span,
+                                format!("capability `{}` is exported more than once", n.name),
+                            )
+                            .with_label(*prev, "previously exported here"),
+                        );
+                        continue;
+                    }
+                    seen.insert(n.name.clone(), n.span);
+                    if !local.capabilities.contains_key(&n.name) {
+                        errors.push(
+                            CompileError::new(
+                                "karn.exports.undeclared_capability",
+                                n.span,
+                                format!(
+                                    "`exports capability` references `{}`, which is not a capability declared in context `{}`",
+                                    n.name, name
+                                ),
+                            )
+                            .with_note(
+                                "only capabilities declared in the same context can appear in `exports capability` clauses",
+                            ),
+                        );
+                        continue;
+                    }
+                    if !local.providers.contains_key(&n.name) {
+                        errors.push(
+                            CompileError::new(
+                                "karn.exports.capability_not_provided",
+                                n.span,
+                                format!(
+                                    "exported capability `{}` has no provider in context `{}` — a consumer cannot instantiate it",
+                                    n.name, name
+                                ),
+                            )
+                            .with_note(
+                                "add a `provides {n} = …` declaration so the capability can be wired into consumers",
+                            ),
+                        );
+                    }
+                }
+            }
+        }
     }
 
     // -- 6c. Validate that providers match their capabilities exactly. --
@@ -1277,6 +1347,104 @@ fn compile_project_inner(
 /// Build a project-level composition root that wires every context's
 /// providers and cross-context surfaces together. Returns `None` if the
 /// project has no cross-context wiring to glue.
+/// Resolve a `given` prefix (alias or qualified context name) to a consumed
+/// context, using one context's `consumes`/alias tables (v0.15).
+fn resolve_consume_prefix(
+    prefix: &str,
+    consumed: &[String],
+    aliases: &HashMap<String, String>,
+) -> Option<String> {
+    if let Some(q) = aliases.get(prefix) {
+        return Some(q.clone());
+    }
+    if consumed.iter().any(|c| c == prefix) {
+        return Some(prefix.to_string());
+    }
+    None
+}
+
+/// v0.15: the cross-context capabilities a context's **handlers** reference,
+/// as `deps_key → consumed_context`. These become top-level deps fields.
+fn handler_cross_caps(
+    table: &UnitTable,
+    consumed: &[String],
+    aliases: &HashMap<String, String>,
+) -> std::collections::BTreeMap<String, String> {
+    let mut out = std::collections::BTreeMap::new();
+    let mut scan = |given: &[CapRef]| {
+        for c in given {
+            if let Some(p) = c.prefix()
+                && let Some(ctx) = resolve_consume_prefix(&p, consumed, aliases)
+            {
+                out.entry(c.key().to_string()).or_insert(ctx);
+            }
+        }
+    };
+    for s in table.services.values() {
+        for h in &s.handlers {
+            scan(&h.given);
+        }
+    }
+    for a in table.agents.values() {
+        for h in &a.handlers {
+            scan(&h.given);
+        }
+    }
+    out
+}
+
+/// v0.15: build the TypeScript expression instantiating the provider of
+/// capability `cap` declared in `provider_ctx`, recursively wiring its `given`
+/// dependencies — local sibling providers and cross-context capability
+/// providers alike. Stateless providers, so fresh instances per use are fine.
+fn instantiate_provider_expr(
+    provider_ctx: &str,
+    cap: &str,
+    unit_tables: &HashMap<String, UnitTable>,
+    unit_consumes: &HashMap<String, Vec<String>>,
+    unit_consumes_aliases: &HashMap<String, HashMap<String, String>>,
+) -> String {
+    let ns = provider_ctx.replace('.', "_");
+    let Some(provider) = unit_tables
+        .get(provider_ctx)
+        .and_then(|t| t.providers.get(cap))
+    else {
+        return format!("new {ns}.{cap}()");
+    };
+    if provider.given.is_empty() {
+        return format!("new {ns}.{}()", provider.provider_name.name);
+    }
+    let consumed = unit_consumes.get(provider_ctx).cloned().unwrap_or_default();
+    let aliases = unit_consumes_aliases
+        .get(provider_ctx)
+        .cloned()
+        .unwrap_or_default();
+    let deps: Vec<String> = provider
+        .given
+        .iter()
+        .map(|g| {
+            let target_ctx = match g.prefix() {
+                Some(p) => resolve_consume_prefix(&p, &consumed, &aliases)
+                    .unwrap_or_else(|| provider_ctx.to_string()),
+                None => provider_ctx.to_string(),
+            };
+            let expr = instantiate_provider_expr(
+                &target_ctx,
+                g.key(),
+                unit_tables,
+                unit_consumes,
+                unit_consumes_aliases,
+            );
+            format!("{}: {}", g.key(), expr)
+        })
+        .collect();
+    format!(
+        "new {ns}.{}({{ {} }})",
+        provider.provider_name.name,
+        deps.join(", ")
+    )
+}
+
 fn emit_composition_root(
     groups: &HashMap<String, Vec<usize>>,
     kinds: &HashMap<String, UnitKind>,
@@ -1296,6 +1464,30 @@ fn emit_composition_root(
                 {
                     needs_compose = true;
                 }
+            }
+        }
+    }
+    // v0.15: also compose when a context uses a consumed context's capability
+    // (in a handler or in a provider's `given`) — the consumer must instantiate
+    // the provided capability's provider locally.
+    if !needs_compose {
+        for (name, kind) in kinds {
+            if *kind != UnitKind::Context {
+                continue;
+            }
+            let Some(table) = unit_tables.get(name) else {
+                continue;
+            };
+            let consumed = unit_consumes.get(name).cloned().unwrap_or_default();
+            let aliases = unit_consumes_aliases.get(name).cloned().unwrap_or_default();
+            if !handler_cross_caps(table, &consumed, &aliases).is_empty()
+                || table
+                    .providers
+                    .values()
+                    .any(|p| p.given.iter().any(|g| g.is_cross_context()))
+            {
+                needs_compose = true;
+                break;
             }
         }
     }
@@ -1356,13 +1548,53 @@ fn emit_composition_root(
         let Some(table) = unit_tables.get(ctx_name.as_str()) else {
             continue;
         };
+        // A context's deps object exists only to feed its `makeSurface`; a
+        // capability-only context (no services) needs neither (v0.15).
+        if table.services.is_empty() {
+            continue;
+        }
         let ns = ctx_name.replace('.', "_");
 
         let mut deps_entries: Vec<String> = table
             .providers
-            .iter()
-            .map(|(cap, p)| format!("{cap}: new {ns}.{}()", p.provider_name.name))
+            .keys()
+            .map(|cap| {
+                format!(
+                    "{cap}: {}",
+                    instantiate_provider_expr(
+                        ctx_name,
+                        cap,
+                        unit_tables,
+                        unit_consumes,
+                        unit_consumes_aliases,
+                    )
+                )
+            })
             .collect();
+        // v0.15: cross-context capabilities used directly by handlers become
+        // top-level deps fields, instantiated from the providing context.
+        {
+            let consumed = unit_consumes
+                .get(ctx_name.as_str())
+                .cloned()
+                .unwrap_or_default();
+            let aliases = unit_consumes_aliases
+                .get(ctx_name.as_str())
+                .cloned()
+                .unwrap_or_default();
+            for (key, cctx) in handler_cross_caps(table, &consumed, &aliases) {
+                deps_entries.push(format!(
+                    "{key}: {}",
+                    instantiate_provider_expr(
+                        &cctx,
+                        &key,
+                        unit_tables,
+                        unit_consumes,
+                        unit_consumes_aliases,
+                    )
+                ));
+            }
+        }
         deps_entries.sort();
 
         let mut surface_entries: Vec<String> = Vec::new();
@@ -1930,6 +2162,9 @@ pub struct UnitTable {
     pub services: HashMap<String, ServiceDecl>,
     /// Per-context agents (v0.5). Empty for commons.
     pub agents: HashMap<String, AgentDecl>,
+    /// v0.15: capability names this context offers to consumers via
+    /// `exports capability { … }`. Empty for commons.
+    pub exported_capabilities: std::collections::HashSet<String>,
 }
 
 fn build_unit_table(
@@ -1958,6 +2193,18 @@ fn build_unit_table(
                 } else {
                     table.types.insert(t.name.name.clone(), t.clone());
                     table.methods.entry(t.name.name.clone()).or_default();
+                }
+            }
+        }
+    }
+    // v0.15: collect the names a context exports as capabilities.
+    for &i in indices {
+        if let Some(ctx) = parsed[i].context() {
+            for clause in &ctx.exports {
+                if matches!(clause.kind, ExportKind::Capability) {
+                    for n in &clause.names {
+                        table.exported_capabilities.insert(n.name.clone());
+                    }
                 }
             }
         }
@@ -2217,6 +2464,10 @@ fn build_cross_context_info(
     let mut consumed_services: HashMap<String, HashMap<String, resolver::CrossContextService>> =
         HashMap::new();
     let mut consumed_types: HashMap<String, HashMap<String, TypeDecl>> = HashMap::new();
+    let mut consumed_capabilities: HashMap<
+        String,
+        HashMap<String, resolver::CrossContextCapability>,
+    > = HashMap::new();
     for t in &consumed_contexts {
         let other_types_combined = combined_types_for(t, unit_tables, unit_uses);
         consumed_types.insert(t.clone(), other_types_combined.clone());
@@ -2248,6 +2499,47 @@ fn build_cross_context_info(
             );
         }
         consumed_services.insert(t.clone(), svcs);
+
+        // v0.15: gather the consumed context's exported capabilities, each
+        // paired with the provider that implements it.
+        let mut caps: HashMap<String, resolver::CrossContextCapability> = HashMap::new();
+        for cap_name in &other_table.exported_capabilities {
+            let Some(decl) = other_table.capabilities.get(cap_name) else {
+                continue;
+            };
+            let Some(provider) = other_table.providers.get(cap_name) else {
+                continue;
+            };
+            let ops = decl
+                .ops
+                .iter()
+                .map(|op| resolver::CrossContextCapabilityOp {
+                    name: op.name.name.clone(),
+                    params: op
+                        .params
+                        .iter()
+                        .map(|p| (p.name.name.clone(), p.type_ref.clone()))
+                        .collect(),
+                    return_type: op.return_type.clone(),
+                })
+                .collect();
+            caps.insert(
+                cap_name.clone(),
+                resolver::CrossContextCapability {
+                    name: cap_name.clone(),
+                    ops,
+                    provider_name: provider.provider_name.name.clone(),
+                    provider_given: provider
+                        .given
+                        .iter()
+                        .filter(|c| !c.is_cross_context())
+                        .map(|c| c.key().to_string())
+                        .collect(),
+                    span: decl.span,
+                },
+            );
+        }
+        consumed_capabilities.insert(t.clone(), caps);
     }
     resolver::CrossContextInfo {
         self_context: Some(name.to_string()),
@@ -2255,7 +2547,78 @@ fn build_cross_context_info(
         aliases,
         consumed_services,
         consumed_types,
+        consumed_capabilities,
     }
+}
+
+/// v0.15: validate one `given` capability reference. A bare reference must name
+/// a capability declared in this context; a cross-context reference (`given
+/// B.Cap`) must name a capability the consumed context exports. Returns the
+/// local [`CapabilityInfo`] to add to the in-scope map for bare references;
+/// cross-context references return `None` (their calls are type-checked via
+/// `consumed_capabilities` at the call site) but are still validated here.
+fn resolve_given_cap_ref(
+    cap_ref: &CapRef,
+    capability_info_map: &HashMap<String, CapabilityInfo>,
+    cross_context: &resolver::CrossContextInfo,
+    errors: &mut Vec<CompileError>,
+) -> Option<CapabilityInfo> {
+    let Some(prefix) = cap_ref.prefix() else {
+        // Local capability.
+        match capability_info_map.get(cap_ref.key()) {
+            Some(info) => return Some(info.clone()),
+            None => {
+                errors.push(CompileError::new(
+                    "karn.given.unknown_capability",
+                    cap_ref.span,
+                    format!(
+                        "capability `{}` is not declared in this context",
+                        cap_ref.key()
+                    ),
+                ));
+                return None;
+            }
+        }
+    };
+    // Cross-context capability (`given B.Cap` / `given Alias.Cap`).
+    let Some(ctx_name) = cross_context.resolve_prefix(&prefix) else {
+        errors.push(
+            CompileError::new(
+                "karn.resolve.unconsumed_context",
+                cap_ref.span,
+                format!(
+                    "`given {}.{}` refers to a context that this context does not `consumes`",
+                    prefix,
+                    cap_ref.key()
+                ),
+            )
+            .with_note(
+                "add a `consumes` clause for the providing context (optionally with an alias) at the top of this context",
+            ),
+        );
+        return None;
+    };
+    let exports_it = cross_context
+        .consumed_capabilities
+        .get(&ctx_name)
+        .is_some_and(|m| m.contains_key(cap_ref.key()));
+    if !exports_it {
+        errors.push(
+            CompileError::new(
+                "karn.given.cross_context_unknown_capability",
+                cap_ref.span,
+                format!(
+                    "context `{}` does not export a capability named `{}`",
+                    ctx_name,
+                    cap_ref.key()
+                ),
+            )
+            .with_note(
+                "the providing context must list the capability in an `exports capability { … }` clause",
+            ),
+        );
+    }
+    None
 }
 
 /// Build the combined type table for `unit`: its own types merged with the
@@ -2817,19 +3180,12 @@ fn check_v0_5_declarations(
         // Build the provider's capability scope from its `given`, validating
         // each name is a declared capability.
         let mut provider_caps: HashMap<String, CapabilityInfo> = HashMap::new();
-        for cap_name in &provider.given {
-            let Some(info) = capability_info_map.get(&cap_name.name) else {
-                errors.push(CompileError::new(
-                    "karn.given.unknown_capability",
-                    cap_name.span,
-                    format!(
-                        "capability `{}` is not declared in this context",
-                        cap_name.name
-                    ),
-                ));
-                continue;
-            };
-            provider_caps.insert(cap_name.name.clone(), info.clone());
+        for cap_ref in &provider.given {
+            if let Some(info) =
+                resolve_given_cap_ref(cap_ref, &capability_info_map, cross_context, &mut errors)
+            {
+                provider_caps.insert(cap_ref.key().to_string(), info);
+            }
         }
         for op in &provider.ops {
             checker::check_handler_body(
@@ -2844,10 +3200,11 @@ fn check_v0_5_declarations(
                 capability_info_map.clone(),
                 None,
                 None,
-                // Unused-`given` on providers is deferred (a capability may be
-                // used in one op but not another); pass no declared set so the
-                // per-op unused check doesn't false-positive.
-                Vec::new(),
+                // The provider's `given` keys are in scope (so cross-context
+                // capability calls resolve), but unused-`given` is not reported
+                // per-op: a capability may be used in one op but not another.
+                provider.given.iter().map(|c| c.key().to_string()).collect(),
+                false,
             );
         }
     }
@@ -2946,21 +3303,15 @@ fn check_v0_5_declarations(
     // Check service handlers.
     for service in table.services.values() {
         for handler in &service.handlers {
-            // The given clause must reference only declared capabilities.
+            // The given clause must reference only declared (local) or
+            // exported (cross-context) capabilities.
             let mut handler_caps: HashMap<String, CapabilityInfo> = HashMap::new();
-            for cap_name in &handler.given {
-                let Some(info) = capability_info_map.get(&cap_name.name) else {
-                    errors.push(CompileError::new(
-                        "karn.given.unknown_capability",
-                        cap_name.span,
-                        format!(
-                            "capability `{}` is not declared in this context",
-                            cap_name.name
-                        ),
-                    ));
-                    continue;
-                };
-                handler_caps.insert(cap_name.name.clone(), info.clone());
+            for cap_ref in &handler.given {
+                if let Some(info) =
+                    resolve_given_cap_ref(cap_ref, &capability_info_map, cross_context, &mut errors)
+                {
+                    handler_caps.insert(cap_ref.key().to_string(), info);
+                }
             }
             // The handler return type must be Effect[T].
             if !matches!(handler.return_type, TypeRef::Effect(_, _)) {
@@ -2974,7 +3325,7 @@ fn check_v0_5_declarations(
                 ));
             }
             let given_declared: Vec<String> =
-                handler.given.iter().map(|c| c.name.clone()).collect();
+                handler.given.iter().map(|c| c.key().to_string()).collect();
             checker::check_handler_body(
                 &handler.body,
                 &handler.return_type,
@@ -2988,6 +3339,7 @@ fn check_v0_5_declarations(
                 None,
                 None,
                 given_declared,
+                true,
             );
         }
     }
@@ -3135,19 +3487,12 @@ fn check_v0_5_declarations(
 
         for handler in &agent.handlers {
             let mut handler_caps: HashMap<String, CapabilityInfo> = HashMap::new();
-            for cap_name in &handler.given {
-                let Some(info) = capability_info_map.get(&cap_name.name) else {
-                    errors.push(CompileError::new(
-                        "karn.given.unknown_capability",
-                        cap_name.span,
-                        format!(
-                            "capability `{}` is not declared in this context",
-                            cap_name.name
-                        ),
-                    ));
-                    continue;
-                };
-                handler_caps.insert(cap_name.name.clone(), info.clone());
+            for cap_ref in &handler.given {
+                if let Some(info) =
+                    resolve_given_cap_ref(cap_ref, &capability_info_map, cross_context, &mut errors)
+                {
+                    handler_caps.insert(cap_ref.key().to_string(), info);
+                }
             }
             // The handler return type must be Effect[T].
             if !matches!(handler.return_type, TypeRef::Effect(_, _)) {
@@ -3161,7 +3506,7 @@ fn check_v0_5_declarations(
                 ));
             }
             let given_declared: Vec<String> =
-                handler.given.iter().map(|c| c.name.clone()).collect();
+                handler.given.iter().map(|c| c.key().to_string()).collect();
             checker::check_handler_body(
                 &handler.body,
                 &handler.return_type,
@@ -3175,6 +3520,7 @@ fn check_v0_5_declarations(
                 Some(state_ty.clone()),
                 Some(self_scope.clone()),
                 given_declared,
+                true,
             );
         }
     }
@@ -3417,19 +3763,24 @@ fn detect_provider_dependency_cycles(
         stack.push(node.to_string());
         if let Some(p) = providers.get(node) {
             for dep in &p.given {
-                // Only follow dependencies that have a provider in this context.
-                if !providers.contains_key(&dep.name) {
+                // Cross-context dependencies follow the (acyclic) `consumes`
+                // graph; only intra-context provider edges can form a cycle here.
+                if dep.is_cross_context() {
                     continue;
                 }
-                if in_stack.contains(&dep.name) {
+                // Only follow dependencies that have a provider in this context.
+                if !providers.contains_key(dep.key()) {
+                    continue;
+                }
+                if in_stack.contains(dep.key()) {
                     // A back-edge: everything from `dep` down the current stack
                     // is on the cycle.
-                    let start = stack.iter().position(|n| n == &dep.name).unwrap_or(0);
+                    let start = stack.iter().position(|n| n == dep.key()).unwrap_or(0);
                     for n in &stack[start..] {
                         cyclic.insert(n.clone());
                     }
-                } else if !visited.contains(&dep.name) {
-                    visit(&dep.name, providers, visited, stack, in_stack, cyclic);
+                } else if !visited.contains(dep.key()) {
+                    visit(dep.key(), providers, visited, stack, in_stack, cyclic);
                 }
             }
         }
@@ -4057,6 +4408,7 @@ fn check_op_body_with_privileged_view(
         None,
         None,
         Vec::new(),
+        false,
     );
     let _ = in_test_body; // Mock op bodies are not test bodies; assert is not valid here.
 }
@@ -4597,6 +4949,7 @@ fn emit_mock_op_body(
             None,
             None,
             Vec::new(),
+            false,
         );
     }
     let cross = crate::resolver::CrossContextInfo::default();

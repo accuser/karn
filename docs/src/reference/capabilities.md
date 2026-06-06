@@ -80,8 +80,76 @@ A capability may not depend on itself, directly or transitively
 (`karn.provider.dependency_cycle`) — including the trivial `provides X = … given
 X`.
 
+## Cross-context capabilities (`exports capability`)
+
+A context can offer a capability for *other* contexts to consume — the pattern
+behind **platform / framework contexts** (a `Clock`, an `Http` client, a
+`Random` source) that application contexts depend on without re-declaring.
+
+The providing context lists the capability in an `exports capability { … }`
+clause; each name must be a capability the context both **declares** and
+**provides**:
+
+```karn
+context platform.time
+
+exports capability { Clock }
+
+capability Clock {
+  fn now() -> Effect[Int]
+}
+
+provides Clock = SystemClock {
+  fn now() -> Effect[Int] {
+    0
+  }
+}
+```
+
+A consumer `consumes` that context and depends on the capability through a
+**qualified `given`** — `given B.Cap`, or `given Alias.Cap` when the `consumes`
+clause introduces an alias. The capability call uses the same prefix:
+
+```karn,ignore
+context ops.jobs
+
+consumes platform.time
+
+service tick {
+  on call() -> Effect[Int] given platform.time.Clock {
+    let t <- platform.time.Clock.now()
+    t
+  }
+}
+```
+
+The capability **contract** is imported for type-checking; the **provider** is
+instantiated in the consumer's own composition and the call runs **in-process**
+(no Worker hop) — each consuming Worker gets its own provider instance, exactly
+as platform capabilities intend. A consumer's provider may also depend on a
+cross-context capability (`provides X = Impl given B.Cap`); the composition root
+wires the provider across the boundary.
+
+Errors:
+
+- `karn.exports.undeclared_capability` — `exports capability` names something the
+  context does not declare as a capability.
+- `karn.exports.capability_not_provided` — an exported capability has no provider
+  (a consumer could not instantiate it).
+- `karn.given.cross_context_unknown_capability` — `given B.Cap` where `B` does
+  not export `Cap`.
+- A `given B.Cap` whose `B` is not `consumes`-d is the ordinary
+  `karn.resolve.unconsumed_context`.
+
+Out of scope (deferred): remote routing of capability calls to the providing
+Worker, capabilities backed by another context's private agent state, and
+transitive re-export of a consumed capability.
+
 ## Emission
 
 Providers compile to classes implementing the capability interface; a composed
 provider gains a constructor that receives its dependencies, and the generated
-`compose` instantiates providers in topological order. See [emission](emission.md).
+`compose` instantiates providers in topological order. A cross-context
+capability is instantiated locally in the consumer's composition (its provider
+class imported from the providing context), so the call lowers to an ordinary
+`deps.<Cap>.op(…)`. See [emission](emission.md).

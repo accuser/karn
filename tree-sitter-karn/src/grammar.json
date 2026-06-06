@@ -440,7 +440,7 @@
         },
         {
           "type": "FIELD",
-          "name": "visibility",
+          "name": "kind",
           "content": {
             "type": "CHOICE",
             "members": [
@@ -451,6 +451,10 @@
               {
                 "type": "STRING",
                 "value": "transparent"
+              },
+              {
+                "type": "STRING",
+                "value": "capability"
               }
             ]
           }
@@ -2396,7 +2400,7 @@
               "name": "capability",
               "content": {
                 "type": "SYMBOL",
-                "name": "identifier"
+                "name": "qualified_name"
               }
             },
             {
@@ -2413,7 +2417,7 @@
                     "name": "capability",
                     "content": {
                       "type": "SYMBOL",
-                      "name": "identifier"
+                      "name": "qualified_name"
                     }
                   }
                 ]

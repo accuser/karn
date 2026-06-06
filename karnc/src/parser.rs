@@ -872,14 +872,19 @@ impl<'a> Parser<'a> {
 
     fn parse_exports_decl(&mut self) -> Result<ExportsDecl, CompileError> {
         let kw = self.expect(TokenKind::Exports, "to start an `exports` declaration")?;
-        let visibility = match self.peek_kind() {
+        let kind = match self.peek_kind() {
             Some(TokenKind::Opaque) => {
                 self.bump();
-                Visibility::Opaque
+                ExportKind::Type(Visibility::Opaque)
             }
             Some(TokenKind::Transparent) => {
                 self.bump();
-                Visibility::Transparent
+                ExportKind::Type(Visibility::Transparent)
+            }
+            // v0.15: `exports capability { ... }` offers capabilities to consumers.
+            Some(TokenKind::Capability) => {
+                self.bump();
+                ExportKind::Capability
             }
             Some(_) => {
                 let t = self.peek().unwrap();
@@ -887,26 +892,30 @@ impl<'a> Parser<'a> {
                     "karn.parse.expected_visibility",
                     t.span,
                     format!(
-                        "expected `opaque` or `transparent` after `exports`, found {}",
+                        "expected `opaque`, `transparent`, or `capability` after `exports`, found {}",
                         t.kind.describe()
                     ),
                 )
                 .with_note(
-                    "exports clauses are `exports opaque { ... }` or `exports transparent { ... }`",
+                    "exports clauses are `exports opaque { ... }`, `exports transparent { ... }`, or `exports capability { ... }`",
                 ));
             }
             None => {
                 return Err(CompileError::new(
                     "karn.parse.unexpected_eof",
                     self.eof_span(),
-                    "expected `opaque` or `transparent` after `exports`, found end of file",
+                    "expected `opaque`, `transparent`, or `capability` after `exports`, found end of file",
                 ));
             }
         };
         self.expect(TokenKind::LBrace, "to open the exports list")?;
         let mut names = Vec::new();
+        let name_role = match kind {
+            ExportKind::Capability => "as an exported capability name",
+            ExportKind::Type(_) => "as an exported type name",
+        };
         while self.peek_kind() != Some(TokenKind::RBrace) {
-            names.push(self.expect_ident("as an exported type name")?);
+            names.push(self.expect_ident(name_role)?);
             if self.eat(TokenKind::Comma).is_none() {
                 break;
             }
@@ -914,7 +923,7 @@ impl<'a> Parser<'a> {
         let close = self.expect(TokenKind::RBrace, "to close the exports list")?;
         let span = kw.span.merge(close.span);
         Ok(ExportsDecl {
-            visibility,
+            kind,
             names,
             span,
             trivia: Trivia::default(),
@@ -3279,18 +3288,52 @@ impl<'a> Parser<'a> {
         })
     }
 
+    /// Parse one capability reference in a `given` clause (v0.15 §3.2). A bare
+    /// name (`Cap`) is a local capability; a dotted name (`B.Cap` /
+    /// `platform.time.Clock`) refers to a capability provided by a consumed
+    /// context — every segment but the last forms the context prefix.
+    fn parse_cap_ref(&mut self) -> Result<CapRef, CompileError> {
+        let role = "as a capability name in the `given` clause";
+        let mut parts = vec![self.expect_ident(role)?];
+        while self.peek_kind() == Some(TokenKind::Dot) {
+            self.bump();
+            parts.push(self.expect_ident(role)?);
+        }
+        let name = parts.pop().unwrap();
+        let context = if parts.is_empty() {
+            None
+        } else {
+            let qspan = parts
+                .first()
+                .unwrap()
+                .span
+                .merge(parts.last().unwrap().span);
+            Some(QualifiedName { parts, span: qspan })
+        };
+        let span = context
+            .as_ref()
+            .map(|q| q.span.merge(name.span))
+            .unwrap_or(name.span);
+        Ok(CapRef {
+            context,
+            name,
+            span,
+        })
+    }
+
     fn parse_provider_decl(&mut self) -> Result<ProviderDecl, CompileError> {
         let kw = self.expect(TokenKind::Provides, "to start a provider declaration")?;
         let capability = self.expect_ident("after `provides`")?;
         self.expect(TokenKind::Eq, "after the capability name")?;
         let provider_name = self.expect_ident("as the provider name")?;
         // v0.12: optional `given C1, C2` — capabilities the provider depends on.
+        // v0.15: a dependency may be a cross-context capability (`given B.Cap`).
         let mut given = Vec::new();
         if self.peek_kind() == Some(TokenKind::Given) {
             self.bump();
-            given.push(self.expect_ident("as a capability name in the `given` clause")?);
+            given.push(self.parse_cap_ref()?);
             while self.eat(TokenKind::Comma).is_some() {
-                given.push(self.expect_ident("as a capability name in the `given` clause")?);
+                given.push(self.parse_cap_ref()?);
             }
         }
         self.expect(TokenKind::LBrace, "to open the provider body")?;
@@ -3647,9 +3690,9 @@ impl<'a> Parser<'a> {
         let mut given = Vec::new();
         if self.peek_kind() == Some(TokenKind::Given) {
             self.bump();
-            given.push(self.expect_ident("as a capability name in the `given` clause")?);
+            given.push(self.parse_cap_ref()?);
             while self.eat(TokenKind::Comma).is_some() {
-                given.push(self.expect_ident("as a capability name in the `given` clause")?);
+                given.push(self.parse_cap_ref()?);
             }
         }
         let body = self.parse_block("to open the handler body")?;
@@ -3912,8 +3955,8 @@ mod tests {
         assert_eq!(c.uses.len(), 1);
         assert_eq!(c.consumes.len(), 1);
         assert_eq!(c.exports.len(), 2);
-        assert_eq!(c.exports[0].visibility, Visibility::Opaque);
-        assert_eq!(c.exports[1].visibility, Visibility::Transparent);
+        assert_eq!(c.exports[0].kind, ExportKind::Type(Visibility::Opaque));
+        assert_eq!(c.exports[1].kind, ExportKind::Type(Visibility::Transparent));
     }
 
     #[test]

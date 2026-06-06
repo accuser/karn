@@ -1428,20 +1428,14 @@
     "type": "exports_decl",
     "named": true,
     "fields": {
-      "name": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": "identifier",
-            "named": true
-          }
-        ]
-      },
-      "visibility": {
+      "kind": {
         "multiple": false,
         "required": true,
         "types": [
+          {
+            "type": "capability",
+            "named": false
+          },
           {
             "type": "opaque",
             "named": false
@@ -1449,6 +1443,16 @@
           {
             "type": "transparent",
             "named": false
+          }
+        ]
+      },
+      "name": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
           }
         ]
       }
@@ -1813,7 +1817,7 @@
         "required": true,
         "types": [
           {
-            "type": "identifier",
+            "type": "qualified_name",
             "named": true
           }
         ]

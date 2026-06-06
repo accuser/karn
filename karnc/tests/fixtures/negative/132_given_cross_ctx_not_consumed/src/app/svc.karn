@@ -1,0 +1,8 @@
+context app.svc
+
+service tick {
+  on call() -> Effect[Int] given platform.clk.Clock {
+    let t <- platform.clk.Clock.now()
+    t
+  }
+}

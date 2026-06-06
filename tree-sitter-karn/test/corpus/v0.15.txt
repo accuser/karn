@@ -1,0 +1,53 @@
+================================================================================
+exports capability and cross-context given
+================================================================================
+
+context ops.jobs
+
+exports capability { Clock }
+
+consumes platform.time
+
+service tick {
+  on call() -> Effect[Int] given platform.time.Clock {
+    let t <- platform.time.Clock.now()
+    t
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (context_decl
+    (qualified_name
+      (identifier)
+      (identifier))
+    (exports_decl
+      (identifier))
+    (consumes_decl
+      (qualified_name
+        (identifier)
+        (identifier)))
+    (service_decl
+      (identifier)
+      (handler
+        (call_handler
+          (generic_type_ref
+            (builtin_type)
+            (base_type))
+          (given_clause
+            (qualified_name
+              (identifier)
+              (identifier)
+              (identifier)))
+          (block
+            (effect_let_stmt
+              (identifier)
+              (method_call
+                (field_access
+                  (field_access
+                    (identifier)
+                    (identifier))
+                  (identifier))
+                (identifier)))
+            (identifier)))))))
