@@ -1,0 +1,56 @@
+name: Deploy docs to GitHub Pages
+
+on:
+  # Publish when the docs (or the things they're generated from) change on main.
+  push:
+    branches: [main]
+  # Allow a manual run from the Actions tab.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; don't cancel an in-progress one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the book
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Pin mdBook to 0.4.x (mdbook-linkcheck targets it; 0.5 changed the
+      # renderer protocol).
+      - name: Install mdBook + linkcheck
+        run: |
+          cargo install mdbook --version "=0.4.51" --locked
+          cargo install mdbook-linkcheck --locked
+      # book.toml references ../target/release/mdbook-karn-highlight.
+      - name: Build the Karn highlighting preprocessor
+        run: cargo build --release -p mdbook-karn-highlight
+      # Builds the html backend (with highlighting) and the linkcheck backend;
+      # a broken internal link fails the build, so broken docs never deploy.
+      - name: Build the book
+        run: mdbook build docs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          # With linkcheck enabled, the HTML site lands in book/html/.
+          path: docs/book/html
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
