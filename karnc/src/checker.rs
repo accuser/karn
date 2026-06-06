@@ -818,6 +818,67 @@ pub fn compatible(t: &Ty, u: &Ty) -> bool {
     }
 }
 
+/// v0.11: type-check an agent state-field initialiser (`field: T = init`). The
+/// initialiser must be a *static* value of the field type — it is checked in an
+/// empty, pure scope (so `self`, parameters, capabilities, and effects are all
+/// out of reach) with the field type as the expected type, so refined literals
+/// admit (v0.9.4) and sum variants resolve. The init's expression types are
+/// recorded into `expr_types` for emission; a single
+/// `karn.agents.bad_state_initialiser` is pushed on any failure.
+pub fn check_state_initialiser(
+    init: &Expr,
+    field_type: &TypeRef,
+    input: &ResolvedCommons,
+    expr_types: &mut HashMap<Span, Ty>,
+    errors: &mut Vec<CompileError>,
+) {
+    let Some(field_ty) = resolve_type_ref(field_type, &input.types) else {
+        return; // an unresolved field type is reported elsewhere
+    };
+    let mut local_errors: Vec<CompileError> = Vec::new();
+    let result = {
+        let mut ctx = Ctx {
+            input,
+            expr_types,
+            errors: &mut local_errors,
+            scopes: vec![HashMap::new()],
+            return_ty: field_ty.clone(),
+            return_ty_span: init.span,
+            effectful: false,
+            agent_state_ty: None,
+            commit_seen: false,
+            capabilities: HashMap::new(),
+            declared_capabilities: HashMap::new(),
+            given_remaining: HashSet::new(),
+            given_used: HashSet::new(),
+            in_test_body: false,
+        };
+        type_of(init, Some(&field_ty), &mut ctx)
+    };
+    let compatible_result = matches!(&result, Some(t) if compatible(t, &field_ty));
+    if !compatible_result || !local_errors.is_empty() {
+        let got = result
+            .as_ref()
+            .map(|t| t.display())
+            .unwrap_or_else(|| "an invalid expression".to_string());
+        errors.push(
+            CompileError::new(
+                "karn.agents.bad_state_initialiser",
+                init.span,
+                format!(
+                    "state field initialiser must be a static value of type `{}` (got `{got}`)",
+                    field_ty.display(),
+                ),
+            )
+            .with_note(
+                "an initialiser is a compile-time value — a literal, a sum variant, \
+                 `Some`/`None`/`Ok`/`Err`, a record, or `T.unsafe(lit)` — with no reference to \
+                 `self`, parameters, or capabilities",
+            ),
+        );
+    }
+}
+
 pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> {
     ctx.push_scope();
     for stmt in &block.statements {

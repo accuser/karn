@@ -1,0 +1,16 @@
+context turnstile
+
+type Gate = enum { Locked, Unlocked }
+
+agent Turnstile {
+  key id: String
+
+  state {
+    gate: Gate = Locked,
+  }
+
+  on call unlock() -> Effect[Result[(), String]] {
+    commit { ...self.state, gate: Unlocked }
+    Ok(())
+  }
+}

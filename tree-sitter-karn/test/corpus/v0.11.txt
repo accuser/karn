@@ -1,0 +1,46 @@
+================================================================================
+agent state field with sum initialiser
+================================================================================
+
+context signal
+
+agent Signal {
+  key id: String
+
+  state {
+    colour: Light = Red,
+  }
+
+  on call peek() -> Effect[Result[(), String]] {
+    Ok(())
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (context_decl
+    (qualified_name
+      (identifier))
+    (agent_decl
+      (identifier)
+      (key_decl
+        (identifier)
+        (base_type))
+      (state_decl
+        (record_field
+          (identifier)
+          (identifier)
+          (identifier)))
+      (handler
+        (call_handler
+          (identifier)
+          (generic_type_ref
+            (builtin_type)
+            (generic_type_ref
+              (builtin_type)
+              (unit_type)
+              (base_type)))
+          (block
+            (ok_expr
+              (unit_literal))))))))

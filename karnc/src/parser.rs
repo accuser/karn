@@ -1810,10 +1810,20 @@ impl<'a> Parser<'a> {
             end_span = r.span;
             refinement = Some(r);
         }
+        // v0.11: an optional `= <expr>` initial-value, used by agent state
+        // fields. Parsed for every record field; the checker restricts where it
+        // is meaningful.
+        let mut init = None;
+        if self.eat(TokenKind::Eq).is_some() {
+            let e = self.parse_expr()?;
+            end_span = e.span;
+            init = Some(e);
+        }
         Ok(RecordField {
             name: name.clone(),
             type_ref,
             refinement,
+            init,
             span: name.span.merge(end_span),
         })
     }

@@ -228,6 +228,9 @@ module.exports = grammar({
         ":",
         field("type", $._type_ref),
         optional(seq("where", field("refinement", $.refinement))),
+        // v0.11: an optional initial-value expression. Meaningful on agent
+        // `state` fields; the checker restricts where it applies.
+        optional(seq("=", field("init", $._expression))),
       ),
 
     sum_type: ($) => prec.right(repeat1($.sum_variant)),

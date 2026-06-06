@@ -2967,33 +2967,6 @@ fn check_v0_5_declarations(
 
     // Check agent handlers.
     for agent in table.agents.values() {
-        // v0.9.2: every state field must be zeroable. A fresh agent key has no
-        // committed state; `loadState` synthesises the zero-value record, so a
-        // field whose type has no defined zero (a non-Option sum, an opaque
-        // type, or a refinement that excludes the underlying zero) cannot be
-        // initialised and is rejected pending explicit-initialiser syntax.
-        for field in &agent.state_fields {
-            if checker::zero_value_ts(&field.type_ref, field.refinement.as_ref(), &typed.types)
-                .is_none()
-            {
-                errors.push(
-                    CompileError::new(
-                        "karn.agents.non_zeroable_state_field",
-                        field.span,
-                        format!(
-                            "agent `{}` state field `{}` has no defined zero value, so a \
-                             fresh key cannot be initialised",
-                            agent.name.name, field.name.name
-                        ),
-                    )
-                    .with_note(
-                        "agent state must zero-initialise for a never-seen key; wrap the field \
-                         in `Option[…]` (None means \"never set\"), or wait for \
-                         explicit-initialiser syntax",
-                    ),
-                );
-            }
-        }
         // Build the agent's state type as a synthetic record. We expose it
         // under the name `<AgentName>State` in the type table so the body
         // can reference it.
@@ -3026,6 +2999,43 @@ fn check_v0_5_declarations(
             cross_context: cross_context.clone(),
             agents: table.agents.clone(),
         };
+        // v0.11: every state field must have a defined initial value for a
+        // fresh key — an explicit static initialiser, or (v0.9.2) an implicit
+        // zero. A field with neither is rejected.
+        for field in &agent.state_fields {
+            if let Some(init) = &field.init {
+                checker::check_state_initialiser(
+                    init,
+                    &field.type_ref,
+                    &resolved_for_handler,
+                    &mut typed.expr_types,
+                    &mut errors,
+                );
+            } else if checker::zero_value_ts(
+                &field.type_ref,
+                field.refinement.as_ref(),
+                &typed.types,
+            )
+            .is_none()
+            {
+                errors.push(
+                    CompileError::new(
+                        "karn.agents.non_zeroable_state_field",
+                        field.span,
+                        format!(
+                            "agent `{}` state field `{}` has no defined zero value, so a \
+                             fresh key cannot be initialised",
+                            agent.name.name, field.name.name
+                        ),
+                    )
+                    .with_note(
+                        "add an initialiser (`field: T = value`) to give a fresh key its \
+                         starting value, or wrap the field in `Option[…]` (None means \
+                         \"never set\")",
+                    ),
+                );
+            }
+        }
         let state_ty = Ty::Named {
             name: agent_state_name.clone(),
             kind: checker::NamedKind::Record,
@@ -3051,6 +3061,7 @@ fn check_v0_5_declarations(
                         },
                         type_ref: agent.key_type.clone(),
                         refinement: None,
+                        init: None,
                         span: agent.key_name.span,
                     },
                     RecordField {
@@ -3063,6 +3074,7 @@ fn check_v0_5_declarations(
                             span: agent.state_span,
                         }),
                         refinement: None,
+                        init: None,
                         span: agent.state_span,
                     },
                 ],

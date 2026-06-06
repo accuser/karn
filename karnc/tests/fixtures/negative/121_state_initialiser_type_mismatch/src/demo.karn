@@ -1,0 +1,15 @@
+context demo
+
+type Light = enum { Red, Green }
+
+agent Signal {
+  key id: String
+
+  state {
+    count: Int = Red,
+  }
+
+  on call peek() -> Effect[Result[(), String]] {
+    Ok(())
+  }
+}

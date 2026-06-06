@@ -6,7 +6,7 @@
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../how-to/troubleshooting/index.md).
 
-There are **213** codes in total.
+There are **214** codes in total.
 
 ## Agents
 
@@ -18,7 +18,8 @@ There are **213** codes in total.
 | `karn.agent.key_mismatch` | An agent key argument has the wrong type. |
 | `karn.agent.outside_context` | An `agent` was declared outside a context. |
 | `karn.agent.return_not_effect` | An agent handler's return type is not an `Effect`. |
-| `karn.agents.non_zeroable_state_field` | An agent state field has no zero value, so a fresh key cannot be initialised. |
+| `karn.agents.bad_state_initialiser` | An agent state-field initialiser is not a static value of the field's type. |
+| `karn.agents.non_zeroable_state_field` | An agent state field has no initialiser and no implicit zero value. |
 
 ## Assertions
 

@@ -1,0 +1,29 @@
+context orders
+
+type OrderStatus = enum { Pending, Placed, Cancelled }
+type OrderError  = enum { AlreadyPlaced, AlreadyCancelled }
+
+agent Order {
+  key id: String
+
+  state {
+    status: OrderStatus = Pending,
+    items:  Int,
+  }
+
+  on call addItem(quantity: Int) -> Effect[Result[(), OrderError]] {
+    commit { ...self.state, items: self.state.items + quantity }
+    Ok(())
+  }
+
+  on call place() -> Effect[Result[(), OrderError]] {
+    match self.state.status {
+      Pending => {
+        commit { ...self.state, status: Placed }
+        Ok(())
+      }
+      Placed    => Err(AlreadyPlaced)
+      Cancelled => Err(AlreadyCancelled)
+    }
+  }
+}

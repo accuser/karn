@@ -634,6 +634,10 @@ impl<'a> Formatter<'a> {
             self.push(" where ");
             self.format_refinement(r);
         }
+        if let Some(init) = &field.init {
+            self.push(" = ");
+            self.format_expr(init);
+        }
     }
 
     fn format_record_field_oneline(&self, field: &RecordField) -> String {
@@ -642,6 +646,10 @@ impl<'a> Formatter<'a> {
         if let Some(r) = &field.refinement {
             out.push_str(" where ");
             out.push_str(&refinement_to_string(r));
+        }
+        if let Some(init) = &field.init {
+            out.push_str(" = ");
+            out.push_str(&expr_to_string(init));
         }
         out
     }

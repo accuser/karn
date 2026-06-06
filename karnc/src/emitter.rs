@@ -2362,8 +2362,38 @@ fn emit_agent(out: &mut String, a: &AgentDecl, commons: &TypedCommons, ctx: &Emi
     let registry = agent_registry_name(&a.name.name);
     let zero_fn = format!("__zeroOf{}State", a.name.name);
     writeln!(out, "const {registry} = new StateRegistry();").unwrap();
-    let zero_record = crate::checker::agent_state_zero_record(&a.state_fields, &commons.types)
-        .unwrap_or_else(|| "{}".to_string());
+    // v0.11: build the fresh-state record. A field with an explicit initialiser
+    // lowers its (static) expression; a field without one uses the v0.9.2
+    // implicit zero.
+    let zero_record = {
+        let mut parts: Vec<String> = Vec::new();
+        for f in &a.state_fields {
+            let val = if let Some(init) = &f.init {
+                let mut stmts = Vec::new();
+                let mut icx = LowerCtx::new(commons, &ctx.cross_context);
+                icx.target = ctx.target;
+                icx.local_agents = ctx.local_agents.clone();
+                let expr = lower_expr(init, &mut stmts, &mut icx);
+                // A static initialiser lowers to a pure expression (no setup
+                // statements); if any appear, fall back to inlining them as a
+                // comma sequence so the record stays valid.
+                if stmts.is_empty() {
+                    expr
+                } else {
+                    format!("({}, {expr})", stmts.join(", "))
+                }
+            } else {
+                crate::checker::zero_value_ts(&f.type_ref, f.refinement.as_ref(), &commons.types)
+                    .unwrap_or_else(|| "undefined as never".to_string())
+            };
+            parts.push(format!("{}: {val}", f.name.name));
+        }
+        if parts.is_empty() {
+            "{}".to_string()
+        } else {
+            format!("{{ {} }}", parts.join(", "))
+        }
+    };
     writeln!(
         out,
         "function {zero_fn}(): {state_ty} {{ return {zero_record}; }}"

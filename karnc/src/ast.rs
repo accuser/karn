@@ -541,6 +541,10 @@ pub struct RecordField {
     pub name: Ident,
     pub type_ref: TypeRef,
     pub refinement: Option<Refinement>,
+    /// v0.11: an optional initial-value expression. Only meaningful on agent
+    /// `state` fields (the field's fresh-key value); ignored / rejected on
+    /// record-type fields by the checker.
+    pub init: Option<Expr>,
     pub span: Span,
 }
 

@@ -1,0 +1,14 @@
+context retry
+
+agent Task {
+  key id: String
+
+  state {
+    retries: Int = 3,
+    done:    Bool,
+  }
+
+  on call peek() -> Effect[Result[(), String]] {
+    Ok(())
+  }
+}

@@ -25,18 +25,23 @@ agent Gauge {
 
 ## Fix
 
-- **Use `Option` for "not set yet".** This is the usual answer: `None` is a valid
-  zero and means "never set".
+- **Add an initialiser** (v0.11). Give the field an explicit starting value with
+  `= <value>`; any type becomes admissible, including sums (a state machine's
+  initial state) and refined types:
 
   ```karn
   state {
-    level: Option[Int],
+    level: Int where Positive = 1,
   }
   ```
 
+  The initialiser must be a compile-time value; see
+  [`karn.agents.bad_state_initialiser`](agents-bad-state-initialiser.md).
+
+- **Use `Option` for "not set yet".** `None` is a valid zero and means "never
+  set" (`level: Option[Int]`).
 - **Relax the refinement** so the zero is admitted (e.g. `NonNegative` instead of
   `Positive`, since `0` satisfies `NonNegative`).
-- **Choose a zeroable field type** (a plain `Int`, a record of zeroables, etc.).
 
 ## Related
 
