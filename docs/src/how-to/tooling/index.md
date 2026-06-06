@@ -1,11 +1,6 @@
 # Editor & tooling
 
-<!-- This page is a Phase 0 stub. See ../../karn-documentation-plan.md -->
+Recipes for setting up the Karn toolchain.
 
-> **Status:** Planned — Phase 2 (task coverage).
->
-> **Mode: How-to guide** — steps to a goal you already have; assumes basic competence. No teaching, no rationale.
-
-Tasks for setting up the Karn toolchain.
-
-_To be written._
+- [Format your code with `karn-fmt`](format.md)
+- [Set up editor support](editor-support.md)

@@ -1,11 +1,14 @@
 # Troubleshooting
 
-<!-- This page is a Phase 0 stub. See ../../karn-documentation-plan.md -->
+One page per common diagnostic — the cause and the fix. Search for the error
+code you saw.
 
-> **Status:** Planned — Phase 2 (task coverage).
->
-> **Mode: How-to guide** — steps to a goal you already have; assumes basic competence. No teaching, no rationale.
+- [`karn.refine.literal_violates`](refine-literal-violates.md) — a literal didn't
+  satisfy a refined type's predicate.
+- [`karn.agents.non_zeroable_state_field`](agents-non-zeroable-state-field.md) —
+  an agent state field can't be zero-initialised.
+- [`karn.mock.*` errors](mock-errors.md) — `outside_test`, `needs_pin`, and
+  related Mock usage errors.
 
-One page per common diagnostic — paste an error code here to find the cause and fix.
-
-_To be written._
+For the complete list of codes, see the
+[diagnostic index](../../reference/diagnostics.md).

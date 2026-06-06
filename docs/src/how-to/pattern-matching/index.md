@@ -1,11 +1,6 @@
 # Pattern matching
 
-<!-- This page is a Phase 0 stub. See ../../karn-documentation-plan.md -->
+Recipes for inspecting and narrowing values.
 
-> **Status:** Planned — Phase 2 (task coverage).
->
-> **Mode: How-to guide** — steps to a goal you already have; assumes basic competence. No teaching, no rationale.
-
-Tasks for matching and narrowing values.
-
-_To be written._
+- [Pattern-match with `match`](match.md)
+- [Narrow and bind with `is`](narrow-with-is.md)

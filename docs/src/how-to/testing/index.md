@@ -1,11 +1,8 @@
 # Testing
 
-<!-- This page is a Phase 0 stub. See ../../karn-documentation-plan.md -->
+Recipes for writing and running tests.
 
-> **Status:** Planned — Phase 2 (task coverage).
->
-> **Mode: How-to guide** — steps to a goal you already have; assumes basic competence. No teaching, no rationale.
+- [Write tests, mock collaborators, and pin a `Mock[T]`](write-tests.md)
 
-Tasks for writing and running tests.
-
-_To be written._
+See also the [testing reference](../../reference/testing.md) and
+[The testing philosophy](../../explanation/testing-philosophy.md).

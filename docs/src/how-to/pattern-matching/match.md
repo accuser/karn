@@ -1,11 +1,49 @@
 # Pattern-match with `match`
 
-<!-- This page is a Phase 0 stub. See ../../karn-documentation-plan.md -->
+**Goal:** branch on the variants of a sum type (or a `Result`/`Option`), binding
+each variant's payload.
 
-> **Status:** Planned — Phase 2 (task coverage).
->
-> **Mode: How-to guide** — steps to a goal you already have; assumes basic competence. No teaching, no rationale.
+## Match on a sum type
 
-Match on the variants of a sum type with `match`.
+`match` requires an arm for **every** variant. Name a variant to match it; bind
+its payload by naming the fields:
 
-_To be written._
+```karn
+commons shop {
+  type Status =
+    | Pending
+    | Shipped(tracking: String)
+    | Cancelled(reason: String)
+
+  fn describe(s: Status) -> String {
+    match s {
+      Pending => "awaiting shipment"
+      Shipped(tracking: t) => t
+      Cancelled(reason: r) => r
+    }
+  }
+}
+```
+
+Omit a variant and the program does not compile — there is no accidental
+fall-through. A `match` is an expression: its value is the value of the matched
+arm.
+
+## Match on `Result` and `Option`
+
+The same form works for the built-in sum types:
+
+```karn
+fn label(o: Option[Int]) -> String {
+  match o {
+    Some(n) => "present"
+    None => "absent"
+  }
+}
+```
+
+## Related
+
+- For a one-branch test that yields a `Bool`, see
+  [Narrow and bind with `is`](narrow-with-is.md).
+- Reference: [type system](../../reference/types.md).

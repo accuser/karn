@@ -24,7 +24,7 @@ For a one-screen tour of how the book is laid out and how to read it, see
 
 ---
 
-> 🚧 **Scaffold in progress.** This book is being written in phases. Right now
-> the structure and the introduction are in place; tutorials, how-to guides,
-> reference, and explanation pages are being filled in. Pages still marked
-> _“To be written”_ are placeholders.
+> 🚧 **Being written in phases.** The introduction and the full six-part
+> [tutorial](tutorials/01-first-program.md) spine are complete; the how-to
+> guides, reference, and explanation sections are being filled in next. Pages
+> still marked _“To be written”_ are placeholders.

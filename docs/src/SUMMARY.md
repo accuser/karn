@@ -29,7 +29,7 @@
   - [Types & values](how-to/types/index.md)
     - [Work with `Result` and optional values](how-to/types/result-and-optionals.md)
     - [Define sum, record, and opaque types](how-to/types/define-types.md)
-    - [Consume a value with `consumes … as`](how-to/types/consumes.md)
+    - [Consume another context's services](how-to/types/consumes.md)
   - [Agents](how-to/agents/index.md)
     - [Build a stateful agent](how-to/agents/stateful-agent.md)
   - [HTTP](how-to/http/index.md)

@@ -1,11 +1,9 @@
 # Types & values
 
-<!-- This page is a Phase 0 stub. See ../../karn-documentation-plan.md -->
+Recipes for Karn's core types and values.
 
-> **Status:** Planned — Phase 2 (task coverage).
->
-> **Mode: How-to guide** — steps to a goal you already have; assumes basic competence. No teaching, no rationale.
+- [Work with `Result` and optional values](result-and-optionals.md)
+- [Define and consume sum, record, and opaque types](define-types.md)
+- [Consume another context's services with `consumes`](consumes.md)
 
-Tasks for working with Karn's core types and values.
-
-_To be written._
+See also the [type system reference](../../reference/types.md).

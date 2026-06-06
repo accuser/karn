@@ -1,11 +1,8 @@
 # HTTP
 
-<!-- This page is a Phase 0 stub. See ../../karn-documentation-plan.md -->
+Recipes for handling HTTP requests.
 
-> **Status:** Planned — Phase 2 (task coverage).
->
-> **Mode: How-to guide** — steps to a goal you already have; assumes basic competence. No teaching, no rationale.
+- [Handle an HTTP request and shape an `HttpResult`](handle-request.md)
 
-Tasks for handling HTTP requests.
-
-_To be written._
+See also the [HTTP reference](../../reference/http.md) and
+[Target Cloudflare Workers](../projects/cloudflare-workers.md).

@@ -1,11 +1,47 @@
 # `karn.mock.*` errors
 
-<!-- This page is a Phase 0 stub. See ../../karn-documentation-plan.md -->
+`Mock[T]` fabricates values **in tests only**. These are its common errors.
 
-> **Status:** Planned — Phase 2 (task coverage).
->
-> **Mode: How-to guide** — steps to a goal you already have; assumes basic competence. No teaching, no rationale.
+## `karn.mock.outside_test`
 
-`needs_pin`, `outside_test`, and `unsupported_kind` — Mock usage errors and fixes.
+```text
+[karn.mock.outside_test] Error: `Mock[T]` is only valid inside a test case body
+```
 
-_To be written._
+**Cause:** you used `Mock[T]` outside a `test "…" { … }` case — for example in a
+regular function.
+
+**Fix:** move the `Mock[T]` into a test case. To construct a value in production
+code, use a real constructor instead (`.of` or `.unsafe` for a refined or opaque
+type; a record/variant literal otherwise).
+
+## `karn.mock.needs_pin`
+
+```text
+[karn.mock.needs_pin] bare `Mock[Code]` cannot generate a value for a `Matches` refinement
+```
+
+**Cause:** you wrote a bare `Mock[T]` for a type whose refinement is a `Matches`
+pattern. Karn cannot invent a string that matches an arbitrary regex.
+
+**Fix:** pin a concrete value that satisfies the pattern:
+
+```karn
+type Code = String where Matches("[a-z]+")
+
+// in a test case:
+let c = Mock[Code]("abc")
+```
+
+## Other Mock errors
+
+- The type doesn't resolve, or its kind can't be mocked — check the type name and
+  see the [testing reference](../../reference/testing.md).
+- A pinned value that violates the refinement is rejected for the same reason a
+  literal would be (see
+  [`karn.refine.literal_violates`](refine-literal-violates.md)).
+
+## Related
+
+- [Write tests and mock collaborators](../testing/write-tests.md)
+- Reference: [testing](../../reference/testing.md)

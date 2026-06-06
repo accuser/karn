@@ -1,11 +1,64 @@
 # Work with `Result` and optional values
 
-<!-- This page is a Phase 0 stub. See ../../karn-documentation-plan.md -->
+**Goal:** produce and consume `Result` (success or error) and `Option` (a value
+or nothing).
 
-> **Status:** Planned — Phase 2 (task coverage).
->
-> **Mode: How-to guide** — steps to a goal you already have; assumes basic competence. No teaching, no rationale.
+Karn has no exceptions and no `null`. Fallible operations return `Result[T, E]`;
+possibly-absent values are `Option[T]`.
 
-Produce and consume `Ok`, `Some`, and `None`.
+## Construct values
 
-_To be written._
+```karn
+commons demo {
+  fn ok(n: Int) -> Result[Int, String] {
+    Ok(n)
+  }
+  fn fail() -> Result[Int, String] {
+    Err("nope")
+  }
+  fn wrap(n: Int) -> Option[Int] {
+    Some(n)
+  }
+  fn empty() -> Option[Int] {
+    None
+  }
+}
+```
+
+## Consume with `match`
+
+```karn
+fn extract(o: Option[Int]) -> Int {
+  match o {
+    Some(n) => n
+    None => 0
+  }
+}
+```
+
+The same form works for `Result`, with `Ok` and `Err` arms.
+
+## Propagate errors with `?`
+
+Inside a function that itself returns a `Result`, `?` unwraps an `Ok` or returns
+early on an `Err`:
+
+```karn
+commons demo {
+  type Reps = Int where InRange(1, 100)
+
+  fn doubled(n: Int) -> Result[Int, ValidationError] {
+    let r = Reps.of(n)?
+    Ok(r * 2)
+  }
+}
+```
+
+If `Reps.of(n)` is `Err(e)`, `doubled` returns `Err(e)` immediately; otherwise
+`r` is the unwrapped value.
+
+## Related
+
+- [Pattern-match with `match`](../pattern-matching/match.md) ·
+  [Narrow and bind with `is`](../pattern-matching/narrow-with-is.md)
+- [Define a refined type and validate untrusted input](../refined-types/define-and-validate.md)

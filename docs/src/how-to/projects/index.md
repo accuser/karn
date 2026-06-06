@@ -1,11 +1,8 @@
 # Projects
 
-<!-- This page is a Phase 0 stub. See ../../karn-documentation-plan.md -->
+Recipes for laying out and building Karn projects.
 
-> **Status:** Planned — Phase 2 (task coverage).
->
-> **Mode: How-to guide** — steps to a goal you already have; assumes basic competence. No teaching, no rationale.
+- [Lay out a project](layout.md)
+- [Target Cloudflare Workers](cloudflare-workers.md)
 
-Tasks for laying out and building Karn projects.
-
-_To be written._
+See also the [`karn.toml` reference](../../reference/manifest.md).

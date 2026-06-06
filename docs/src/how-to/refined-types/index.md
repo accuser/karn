@@ -1,11 +1,9 @@
 # Refined types
 
-<!-- This page is a Phase 0 stub. See ../../karn-documentation-plan.md -->
+Recipes for defining refined types and getting values into them.
 
-> **Status:** Planned — Phase 2 (task coverage).
->
-> **Mode: How-to guide** — steps to a goal you already have; assumes basic competence. No teaching, no rationale.
+- [Define a refined type and validate untrusted input](define-and-validate.md)
+- [Use a literal where a refined type is expected](literal-admission.md)
 
-Tasks for defining refined types and admitting values into them.
-
-_To be written._
+See also the [refined-type reference](../../reference/refined-types.md) for the
+complete predicate list and admission rules.
