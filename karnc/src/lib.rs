@@ -15,6 +15,7 @@
 
 pub mod ast;
 pub mod checker;
+pub mod diagnostics;
 pub mod emitter;
 pub mod error;
 pub mod fmt;
