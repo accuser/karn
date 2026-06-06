@@ -1,0 +1,16 @@
+[package]
+name = "mdbook-karn-highlight"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "mdbook-karn-highlight"
+path = "src/main.rs"
+
+[dependencies]
+serde_json.workspace = true
+tree-sitter = "0.25"
+tree-sitter-highlight = "0.25"
+
+[build-dependencies]
+cc = "1"

@@ -5,18 +5,31 @@ description = "The official guide and reference for the Karn programming languag
 language = "en"
 src = "src"
 
+# Syntax-highlight ```karn code blocks using the tree-sitter-karn grammar.
+# Build the binary first: `cargo build --release -p mdbook-karn-highlight`.
+[preprocessor.karn-highlight]
+command = "../target/release/mdbook-karn-highlight"
+renderers = ["html"]
+
 [output.html]
 default-theme = "rust"
 preferred-dark-theme = "ayu"
 git-repository-url = "https://github.com/accuser/karn"
 edit-url-template = "https://github.com/accuser/karn/edit/main/docs/{path}"
+additional-css = ["theme/karn-highlight.css"]
 
 [output.html.fold]
 enable = true
 level = 1
 
-# Phase 0 keeps book.toml to what is installed today so `mdbook build` is green
-# out of the box. Deferred to later passes (see karn-documentation-plan.md §6, §7):
+# Validate links at build time. Internal (cross-page) links are checked and a
+# broken one fails the build. External web links are not followed, to keep the
+# build deterministic and offline-friendly in CI; flip `follow-web-links` to
+# true for an occasional manual external-link audit.
+[output.linkcheck]
+follow-web-links = false
+warning-policy = "error"
+
+# Still deferred (see karn-documentation-plan.md §6, §7):
 #   - tree-sitter-karn highlighting preprocessor (decided; not yet written)
-#   - mdbook-admonish / mdbook-mermaid / mdbook-toc / mdbook-linkcheck
-#   - example-compilation gate + British-English wordlist lint in CI
+#   - mdbook-admonish / mdbook-mermaid / mdbook-toc

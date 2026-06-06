@@ -1,5 +1,5 @@
 [workspace]
-members = ["karnc", "karn-fmt", "karn-lsp"]
+members = ["karnc", "karn-fmt", "karn-lsp", "mdbook-karn-highlight"]
 resolver = "3"
 
 [workspace.package]

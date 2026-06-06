@@ -34,13 +34,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Install mdBook
-        run: cargo install mdbook --locked
-      - name: Build
+      - name: British-English lint
+        run: bash docs/tools/check-british-english.sh
+      - name: Install mdBook + linkcheck
+        run: cargo install mdbook mdbook-linkcheck --locked
+      # book.toml references ../target/release/mdbook-karn-highlight, so build it
+      # before the book.
+      - name: Build the Karn highlighting preprocessor
+        run: cargo build --release -p mdbook-karn-highlight
+      # `mdbook build` runs the html backend (with karn highlighting) and the
+      # linkcheck backend; a broken internal link fails the build.
+      - name: Build the book (with link checking)
         run: mdbook build docs
-
-# Deferred guardrails (see karn-documentation-plan.md §7, Phase 0):
-#   - mdbook-linkcheck (validate internal/external links)
-#   - a British-English wordlist lint
-#   - the tree-sitter-karn highlighting preprocessor
-# Add these as steps here once their tooling lands.
