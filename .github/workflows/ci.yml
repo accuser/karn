@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Test suite (incl. doc-example gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # `tsc` is needed by the tsc-verify stage and the `karnc test` fixtures.
+      - name: Install TypeScript
+        run: npm install -g typescript
+      # `cargo test` runs the whole karnc suite, which includes:
+      #   - doc_examples        — the example-compilation gate (docs/src/**)
+      #   - diagnostics_registry / keywords_reference / cli_reference
+      #     — assert the generated reference pages are up to date
+      #   - the fixture suite and the tsc-strict verification stage
+      - name: Run tests
+        run: cargo test -p karnc
+
+  docs:
+    name: Build the book
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install mdBook
+        run: cargo install mdbook --locked
+      - name: Build
+        run: mdbook build docs
+
+# Deferred guardrails (see karn-documentation-plan.md §7, Phase 0):
+#   - mdbook-linkcheck (validate internal/external links)
+#   - a British-English wordlist lint
+#   - the tree-sitter-karn highlighting preprocessor
+# Add these as steps here once their tooling lands.

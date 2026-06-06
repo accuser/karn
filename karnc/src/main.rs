@@ -3,86 +3,9 @@
 use std::path::PathBuf;
 use std::process::{Command as ProcCommand, ExitCode, Stdio};
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::Parser;
 use karnc::BuildTarget;
-
-#[derive(Parser, Debug)]
-#[command(name = "karnc", version, about = "Karn v0.3 compiler", long_about = None)]
-struct Cli {
-    #[command(subcommand)]
-    command: Command,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
-enum CliTarget {
-    /// Single-bundle output (the default). Cross-context calls compile to
-    /// direct function invocation.
-    Bundle,
-    /// One Cloudflare Worker per context. Cross-context calls go over
-    /// Service Bindings using a JSON wire format.
-    Workers,
-}
-
-impl From<CliTarget> for BuildTarget {
-    fn from(t: CliTarget) -> Self {
-        match t {
-            CliTarget::Bundle => BuildTarget::Bundle,
-            CliTarget::Workers => BuildTarget::Workers,
-        }
-    }
-}
-
-#[derive(Subcommand, Debug)]
-enum Command {
-    /// Compile a `.karn` file (single-file commons) to a TypeScript file,
-    /// or a directory project to a tree of TypeScript files mirroring the
-    /// source layout.
-    Compile {
-        /// Input `.karn` file, or directory project root.
-        input: PathBuf,
-        /// Output `.ts` file (for single-file input) or output root
-        /// directory (for project input).
-        #[arg(short, long)]
-        output: PathBuf,
-        /// Build target. `bundle` (default) produces a single deployment
-        /// unit; `workers` produces one Cloudflare Worker per context with
-        /// Service Binding plumbing (v0.8).
-        #[arg(long, value_enum, default_value = "bundle")]
-        target: CliTarget,
-    },
-    /// Type-check a `.karn` file or project without writing output.
-    Check {
-        /// Input `.karn` file or project root.
-        input: PathBuf,
-    },
-    /// Format `.karn` source files in place. Passing `-` reads from stdin
-    /// and writes to stdout.
-    Fmt {
-        /// Files to format. Use `-` for stdin → stdout.
-        inputs: Vec<PathBuf>,
-        /// Check formatting without writing changes. Exits non-zero if any
-        /// file is not already canonical.
-        #[arg(long)]
-        check: bool,
-    },
-    /// Discover and run test declarations in a project. Compiles the project
-    /// (including all generated `tests/*.test.ts` modules), then invokes
-    /// Node.js on the aggregated runner script. Requires `tsc` and `node`
-    /// to be on PATH.
-    Test {
-        /// Input project root directory. Defaults to the current directory.
-        #[arg(default_value = ".")]
-        input: PathBuf,
-        /// Where to write compiled TypeScript test runner modules.
-        /// Defaults to `<input>/out`.
-        #[arg(short, long)]
-        output: Option<PathBuf>,
-        /// Skip the runner invocation; just emit the generated test files.
-        /// Useful for CI flows that drive the runner separately.
-        #[arg(long)]
-        no_run: bool,
-    },
-}
+use karnc::cli::{Cli, Command};
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
