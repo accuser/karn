@@ -36,8 +36,13 @@ jobs:
         run: cargo build --release -p mdbook-karn-highlight
       # Builds the html backend (with highlighting) and the linkcheck backend;
       # a broken internal link fails the build, so broken docs never deploy.
+      # Run from inside docs/ so the preprocessor `command` in book.toml
+      # (`../target/release/mdbook-karn-highlight`) resolves against the repo
+      # root — mdbook spawns preprocessors relative to the process cwd, not the
+      # book root.
       - name: Build the book
-        run: mdbook build docs
+        working-directory: docs
+        run: mdbook build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
