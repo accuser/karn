@@ -5,7 +5,7 @@
 //! optionally some secondary labels and notes. Rendering goes through
 //! [`ariadne`] for source-pointing colour output.
 
-use ariadne::{Color, Label, Report, ReportKind};
+use ariadne::{Color, Config, Label, Report, ReportKind};
 
 use crate::span::Span;
 
@@ -40,13 +40,32 @@ impl CompileError {
         self
     }
 
-    /// Build an [`ariadne::Report`] for this error, anchored to the given filename.
+    /// Build an [`ariadne::Report`] for this error, anchored to the given
+    /// filename. Colour is on (for the CLI and human-facing test output).
     pub fn report<'a>(
         &'a self,
         filename: &'a str,
     ) -> Report<'a, (&'a str, std::ops::Range<usize>)> {
+        self.report_with_config(filename, Config::default())
+    }
+
+    /// Build a colourless [`ariadne::Report`], for transcripts committed to the
+    /// repo — no ANSI escape codes, so the output is byte-stable across machines.
+    pub fn report_plain<'a>(
+        &'a self,
+        filename: &'a str,
+    ) -> Report<'a, (&'a str, std::ops::Range<usize>)> {
+        self.report_with_config(filename, Config::default().with_color(false))
+    }
+
+    fn report_with_config<'a>(
+        &'a self,
+        filename: &'a str,
+        config: Config,
+    ) -> Report<'a, (&'a str, std::ops::Range<usize>)> {
         let primary_span = (filename, self.span.range());
         let mut builder = Report::build(ReportKind::Error, primary_span.clone())
+            .with_config(config)
             .with_code(self.category)
             .with_message(&self.message)
             .with_label(

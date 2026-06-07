@@ -56,8 +56,21 @@ well-defined state anyway. Zeroability guarantees that a never-seen key has an
 unambiguous starting value, computed by the compiler and baked into the runtime.
 
 This is why a field like `Int where Positive` is rejected: `Positive` excludes
-`0`, so there is no honest starting value, and the compiler says so with
-[`karn.agents.non_zeroable_state_field`](../how-to/troubleshooting/agents-non-zeroable-state-field.md).
+`0`, so there is no honest starting value. Give a state field such a type with no
+initialiser:
+
+```karn,fail
+{{#include ../../diagnostics/agents_non_zeroable.karn}}
+```
+
+and the compiler says so — verbatim, captured from `karnc`:
+
+```text
+{{#include ../../diagnostics/agents_non_zeroable.txt}}
+```
+
+The fix is to give the field a starting value
+([`karn.agents.non_zeroable_state_field`](../how-to/troubleshooting/agents-non-zeroable-state-field.md)).
 
 ## Why "not set yet" is `Option`, not a special case
 

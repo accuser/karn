@@ -85,6 +85,30 @@ anchor, and that every directive argument names a real rule. So a new production
 cannot ship without a documented entry, and the diagnostic index's **Construct**
 column deep-links to `grammar.md#rule-<rule>` and always resolves.
 
+## Showing a real diagnostic
+
+To show what the compiler actually says when it refuses a program — verbatim, not
+paraphrased — add a deliberately failing fixture and `{{#include}}` both it and
+its captured transcript:
+
+1. Write a standalone failing program at `docs/diagnostics/<id>.karn` (a
+   `commons` or `context` block, like a doc example, but one that must error).
+2. Run `KARN_BLESS=1 cargo test -p karnc --test doc_diagnostics`. This compiles
+   the fixture, asserts it fails, and writes the real diagnostic — colour-free,
+   with a stable `<id>.karn` label — to `docs/diagnostics/<id>.txt`.
+3. On the page, show the source in a `karn,fail` fence and the transcript in a
+   `text` fence, each holding a single mdBook `#include` line pointing at
+   `docs/diagnostics/<id>.karn` and `docs/diagnostics/<id>.txt` (the path is
+   relative to the page). See [the agent model](../explanation/the-agent-model.md)
+   for a live example to copy.
+
+The `.txt` transcripts are **generated — never hand-edit them**;
+`doc_diagnostics` (run in CI) re-derives them from `karnc` and fails if the
+committed copy drifts, and fails if a fixture ever starts compiling. The fixtures
+live outside `docs/src/`, so the doc-example gate skips a fenced block whose body
+is only an `{{#include}}` (it is display-only; the fixture's own compile is what
+`doc_diagnostics` checks).
+
 ## The guardrails
 
 Four mechanisms keep the docs honest; all run in CI.

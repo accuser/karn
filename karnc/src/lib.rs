@@ -164,6 +164,21 @@ pub fn render_errors(errors: &[CompileError], source: &str, filename: &str) -> S
     String::from_utf8_lossy(&out).into_owned()
 }
 
+/// Render a list of compile errors to a string with colour disabled and the
+/// given filename as the source label. Unlike [`render_errors`], the output
+/// contains no ANSI escape codes, so it is byte-stable — suitable for the
+/// committed diagnostic transcripts under `docs/diagnostics/`.
+pub fn render_errors_plain(errors: &[CompileError], source: &str, filename: &str) -> String {
+    let mut out = Vec::new();
+    let mut cache = (filename, Source::from(source));
+    for err in errors {
+        err.report_plain(filename)
+            .write(&mut cache, &mut out)
+            .expect("write to Vec<u8> cannot fail");
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 /// Render to stderr with color, used by the CLI.
 pub fn print_errors(errors: &[CompileError], source: &str, filename: &str) {
     let mut cache = (filename, Source::from(source));

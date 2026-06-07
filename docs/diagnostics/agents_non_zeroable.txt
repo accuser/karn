@@ -1,0 +1,9 @@
+[karn.agents.non_zeroable_state_field] Error: agent `Gauge` state field `level` has no defined zero value, so a fresh key cannot be initialised
+   ╭─[ agents_non_zeroable.karn:9:5 ]
+   │
+ 9 │     level: Level,        -- no initialiser, and Positive excludes 0
+   │     ──────┬─────  
+   │           ╰─────── agent `Gauge` state field `level` has no defined zero value, so a fresh key cannot be initialised
+   │ 
+   │ Note: add an initialiser (`field: T = value`) to give a fresh key its starting value, or wrap the field in `Option[…]` (None means "never set")
+───╯

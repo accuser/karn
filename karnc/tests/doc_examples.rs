@@ -120,7 +120,8 @@ fn every_doc_example_compiles() {
     let blocks = collect_blocks();
     assert!(!blocks.is_empty(), "found no ```karn blocks under docs/src");
 
-    let (mut checked_ok, mut checked_fail, mut skip_ignored, mut skip_fragment) = (0, 0, 0, 0);
+    let (mut checked_ok, mut checked_fail, mut skip_ignored, mut skip_fragment, mut skip_include) =
+        (0, 0, 0, 0, 0);
     let mut failures: Vec<String> = Vec::new();
 
     for (idx, b) in blocks.iter().enumerate() {
@@ -128,6 +129,20 @@ fn every_doc_example_compiles() {
 
         if b.info.contains("ignore") {
             skip_ignored += 1;
+            continue;
+        }
+        // Display-only blocks: a body that is just `{{#include …}}` directive(s)
+        // is rendered by mdBook from a fixture file that lives outside docs/src/
+        // (e.g. docs/diagnostics/*.karn). The fixture's own compile is checked by
+        // tests/doc_diagnostics.rs, so don't demand it stand alone here.
+        let nonempty: Vec<&str> = b
+            .body
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .collect();
+        if !nonempty.is_empty() && nonempty.iter().all(|l| l.starts_with("{{#include")) {
+            skip_include += 1;
             continue;
         }
         let expect_fail = b.info.contains("fail");
@@ -167,7 +182,8 @@ fn every_doc_example_compiles() {
 
     eprintln!(
         "doc examples: {checked_ok} compiled, {checked_fail} failed-as-expected, \
-         {skip_fragment} fragments skipped, {skip_ignored} ignored ({} total)",
+         {skip_fragment} fragments skipped, {skip_ignored} ignored, \
+         {skip_include} include-only skipped ({} total)",
         blocks.len()
     );
 
