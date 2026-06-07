@@ -11,7 +11,8 @@ Keep editing `shortener.karn`.
 
 ## Declare a refined type
 
-A refined type is a base type plus a predicate, written with `where`. Give the
+A [refined type](../reference/glossary.md#term-refined-type) is a base type plus a
+predicate, written with `where`. Give the
 shortener real `ShortCode` and `Url` types:
 
 ```karn

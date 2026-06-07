@@ -1,9 +1,11 @@
 # What is Karn?
 
 Karn is a statically typed programming language for building services. It is
-**architecture-first**: the shape of a program — its contexts, services,
-agents, and the types that flow between them — is part of the language, not a
-convention layered on top. Karn compiles to **typed TypeScript** and targets
+**architecture-first**: the shape of a program — its
+[contexts](../reference/glossary.md#term-context),
+[services](../reference/glossary.md#term-service),
+[agents](../reference/glossary.md#term-agent), and the types that flow between
+them — is part of the language, not a convention layered on top. Karn compiles to **typed TypeScript** and targets
 **Cloudflare Workers**.
 
 ## The idea in one example
@@ -32,9 +34,11 @@ Compiling either with `karnc` produces TypeScript you can read, run, and deploy.
 
 ## What makes Karn distinct
 
-- **Make illegal states unrepresentable.** Karn leans on *refined types*
-  (types carrying a predicate), *opaque types*, and *errors-as-values*
-  (`Result`, `Ok`/`Some`/`None`) so that whole classes of bug cannot be
+- **Make illegal states unrepresentable.** Karn leans on
+  *[refined types](../reference/glossary.md#term-refined-type)*
+  (types carrying a predicate), *[opaque types](../reference/glossary.md#term-opaque-type)*,
+  and *errors-as-values* ([`Result`](../reference/glossary.md#term-result-option),
+  `Ok`/`Some`/`None`) so that whole classes of bug cannot be
   expressed. See [The type-system philosophy](../explanation/type-system-philosophy.md).
 - **Architecture in the language.** Contexts, services, and stateful *agents*
   are first-class. See [How a Karn program is shaped](../explanation/how-a-karn-program-is-shaped.md).
@@ -42,7 +46,8 @@ Compiling either with `karnc` produces TypeScript you can read, run, and deploy.
   natural fit for Cloudflare Workers, with a static type system in front of it.
   See [Why compile to TypeScript](../explanation/why-compile-to-typescript.md).
 - **Testing is built in.** `test` blocks, `assert`, dependency `mocks`, and
-  `Mock[T]` value fabrication ship with the language.
+  [`Mock[T]`](../reference/glossary.md#term-mock) value fabrication ship with the
+  language.
 
 ## What Karn is *not* (yet)
 

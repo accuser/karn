@@ -1,7 +1,10 @@
 # The refined-literal admission model
 
-When you write a literal where a refined type is expected, Karn checks it at
-compile time and admits it directly — no `.of`, no `Result`:
+When you write a literal where a
+[refined type](../reference/glossary.md#term-refined-type) is expected, Karn
+checks it at compile time and admits it directly — no
+[`.of`](../reference/glossary.md#term-of-unsafe), no
+[`Result`](../reference/glossary.md#term-result-option):
 
 ```karn
 fn defaultQty() -> Quantity {   -- Quantity = Int where InRange(1, 100)

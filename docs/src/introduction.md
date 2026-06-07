@@ -22,7 +22,7 @@ need. If you are not sure where to start:
 Or choose a path by background:
 
 - **Coming from TypeScript?** Read
-  [Karn compared to TypeScript](explanation/karn-compared-to-typescript.md).
+  [Coming from TypeScript](introduction/coming-from-typescript.md).
 - **New to typed or functional ideas?** Start at
   [Tutorial 1](tutorials/01-first-program.md), keeping the
   [glossary](reference/glossary.md) to hand.

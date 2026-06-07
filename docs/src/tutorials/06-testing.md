@@ -112,7 +112,8 @@ code.
 ## Fabricate values with `Mock[T]`
 
 Tests often need a value of some type without caring exactly what it is.
-`Mock[T]` fabricates one. For a refined type it produces a value that satisfies
+[`Mock[T]`](../reference/glossary.md#term-mock) fabricates one. For a refined type
+it produces a value that satisfies
 the refinement; pass an argument to pin a specific one:
 
 ```karn,ignore

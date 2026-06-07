@@ -32,7 +32,8 @@ service api {
 
 A few new things:
 
-- `context shortener` declares a **context** rather than a `commons`. Contexts
+- `context shortener` declares a
+  **[context](../reference/glossary.md#term-context)** rather than a `commons`. Contexts
   are the unit Karn deploys — each becomes one Worker.
 - `service api { … }` groups request handlers.
 - `on http GET "/links/:code" (code: String)` is a handler: it answers

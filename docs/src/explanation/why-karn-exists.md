@@ -14,8 +14,9 @@ without ever *stating* it. Over time the two drift apart, and the gap is where
 bugs and onboarding pain live.
 
 Karn's first bet is that **the architecture should be in the language**. A
-context is a deployable boundary. A service groups handlers. An agent is a named,
-keyed owner of state. These are not naming conventions or folder layouts — they
+[context](../reference/glossary.md#term-context) is a deployable boundary. A
+[service](../reference/glossary.md#term-service) groups handlers. An
+[agent](../reference/glossary.md#term-agent) is a named, keyed owner of state. These are not naming conventions or folder layouts — they
 are constructs the compiler understands and enforces. The shape of the system is
 written down, checked, and compiled, so it cannot quietly rot.
 
@@ -28,15 +29,19 @@ swapped with a customer id. A percentage is "just a number", so one day it is
 
 Karn pushes hard on the type system to close these gaps:
 
-- **Refined types** carry a predicate, so `Age = Int where InRange(0, 150)` is a
-  distinct type whose invalid values *cannot be constructed*. An out-of-range
-  literal is a compile error, not a runtime surprise.
-- **Opaque types** give a value a nominal identity, so an `OrderId` and a
-  `CustomerId` never mix even though both are strings underneath.
-- **Errors are values.** Operations that can fail return a `Result`; absence is
-  an `Option`. There are no exceptions to forget to catch — the type forces the
-  caller to handle both outcomes.
-- **Agent state must be zeroable**, so a never-seen key has a well-defined
+- **[Refined types](../reference/glossary.md#term-refined-type)** carry a
+  predicate, so `Age = Int where InRange(0, 150)` is a distinct type whose invalid
+  values *cannot be constructed*. An out-of-range literal is a compile error, not
+  a runtime surprise.
+- **[Opaque types](../reference/glossary.md#term-opaque-type)** give a value a
+  nominal identity, so an `OrderId` and a `CustomerId` never mix even though both
+  are strings underneath.
+- **Errors are values.** Operations that can fail return a
+  [`Result`](../reference/glossary.md#term-result-option); absence is an `Option`.
+  There are no exceptions to forget to catch — the type forces the caller to
+  handle both outcomes.
+- **Agent state must be [zeroable](../reference/glossary.md#term-zeroable)**, so a
+  never-seen key has a well-defined
   starting state, and "uninitialised" is expressed honestly with `Option`.
 
 The aim throughout is to move whole categories of bug from *runtime* to *compile

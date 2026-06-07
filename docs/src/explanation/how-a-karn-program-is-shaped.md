@@ -43,9 +43,12 @@ Every Karn declaration lives in one of two top-level units:
 - **`commons`** — pure, stateless building blocks: types and functions. A
   `commons` compiles to plain TypeScript types and functions. It has no state,
   no effects, and no dependencies on contexts.
-- **`context`** — a deployable boundary. Contexts hold services, agents,
-  capabilities, and handlers. A context is the unit Karn deploys: on the
-  `workers` target, each context becomes its own Cloudflare Worker.
+- **[`context`](../reference/glossary.md#term-context)** — a deployable boundary.
+  Contexts hold [services](../reference/glossary.md#term-service),
+  [agents](../reference/glossary.md#term-agent),
+  [capabilities](../reference/glossary.md#term-capability), and handlers. A
+  context is the unit Karn deploys: on the `workers` target, each context becomes
+  its own Cloudflare Worker.
 
 A useful way to think about it: `commons` is your domain vocabulary; `context` is
 a running, deployable piece of your system.
@@ -57,7 +60,8 @@ a running, deployable piece of your system.
 - **Agents** own state, keyed by identity. See [The agent model](the-agent-model.md).
 - **Capabilities** are dependencies a handler asks for with `given` — an
   interface the context needs but does not itself implement.
-- **Providers** (`provides`) supply an implementation of a capability.
+- **[Providers](../reference/glossary.md#term-provider)** (`provides`) supply an
+  implementation of a capability.
 
 ## How the pieces connect
 

@@ -7,13 +7,15 @@ ideas do most of the work.
 
 ## Refinement: types describe values, not just shapes
 
-A conventional type says "this is an integer". A *refined* type says "this is an
+A conventional type says "this is an integer". A
+*[refined](../reference/glossary.md#term-refined-type)* type says "this is an
 integer between 0 and 150". The predicate is part of the type, so an out-of-range
 `Age` is not a value you forgot to check — it is a value that cannot exist.
 
 This has a sharp consequence at the boundary between trusted and untrusted data.
 A literal you write is checked at compile time and admitted directly; input from
-the outside world must pass through `.of`, which returns a `Result`. The type
+the outside world must pass through [`.of`](../reference/glossary.md#term-of-unsafe),
+which returns a [`Result`](../reference/glossary.md#term-result-option). The type
 system thereby forces validation to happen exactly once, at the edge, and
 everything inside the edge can assume validity. See
 [The refined-literal admission model](refined-literal-admission.md).
@@ -22,8 +24,9 @@ everything inside the edge can assume validity. See
 
 Two values can have the same representation and yet mean entirely different
 things. An order id and a customer id might both be strings, but swapping them is
-a serious bug. An **opaque** type gives a value a distinct identity: `OrderId` is
-backed by a `String` but is not a `String`, and the compiler refuses to mix them.
+a serious bug. An **[opaque](../reference/glossary.md#term-opaque-type)** type
+gives a value a distinct identity: `OrderId` is backed by a `String` but is not a
+`String`, and the compiler refuses to mix them.
 
 In TypeScript, two string-backed aliases are interchangeable, so the swap
 compiles and ships:

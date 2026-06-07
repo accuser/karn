@@ -2,7 +2,8 @@
 
 Everything so far has been stateless: a request comes in, a value goes out,
 nothing is remembered. A URL shortener has to remember — which code maps to which
-URL, and how often each was followed. In Karn, the unit of state is an **agent**:
+URL, and how often each was followed. In Karn, the unit of state is an
+**[agent](../reference/glossary.md#term-agent)**:
 a named thing, identified by a key, that owns some state and exposes handlers to
 read and change it.
 

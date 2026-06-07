@@ -15,7 +15,8 @@ Keep editing `shortener.karn`; we compile it at the end.
 
 ## Records group fields
 
-A **record** groups fields into a single value. The shortener needs a request
+A **[record](../reference/glossary.md#term-record)** groups fields into a single
+value. The shortener needs a request
 body and two response shapes:
 
 ```karn
@@ -57,7 +58,8 @@ export interface ResolveView {
 ## A sum type for errors
 
 Creating or resolving a link can go wrong in a few distinct ways. That is exactly
-what a **sum type** expresses — a value that is one of several named variants.
+what a **[sum type](../reference/glossary.md#term-sum-type)** expresses — a value
+that is one of several named variants.
 When none of the variants carries a payload, the shorthand is an **enum**:
 
 ```karn

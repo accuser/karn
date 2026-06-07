@@ -178,6 +178,22 @@ Four mechanisms keep the docs honest; all run in CI.
 - **Document the present.** Write what compiles today; mark planned features as
   planned.
 
+## Glossary first-use linking
+
+The [glossary](../reference/glossary.md) gives each load-bearing term a stable
+anchor, `#term-<slug>` (e.g. `#term-refined-type`). On a reader-facing page, link
+the **first** occurrence of a glossary term to its entry —
+`[refined type](../reference/glossary.md#term-refined-type)` — and only the first;
+never inside a heading, a code fence, or on the glossary page itself.
+
+`docs/tools/check-glossary-links.sh` is an **advisory** lint: it lists, per page,
+glossary terms that appear with no link to their entry, so first-use linking can
+be caught up page by page. It prints findings and exits 0 (set
+`GLOSSARY_LINK_STRICT=1` to exit non-zero on findings). It deliberately does not
+auto-link — terms are common words, so a human decides each first use; an
+auto-linking preprocessor is a possible future if the false-positive risk can be
+contained.
+
 ## Docs ship with the feature
 
 Treat docs as part of an increment's definition of done (see

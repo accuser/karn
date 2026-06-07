@@ -2,12 +2,13 @@
 
 An **agent** is Karn's unit of state. It is a named thing, identified by a key,
 that owns some state and exposes handlers to read and change it. This page
-explains what that means and why agent state must be *zeroable*.
+explains what that means and why agent state must be
+*[zeroable](../reference/glossary.md#term-zeroable)*.
 
 ## What an agent is
 
-Most of a Karn program is stateless: functions and services transform inputs into
-outputs. An agent is the deliberate exception — the place where something is
+Most of a Karn program is stateless: functions and
+[services](../reference/glossary.md#term-service) transform inputs into outputs. An agent is the deliberate exception — the place where something is
 *remembered* between calls.
 
 Each agent has a **key**. Two calls naming the same key address the same logical
@@ -17,7 +18,7 @@ instance with the same state; different keys are independent. A `Counter` keyed 
 becomes a Cloudflare Durable Object, where the key selects the object instance.
 
 State is read through `self.state` and changed by building a new state value and
-`commit`-ting it. State is never mutated in place — a handler commits a
+[`commit`](../reference/glossary.md#term-commit)-ting it. State is never mutated in place — a handler commits a
 replacement — which keeps each handler's effect on state explicit.
 
 ```mermaid
