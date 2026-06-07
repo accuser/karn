@@ -29,3 +29,28 @@ jobs:
         run: cargo test -p karnc
         env:
           KARN_REQUIRE_TSC: "1"
+
+  docs:
+    name: Build the book (html + linkcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Pin mdBook to 0.4.x (mdbook-linkcheck targets it; 0.5 changed the
+      # renderer protocol). Mirrors pages.yml so broken docs fail on the PR,
+      # not at deploy time.
+      - name: Install mdBook + linkcheck
+        run: |
+          cargo install mdbook --version "=0.4.51" --locked
+          cargo install mdbook-linkcheck --locked
+      # book.toml references the three in-house preprocessors under
+      # ../target/release/ (highlight, grammar, visuals).
+      - name: Build the Karn mdBook preprocessors
+        run: cargo build --release -p mdbook-karn-highlight -p mdbook-karn-grammar -p mdbook-karn-visuals
+      # Run from inside docs/ so the preprocessor `command` paths in book.toml
+      # resolve against the repo root (mdbook spawns preprocessors relative to
+      # the process cwd, not the book root). A broken internal link fails here.
+      - name: Build the book
+        working-directory: docs
+        run: mdbook build

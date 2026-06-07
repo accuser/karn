@@ -13,14 +13,17 @@ on http <METHOD> "<route>" (<params>) -> Effect[HttpResult[T]] {
 ```
 
 - **Methods:** `GET`, `POST`, `PUT`, `PATCH`, `DELETE`.
-- **Route:** must start with `/`; a `:name` segment is a path parameter. The
-  `/_karn/` prefix is reserved (`karn.http.reserved_prefix`).
+- **Route:** must start with `/`; a `:name` segment is a path parameter.
 - **Parameters:** each parameter is either a path parameter (matching a `:name`
   segment) or the special `body` parameter. A path parameter's type must be
   constructible from a string (`karn.http.path_param_not_stringy`); `GET` and
   `DELETE` may not take a `body` (`karn.http.body_on_get_or_delete`).
 - **Return type:** must be `Effect[HttpResult[T]]`
   (`karn.http.return_not_effect_http_result`).
+
+> [!DANGER]
+> The `/_karn/` route prefix is reserved for the runtime. Any route under it is
+> rejected with `karn.http.reserved_prefix`.
 
 A `body` parameter is parsed from the request JSON and validated before the
 handler runs; an invalid body is rejected with `400` at the boundary.
@@ -40,9 +43,10 @@ handler runs; an invalid body is rejected with `400` at the boundary.
 | `UnprocessableEntity(message)` | 422 | message |
 | `ServerError(message)` | 500 | message |
 
-When `Ok`/`Err` could mean either `Result` or `HttpResult`, qualify the
-constructor (e.g. `HttpResult.Ok(…)`) to resolve
-`karn.types.ambiguous_constructor`.
+> [!TIP]
+> When `Ok`/`Err` could mean either `Result` or `HttpResult`, qualify the
+> constructor (e.g. `HttpResult.Ok(…)`) to resolve
+> `karn.types.ambiguous_constructor`.
 
 ## Example
 

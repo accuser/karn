@@ -68,7 +68,23 @@ with `<-`. Pure code (a `commons` function) cannot perform effects, and the
 compiler enforces the separation. The result is that the effectful parts of a
 program are visible in the types, and the pure core stays pure.
 
+> [!WARNING]
+> A `commons` function is pure: it cannot perform effects or reach a capability.
+> Effectful work belongs in a context's handlers and providers, where it shows in
+> the type as `Effect[T]`.
+
 ## From source to deployment
+
+Compilation is a fixed pipeline:
+
+```mermaid
+flowchart LR
+  src["source (.karn)"] --> lex[lex] --> parse[parse] --> resolve[resolve] --> check[check] --> emit[emit] --> ts["TypeScript"] --> tsc{"tsc --strict"}
+```
+
+*The compile pipeline.* Source is lexed, parsed, name-resolved, and
+type-checked, then emitted as TypeScript; a final `tsc --strict` pass verifies
+the emitted code, so a successful build is type-correct end to end.
 
 The source layout *is* the structure: a unit's file path must match its qualified
 name, so the tree on disk mirrors the architecture. Compilation then maps that

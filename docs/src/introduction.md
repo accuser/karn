@@ -1,6 +1,6 @@
 # The Karn Book
 
-> ⚠️ **Karn is pre-1.0 (currently v0.9.4) and under active development.**
+> ⚠️ **Karn is pre-1.0 (currently v0.16) and under active development.**
 > The language changes in small, spec-first increments. This book documents
 > **what compiles today**; planned features are marked as planned rather than
 > described as if they exist. See [Versioning & roadmap](explanation/versioning-and-roadmap.md).
@@ -28,6 +28,10 @@ Or choose a path by background:
   [glossary](reference/glossary.md) to hand.
 - **Evaluating Karn?** Read [Why Karn exists](explanation/why-karn-exists.md),
   then [Karn compared to TypeScript](explanation/karn-compared-to-typescript.md).
+
+> [!NOTE]
+> Meet an unfamiliar term? The [glossary](reference/glossary.md) defines Karn's
+> load-bearing vocabulary, one line each.
 
 For a one-screen tour of how the book is laid out and how to read it, see
 [How these docs are organised](introduction/how-these-docs-are-organised.md).

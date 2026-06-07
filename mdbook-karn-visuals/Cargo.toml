@@ -1,0 +1,11 @@
+[package]
+name = "mdbook-karn-visuals"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "mdbook-karn-visuals"
+path = "src/main.rs"
+
+[dependencies]
+serde_json.workspace = true

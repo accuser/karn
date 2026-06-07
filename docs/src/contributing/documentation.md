@@ -10,13 +10,41 @@ the contributor and tooling sections.
 ```sh
 cargo build --release -p mdbook-karn-highlight   # the highlighting preprocessor
 cargo build --release -p mdbook-karn-grammar     # the {{#grammar}} include preprocessor
-cargo install mdbook mdbook-linkcheck            # one-time
+cargo build --release -p mdbook-karn-visuals     # diagrams + callouts preprocessor
+cargo install mdbook --version "=0.4.51" --locked  # pinned (linkcheck targets 0.4)
+cargo install mdbook-linkcheck --locked            # one-time
 mdbook build docs                                # html + linkcheck + highlighting
 mdbook serve docs                                # live preview
 ```
 
-`book.toml` wires in the highlighting preprocessor and link checking, so a broken
-internal link fails the build.
+`book.toml` wires in the preprocessors and link checking, so a broken internal
+link fails the build.
+
+## Diagrams and callouts
+
+These render through the in-house `mdbook-karn-visuals` preprocessor (chosen over
+external plugins to stay pinned to mdBook 0.4.51, offline, and CDN-free).
+
+**Diagrams.** Write a fenced ` ```mermaid ` block; it renders client-side via the
+vendored `theme/mermaid.min.js`. **Accessibility rule — required:** every diagram
+carries a *caption* and a *text equivalent* in the surrounding prose. No
+information may live only in a picture; a reader who cannot see the diagram must
+still get the full meaning from the text.
+
+**Callouts.** Write a GitHub-style alert blockquote. Exactly four kinds, each
+with a fixed meaning — use them for what they say, not for decoration:
+
+| Callout | Means |
+|---|---|
+| `> [!NOTE]` | an aside or clarification |
+| `> [!TIP]` | a better or faster way |
+| `> [!WARNING]` | easy to get wrong; proceed carefully |
+| `> [!DANGER]` | will break, or is forbidden |
+
+```text
+> [!WARNING]
+> Body text — ordinary Markdown, rendered normally.
+```
 
 ## Embedding a grammar production
 
@@ -113,5 +141,7 @@ Four mechanisms keep the docs honest; all run in CI.
 
 Treat docs as part of an increment's definition of done (see
 [Testing & fixtures](testing.md)): update the affected reference (regenerating
-the generated pages), add a changelog entry, and check that any touched tutorial
-or how-to still compiles under the doc-example gate.
+the generated pages), add a changelog entry, bump the version references (the
+introduction banner, `tooling/index.md`, and `explanation/versioning-and-roadmap.md`)
+when the increment changes it, and check that any touched tutorial or how-to still
+compiles under the doc-example gate.

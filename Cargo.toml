@@ -6,6 +6,7 @@ members = [
     "karn-lsp",
     "mdbook-karn-grammar",
     "mdbook-karn-highlight",
+    "mdbook-karn-visuals",
 ]
 resolver = "3"
 
