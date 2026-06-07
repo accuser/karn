@@ -111,7 +111,11 @@
   - [§7 Meaning by translation](spec/emission.md)
     - [§7.4 The runtime library](spec/runtime-library.md)
   - [§8 Compilation model](spec/compilation-model.md)
+  - [§9 Diagnostics](spec/diagnostics.md)
+  - [§10 Conformance & test corpus](spec/conformance.md)
   - [§11 Complete grammar](spec/grammar-appendix.md)
+  - [Appendix A — Planned features](spec/appendix-planned.md)
+  - [Appendix B — Version history](spec/appendix-version-history.md)
 
 ---
 

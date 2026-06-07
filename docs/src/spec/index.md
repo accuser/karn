@@ -54,10 +54,10 @@ means.
   [runtime-library contract](runtime-library.md).
 - [§8 Compilation model](compilation-model.md) — the `karn.toml` manifest, project
   layout, and the build contract.
-- §9 Diagnostics — the normative catalogue; the codes are the identifiers of the
-  §5 rules.
-- §10 Conformance & test corpus — the `karnc` fixture corpus as the conformance
-  suite.
+- [§9 Diagnostics](diagnostics.md) — the normative catalogue; the codes are the
+  identifiers of the §5 rules.
+- [§10 Conformance & test corpus](conformance.md) — the `karnc` fixture corpus as
+  the conformance suite.
 - [§11 Complete grammar](grammar-appendix.md) — the complete generated grammar.
-- Appendix A — Planned features (post-MVP, non-normative).
-- Appendix B — Version history.
+- [Appendix A — Planned features](appendix-planned.md) (post-MVP, non-normative).
+- [Appendix B — Version history](appendix-version-history.md).
