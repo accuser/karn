@@ -178,6 +178,27 @@ Four mechanisms keep the docs honest; all run in CI.
 - **Document the present.** Write what compiles today; mark planned features as
   planned.
 
+### The four voices
+
+"One mode per page" is also a rule about *voice*: the same fact should sound
+different in each mode. Here is "an agent's state must be zeroable", written four
+ways — read them as a tuning fork before you draft a page.
+
+- **Tutorial** (warm, "we", a guaranteed path): "We'll give the counter a
+  `count` field. Karn needs a starting value for a brand-new key, so every state
+  field must have a zero — `Int`'s is `0`, so we're set. Run it and watch a fresh
+  counter read `0`."
+- **How-to** (imperative, goal-first): "Keep every agent state field zeroable:
+  use a type with an implicit zero (`Int`, `Bool`, `String`, `Option[T]`), or
+  give the field an initialiser (`field: T = value`)."
+- **Reference** (neutral, terse): "Each agent `state` field must be zeroable — it
+  has an implicit zero value or an initialiser. A non-zeroable field without an
+  initialiser is rejected (`karn.agents.non_zeroable_state_field`)."
+- **Explanation** (discursive, a view): "Why insist on a zero? A fresh key has no
+  stored state, and no constructor was required first, so the agent must still
+  come into being with a defined value. Zeroability is how Karn makes 'never seen
+  before' honest instead of undefined."
+
 ## Glossary first-use linking
 
 The [glossary](../reference/glossary.md) gives each load-bearing term a stable

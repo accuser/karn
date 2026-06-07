@@ -102,6 +102,12 @@ compiler enforces it for free. That is the same bet [Karn makes
 everywhere](why-karn-exists.md): the correct way should be the structurally
 enforced way.
 
+The enforcement is not silent, either. Each refusal above arrived with a
+diagnostic naming the exact invariant — the swapped id, the unhandled `Result` —
+so the type system reads less like a wall than a teacher. That the constraints
+are [pedagogical by design](why-karn-exists.md#what-this-adds-up-to) is the bet
+underneath this one.
+
 ```mermaid
 graph TD
   base["base types: Int, String, Bool"]

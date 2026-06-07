@@ -91,5 +91,15 @@ bespoke one. Whether that trade is worth it for you depends on the work — see
 [Karn compared to TypeScript](karn-compared-to-typescript.md) for when to reach
 for it.
 
+Underneath the three bets is a quieter principle: the constraints are
+**pedagogical by design**. Karn makes the right shape the path of least
+resistance — the expressible program tends to be the correct one — and when you
+do reach for a shape it will not allow, it does not merely fail. It declines the
+program and names the invariant you broke, as the refusals above (and on the
+[type-system](type-system-philosophy.md) and [agent](the-agent-model.md) pages)
+show: the diagnostic is the lesson, delivered at the moment it is most useful.
+Karn is a service-tier language, not a teaching tool — but a language that
+explains every refusal is one you come to understand *as you use it*.
+
 If you have not yet, the fastest way to get the feel of these ideas is to build
 something: start with [Tutorial 1](../tutorials/01-first-program.md).
