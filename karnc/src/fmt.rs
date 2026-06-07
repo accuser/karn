@@ -1,7 +1,7 @@
 //! Karn source formatter.
 //!
 //! Re-parses the source into an AST and re-prints it in canonical form per
-//! the style rules in `karn-lsp-spec.md` §3.5:
+//! the style rules in `design/karn-lsp-spec.md` §3.5:
 //!
 //! - Tabs by default (one tab per nesting level).
 //! - K&R brace style: opening brace on the same line as the construct header.
@@ -21,7 +21,7 @@
 //! line as the node's last token. Comments inside expression sub-trees
 //! are not yet attached to individual operands; they are folded into the
 //! enclosing statement's leading trivia (or dropped if no such enclosing
-//! statement exists). See `karn-lsp-spec.md` §3.5 for the canonical
+//! statement exists). See `design/karn-lsp-spec.md` §3.5 for the canonical
 //! comment-placement rules.
 
 use crate::ast::*;
