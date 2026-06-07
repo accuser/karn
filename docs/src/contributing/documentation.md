@@ -230,15 +230,32 @@ productions and `{{#grammar-semantics}}` diagnostics just like the reference (th
 rendered output is shared from one source, so there is no drift), and every
 example is covered by the doc-example gate. It adds no preprocessor of its own.
 
-The spec **grows by phase**: chapters are added to `SUMMARY.md` only as they are
-written. Unwritten chapters live as plain text in the outline on the spec's index
-page — never as stub pages or "to be written" navigation entries.
+**Keeping the spec current.** A language or grammar increment updates the
+**affected spec chapters** — it does *not* spawn a new `karn-mvp-grammar-v0.X.md`
+file. That per-increment-file practice is **retired**; the spec, with the
+[changelog](../reference/changelog.md), is now the record (Appendix B frames the
+old instalments as superseded history). Much of the spec stays current for free:
+the `{{#grammar}}` productions (§3/§4/§11) and the `{{#grammar-semantics}}`
+diagnostic links (§5) re-render from the grammar and the registry, so syntax and
+the diagnostic catalogue never drift. The **prose** is hand-maintained — when
+behaviour changes, review §5 (static semantics), §6 (the type system), §7 / §7.4
+(emission and the runtime library), §8 (compilation), §10 (conformance), and
+Appendix B (version history).
+
+**Verify against the compiler.** Specification and reference claims are checked
+against the **actual compiler** — the emitter, the checker, and the fixtures —
+never against the older design documents. Three are **not normative** and have
+drifted: `karn-design-notes.md` (rationale and history; still refers to a Go
+compiler — Karn's compiler is Rust), `karn-type-system.md` (aspirational v1), and
+the retired `karn-runtime-spec.md`. Cite them for *intent* only, never for current
+behaviour.
 
 ## Docs ship with the feature
 
 Treat docs as part of an increment's definition of done (see
 [Testing & fixtures](testing.md)): update the affected reference (regenerating
-the generated pages), add a changelog entry, bump the version references (the
-introduction banner, `tooling/index.md`, and `explanation/versioning-and-roadmap.md`)
-when the increment changes it, and check that any touched tutorial or how-to still
-compiles under the doc-example gate.
+the generated pages), update the affected [specification](../spec/index.md)
+chapters (per *Keeping the spec current* above), add a changelog entry, bump the
+version references (the introduction banner, `tooling/index.md`, and
+`explanation/versioning-and-roadmap.md`) when the increment changes it, and check
+that any touched tutorial or how-to still compiles under the doc-example gate.
