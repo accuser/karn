@@ -576,6 +576,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "karn-grammar"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "karn-lsp"
 version = "0.1.0"
 dependencies = [
@@ -598,9 +605,9 @@ dependencies = [
  "ariadne",
  "clap",
  "insta",
+ "karn-grammar",
  "logos",
  "regex",
- "serde_json",
 ]
 
 [[package]]
@@ -702,6 +709,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1525a2a28c7f4fa0fc98bb91ae755d1e2d1505079e05539e35bc876b5d65ae9"
 dependencies = [
  "regex-automata",
+]
+
+[[package]]
+name = "mdbook-karn-grammar"
+version = "0.1.0"
+dependencies = [
+ "karn-grammar",
+ "serde_json",
 ]
 
 [[package]]

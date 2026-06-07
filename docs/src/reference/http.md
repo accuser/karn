@@ -1,6 +1,9 @@
 # HTTP
 
-HTTP handlers are declared in a `service` inside a `context`.
+HTTP handlers are declared in a `service` inside a `context`. The grammar
+production, generated from the parser:
+
+{{#grammar http_handler}}
 
 ## Handler form
 

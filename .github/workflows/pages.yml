@@ -31,9 +31,10 @@ jobs:
         run: |
           cargo install mdbook --version "=0.4.51" --locked
           cargo install mdbook-linkcheck --locked
-      # book.toml references ../target/release/mdbook-karn-highlight.
-      - name: Build the Karn highlighting preprocessor
-        run: cargo build --release -p mdbook-karn-highlight
+      # book.toml references ../target/release/mdbook-karn-highlight and
+      # ../target/release/mdbook-karn-grammar.
+      - name: Build the Karn mdBook preprocessors
+        run: cargo build --release -p mdbook-karn-highlight -p mdbook-karn-grammar
       # Builds the html backend (with highlighting) and the linkcheck backend;
       # a broken internal link fails the build, so broken docs never deploy.
       # Run from inside docs/ so the preprocessor `command` in book.toml

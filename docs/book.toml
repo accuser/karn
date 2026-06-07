@@ -11,6 +11,16 @@ src = "src"
 command = "../target/release/mdbook-karn-highlight"
 renderers = ["html"]
 
+# Embed a single grammar production with `{{#grammar <rule>}}`, rendered from the
+# grammar so it cannot drift. Build first: `cargo build --release -p
+# mdbook-karn-grammar`. `before` is belt-and-braces; we emit `ebnf`, so ordering
+# against the highlighter doesn't actually matter.
+[preprocessor.karn-grammar]
+command = "../target/release/mdbook-karn-grammar"
+renderers = ["html"]
+grammar = "../tree-sitter-karn/src/grammar.json"
+before = ["karn-highlight"]
+
 [output.html]
 default-theme = "rust"
 preferred-dark-theme = "ayu"

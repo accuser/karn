@@ -9,6 +9,7 @@ the contributor and tooling sections.
 
 ```sh
 cargo build --release -p mdbook-karn-highlight   # the highlighting preprocessor
+cargo build --release -p mdbook-karn-grammar     # the {{#grammar}} include preprocessor
 cargo install mdbook mdbook-linkcheck            # one-time
 mdbook build docs                                # html + linkcheck + highlighting
 mdbook serve docs                                # live preview
@@ -16,6 +17,21 @@ mdbook serve docs                                # live preview
 
 `book.toml` wires in the highlighting preprocessor and link checking, so a broken
 internal link fails the build.
+
+## Embedding a grammar production
+
+A reference page can embed one grammar production by name. Put a line whose only
+content is the directive:
+
+```text
+{{#grammar http_handler}}
+```
+
+The `mdbook-karn-grammar` preprocessor replaces it with an `ebnf` block holding
+that production, rendered from `tree-sitter-karn/src/grammar.json` (the same
+source as the [grammar appendix](../reference/grammar.md)) so it cannot drift
+from the parser. The rendered production is generated — never hand-edit it. An
+unknown rule name fails the build, so a typo cannot silently vanish.
 
 ## The guardrails
 
