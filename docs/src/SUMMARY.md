@@ -106,6 +106,8 @@
   - [§2 Notation & conventions](spec/conventions.md)
   - [§3 Lexical grammar](spec/lexical-grammar.md)
   - [§4 Syntactic grammar](spec/syntactic-grammar.md)
+  - [§5 Static semantics](spec/static-semantics.md)
+  - [§6 The type system](spec/type-system.md)
   - [§11 Complete grammar](spec/grammar-appendix.md)
 
 ---

@@ -1,0 +1,209 @@
+# §5 Static semantics
+
+A program that parses ([§3](lexical-grammar.md), [§4](syntactic-grammar.md)) is
+not yet known to be well-formed. This chapter states the **well-formedness
+rules**: the conditions a program MUST satisfy beyond parsing, each tied to the
+`karn.*` diagnostic a conforming implementation emits when the rule is violated
+([§1.3](scope.md)). A program is well-formed exactly when it provokes no such
+diagnostic.
+
+> [!NOTE]
+> Lexical and grammatical errors — the `karn.lex.*` and `karn.parse.*` codes —
+> are *syntactic*: they report a text that does not match the grammar, and are
+> governed by §3 and §4. This chapter covers only **post-syntactic**
+> well-formedness. This note is informative.
+
+The rules are organised by theme. Each theme states its load-bearing rules and
+cites the governing codes; the **exhaustive** code-by-code catalogue is the
+[diagnostic index](../reference/diagnostics.md) (and §9). Where a theme maps to a
+single construct, its full set of governing diagnostics is surfaced inline with
+`{{#grammar-semantics}}`.
+
+## §5.1 Name resolution & visibility
+
+Every referenced name MUST resolve to a declaration in scope
+(`karn.resolve.unknown_name`, `karn.resolve.unknown_type`,
+`karn.resolve.unknown_function`, `karn.resolve.unknown_field`). A name used where
+a value is expected MUST denote a value, not a type (`karn.resolve.type_in_expr`,
+`karn.resolve.type_as_function`); a function MUST be called, not referenced bare
+(`karn.resolve.fn_without_call`).
+
+Within a scope, names MUST be unique: duplicate types, functions, methods,
+services, capabilities, providers, agents, record fields, variants, and
+parameters are each rejected (the `karn.resolve.duplicate_*` codes). A `let`
+binding MUST NOT shadow a function or a type (`karn.resolve.let_shadows_fn`,
+`karn.resolve.let_shadows_type`).
+
+A `commons` is imported with `uses`, which MUST name an existing `commons`, not a
+context, and MUST NOT be self-referential or introduce a colliding name
+(`karn.uses.unknown_commons`, `karn.uses.target_is_context`,
+`karn.uses.self_reference`, `karn.uses.name_conflict`). The visibility of types
+across context boundaries is governed by `exports` and `consumes`
+([§5.8](#58-boundaries--cross-context)).
+
+## §5.2 Well-typedness
+
+Every expression MUST have the type its position requires. A function or method
+argument MUST match the parameter type (`karn.types.argument_mismatch`), and a
+call MUST supply the right number of arguments (`karn.resolve.arity_mismatch`,
+`karn.types.method_arity`). A returned value MUST match the declared return type
+(`karn.types.return_mismatch`); a `let` value MUST match any annotation
+(`karn.types.let_annotation_mismatch`); a record field MUST be given a value of
+its type (`karn.types.field_value_mismatch`), and every required field MUST be
+supplied (`karn.resolve.missing_field`).
+
+An `if` condition MUST be a `Bool` and both branches MUST share a type
+(`karn.types.if_non_bool_cond`, `karn.types.if_branch_mismatch`). The payloads of
+`Ok`, `Err`, `Some`, and the like MUST match the expected component type (the
+`karn.types.*_value_mismatch` codes). Where a constructor is ambiguous between
+`Result` and `HttpResult`, it MUST be qualified (`karn.types.ambiguous_constructor`).
+
+{{#grammar-semantics if_expr}}
+
+## §5.3 Refinement & admission
+
+A refinement's predicates MUST apply to the type's base — a string predicate on
+an `Int` is rejected (`karn.types.predicate_base_mismatch`) — and MUST be
+internally consistent: an `InRange` MUST NOT be inverted
+(`karn.types.inverted_range`), a length MUST NOT be negative
+(`karn.types.negative_length`), a `Matches` regex MUST be valid
+(`karn.types.invalid_regex`), and the predicates together MUST admit at least one
+value (`karn.types.empty_refinement`).
+
+A **literal** written where a refined type is expected is admitted at compile
+time ([§6.4](type-system.md#64-admission--construction)) in these positions:
+return (block tail), a `let` with a type annotation, an `Ok`/`Some`/`Err`
+payload, and a refined-typed call argument. The literal MUST satisfy the
+predicate, or it is rejected (`karn.refine.literal_violates`); an admitted
+literal MUST be a compile-time literal, not an expression or identifier. **Opaque
+types are excluded** from admission and MUST be constructed through `.of`,
+`.unsafe`, or `.raw`, never record syntax (`karn.resolve.opaque_record_construction`,
+`karn.types.opaque_record_construction`); `.raw` MUST be used only within the
+defining `commons` (`karn.types.opaque_raw_outside`) and `.unsafe` only within
+the defining context (`karn.types.opaque_unsafe_outside`).
+
+{{#grammar-semantics refined_type}}
+
+## §5.4 Agents & state
+
+An `agent` MUST be declared inside a context (`karn.agent.outside_context`) and
+MUST NOT declare `on http`, `on cron`, or `on queue` handlers (the
+`karn.parse.*_in_agent` codes). Each agent handler's return type MUST be an
+`Effect` (`karn.agent.return_not_effect`).
+
+Every `state` field MUST have a defined initial value: either an **explicit
+initialiser** — a compile-time constant of the field's type, not referencing
+`self`, parameters, or capabilities (`karn.agents.bad_state_initialiser`) — or an
+**implicit zero** (`Int` → `0`, `Bool` → `false`, `String` → `""`, `Option[T]` →
+`None`, a record of zeroable fields). A field with neither is rejected
+(`karn.agents.non_zeroable_state_field`).
+
+A `commit` MUST occur only in an agent handler (`karn.commit.outside_agent`), its
+value MUST match the agent's state type (`karn.commit.wrong_state_type`), and at
+most one `commit` may be reachable on any execution path
+(`karn.commit.two_reachable_commits`). Constructing or calling an agent MUST use
+the right key arity and type and a declared handler (`karn.agent.construction_arity`,
+`karn.agent.key_mismatch`, `karn.agent.handler_arity`, `karn.agent.handler_not_found`).
+
+{{#grammar-semantics state_decl}}
+
+## §5.5 Effects, capabilities & providers
+
+Karn separates **pure** from **effectful** code. An `<-` bind MUST occur in an
+effectful position and MUST be applied to an `Effect`
+(`karn.effect.bind_in_pure_context`, `karn.effect.bind_on_non_effect`); a
+capability call or a cross-context call MUST NOT occur in a pure context
+(`karn.effect.capability_in_pure_context`, `karn.effect.cross_context_in_pure_context`).
+
+A capability MUST be declared inside a context
+(`karn.capability.outside_context`); a provider MUST implement exactly its
+capability's operations — no missing, no extra, signatures matching
+(`karn.provider.missing_operation`, `karn.provider.extra_operation`,
+`karn.provider.signature_mismatch`) — and MUST name an existing capability
+(`karn.provider.unknown_capability`). A handler or provider MUST declare every
+capability it uses with `given`, and `given` MUST name a real capability; a call
+to an undeclared capability is rejected and an unused one warned
+(`karn.given.unknown_capability`, `karn.given.undeclared_capability`,
+`karn.given.unused_capability`). Providers MUST NOT form a dependency cycle
+through `given` (`karn.provider.dependency_cycle`).
+
+{{#grammar-semantics given_clause}}
+
+## §5.6 Pattern matching
+
+A `match` MUST be **exhaustive** — every variant of the scrutinised sum,
+`Result`, or `Option` covered (`karn.types.non_exhaustive_match`) — and its
+scrutinee MUST be a sum type (`karn.types.match_non_sum_discriminant`). Its arms
+MUST share a result type (`karn.types.match_arm_mismatch`), MUST NOT repeat a
+variant (`karn.types.duplicate_variant_arm`), and MUST NOT be unreachable
+(`karn.types.unreachable_arm`).
+
+A pattern MUST name a real variant (`karn.types.unknown_variant_in_pattern`) and
+real payload fields (`karn.types.unknown_pattern_field`), bind the right number
+of fields (`karn.types.pattern_arity`), and MUST NOT mix named and positional
+bindings (`karn.types.mixed_pattern_bindings`). An `is` check MUST be applied to a
+value of the matching base or sum (`karn.types.is_base_mismatch`,
+`karn.types.is_non_sum`, `karn.types.is_unknown_variant`).
+
+{{#grammar-semantics match_expr}}
+
+## §5.7 Handlers
+
+A `service` MUST be declared inside a context (`karn.service.outside_context`) and
+every service handler MUST return an `Effect` (`karn.service.return_not_effect`).
+
+An `on http` handler MUST return `Effect[HttpResult[T]]`
+(`karn.http.return_not_effect_http_result`); its route MUST be well-formed and
+unique, MUST NOT use the reserved `/_karn/` prefix
+(`karn.http.invalid_path`, `karn.http.duplicate_route`, `karn.http.reserved_prefix`),
+and each `:name` segment MUST bind to a string-constructible parameter
+(`karn.http.unbound_path_param`, `karn.http.path_param_not_stringy`,
+`karn.http.extra_param`); `GET` and `DELETE` MUST NOT take a `body`
+(`karn.http.body_on_get_or_delete`). An `on cron` handler MUST take at most one
+`Int` parameter, a valid five-field schedule, and return `Effect[Result[(), E]]`
+(the `karn.cron.*` codes); an `on queue` handler MUST take exactly one `message`
+parameter, a non-empty queue name, and the same return shape (the `karn.queue.*`
+codes).
+
+{{#grammar-semantics http_handler}}
+
+## §5.8 Boundaries & cross-context
+
+`consumes` MUST appear only in a context, MUST name an existing context (not a
+`commons` or itself), and MUST NOT produce colliding names or aliases (the
+`karn.consumes.*` codes). Calling another context's service requires a `consumes`
+declaration (`karn.resolve.unconsumed_context`), and contexts MUST NOT form a
+`consumes` cycle (`karn.context.consumes_cycle`).
+
+`exports` MUST name declared types or capabilities, MUST NOT export a name twice
+or with conflicting visibility, and an exported capability MUST have a provider
+(the `karn.exports.*` codes). A value crossing a boundary MUST be structurally
+compatible with the receiving side ([§6.5](type-system.md#65-type-compatibility--boundaries),
+`karn.boundary.structural_mismatch`); a context-owned type MUST NOT be constructed
+or an opaque export inspected from outside (`karn.context.external_construction`,
+`karn.context.opaque_inspection`).
+
+An integration test MUST wire at least two distinct, declared contexts, MUST NOT
+duplicate a participant or suite name, and MUST wire every consumed dependency
+(the `karn.integration.*` codes).
+
+{{#grammar-semantics consumes_decl}}
+
+## §5.9 Testing constructs
+
+An `assert` MUST occur only in a test case body and MUST be given a `Bool`
+(`karn.assert.outside_test`, `karn.assert.non_bool`). A `test` block MUST target
+an existing unit and MUST NOT duplicate a case description
+(`karn.test.unknown_target`, `karn.test.duplicate_case_name`).
+
+`Mock[T]` MUST occur only in a test body (`karn.mock.outside_test`), name a
+resolvable type (`karn.mock.unknown_type`), and receive pins that are
+compile-time literals of the right arity satisfying the type
+(`karn.mock.pin_not_literal`, `karn.mock.arity`, `karn.mock.literal_violates`); a
+type that cannot be fabricated MUST be pinned (`karn.mock.needs_pin`,
+`karn.mock.unsupported_kind`). A `mocks` block MUST name an in-scope capability,
+match its signature, and MUST NOT be used in an integration test or a commons
+test (`karn.mock.unknown_target`, `karn.mock.signature_mismatch`,
+`karn.integration.mock_in_integration`, `karn.mock.in_commons_test`).
+
+{{#grammar-semantics mock_expr}}

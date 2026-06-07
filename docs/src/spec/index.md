@@ -46,9 +46,10 @@ means.
   comments, doc-blocks, trivia.
 - [§4 Syntactic grammar](syntactic-grammar.md) — the productions, organised by
   construct.
-- §5 Static semantics — well-formedness per construct, woven to diagnostics.
-- §6 The type system — base, refined, opaque, sum, record, and enum types;
-  `Result`, `Option`, `Effect`; refinement and admission.
+- [§5 Static semantics](static-semantics.md) — well-formedness per construct,
+  woven to diagnostics.
+- [§6 The type system](type-system.md) — base, refined, opaque, sum, record, and
+  enum types; `Result`, `Option`, `Effect`; refinement and admission.
 - §7 Meaning by translation — what each construct emits, and the runtime-library
   contract.
 - §8 Compilation model — the `karn.toml` manifest, project layout, and the build
