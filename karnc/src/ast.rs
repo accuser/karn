@@ -146,6 +146,9 @@ pub enum SourceUnit {
     Commons(Commons),
     Context(Context),
     Test(TestDecl),
+    /// v0.16: a `test integration "name" { wires … }` multi-Worker integration
+    /// test. Its `name()` is synthesised from the suite name.
+    Integration(IntegrationDecl),
 }
 
 impl SourceUnit {
@@ -154,6 +157,7 @@ impl SourceUnit {
             SourceUnit::Commons(c) => &c.name,
             SourceUnit::Context(c) => &c.name,
             SourceUnit::Test(t) => &t.target,
+            SourceUnit::Integration(i) => &i.name,
         }
     }
 
@@ -162,6 +166,7 @@ impl SourceUnit {
             SourceUnit::Commons(c) => c.span,
             SourceUnit::Context(c) => c.span,
             SourceUnit::Test(t) => t.span,
+            SourceUnit::Integration(i) => i.span,
         }
     }
 
@@ -170,6 +175,7 @@ impl SourceUnit {
             SourceUnit::Commons(_) => "commons",
             SourceUnit::Context(_) => "context",
             SourceUnit::Test(_) => "test",
+            SourceUnit::Integration(_) => "integration test",
         }
     }
 }
@@ -235,6 +241,33 @@ pub struct TestCase {
     pub documentation: Option<String>,
     pub span: Span,
     pub trivia: Trivia,
+}
+
+/// A `test integration "name" { wires C1, C2, … ; cases }` declaration
+/// (v0.16 §3.1). Unlike a unit test, an integration test names a *set* of
+/// participating contexts (`wires`), stands each up as its own Worker, and
+/// exercises a flow across the real Worker boundary. It carries no `mocks`.
+#[derive(Debug, Clone)]
+pub struct IntegrationDecl {
+    /// The suite name, taken from the string literal after `integration`.
+    pub suite: String,
+    /// The span of the suite-name literal — used in diagnostics and reports.
+    pub suite_span: Span,
+    /// A synthesised qualified name (`integration <suite>`), so the unit shares
+    /// the `SourceUnit::name()` shape. Not user-written.
+    pub name: QualifiedName,
+    /// The participating contexts, in declaration order (≥ 2, validated later).
+    pub participants: Vec<QualifiedName>,
+    /// `uses` clauses bringing commons into the case bodies.
+    pub uses: Vec<UsesDecl>,
+    /// The individual test cases.
+    pub cases: Vec<TestCase>,
+    /// Surface form: brace-delimited body or headerless fragment.
+    pub form: CommonsForm,
+    pub documentation: Option<String>,
+    pub span: Span,
+    pub trivia: Trivia,
+    pub trailing_comments: Vec<String>,
 }
 
 /// A capability reference in a `given` clause (v0.15 §3.2). A bare name is a

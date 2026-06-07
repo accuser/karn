@@ -44,6 +44,7 @@
     - [Process a queued message](how-to/queue/handle-queue-message.md)
   - [Testing](how-to/testing/index.md)
     - [Write tests and mock collaborators](how-to/testing/write-tests.md)
+    - [Test a flow across Workers](how-to/testing/integration.md)
   - [Projects](how-to/projects/index.md)
     - [Lay out a project](how-to/projects/layout.md)
     - [Target Cloudflare Workers](how-to/projects/cloudflare-workers.md)
@@ -60,6 +61,7 @@
     - [`karn.mock.*` errors](how-to/troubleshooting/mock-errors.md)
     - [`karn.cron.*` errors](how-to/troubleshooting/cron-errors.md)
     - [`karn.queue.*` errors](how-to/troubleshooting/queue-errors.md)
+    - [`karn.integration.*` errors](how-to/troubleshooting/integration-errors.md)
 
 # Reference
 

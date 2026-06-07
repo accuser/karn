@@ -80,7 +80,10 @@ fn gather_md(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 fn first_line(body: &str) -> &str {
-    body.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("")
+    body.lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty())
+        .unwrap_or("")
 }
 
 /// Compile a `context …` block as a one-file project under a unique temp dir.
@@ -131,12 +134,14 @@ fn every_doc_example_compiles() {
         let first = first_line(&b.body);
 
         let result: Result<(), String> = if first.starts_with("commons ") {
-            karnc::compile(&b.body, &b.file).map(|_| ()).map_err(|errs| {
-                errs.iter()
-                    .map(|e| format!("{}: {}", e.category, e.message))
-                    .collect::<Vec<_>>()
-                    .join("; ")
-            })
+            karnc::compile(&b.body, &b.file)
+                .map(|_| ())
+                .map_err(|errs| {
+                    errs.iter()
+                        .map(|e| format!("{}: {}", e.category, e.message))
+                        .collect::<Vec<_>>()
+                        .join("; ")
+                })
         } else if first.starts_with("context ") {
             compile_context(&b.body, idx)
         } else {

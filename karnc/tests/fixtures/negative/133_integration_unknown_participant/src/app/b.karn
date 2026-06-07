@@ -1,0 +1,4 @@
+context app.b
+service pong {
+  on call() -> Effect[Int] { 2 }
+}

@@ -1264,6 +1264,7 @@ fn write_header(out: &mut String, commons: &TypedCommons, ctx: &EmitProjectCtx) 
         UnitKind::Commons => "commons",
         UnitKind::Context => "context",
         UnitKind::Test => "test",
+        UnitKind::Integration => "integration test",
     };
     writeln!(out, "// {kind} {}", commons.commons.name.joined()).unwrap();
     writeln!(out).unwrap();
@@ -2971,6 +2972,34 @@ pub fn lower_test_case_body(
     }
     // Evaluate the tail expression but discard its value; assertions inside
     // it still take effect via thrown AssertionErrors.
+    let mut stmts = Vec::new();
+    let tail = lower_expr(&block.tail, &mut stmts, &mut cx);
+    for s in &stmts {
+        write_line(&mut out, 0, s);
+    }
+    if !tail.is_empty() && tail != "undefined" {
+        write_line(&mut out, 0, &format!("void ({tail});"));
+    }
+    out
+}
+
+/// v0.16: lower an integration test case body. Like [`lower_test_case_body`],
+/// but in **workers** mode and from a synthetic harness root: entry calls
+/// (`ctx.service(args)`) are cross-context calls that lower to `callService(
+/// deps.env.<BINDING>, …)` over the real wire. The harness root declares no
+/// local services/agents, so those scoped sets stay empty; `cross_context`
+/// carries every participant's service surface.
+pub fn lower_integration_case_body(
+    block: &Block,
+    typed: &mut TypedCommons,
+    cross_context: &crate::resolver::CrossContextInfo,
+) -> String {
+    let mut out = String::new();
+    let mut cx = LowerCtx::new(typed, cross_context);
+    cx.target = BuildTarget::Workers;
+    for stmt in &block.statements {
+        emit_statement(&mut out, stmt, &mut cx, 0);
+    }
     let mut stmts = Vec::new();
     let tail = lower_expr(&block.tail, &mut stmts, &mut cx);
     for s in &stmts {

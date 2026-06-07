@@ -64,6 +64,7 @@ fn run_test(input: PathBuf, output: Option<PathBuf>, no_run: bool) -> ExitCode {
     };
     // Write every compiled file to disk under the output root.
     let mut wrote_any_test = false;
+    let mut has_integration = false;
     for file in &out.files {
         let target = output_root.join(&file.output_path);
         if let Some(parent) = target.parent() {
@@ -73,10 +74,51 @@ fn run_test(input: PathBuf, output: Option<PathBuf>, no_run: bool) -> ExitCode {
             eprintln!("karnc test: could not write `{}`: {e}", target.display());
             return ExitCode::FAILURE;
         }
-        if file.output_path.to_string_lossy().starts_with("tests/") {
+        let rel = file.output_path.to_string_lossy();
+        if rel.starts_with("tests/") {
             wrote_any_test = true;
         }
+        if rel.starts_with("tests/integration_") {
+            has_integration = true;
+        }
     }
+
+    // v0.16: integration tests stand their participants up as real Workers, so
+    // they import the workers-mode output (`workers/**`) and the serialise/
+    // deserialise helpers the workers commons emit. The bundle compile above
+    // does not produce those, so run a second compile in workers mode and
+    // overlay everything except the `tests/` tree (whose unit modules import
+    // the bundle output). The workers commons are a strict superset of the
+    // bundle ones, so overwriting them is safe for the bundle code too.
+    if has_integration {
+        let workers_out = if split_mode {
+            let paths = karnc::read_project_paths(&input);
+            karnc::compile_project_with_split_paths(&input, karnc::BuildTarget::Workers, &paths)
+        } else {
+            karnc::compile_project_with_target(&input, karnc::BuildTarget::Workers)
+        };
+        let workers_out = match workers_out {
+            Ok(o) => o,
+            Err(errors) => {
+                karnc::print_project_errors(&input, &errors);
+                return ExitCode::FAILURE;
+            }
+        };
+        for file in &workers_out.files {
+            if file.output_path.to_string_lossy().starts_with("tests/") {
+                continue;
+            }
+            let target = output_root.join(&file.output_path);
+            if let Some(parent) = target.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            if let Err(e) = std::fs::write(&target, &file.typescript) {
+                eprintln!("karnc test: could not write `{}`: {e}", target.display());
+                return ExitCode::FAILURE;
+            }
+        }
+    }
+
     if !wrote_any_test {
         eprintln!(
             "karnc test: no test declarations found in `{}`",

@@ -87,9 +87,7 @@ fn render_markdown(grammar_json: &str) -> String {
          Source: tree-sitter-karn/src/grammar.json, via karnc/tests/grammar_reference.rs.\n     \
          Regenerate with: KARN_BLESS=1 cargo test -p karnc --test grammar_reference -->\n\n",
     );
-    out.push_str(
-        "The complete Karn grammar, generated from the `tree-sitter-karn` grammar.\n\n",
-    );
+    out.push_str("The complete Karn grammar, generated from the `tree-sitter-karn` grammar.\n\n");
     out.push_str("**Notation.** ");
     out.push_str(
         "`\"x\"` a literal token · `/x/` a regular expression · `( … )?` optional · \
@@ -128,15 +126,14 @@ fn render_markdown(grammar_json: &str) -> String {
 }
 
 fn grammar_json() -> String {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../tree-sitter-karn/src/grammar.json");
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tree-sitter-karn/src/grammar.json");
     fs::read_to_string(path).expect("read grammar.json")
 }
 
 #[test]
 fn generated_grammar_page_is_up_to_date() {
-    let page = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../docs/src/reference/grammar.md");
+    let page = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../docs/src/reference/grammar.md");
     let rendered = render_markdown(&grammar_json());
 
     if std::env::var_os("KARN_BLESS").is_some() {

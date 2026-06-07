@@ -1,0 +1,4 @@
+context app.a
+service ping {
+  on call() -> Effect[Int] { 1 }
+}

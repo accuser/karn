@@ -9,12 +9,15 @@ The complete Karn grammar, generated from the `tree-sitter-karn` grammar.
 **Notation.** `"x"` a literal token · `/x/` a regular expression · `( … )?` optional · `( … )*` zero or more · `( … )+` one or more · `a | b` choice · `ε` empty. Rule names beginning with `_` are internal helper rules (inlined into the syntax tree). `doc_block` is an external token — a `--- … ---` documentation block.
 
 ```ebnf
-source_file ::= (commons_decl | context_decl | test_decl)+ | _item_fragment+ | _expr_fragment
+source_file ::= (commons_decl | context_decl | integration_decl | test_decl)+ | _item_fragment+ | _expr_fragment
 _item_fragment ::= _context_body_item | handler | state_decl | key_decl
 _expr_fragment ::= _statement+ _expression? | _expression
 commons_decl ::= "commons" qualified_name ("{" _commons_body_item* "}" | _commons_body_item*)
 context_decl ::= "context" qualified_name ("{" _context_body_item* "}" | _context_body_item*)
 test_decl ::= "test" qualified_name ("{" _test_body_item* "}" | _test_body_item*)
+integration_decl ::= "test" "integration" string_literal ("{" wires_decl _integration_body_item* "}" | wires_decl _integration_body_item*)
+wires_decl ::= "wires" qualified_name ("," qualified_name)*
+_integration_body_item ::= uses_decl | test_case
 qualified_name ::= identifier ("." identifier)*
 _commons_body_item ::= uses_decl | type_decl | fn_decl | capability_decl | provider_decl | service_decl | agent_decl
 _context_body_item ::= uses_decl | consumes_decl | exports_decl | type_decl | fn_decl | capability_decl | provider_decl | service_decl | agent_decl

@@ -1,0 +1,4 @@
+context app.bystander
+service idle {
+  on call() -> Effect[Int] { 0 }
+}

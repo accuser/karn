@@ -2079,6 +2079,40 @@
     }
   },
   {
+    "type": "integration_decl",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "test_case",
+          "named": true
+        },
+        {
+          "type": "uses_decl",
+          "named": true
+        },
+        {
+          "type": "wires_decl",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "is_expr",
     "named": true,
     "fields": {
@@ -4507,6 +4541,10 @@
           "named": true
         },
         {
+          "type": "integration_decl",
+          "named": true
+        },
+        {
           "type": "key_decl",
           "named": true
         },
@@ -4937,6 +4975,22 @@
     "fields": {}
   },
   {
+    "type": "wires_decl",
+    "named": true,
+    "fields": {
+      "participant": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "qualified_name",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "!",
     "named": false
   },
@@ -5221,6 +5275,10 @@
     "named": false
   },
   {
+    "type": "integration",
+    "named": false
+  },
+  {
     "type": "is",
     "named": false
   },
@@ -5315,6 +5373,10 @@
   {
     "type": "wildcard",
     "named": true
+  },
+  {
+    "type": "wires",
+    "named": false
   },
   {
     "type": "{",

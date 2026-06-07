@@ -6,7 +6,7 @@
 
 Every reserved keyword, with a one-line description. Reserved words cannot be used as identifiers.
 
-There are **48** reserved keywords.
+There are **49** reserved keywords.
 
 | Keyword | Meaning |
 |---|---|
@@ -58,3 +58,4 @@ There are **48** reserved keywords.
 | `type` | Declare a type: alias, record, sum, opaque, or refined. |
 | `uses` | Bring a commons into scope. |
 | `where` | Attach refinement predicates to a base type. |
+| `wires` | List the contexts a `test integration` stands up as Workers. |

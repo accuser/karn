@@ -118,6 +118,16 @@ pub fn parse(tokens: &[Token], source: &str) -> Result<Commons, Vec<CompileError
                 "tests must be compiled as part of a project — pass the source directory, e.g. `karnc compile --target bundle --output out src`",
             ),
         ]),
+        SourceUnit::Integration(i) => Err(vec![
+            CompileError::new(
+                "karn.parse.unexpected_test",
+                i.span,
+                "expected a `commons` declaration but found an integration test",
+            )
+            .with_note(
+                "tests must be compiled as part of a project — pass the source directory, e.g. `karnc compile --target bundle --output out src`",
+            ),
+        ]),
     }
 }
 
@@ -485,8 +495,23 @@ impl<'a> Parser<'a> {
                 Ok(SourceUnit::Context(c))
             }
             Some(TokenKind::Test) => {
+                // v0.16: `test integration "name" { … }` is the integration-test
+                // kind. `integration` is contextual — it's an ordinary identifier
+                // everywhere except directly after `test` and before a string
+                // literal (the suite name). Anything else is a v0.7 unit test.
+                let next = self.tokens.get(self.pos + 1);
+                let after = self.tokens.get(self.pos + 2).map(|t| t.kind);
+                let is_integration = matches!(next, Some(t)
+                    if t.kind == TokenKind::Ident
+                        && self.slice(t.span) == "integration")
+                    && after == Some(TokenKind::StrLit);
                 let start = self.expect(TokenKind::Test, "to start the test declaration")?;
                 let doc = self.finalize_doc(leading_doc, start.span);
+                if is_integration {
+                    let mut i = self.parse_integration(start.span, doc)?;
+                    i.trivia = header_trivia;
+                    return Ok(SourceUnit::Integration(i));
+                }
                 let name = self.parse_qualified_name()?;
                 let mut t = match self.peek_kind() {
                     Some(TokenKind::LBrace) => self.parse_test_brace(start.span, name, doc)?,
@@ -1159,6 +1184,197 @@ impl<'a> Parser<'a> {
             trivia: Trivia::default(),
             trailing_comments,
         })
+    }
+
+    /// Parse a `test integration "name"` declaration (the leading `test` has
+    /// already been consumed; `start` is its span). Handles both the brace form
+    /// (`{ wires …; cases }`) and the headerless fragment form. The `integration`
+    /// contextual keyword and the suite-name literal are consumed here.
+    fn parse_integration(
+        &mut self,
+        start: Span,
+        documentation: Option<String>,
+    ) -> Result<IntegrationDecl, CompileError> {
+        // The contextual `integration` keyword (an Ident, validated by the caller).
+        let kw = self.expect(TokenKind::Ident, "the contextual keyword `integration`")?;
+        debug_assert_eq!(self.slice(kw.span), "integration");
+        let name_tok = self.expect(TokenKind::StrLit, "as the integration suite name")?;
+        let suite = parse_string_literal(self.slice(name_tok.span), name_tok.span)?;
+        let synth_name = QualifiedName {
+            parts: vec![Ident {
+                name: format!("integration {suite}"),
+                span: name_tok.span,
+            }],
+            span: name_tok.span,
+        };
+
+        let brace = self.peek_kind() == Some(TokenKind::LBrace);
+        if brace {
+            self.bump();
+        }
+
+        // The `wires` clause is required and leads the body.
+        let participants = self.parse_wires_clause()?;
+
+        let mut uses = Vec::new();
+        let mut cases = Vec::new();
+        let mut last_span = name_tok.span;
+        let mut seen_non_uses = false;
+        let trailing_comments: Vec<String>;
+        loop {
+            let (mut leading, item_doc) = self.collect_item_lead();
+            match self.peek_kind() {
+                Some(TokenKind::RBrace) if brace => {
+                    if let Some((_, doc_span)) = item_doc {
+                        self.warnings.push(CompileError::new(
+                            "karn.parse.orphan_doc_block",
+                            doc_span,
+                            "documentation block has no following declaration to attach to",
+                        ));
+                    }
+                    trailing_comments = std::mem::take(&mut leading);
+                    break;
+                }
+                None if !brace => {
+                    if let Some((_, doc_span)) = item_doc {
+                        self.warnings.push(CompileError::new(
+                            "karn.parse.orphan_doc_block",
+                            doc_span,
+                            "documentation block has no following declaration to attach to",
+                        ));
+                    }
+                    leading.extend(self.trivia.take_epilogue());
+                    trailing_comments = leading;
+                    break;
+                }
+                Some(TokenKind::Uses) => {
+                    if let Some((_, doc_span)) = item_doc {
+                        self.warnings.push(CompileError::new(
+                            "karn.parse.orphan_doc_block",
+                            doc_span,
+                            "documentation block before `uses` is not allowed",
+                        ));
+                    }
+                    if seen_non_uses {
+                        let t = self.peek().unwrap();
+                        return Err(CompileError::new(
+                            "karn.parse.uses_after_decls",
+                            t.span,
+                            "`uses` clauses must appear before any `test` cases in an integration test",
+                        ));
+                    }
+                    match self.parse_uses_decl() {
+                        Ok(mut u) => {
+                            u.trivia.leading = leading;
+                            u.trivia.trailing = self.take_trailing_trivia();
+                            last_span = u.span;
+                            uses.push(u);
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
+                }
+                Some(TokenKind::Test) => {
+                    let next_span = self.peek().unwrap().span;
+                    let doc = self.finalize_doc(item_doc, next_span);
+                    match self.parse_test_case() {
+                        Ok(mut c) => {
+                            c.documentation = doc;
+                            c.trivia.leading = leading;
+                            c.trivia.trailing = self.take_trailing_trivia();
+                            last_span = c.span;
+                            cases.push(c);
+                            seen_non_uses = true;
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
+                }
+                Some(TokenKind::Mocks) => {
+                    let t = self.peek().unwrap();
+                    let err = CompileError::new(
+                        "karn.integration.mock_in_integration",
+                        t.span,
+                        "`mocks` is not allowed in an integration test",
+                    )
+                    .with_note(
+                        "integration tests wire participants with their real implementations; use a unit test (`test <context> { mocks … }`) for mocking",
+                    );
+                    if self.recover_mode {
+                        self.recovered_errors.push(err);
+                        self.bump();
+                        self.recover_to_top_item();
+                    } else {
+                        return Err(err);
+                    }
+                }
+                _ => {
+                    let t = self.peek();
+                    let (span, found) = match t {
+                        Some(t) => (t.span, t.kind.describe().to_string()),
+                        None => (self.eof_span(), "end of file".to_string()),
+                    };
+                    let err = CompileError::new(
+                        "karn.parse.expected_item",
+                        span,
+                        format!("expected `uses` or `test \"name\"` declaration, found {found}"),
+                    )
+                    .with_note(
+                        "an integration test body is a `wires` clause followed by `uses` and `test \"name\"` declarations",
+                    );
+                    if self.recover_mode {
+                        self.recovered_errors.push(err);
+                        self.bump();
+                        self.recover_to_top_item();
+                    } else {
+                        return Err(err);
+                    }
+                }
+            }
+        }
+        let end_span = if brace {
+            self.expect(TokenKind::RBrace, "to close the integration test body")?
+                .span
+        } else {
+            last_span
+        };
+        Ok(IntegrationDecl {
+            suite,
+            suite_span: name_tok.span,
+            name: synth_name,
+            participants,
+            uses,
+            cases,
+            form: if brace {
+                CommonsForm::Brace
+            } else {
+                CommonsForm::Fragment
+            },
+            documentation,
+            span: start.merge(end_span),
+            trivia: Trivia::default(),
+            trailing_comments,
+        })
+    }
+
+    /// Parse the required `wires C1, C2, …` clause that leads an integration
+    /// test body. Accepts one-or-more here; the ≥ 2 rule is a checker
+    /// diagnostic (`karn.integration.too_few_participants`) for a better message.
+    fn parse_wires_clause(&mut self) -> Result<Vec<QualifiedName>, CompileError> {
+        self.expect(
+            TokenKind::Wires,
+            "to begin the integration participant list",
+        )?;
+        let mut participants = vec![self.parse_qualified_name()?];
+        while self.eat(TokenKind::Comma).is_some() {
+            // Allow a trailing comma before the next item/`}`.
+            if matches!(
+                self.peek_kind(),
+                Some(TokenKind::RBrace) | Some(TokenKind::Uses) | Some(TokenKind::Test) | None
+            ) {
+                break;
+            }
+            participants.push(self.parse_qualified_name()?);
+        }
+        Ok(participants)
     }
 
     fn parse_mock_decl(&mut self) -> Result<MockDecl, CompileError> {

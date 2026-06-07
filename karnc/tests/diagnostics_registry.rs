@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use karnc::diagnostics::{render_markdown, REGISTRY};
+use karnc::diagnostics::{REGISTRY, render_markdown};
 
 /// Collect every `"karn.x.y"` string literal across the compiler source,
 /// excluding the registry module itself.
@@ -55,7 +55,11 @@ fn registry_has_no_duplicates_and_is_sorted() {
     assert_eq!(codes, sorted, "REGISTRY must be sorted by code");
 
     let unique: BTreeSet<&str> = codes.iter().copied().collect();
-    assert_eq!(unique.len(), codes.len(), "REGISTRY contains duplicate codes");
+    assert_eq!(
+        unique.len(),
+        codes.len(),
+        "REGISTRY contains duplicate codes"
+    );
 }
 
 #[test]
@@ -80,8 +84,8 @@ fn registry_matches_codes_used_in_source() {
 
 #[test]
 fn generated_diagnostics_page_is_up_to_date() {
-    let page = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../docs/src/reference/diagnostics.md");
+    let page =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../docs/src/reference/diagnostics.md");
     let rendered = render_markdown();
 
     if std::env::var_os("KARN_BLESS").is_some() {

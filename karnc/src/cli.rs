@@ -183,7 +183,10 @@ pub fn render_markdown() -> String {
                 let label = if arg.is_positional() {
                     format!("`{}`", arg.get_id().to_string().to_uppercase())
                 } else {
-                    let long = arg.get_long().map(|l| format!("`--{l}`")).unwrap_or_default();
+                    let long = arg
+                        .get_long()
+                        .map(|l| format!("`--{l}`"))
+                        .unwrap_or_default();
                     match arg.get_short() {
                         Some(c) => format!("{long} (`-{c}`)"),
                         None => long,

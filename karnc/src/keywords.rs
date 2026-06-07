@@ -24,16 +24,31 @@ pub const KEYWORDS: &[KeywordInfo] = &[
     k("Result", "The success-or-error type, `Result[T, E]`."),
     k("Some", "The present variant of `Option`."),
     k("String", "The string base type."),
-    k("ValidationError", "The error type returned by a refined type's `.of`."),
+    k(
+        "ValidationError",
+        "The error type returned by a refined type's `.of`.",
+    ),
     k("agent", "Declare a stateful, keyed agent inside a context."),
     k("and", "Combine refinement predicates (`where A and B`)."),
     k("as", "Alias a consumed context (`consumes X as Y`)."),
     k("assert", "Assert a condition inside a test case."),
-    k("capability", "Declare a capability (a dependency interface) in a context."),
+    k(
+        "capability",
+        "Declare a capability (a dependency interface) in a context.",
+    ),
     k("commit", "Persist new agent state from within a handler."),
-    k("commons", "Declare a pure, stateless module of types and functions."),
-    k("consumes", "Declare a dependency on another context's services."),
-    k("context", "Declare a deployable context (services, agents, capabilities)."),
+    k(
+        "commons",
+        "Declare a pure, stateless module of types and functions.",
+    ),
+    k(
+        "consumes",
+        "Declare a dependency on another context's services.",
+    ),
+    k(
+        "context",
+        "Declare a deployable context (services, agents, capabilities).",
+    ),
     k("cron", "Declare a scheduled handler (`on cron`)."),
     k("else", "The alternative branch of an `if` expression."),
     k("enum", "Declare a payloadless sum type (`enum { A, B }`)."),
@@ -44,24 +59,55 @@ pub const KEYWORDS: &[KeywordInfo] = &[
     k("given", "Declare the capabilities a handler requires."),
     k("http", "Declare an HTTP handler (`on http`)."),
     k("if", "A conditional expression."),
-    k("is", "Test a value against a variant pattern, yielding a `Bool`."),
-    k("let", "Bind a local value (`let x = …`, or `let x <- …` for an effect)."),
-    k("match", "Pattern-match over a sum type, `Result`, or `Option`."),
-    k("mocks", "Provide a mock capability implementation in a test."),
+    k(
+        "is",
+        "Test a value against a variant pattern, yielding a `Bool`.",
+    ),
+    k(
+        "let",
+        "Bind a local value (`let x = …`, or `let x <- …` for an effect).",
+    ),
+    k(
+        "match",
+        "Pattern-match over a sum type, `Result`, or `Option`.",
+    ),
+    k(
+        "mocks",
+        "Provide a mock capability implementation in a test.",
+    ),
     k("on", "Begin a handler declaration (`on call`, `on http`)."),
-    k("opaque", "Declare an opaque type, or export a type opaquely."),
+    k(
+        "opaque",
+        "Declare an opaque type, or export a type opaquely.",
+    ),
     k("provides", "Provide an implementation of a capability."),
     k("queue", "Declare a queue-consumer handler (`on queue`)."),
-    k("record", "Reserved keyword (records are written `type X = { … }`)."),
+    k(
+        "record",
+        "Reserved keyword (records are written `type X = { … }`).",
+    ),
     k("self", "The current agent instance, inside a handler."),
-    k("service", "Declare a service (a group of handlers) in a context."),
+    k(
+        "service",
+        "Declare a service (a group of handlers) in a context.",
+    ),
     k("state", "Declare an agent's persistent state block."),
     k("test", "Declare a test block or a test case."),
-    k("transparent", "Export a type with its structure visible (`exports transparent { … }`)."),
+    k(
+        "transparent",
+        "Export a type with its structure visible (`exports transparent { … }`).",
+    ),
     k("true", "The boolean literal `true`."),
-    k("type", "Declare a type: alias, record, sum, opaque, or refined."),
+    k(
+        "type",
+        "Declare a type: alias, record, sum, opaque, or refined.",
+    ),
     k("uses", "Bring a commons into scope."),
     k("where", "Attach refinement predicates to a base type."),
+    k(
+        "wires",
+        "List the contexts a `test integration` stands up as Workers.",
+    ),
 ];
 
 const fn k(word: &'static str, meaning: &'static str) -> KeywordInfo {
@@ -81,7 +127,10 @@ pub fn render_markdown() -> String {
         "Every reserved keyword, with a one-line description. Reserved words cannot \
          be used as identifiers.\n\n",
     );
-    out.push_str(&format!("There are **{}** reserved keywords.\n\n", KEYWORDS.len()));
+    out.push_str(&format!(
+        "There are **{}** reserved keywords.\n\n",
+        KEYWORDS.len()
+    ));
     out.push_str("| Keyword | Meaning |\n|---|---|\n");
     for info in KEYWORDS {
         out.push_str(&format!("| `{}` | {} |\n", info.word, info.meaning));

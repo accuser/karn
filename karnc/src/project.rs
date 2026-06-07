@@ -74,6 +74,8 @@ pub enum UnitKind {
     Commons,
     Context,
     Test,
+    /// v0.16: a `test integration` multi-Worker integration test.
+    Integration,
 }
 
 impl UnitKind {
@@ -82,6 +84,7 @@ impl UnitKind {
             UnitKind::Commons => "commons",
             UnitKind::Context => "context",
             UnitKind::Test => "test",
+            UnitKind::Integration => "integration test",
         }
     }
 }
@@ -256,9 +259,14 @@ fn compile_project_inner(
     let mut groups: HashMap<String, Vec<usize>> = HashMap::new();
     let mut kinds: HashMap<String, UnitKind> = HashMap::new();
     let mut test_groups: HashMap<String, Vec<usize>> = HashMap::new();
+    // v0.16: integration tests are tracked by suite name, separately again from
+    // unit tests — their `name()` is the synthetic `integration <suite>`.
+    let mut integration_groups: HashMap<String, Vec<usize>> = HashMap::new();
     for (i, pf) in parsed.iter().enumerate() {
         let name = pf.unit.name().joined();
-        if pf.kind == UnitKind::Test {
+        if pf.kind == UnitKind::Integration {
+            integration_groups.entry(name).or_default().push(i);
+        } else if pf.kind == UnitKind::Test {
             test_groups.entry(name).or_default().push(i);
         } else {
             groups.entry(name.clone()).or_default().push(i);
@@ -1242,7 +1250,7 @@ fn compile_project_inner(
     // its target, validates mocks against the target's capability/consumed-
     // context shapes, type-checks bodies with the target's privileged view,
     // and emits a per-target TypeScript test module under `tests/`.
-    let test_outputs = process_tests(
+    let (test_outputs, mut runnable_tests) = process_tests(
         &test_groups,
         &parsed,
         &kinds,
@@ -1254,11 +1262,41 @@ fn compile_project_inner(
         &mut errors,
     );
 
+    compiled.extend(test_outputs);
+
+    // v0.16: process integration tests. Each `test integration "name"` suite
+    // validates its `wires` participants, type-checks each case body as a
+    // cross-context call from a synthetic harness root that consumes every
+    // participant, and emits a TypeScript module that stands the participants
+    // up as in-process Workers and exercises the flow across the real wire.
+    let (integration_outputs, integration_runnables) = process_integration_tests(
+        &integration_groups,
+        &parsed,
+        &kinds,
+        &unit_tables,
+        &unit_consumes,
+        &unit_consumes_aliases,
+        &unit_uses,
+        &mut errors,
+    );
+
     if !errors.is_empty() {
         return Err(errors);
     }
 
-    compiled.extend(test_outputs);
+    compiled.extend(integration_outputs);
+    runnable_tests.extend(integration_runnables);
+
+    // v0.16: emit the combined top-level test runner once both passes are done,
+    // so `tests/main.ts` aggregates unit and integration suites together.
+    if !runnable_tests.is_empty() {
+        let main_ts = emit_test_main(&runnable_tests);
+        compiled.push(CompiledFile {
+            source_path: PathBuf::from("tests/main.test.karn"),
+            output_path: PathBuf::from("tests/main.ts"),
+            typescript: main_ts,
+        });
+    }
 
     match target {
         BuildTarget::Bundle => {
@@ -1673,7 +1711,7 @@ impl ParsedFile {
         match &self.unit {
             SourceUnit::Commons(c) => &c.items,
             SourceUnit::Context(c) => &c.items,
-            SourceUnit::Test(_) => {
+            SourceUnit::Test(_) | SourceUnit::Integration(_) => {
                 // Tests don't contribute CommonsItem items; the production
                 // pipeline never asks them to. Return a singleton empty vec.
                 static EMPTY: std::sync::OnceLock<Vec<CommonsItem>> = std::sync::OnceLock::new();
@@ -1687,6 +1725,7 @@ impl ParsedFile {
             SourceUnit::Commons(c) => &c.uses,
             SourceUnit::Context(c) => &c.uses,
             SourceUnit::Test(t) => &t.uses,
+            SourceUnit::Integration(i) => &i.uses,
         }
     }
 
@@ -1694,7 +1733,10 @@ impl ParsedFile {
         match &self.unit {
             SourceUnit::Commons(_) => &[],
             SourceUnit::Context(c) => &c.consumes,
-            SourceUnit::Test(_) => &[],
+            // An integration test's participant edges are resolved separately
+            // (the harness root consumes every participant); it has no
+            // `consumes` of its own.
+            SourceUnit::Test(_) | SourceUnit::Integration(_) => &[],
         }
     }
 
@@ -1708,6 +1750,13 @@ impl ParsedFile {
     fn test(&self) -> Option<&TestDecl> {
         match &self.unit {
             SourceUnit::Test(t) => Some(t),
+            _ => None,
+        }
+    }
+
+    fn integration(&self) -> Option<&IntegrationDecl> {
+        match &self.unit {
+            SourceUnit::Integration(i) => Some(i),
             _ => None,
         }
     }
@@ -1736,6 +1785,13 @@ impl ParsedFile {
                 t.documentation.clone(),
                 t.form,
                 t.span,
+            ),
+            SourceUnit::Integration(i) => (
+                i.name.clone(),
+                i.uses.clone(),
+                i.documentation.clone(),
+                i.form,
+                i.span,
             ),
         };
         Commons {
@@ -1768,6 +1824,7 @@ fn parse_file(root: &Path, path: &Path) -> Result<ParsedFile, Vec<CompileError>>
         SourceUnit::Commons(_) => UnitKind::Commons,
         SourceUnit::Context(_) => UnitKind::Context,
         SourceUnit::Test(_) => UnitKind::Test,
+        SourceUnit::Integration(_) => UnitKind::Integration,
     };
     let rel = path.strip_prefix(root).unwrap_or(path).to_path_buf();
     Ok(ParsedFile {
@@ -1902,7 +1959,7 @@ fn check_directory_name_consistency(parsed: &[ParsedFile]) -> Result<(), Vec<Com
     // grouped by target, not by their own physical layout.
     let mut by_name: HashMap<String, Vec<usize>> = HashMap::new();
     for (i, pf) in parsed.iter().enumerate() {
-        if pf.kind == UnitKind::Test {
+        if matches!(pf.kind, UnitKind::Test | UnitKind::Integration) {
             continue;
         }
         by_name.entry(pf.unit.name().joined()).or_default().push(i);
@@ -1998,7 +2055,7 @@ fn unit_path_matches(rel_path: &Path, qualified_name: &str) -> bool {
 fn check_path_name_alignment(parsed: &[ParsedFile]) -> Result<(), Vec<CompileError>> {
     let mut errors: Vec<CompileError> = Vec::new();
     for pf in parsed {
-        if pf.kind == UnitKind::Test {
+        if matches!(pf.kind, UnitKind::Test | UnitKind::Integration) {
             // Test files are not required to match their target's path.
             continue;
         }
@@ -3931,7 +3988,7 @@ fn process_tests(
     unit_consumes_aliases: &HashMap<String, HashMap<String, String>>,
     unit_uses: &HashMap<String, Vec<String>>,
     errors: &mut Vec<CompileError>,
-) -> Vec<CompiledFile> {
+) -> (Vec<CompiledFile>, Vec<RunnableTest>) {
     let mut outputs: Vec<CompiledFile> = Vec::new();
     let mut runnable_tests: Vec<RunnableTest> = Vec::new();
 
@@ -4142,16 +4199,598 @@ fn process_tests(
         }
     }
 
-    if !runnable_tests.is_empty() && errors.is_empty() {
-        let main_ts = emit_test_main(&runnable_tests);
-        outputs.push(CompiledFile {
-            source_path: PathBuf::from("tests/main.test.karn"),
-            output_path: PathBuf::from("tests/main.ts"),
-            typescript: main_ts,
-        });
+    // v0.16: the top-level `tests/main.ts` runner is emitted once by the caller
+    // after both unit- and integration-test passes, so it can aggregate both.
+    (outputs, runnable_tests)
+}
+
+/// v0.16: process every `test integration "name"` suite. Validates the `wires`
+/// participant set (existence, ≥ 2, no duplicates, full `consumes` closure),
+/// type-checks each case body as a cross-context call from a synthetic harness
+/// root that consumes every participant, and emits a TypeScript module that
+/// stands the participants up as in-process Workers wired by simulated Service
+/// Bindings and runs the cases across the real serialise/deserialise wire.
+#[allow(clippy::too_many_arguments)]
+fn process_integration_tests(
+    integration_groups: &HashMap<String, Vec<usize>>,
+    parsed: &[ParsedFile],
+    kinds: &HashMap<String, UnitKind>,
+    unit_tables: &HashMap<String, UnitTable>,
+    unit_consumes: &HashMap<String, Vec<String>>,
+    unit_consumes_aliases: &HashMap<String, HashMap<String, String>>,
+    unit_uses: &HashMap<String, Vec<String>>,
+    errors: &mut Vec<CompileError>,
+) -> (Vec<CompiledFile>, Vec<RunnableTest>) {
+    let mut outputs: Vec<CompiledFile> = Vec::new();
+    let mut runnables: Vec<RunnableTest> = Vec::new();
+
+    let mut sorted: Vec<&String> = integration_groups.keys().collect();
+    sorted.sort();
+
+    let mut seen_suites: HashMap<String, Span> = HashMap::new();
+
+    for group_name in sorted {
+        let indices = integration_groups.get(group_name).unwrap();
+        // Each suite is a single declaration. Two declarations sharing a name
+        // collide into one group → a duplicate suite.
+        let first = indices[0];
+        let Some(decl) = parsed[first].integration() else {
+            continue;
+        };
+        let mut duplicate = false;
+        if let Some(prev) = seen_suites.get(&decl.suite) {
+            duplicate = true;
+            errors.push(
+                CompileError::new(
+                    "karn.integration.duplicate_suite",
+                    decl.suite_span,
+                    format!(
+                        "integration test `\"{}\"` is declared more than once",
+                        decl.suite
+                    ),
+                )
+                .with_label(*prev, "previously declared here"),
+            );
+        } else {
+            seen_suites.insert(decl.suite.clone(), decl.suite_span);
+        }
+        for &i in &indices[1..] {
+            if let Some(other) = parsed[i].integration() {
+                errors.push(
+                    CompileError::new(
+                        "karn.integration.duplicate_suite",
+                        other.suite_span,
+                        format!(
+                            "integration test `\"{}\"` is declared more than once",
+                            other.suite
+                        ),
+                    )
+                    .with_label(decl.suite_span, "previously declared here"),
+                );
+                duplicate = true;
+            }
+        }
+
+        // -- Validate participants. --
+        let mut participants: Vec<String> = Vec::new();
+        let mut participant_set: HashSet<String> = HashSet::new();
+        let mut bad_participant = false;
+        for p in &decl.participants {
+            let q = p.joined();
+            match kinds.get(&q) {
+                Some(UnitKind::Context) => {}
+                _ => {
+                    errors.push(
+                        CompileError::new(
+                            "karn.integration.unknown_participant",
+                            p.span,
+                            format!("`{q}` is not a declared context in this project"),
+                        )
+                        .with_note(
+                            "every name in a `wires` clause must be a context the project declares",
+                        ),
+                    );
+                    bad_participant = true;
+                    continue;
+                }
+            }
+            if !participant_set.insert(q.clone()) {
+                errors.push(CompileError::new(
+                    "karn.integration.duplicate_participant",
+                    p.span,
+                    format!("context `{q}` is listed more than once in `wires`"),
+                ));
+                continue;
+            }
+            participants.push(q);
+        }
+
+        if participant_set.len() < 2 {
+            errors.push(
+                CompileError::new(
+                    "karn.integration.too_few_participants",
+                    decl.suite_span,
+                    "an integration test must wire at least two contexts",
+                )
+                .with_note(
+                    "to test a single context in isolation, use a unit test (`test <context> { … }`)",
+                ),
+            );
+            bad_participant = true;
+        }
+
+        // -- Closure: every transitively-consumed context must be a participant.
+        for p in &participants {
+            if let Some(deps) = unit_consumes.get(p) {
+                for d in deps {
+                    if !participant_set.contains(d) {
+                        errors.push(
+                            CompileError::new(
+                                "karn.integration.unwired_dependency",
+                                decl.suite_span,
+                                format!(
+                                    "participant `{p}` consumes `{d}`, which is not wired into this integration test",
+                                ),
+                            )
+                            .with_note(format!(
+                                "add `{d}` to the `wires` clause — an integration test runs each participant as a real Worker, so every consumed context needs one",
+                            )),
+                        );
+                        bad_participant = true;
+                    }
+                }
+            }
+        }
+
+        // -- Duplicate case names within the suite. --
+        let mut seen_cases: HashMap<String, Span> = HashMap::new();
+        for &i in indices {
+            if let Some(d) = parsed[i].integration() {
+                for case in &d.cases {
+                    if let Some(prev) = seen_cases.get(&case.name) {
+                        errors.push(
+                            CompileError::new(
+                                "karn.test.duplicate_case_name",
+                                case.name_span,
+                                format!(
+                                    "test case `\"{}\"` is declared more than once in integration test `\"{}\"`",
+                                    case.name, decl.suite
+                                ),
+                            )
+                            .with_label(*prev, "previously declared here"),
+                        );
+                        bad_participant = true;
+                    } else {
+                        seen_cases.insert(case.name.clone(), case.name_span);
+                    }
+                }
+            }
+        }
+
+        if duplicate || bad_participant {
+            continue;
+        }
+
+        // -- Build the harness-root cross-context view (consumes all). --
+        let harness_name = group_name.clone();
+        let uses_targets: Vec<String> = decl.uses.iter().map(|u| u.target.joined()).collect();
+        let mut harness_consumes = unit_consumes.clone();
+        harness_consumes.insert(harness_name.clone(), participants.clone());
+        let mut harness_uses = unit_uses.clone();
+        harness_uses.insert(harness_name.clone(), uses_targets.clone());
+        let cross_context = build_cross_context_info(
+            &harness_name,
+            &harness_consumes,
+            unit_consumes_aliases,
+            &harness_uses,
+            unit_tables,
+        );
+
+        // -- Type-check each case body. --
+        let mut body_errs: Vec<CompileError> = Vec::new();
+        for &i in indices {
+            let Some(d) = parsed[i].integration() else {
+                continue;
+            };
+            for case in &d.cases {
+                check_integration_case_body(
+                    &participants,
+                    &uses_targets,
+                    case,
+                    &cross_context,
+                    unit_tables,
+                    &mut body_errs,
+                );
+            }
+        }
+        let bodies_failed = !body_errs.is_empty();
+        errors.extend(body_errs);
+        if bodies_failed {
+            continue;
+        }
+
+        // -- Emit the integration module. --
+        if let Some((path, source, runnable)) = emit_integration_module(
+            decl,
+            &participants,
+            &uses_targets,
+            &cross_context,
+            unit_consumes,
+            unit_tables,
+        ) {
+            outputs.push(CompiledFile {
+                source_path: path.clone(),
+                output_path: path,
+                typescript: source,
+            });
+            runnables.push(runnable);
+        }
     }
 
-    outputs
+    (outputs, runnables)
+}
+
+/// Type-check one integration test case body. The body lives in a synthetic
+/// harness root that consumes every participant; entry calls
+/// (`ctx.service(args)`) are therefore ordinary cross-context calls. The body
+/// has type `Effect[Result[(), AssertionError]]` (modelled as
+/// `Effect[Result[(), ValidationError]]`, as in unit tests).
+fn check_integration_case_body(
+    participants: &[String],
+    uses_targets: &[String],
+    case: &TestCase,
+    cross_context: &resolver::CrossContextInfo,
+    unit_tables: &HashMap<String, UnitTable>,
+    errors: &mut Vec<CompileError>,
+) {
+    // Names in scope: types/fns/methods from `uses` commons (for constructing
+    // arguments) plus each participant's types/methods (so return types rebrand
+    // and variant patterns resolve).
+    let mut types: HashMap<String, TypeDecl> = HashMap::new();
+    let mut fns: HashMap<String, FnDecl> = HashMap::new();
+    let mut methods: HashMap<String, ResolverMethodTable> = HashMap::new();
+    let mut merge = |src: Option<&UnitTable>, with_fns: bool| {
+        let Some(t) = src else { return };
+        for (n, d) in &t.types {
+            types.entry(n.clone()).or_insert_with(|| d.clone());
+        }
+        if with_fns {
+            for (n, f) in &t.fns {
+                fns.entry(n.clone()).or_insert_with(|| f.clone());
+            }
+        }
+        for (n, mt) in &t.methods {
+            let entry = methods.entry(n.clone()).or_default();
+            for (m, decl) in &mt.instance {
+                entry
+                    .instance
+                    .entry(m.clone())
+                    .or_insert_with(|| decl.clone());
+            }
+            for (m, decl) in &mt.statics {
+                entry
+                    .statics
+                    .entry(m.clone())
+                    .or_insert_with(|| decl.clone());
+            }
+        }
+    };
+    for u in uses_targets {
+        merge(unit_tables.get(u), true);
+    }
+    for p in participants {
+        merge(unit_tables.get(p), false);
+    }
+
+    let synthetic_commons = Commons {
+        name: QualifiedName {
+            parts: vec![Ident {
+                name: "integration".to_string(),
+                span: Span::default(),
+            }],
+            span: Span::default(),
+        },
+        items: Vec::new(),
+        uses: Vec::new(),
+        documentation: None,
+        form: CommonsForm::Brace,
+        span: Span::default(),
+        trivia: Trivia::default(),
+        trailing_comments: Vec::new(),
+    };
+    let resolved = crate::resolver::ResolvedCommons {
+        commons: synthetic_commons,
+        types,
+        fns,
+        methods,
+        local_type_names: HashSet::new(),
+        cross_context: cross_context.clone(),
+        agents: HashMap::new(),
+    };
+
+    let unit_span = case.span;
+    let synthetic_return = TypeRef::Effect(
+        Box::new(TypeRef::Result(
+            Box::new(TypeRef::Unit(unit_span)),
+            Box::new(TypeRef::ValidationError(unit_span)),
+            unit_span,
+        )),
+        unit_span,
+    );
+    let return_ty = checker::resolve_type_ref(&synthetic_return, &resolved.types).unwrap();
+    let mut expr_types: HashMap<Span, checker::Ty> = HashMap::new();
+    let mut ctx = checker::Ctx {
+        input: &resolved,
+        expr_types: &mut expr_types,
+        errors,
+        scopes: vec![HashMap::new()],
+        return_ty: return_ty.clone(),
+        return_ty_span: case.span,
+        effectful: true,
+        agent_state_ty: None,
+        commit_seen: false,
+        capabilities: HashMap::new(),
+        declared_capabilities: HashMap::new(),
+        given_remaining: HashSet::new(),
+        given_used: HashSet::new(),
+        in_test_body: true,
+    };
+    let _ = checker::type_of_block(&case.body, Some(&return_ty), &mut ctx);
+}
+
+/// Emit a single integration-test module plus its [`RunnableTest`] pointer.
+/// The module imports each participant's workers-mode handler namespace (for
+/// serialise/deserialise) and Worker entry (for dispatch), builds an in-process
+/// env graph wiring the Service Bindings, and runs each case across the wire.
+fn emit_integration_module(
+    decl: &IntegrationDecl,
+    participants: &[String],
+    uses_targets: &[String],
+    cross_context: &resolver::CrossContextInfo,
+    unit_consumes: &HashMap<String, Vec<String>>,
+    unit_tables: &HashMap<String, UnitTable>,
+) -> Option<(PathBuf, String, RunnableTest)> {
+    let sanitized = sanitise_suite(&decl.suite);
+    let module_path = PathBuf::from(format!("tests/integration_{sanitized}.test.ts"));
+    let mut out = String::new();
+    out.push_str("// Generated by karnc — do not edit by hand.\n");
+    out.push_str(&format!("// integration test: {}\n\n", decl.suite));
+
+    // Runtime imports.
+    let runtime_import = emitter::runtime_import_for(&module_path);
+    out.push_str(&format!(
+        "import {{ Ok, Err, Some, None, callService, type Result, type Option, type ValidationError, type JsonValue, type ServiceBinding }} from \"{runtime_import}\";\n"
+    ));
+
+    // Per-participant: workers handler namespace + Worker entry default export.
+    for p in participants {
+        let ns = p.replace('.', "_");
+        let dir = worker_dir_name(p);
+        out.push_str(&format!(
+            "import * as {ns} from \"../workers/{dir}/handlers.js\";\n"
+        ));
+        out.push_str(&format!(
+            "import worker_{ns} from \"../workers/{dir}/index.js\";\n"
+        ));
+    }
+
+    // `uses` commons (for constructing arguments).
+    let mut uses_imports: Vec<(String, String)> = Vec::new();
+    for u in uses_targets {
+        let ns = u.replace('.', "_");
+        let path = relative_import_for_test(&commons_dir_for(u));
+        uses_imports.push((ns, path));
+    }
+    uses_imports.sort();
+    uses_imports.dedup();
+    for (ns, path) in &uses_imports {
+        out.push_str(&format!("import * as {ns} from \"./{path}.js\";\n"));
+    }
+    out.push('\n');
+
+    out.push_str(&assertion_runtime_helpers());
+
+    // The env-graph harness: stand each participant up as an in-process Worker
+    // and wire its Service Bindings to its siblings; the root env binds to all.
+    out.push_str(&emit_integration_harness(participants, unit_consumes));
+    out.push('\n');
+
+    // One async function per case.
+    let mut typed = integration_typed_commons(uses_targets, participants, unit_tables);
+    let mut case_runners: Vec<String> = Vec::new();
+    for case in &decl.cases {
+        let runner_name = sanitise_case_name(&case.name, &mut case_runners.len());
+        case_runners.push(runner_name.clone());
+        out.push_str(&format!("async function {runner_name}() {{\n"));
+        out.push_str("  try {\n");
+        out.push_str("    const deps = makeHarness();\n");
+        // Bring `uses` commons names into scope for argument construction.
+        for u in uses_targets {
+            let ns = u.replace('.', "_");
+            if let Some(table) = unit_tables.get(u) {
+                let mut names: Vec<&String> = table.types.keys().chain(table.fns.keys()).collect();
+                names.sort();
+                names.dedup();
+                if !names.is_empty() {
+                    let joined: Vec<String> = names.iter().map(|n| (*n).clone()).collect();
+                    out.push_str(&format!(
+                        "    const {{ {} }} = {ns} as any;\n",
+                        joined.join(", ")
+                    ));
+                }
+            }
+        }
+        let body_src = emitter::lower_integration_case_body(&case.body, &mut typed, cross_context);
+        for line in body_src.lines() {
+            out.push_str("    ");
+            out.push_str(line);
+            out.push('\n');
+        }
+        out.push_str("    return { pass: true };\n");
+        out.push_str("  } catch (e) {\n");
+        out.push_str("    if (e instanceof AssertionError) {\n");
+        out.push_str(
+            "      return { pass: false, error: { message: e.message, location: e.location } };\n",
+        );
+        out.push_str("    }\n");
+        out.push_str(
+            "    return { pass: false, error: { message: String(e), location: \"unknown\" } };\n",
+        );
+        out.push_str("  }\n");
+        out.push_str("}\n\n");
+    }
+
+    // Module runner.
+    out.push_str("export async function run() {\n");
+    out.push_str("  const results = [];\n");
+    for (idx, case) in decl.cases.iter().enumerate() {
+        let runner_name = &case_runners[idx];
+        let escaped = escape_ts_string(&case.name);
+        out.push_str(&format!(
+            "  results.push({{ name: \"{escaped}\", ...(await {runner_name}()) }});\n"
+        ));
+    }
+    out.push_str("  return results;\n");
+    out.push_str("}\n");
+
+    Some((
+        module_path.clone(),
+        out,
+        RunnableTest {
+            target_name: format!("integration · {}", decl.suite),
+            module_path,
+        },
+    ))
+}
+
+/// Emit the `makeHarness()` factory: an in-process env per participant whose
+/// Service Bindings call the sibling participants' real Worker `fetch`, plus a
+/// root env binding every participant (the test cases call in through it).
+fn emit_integration_harness(
+    participants: &[String],
+    unit_consumes: &HashMap<String, Vec<String>>,
+) -> String {
+    let mut out = String::new();
+    out.push_str("function makeHarness() {\n");
+    // Declare every participant env first so sibling references resolve.
+    for p in participants {
+        let ns = p.replace('.', "_");
+        out.push_str(&format!("  const env_{ns}: any = {{}};\n"));
+    }
+    // Wire each participant's consumed Service Bindings to its sibling Workers.
+    for p in participants {
+        let ns = p.replace('.', "_");
+        if let Some(deps) = unit_consumes.get(p) {
+            let mut deps_sorted = deps.clone();
+            deps_sorted.sort();
+            for d in &deps_sorted {
+                let dns = d.replace('.', "_");
+                let binding = crate::emitter::wrangler::consumed_binding_name(d);
+                out.push_str(&format!(
+                    "  env_{ns}.{binding} = {{ fetch: (req: Request) => worker_{dns}.fetch(req, env_{dns}) }} as ServiceBinding;\n"
+                ));
+            }
+        }
+    }
+    // Root env binds to every participant.
+    out.push_str("  const rootEnv: any = {};\n");
+    for p in participants {
+        let ns = p.replace('.', "_");
+        let binding = crate::emitter::wrangler::consumed_binding_name(p);
+        out.push_str(&format!(
+            "  rootEnv.{binding} = {{ fetch: (req: Request) => worker_{ns}.fetch(req, env_{ns}) }} as ServiceBinding;\n"
+        ));
+    }
+    out.push_str("  return { env: rootEnv };\n");
+    out.push_str("}\n");
+    out
+}
+
+/// Build the [`checker::TypedCommons`] used to lower integration case bodies —
+/// `uses` commons plus participant types/fns/methods, so static calls and
+/// constructors resolve.
+fn integration_typed_commons(
+    uses_targets: &[String],
+    participants: &[String],
+    unit_tables: &HashMap<String, UnitTable>,
+) -> checker::TypedCommons {
+    let mut types: HashMap<String, TypeDecl> = HashMap::new();
+    let mut fns: HashMap<String, FnDecl> = HashMap::new();
+    let mut methods: HashMap<String, ResolverMethodTable> = HashMap::new();
+    let mut add = |t: Option<&UnitTable>, with_fns: bool| {
+        let Some(t) = t else { return };
+        for (n, d) in &t.types {
+            types.entry(n.clone()).or_insert_with(|| d.clone());
+        }
+        if with_fns {
+            for (n, f) in &t.fns {
+                fns.entry(n.clone()).or_insert_with(|| f.clone());
+            }
+        }
+        for (n, mt) in &t.methods {
+            let entry = methods.entry(n.clone()).or_default();
+            for (m, decl) in &mt.instance {
+                entry
+                    .instance
+                    .entry(m.clone())
+                    .or_insert_with(|| decl.clone());
+            }
+            for (m, decl) in &mt.statics {
+                entry
+                    .statics
+                    .entry(m.clone())
+                    .or_insert_with(|| decl.clone());
+            }
+        }
+    };
+    for u in uses_targets {
+        add(unit_tables.get(u), true);
+    }
+    for p in participants {
+        add(unit_tables.get(p), false);
+    }
+    checker::TypedCommons {
+        commons: Commons {
+            name: QualifiedName {
+                parts: vec![Ident {
+                    name: "integration".to_string(),
+                    span: Span::default(),
+                }],
+                span: Span::default(),
+            },
+            items: Vec::new(),
+            uses: Vec::new(),
+            documentation: None,
+            form: CommonsForm::Brace,
+            span: Span::default(),
+            trivia: Trivia::default(),
+            trailing_comments: Vec::new(),
+        },
+        types,
+        fns,
+        methods,
+        expr_types: HashMap::new(),
+    }
+}
+
+fn sanitise_suite(s: &str) -> String {
+    let mut out = String::new();
+    for ch in s.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push('_');
+        }
+    }
+    while out.contains("__") {
+        out = out.replace("__", "_");
+    }
+    let trimmed = out.trim_matches('_').to_string();
+    if trimmed.is_empty() {
+        "suite".to_string()
+    } else {
+        trimmed
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -73,7 +73,14 @@ module.exports = grammar({
     // declaration abuts a following parenthesised expression.
     source_file: ($) =>
       choice(
-        repeat1(choice($.commons_decl, $.context_decl, $.test_decl)),
+        repeat1(
+          choice(
+            $.commons_decl,
+            $.context_decl,
+            $.integration_decl,
+            $.test_decl,
+          ),
+        ),
         repeat1($._item_fragment),
         $._expr_fragment,
       ),
@@ -127,6 +134,27 @@ module.exports = grammar({
           ),
         ),
       ),
+
+    // v0.16: a multi-Worker integration test. `integration` is contextual
+    // after `test` and before the suite-name string; `wires` lists the
+    // participating contexts. Body holds `uses` and `test "name"` cases (no
+    // `mocks` — integration tests wire real implementations).
+    integration_decl: ($) =>
+      prec.right(
+        seq(
+          "test",
+          "integration",
+          field("name", $.string_literal),
+          choice(
+            seq("{", $.wires_decl, repeat($._integration_body_item), "}"),
+            seq($.wires_decl, repeat($._integration_body_item)),
+          ),
+        ),
+      ),
+
+    wires_decl: ($) => seq("wires", sep1(field("participant", $.qualified_name), ",")),
+
+    _integration_body_item: ($) => choice($.uses_decl, $.test_case),
 
     qualified_name: ($) => sep1($.identifier, "."),
 

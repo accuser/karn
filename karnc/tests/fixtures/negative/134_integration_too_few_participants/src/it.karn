@@ -1,0 +1,4 @@
+test integration "x" {
+  wires app.a
+  test "t" { let r <- app.a.ping() assert r == 1 }
+}

@@ -29,7 +29,30 @@ pub fn outline(source: &str) -> Vec<DocumentSymbol> {
         SourceUnit::Commons(c) => vec![commons_symbol(source, &c)],
         SourceUnit::Context(c) => vec![context_symbol(source, &c)],
         SourceUnit::Test(t) => vec![test_symbol(source, &t)],
+        SourceUnit::Integration(i) => vec![integration_symbol(source, &i)],
     }
+}
+
+fn integration_symbol(source: &str, i: &IntegrationDecl) -> DocumentSymbol {
+    let mut children: Vec<DocumentSymbol> = Vec::new();
+    for c in &i.cases {
+        children.push(make_symbol(
+            c.name.clone(),
+            None,
+            SymbolKind::FUNCTION,
+            span_to_range(source, c.span),
+            span_to_range(source, c.name_span),
+            Vec::new(),
+        ));
+    }
+    make_symbol(
+        format!("test integration \"{}\"", i.suite),
+        detail_from_doc(&i.documentation),
+        SymbolKind::MODULE,
+        span_to_range(source, i.span),
+        span_to_range(source, i.suite_span),
+        children,
+    )
 }
 
 fn test_symbol(source: &str, t: &TestDecl) -> DocumentSymbol {

@@ -1,0 +1,18 @@
+---
+Integration test: the orders→payment flow across the Worker boundary.
+Both contexts run as real (in-process) Workers; the cross-context call
+travels the real serialise/deserialise wire.
+---
+test integration "checkout" {
+  wires shop.orders, shop.payment
+
+  test "small order authorises across the wire" {
+    let r <- shop.orders.place(100)
+    assert r is Ok(_)
+  }
+
+  test "large order is rejected end to end" {
+    let r <- shop.orders.place(50000)
+    assert r is Err(_)
+  }
+}

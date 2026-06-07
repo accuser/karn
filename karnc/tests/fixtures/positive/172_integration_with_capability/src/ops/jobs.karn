@@ -1,0 +1,14 @@
+context ops.jobs
+
+consumes platform.time
+
+exports transparent { TickError }
+
+type TickError = enum { Unavailable }
+
+service tick {
+  on call() -> Effect[Result[Int, TickError]] given platform.time.Clock {
+    let t <- platform.time.Clock.now()
+    Ok(t)
+  }
+}

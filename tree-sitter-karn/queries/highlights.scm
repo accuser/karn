@@ -41,6 +41,8 @@
   "key"
   "test"
   "mocks"
+  "integration"
+  "wires"
 ] @keyword.declaration
 
 [

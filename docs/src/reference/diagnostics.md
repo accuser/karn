@@ -6,7 +6,7 @@
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../how-to/troubleshooting/index.md).
 
-There are **219** codes in total.
+There are **225** codes in total.
 
 ## Agents
 
@@ -148,6 +148,17 @@ There are **219** codes in total.
 | `karn.mock.unknown_target` | `mocks` names a capability that is not in scope. |
 | `karn.mock.unknown_type` | `Mock[T]` names a type that does not resolve. |
 | `karn.mock.unsupported_kind` | `Mock[T]` cannot fabricate a value for this kind of type. |
+
+## Other
+
+| Code | Summary |
+|---|---|
+| `karn.integration.duplicate_participant` | A context is listed more than once in a `wires` clause. |
+| `karn.integration.duplicate_suite` | Two integration tests share the same suite name. |
+| `karn.integration.mock_in_integration` | `mocks` is not allowed in an integration test. |
+| `karn.integration.too_few_participants` | An integration test wires fewer than two contexts. |
+| `karn.integration.unknown_participant` | A `wires` clause names something that is not a declared context. |
+| `karn.integration.unwired_dependency` | A participant consumes a context that is not wired into the integration test. |
 
 ## Parser
 

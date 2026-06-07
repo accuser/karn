@@ -12,16 +12,14 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 
-use karnc::keywords::{render_markdown, KEYWORDS};
+use karnc::keywords::{KEYWORDS, render_markdown};
 
 /// Alphabetic keyword tokens declared in the lexer via `#[token("…")]`.
 fn keywords_in_lexer() -> BTreeSet<String> {
     let lexer = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/lexer.rs");
     let text = fs::read_to_string(&lexer).unwrap();
     let re = regex::Regex::new(r#"#\[token\("([a-zA-Z][a-zA-Z_]*)"\)\]"#).unwrap();
-    re.captures_iter(&text)
-        .map(|c| c[1].to_string())
-        .collect()
+    re.captures_iter(&text).map(|c| c[1].to_string()).collect()
 }
 
 fn registry_keywords() -> BTreeSet<String> {
@@ -59,8 +57,7 @@ fn registry_matches_lexer_tokens() {
 
 #[test]
 fn generated_keywords_page_is_up_to_date() {
-    let page =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../docs/src/reference/keywords.md");
+    let page = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../docs/src/reference/keywords.md");
     let rendered = render_markdown();
 
     if std::env::var_os("KARN_BLESS").is_some() {

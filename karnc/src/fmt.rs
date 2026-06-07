@@ -205,6 +205,65 @@ impl<'a> Formatter<'a> {
             SourceUnit::Commons(c) => self.format_commons(c),
             SourceUnit::Context(c) => self.format_context(c),
             SourceUnit::Test(t) => self.format_test(t),
+            SourceUnit::Integration(i) => self.format_integration(i),
+        }
+    }
+
+    fn format_integration(&mut self, i: &IntegrationDecl) {
+        self.emit_leading_comments(&i.trivia.leading);
+        if let Some(doc) = &i.documentation {
+            self.emit_doc(doc);
+        }
+        let header = format!("test integration \"{}\"", escape_string(&i.suite));
+        match i.form {
+            CommonsForm::Brace => {
+                self.push(&header);
+                self.push(" {");
+                self.newline();
+                self.indented(|f| {
+                    f.format_integration_body(i);
+                });
+                self.push("}");
+                self.newline();
+            }
+            CommonsForm::Fragment => {
+                self.push(&header);
+                self.newline();
+                self.newline();
+                self.format_integration_body(i);
+            }
+        }
+    }
+
+    fn format_integration_body(&mut self, i: &IntegrationDecl) {
+        let wires = i
+            .participants
+            .iter()
+            .map(|p| p.joined())
+            .collect::<Vec<_>>()
+            .join(", ");
+        self.push(&format!("wires {wires}"));
+        self.newline();
+        for u in &i.uses {
+            self.newline();
+            self.emit_leading_comments(&u.trivia.leading);
+            self.push(&format!("uses {}", u.target.joined()));
+            self.emit_trailing_comment(u.trivia.trailing.as_deref());
+            self.newline();
+        }
+        for c in &i.cases {
+            self.newline();
+            self.emit_leading_comments(&c.trivia.leading);
+            if let Some(doc) = &c.documentation {
+                self.emit_doc(doc);
+            }
+            self.push(&format!("test \"{}\" ", escape_string(&c.name)));
+            self.format_block(&c.body);
+            self.newline();
+        }
+        for comment in &i.trailing_comments {
+            self.push(&format!("--{comment}"));
+            self.newline();
         }
     }
 
