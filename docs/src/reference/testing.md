@@ -102,7 +102,10 @@ test integration "checkout" {
   (`karn.integration.duplicate_suite`).
 
 Cross-context capabilities (`given B.Cap`) are wired as in production: the
-provider is instantiated locally in the consumer Worker (v0.15 model A1). See
+provider is instantiated locally in the consumer Worker (v0.15 model A1).
+**Agents** (Durable Objects) work too: a participant's agents are backed by
+in-memory Durable Object instances — same key, same instance **within a case**;
+state starts empty and is **fresh per case**. See
 [Test a flow across Workers](../how-to/testing/integration.md).
 
 `karnc test` runs integration tests in plain Node alongside unit tests — it

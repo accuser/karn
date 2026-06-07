@@ -400,6 +400,35 @@ export function makeAgent<C>(
   const state = registry.getOrCreate(key);
   return constructBundle(state);
 }
+
+// v0.16: an in-process Durable-Object namespace for multi-Worker integration
+// tests. `construct` builds the emitted DO class from a fresh in-memory state;
+// one instance is kept per key (so state accumulates within a test case). The
+// returned stub bridges the stub-side `fetch(url, init)` the agent runtime
+// speaks to the DO class's server-side `fetch(request)`.
+export function makeIntegrationDoNamespace(
+  construct: (state: DurableObjectState) => { fetch(request: Request): Promise<Response> },
+): DurableObjectNamespace {
+  const instances = new Map<string, { fetch(request: Request): Promise<Response> }>();
+  return {
+    idFromName(name: string): unknown {
+      return name;
+    },
+    get(id: unknown): DurableObjectStub {
+      const k = String(id);
+      let inst = instances.get(k);
+      if (inst === undefined) {
+        inst = construct(makeTestState(k));
+        instances.set(k, inst);
+      }
+      const target = inst;
+      return {
+        fetch: (input: string, init?: unknown): Promise<Response> =>
+          target.fetch(new Request(input, init as RequestInit)),
+      };
+    },
+  };
+}
 "#;
 
 /// Emit the contents of `out/tsconfig.json`. The CLI uses `tsc -p` against

@@ -1,0 +1,17 @@
+context demo.api
+
+consumes demo.counter as Counters
+
+exports transparent { ApiError }
+
+type ApiError = enum { Failed }
+
+service tick {
+  on call(id: String) -> Effect[Result[Int, ApiError]] {
+    let r <- Counters.bump(id)
+    match r {
+      Ok(n)  => Ok(n)
+      Err(_) => Err(Failed)
+    }
+  }
+}

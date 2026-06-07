@@ -113,6 +113,10 @@ is needed.
 - Cross-context **capabilities** (`given B.Cap`) work unchanged: the provider is
   instantiated locally in the consumer Worker, so wiring the providing context is
   enough.
+- **Agents** (Durable Objects) work across the wire: a participant's agents are
+  backed by in-memory instances — same key, same instance **within a case**, with
+  state starting empty and resetting **per case**. So a service that drives an
+  agent can be exercised end to end, and you can assert on accumulated state.
 
 See the [testing reference](../../reference/testing.md#test-integration--multi-worker-integration-tests)
 and [`karn.integration.*` errors](../troubleshooting/integration-errors.md).

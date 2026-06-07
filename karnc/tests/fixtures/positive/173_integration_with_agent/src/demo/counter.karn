@@ -1,0 +1,27 @@
+context demo.counter
+
+exports transparent { CounterError }
+
+type CounterError = enum { Overflow }
+
+agent Counter {
+  key id: String
+
+  state {
+    count: Int,
+  }
+
+  on call increment() -> Effect[Result[Int, CounterError]] {
+    let next = self.state.count + 1
+    commit { ...self.state, count: next }
+    Ok(next)
+  }
+}
+
+service bump {
+  on call(id: String) -> Effect[Result[Int, CounterError]] {
+    let c = Counter(id)
+    let t <- c.increment()
+    t
+  }
+}
