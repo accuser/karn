@@ -5,6 +5,11 @@ production, generated from the parser:
 
 {{#grammar http_handler}}
 
+**Static semantics.** Beyond parsing, an `http_handler` is constrained by these
+diagnostics, generated from the compiler's registry:
+
+{{#grammar-semantics http_handler}}
+
 ## Handler form
 
 ```karn

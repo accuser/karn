@@ -1,0 +1,855 @@
+{
+  "_generated": "Generated from the grammar_symbol field of karnc/src/diagnostics.rs. Do not edit by hand. Regenerate with: KARN_BLESS=1 cargo test -p karnc --test diagnostics_registry",
+  "agent_decl": [
+    {
+      "code": "karn.agent.construction_arity",
+      "summary": "An agent was constructed with the wrong number of key arguments."
+    },
+    {
+      "code": "karn.agent.handler_arity",
+      "summary": "An agent handler was called with the wrong number of arguments."
+    },
+    {
+      "code": "karn.agent.handler_not_found",
+      "summary": "Called a handler the agent does not declare."
+    },
+    {
+      "code": "karn.agent.key_mismatch",
+      "summary": "An agent key argument has the wrong type."
+    },
+    {
+      "code": "karn.agent.outside_context",
+      "summary": "An `agent` was declared outside a context."
+    },
+    {
+      "code": "karn.agent.return_not_effect",
+      "summary": "An agent handler's return type is not an `Effect`."
+    },
+    {
+      "code": "karn.parse.empty_agent",
+      "summary": "An `agent` body is empty."
+    },
+    {
+      "code": "karn.parse.expected_agent_key",
+      "summary": "Expected a `key` declaration in an agent."
+    },
+    {
+      "code": "karn.resolve.duplicate_agent",
+      "summary": "Two agents share a name."
+    }
+  ],
+  "assert_expr": [
+    {
+      "code": "karn.assert.non_bool",
+      "summary": "`assert` was given a non-`Bool` expression."
+    },
+    {
+      "code": "karn.assert.outside_test",
+      "summary": "`assert` was used outside a test case body."
+    }
+  ],
+  "base_type": [
+    {
+      "code": "karn.parse.expected_base_type",
+      "summary": "Expected a base type."
+    }
+  ],
+  "binary_expr": [
+    {
+      "code": "karn.parse.non_associative",
+      "summary": "A non-associative operator was chained (e.g. `a == b == c`)."
+    }
+  ],
+  "call": [
+    {
+      "code": "karn.resolve.arity_mismatch",
+      "summary": "A function was called with the wrong number of arguments."
+    },
+    {
+      "code": "karn.resolve.param_as_function",
+      "summary": "A value (such as a parameter) was called as a function."
+    },
+    {
+      "code": "karn.resolve.type_as_function",
+      "summary": "A type name was called as if it were a function."
+    },
+    {
+      "code": "karn.resolve.unknown_function",
+      "summary": "Called a function that does not exist."
+    },
+    {
+      "code": "karn.types.argument_mismatch",
+      "summary": "A function argument has the wrong type."
+    }
+  ],
+  "capability_decl": [
+    {
+      "code": "karn.capability.op_arity",
+      "summary": "A capability operation was called with the wrong number of arguments."
+    },
+    {
+      "code": "karn.capability.outside_context",
+      "summary": "A `capability` was declared outside a context."
+    },
+    {
+      "code": "karn.capability.unknown_operation",
+      "summary": "Referenced an operation the capability does not declare."
+    },
+    {
+      "code": "karn.parse.empty_capability",
+      "summary": "A `capability` body is empty."
+    },
+    {
+      "code": "karn.resolve.duplicate_capability",
+      "summary": "Two capabilities share a name."
+    }
+  ],
+  "capability_op": [
+    {
+      "code": "karn.parse.expected_capability_op",
+      "summary": "Expected a capability operation."
+    }
+  ],
+  "commit_stmt": [
+    {
+      "code": "karn.commit.outside_agent",
+      "summary": "`commit` was used outside an agent handler."
+    },
+    {
+      "code": "karn.commit.two_reachable_commits",
+      "summary": "Two `commit` statements are reachable on the same execution path."
+    },
+    {
+      "code": "karn.commit.wrong_state_type",
+      "summary": "A `commit` value does not match the agent's state type."
+    }
+  ],
+  "consumes_decl": [
+    {
+      "code": "karn.consumes.alias_conflict",
+      "summary": "Two `consumes` aliases collide."
+    },
+    {
+      "code": "karn.consumes.in_commons",
+      "summary": "`consumes` appears in a `commons` (it is only valid in a context)."
+    },
+    {
+      "code": "karn.consumes.name_conflict",
+      "summary": "A `consumes` name collides with another name in scope."
+    },
+    {
+      "code": "karn.consumes.self_reference",
+      "summary": "A context `consumes` itself."
+    },
+    {
+      "code": "karn.consumes.service_arity",
+      "summary": "A consumed service was called with the wrong number of arguments."
+    },
+    {
+      "code": "karn.consumes.target_is_commons",
+      "summary": "`consumes` targets a `commons` instead of a context."
+    },
+    {
+      "code": "karn.consumes.unknown_context",
+      "summary": "`consumes` names a context that does not exist."
+    },
+    {
+      "code": "karn.consumes.unknown_service",
+      "summary": "Called a service the consumed context does not declare."
+    },
+    {
+      "code": "karn.parse.consumes_after_decls",
+      "summary": "`consumes` appears after other declarations."
+    },
+    {
+      "code": "karn.resolve.unconsumed_context",
+      "summary": "A context's service was called without a `consumes` declaration."
+    }
+  ],
+  "context_decl": [
+    {
+      "code": "karn.parse.unexpected_context",
+      "summary": "A `context` appeared where it is not allowed."
+    }
+  ],
+  "cron_handler": [
+    {
+      "code": "karn.cron.bad_params",
+      "summary": "An `on cron` handler declares more than one parameter, or a non-`Int` one."
+    },
+    {
+      "code": "karn.cron.duplicate_schedule",
+      "summary": "Two `on cron` handlers declare the same schedule."
+    },
+    {
+      "code": "karn.cron.invalid_schedule",
+      "summary": "A cron expression is not five whitespace-separated fields."
+    },
+    {
+      "code": "karn.cron.return_not_effect_result",
+      "summary": "An `on cron` handler does not return `Effect[Result[(), E]]`."
+    },
+    {
+      "code": "karn.parse.cron_in_agent",
+      "summary": "An `on cron` handler was declared in an agent."
+    }
+  ],
+  "effect_let_stmt": [
+    {
+      "code": "karn.effect.bind_in_pure_context",
+      "summary": "An `<-` bind was used in a pure (non-effectful) context."
+    },
+    {
+      "code": "karn.effect.bind_on_non_effect",
+      "summary": "An `<-` bind was applied to a non-`Effect` value."
+    }
+  ],
+  "err_expr": [
+    {
+      "code": "karn.types.err_value_mismatch",
+      "summary": "An `Err` payload has the wrong type."
+    }
+  ],
+  "exports_decl": [
+    {
+      "code": "karn.exports.capability_not_provided",
+      "summary": "An exported capability has no provider in its context."
+    },
+    {
+      "code": "karn.exports.conflicting_visibility",
+      "summary": "A type is exported with conflicting visibilities."
+    },
+    {
+      "code": "karn.exports.duplicate_export",
+      "summary": "The same name is exported more than once."
+    },
+    {
+      "code": "karn.exports.duplicate_in_clause",
+      "summary": "A name appears twice in one `exports` clause."
+    },
+    {
+      "code": "karn.exports.undeclared_capability",
+      "summary": "`exports capability` names a capability that is not declared."
+    },
+    {
+      "code": "karn.exports.undeclared_type",
+      "summary": "`exports` names a type that is not declared."
+    },
+    {
+      "code": "karn.parse.expected_visibility",
+      "summary": "Expected a visibility keyword."
+    },
+    {
+      "code": "karn.parse.exports_after_decls",
+      "summary": "`exports` appears after other declarations."
+    }
+  ],
+  "field_access": [
+    {
+      "code": "karn.resolve.unknown_field",
+      "summary": "Accessed a field the record does not have."
+    },
+    {
+      "code": "karn.resolve.unknown_static_member",
+      "summary": "Referenced an unknown static member (e.g. `T.x`)."
+    },
+    {
+      "code": "karn.types.field_access_on_non_record",
+      "summary": "Field access on a value that is not a record."
+    },
+    {
+      "code": "karn.types.opaque_raw_outside",
+      "summary": "`.raw` on an opaque type was used outside its defining commons."
+    },
+    {
+      "code": "karn.types.opaque_unsafe_outside",
+      "summary": "`.unsafe` on an opaque type was used outside its defining context."
+    },
+    {
+      "code": "karn.types.unknown_field",
+      "summary": "Referenced a field the record type does not declare."
+    },
+    {
+      "code": "karn.types.unknown_static_member",
+      "summary": "Referenced an unknown static member on a type."
+    }
+  ],
+  "fn_decl": [
+    {
+      "code": "karn.resolve.duplicate_fn",
+      "summary": "Two functions share a name."
+    },
+    {
+      "code": "karn.resolve.duplicate_method",
+      "summary": "Two methods share a name."
+    }
+  ],
+  "generic_type_ref": [
+    {
+      "code": "karn.parse.generic_arg_count",
+      "summary": "Wrong number of generic type arguments."
+    }
+  ],
+  "given_clause": [
+    {
+      "code": "karn.given.cross_context_unknown_capability",
+      "summary": "`given B.Cap` names a capability the consumed context does not export."
+    },
+    {
+      "code": "karn.given.undeclared_capability",
+      "summary": "A handler uses a capability it did not declare with `given`."
+    },
+    {
+      "code": "karn.given.unknown_capability",
+      "summary": "`given` names a capability that does not exist."
+    },
+    {
+      "code": "karn.given.unused_capability",
+      "summary": "A `given` capability is never used (warning)."
+    }
+  ],
+  "handler": [
+    {
+      "code": "karn.parse.expected_handler",
+      "summary": "Expected a handler."
+    },
+    {
+      "code": "karn.parse.unknown_handler_kind",
+      "summary": "An unknown handler kind (expected `call` or `http`)."
+    }
+  ],
+  "http_handler": [
+    {
+      "code": "karn.http.body_on_get_or_delete",
+      "summary": "A GET or DELETE handler declares a `body` parameter."
+    },
+    {
+      "code": "karn.http.duplicate_route",
+      "summary": "Two handlers share the same method and route."
+    },
+    {
+      "code": "karn.http.extra_param",
+      "summary": "A handler parameter is neither a path parameter nor `body`."
+    },
+    {
+      "code": "karn.http.invalid_path",
+      "summary": "An HTTP route path is malformed."
+    },
+    {
+      "code": "karn.http.path_param_not_stringy",
+      "summary": "A path parameter's type is not constructible from a string."
+    },
+    {
+      "code": "karn.http.reserved_prefix",
+      "summary": "A route uses the reserved `/_karn/` prefix."
+    },
+    {
+      "code": "karn.http.return_not_effect_http_result",
+      "summary": "An HTTP handler does not return `Effect[HttpResult[T]]`."
+    },
+    {
+      "code": "karn.http.unbound_path_param",
+      "summary": "A `:name` route segment has no matching handler parameter."
+    },
+    {
+      "code": "karn.parse.http_in_agent",
+      "summary": "An `on http` handler was declared in an agent."
+    }
+  ],
+  "http_method": [
+    {
+      "code": "karn.parse.unknown_http_method",
+      "summary": "An unknown HTTP method."
+    }
+  ],
+  "identifier": [
+    {
+      "code": "karn.parse.reserved_keyword",
+      "summary": "A reserved keyword was used as an identifier."
+    }
+  ],
+  "if_expr": [
+    {
+      "code": "karn.types.if_branch_mismatch",
+      "summary": "The branches of an `if` have different types."
+    },
+    {
+      "code": "karn.types.if_non_bool_cond",
+      "summary": "An `if` condition is not a `Bool`."
+    }
+  ],
+  "integration_decl": [
+    {
+      "code": "karn.integration.duplicate_suite",
+      "summary": "Two integration tests share the same suite name."
+    },
+    {
+      "code": "karn.integration.unwired_dependency",
+      "summary": "A participant consumes a context that is not wired into the integration test."
+    }
+  ],
+  "is_expr": [
+    {
+      "code": "karn.types.is_base_mismatch",
+      "summary": "An `is` refinement check is applied to a value of the wrong base type."
+    },
+    {
+      "code": "karn.types.is_non_sum",
+      "summary": "`is` was applied to a value that is not a sum type."
+    },
+    {
+      "code": "karn.types.is_unknown_variant",
+      "summary": "`is` names a variant the type does not have."
+    }
+  ],
+  "let_stmt": [
+    {
+      "code": "karn.resolve.let_shadows_fn",
+      "summary": "A `let` binding shadows a function."
+    },
+    {
+      "code": "karn.resolve.let_shadows_type",
+      "summary": "A `let` binding shadows a type."
+    },
+    {
+      "code": "karn.types.let_annotation_mismatch",
+      "summary": "A `let` value does not match its type annotation."
+    }
+  ],
+  "match_arm": [
+    {
+      "code": "karn.types.duplicate_variant_arm",
+      "summary": "A `match` has two arms for the same variant."
+    },
+    {
+      "code": "karn.types.match_arm_mismatch",
+      "summary": "A `match` arm has a different type from the others."
+    },
+    {
+      "code": "karn.types.unreachable_arm",
+      "summary": "A `match` arm is unreachable."
+    }
+  ],
+  "match_expr": [
+    {
+      "code": "karn.parse.empty_match",
+      "summary": "A `match` has no arms."
+    },
+    {
+      "code": "karn.types.match_non_sum_discriminant",
+      "summary": "`match` was applied to a value that is not a sum type."
+    },
+    {
+      "code": "karn.types.non_exhaustive_match",
+      "summary": "A `match` does not cover every variant."
+    }
+  ],
+  "method_call": [
+    {
+      "code": "karn.types.method_arity",
+      "summary": "A method was called with the wrong number of arguments."
+    },
+    {
+      "code": "karn.types.method_not_found",
+      "summary": "Called a method the type does not have."
+    },
+    {
+      "code": "karn.types.method_on_non_named_type",
+      "summary": "A method was called on a built-in type that has no methods."
+    }
+  ],
+  "mock_expr": [
+    {
+      "code": "karn.mock.arity",
+      "summary": "`Mock[T]` was given the wrong number of pin arguments."
+    },
+    {
+      "code": "karn.mock.literal_violates",
+      "summary": "A pinned `Mock[T]` value violates the type's refinement."
+    },
+    {
+      "code": "karn.mock.needs_pin",
+      "summary": "A bare `Mock[T]` cannot generate a value (e.g. a `Matches` string); pin one."
+    },
+    {
+      "code": "karn.mock.outside_test",
+      "summary": "`Mock[T]` was used outside a test case body."
+    },
+    {
+      "code": "karn.mock.pin_not_literal",
+      "summary": "A `Mock[T]` pin argument is not a compile-time literal."
+    },
+    {
+      "code": "karn.mock.pin_unsupported",
+      "summary": "A pin was given for a type kind that does not support pinning."
+    },
+    {
+      "code": "karn.mock.unknown_type",
+      "summary": "`Mock[T]` names a type that does not resolve."
+    },
+    {
+      "code": "karn.mock.unsupported_kind",
+      "summary": "`Mock[T]` cannot fabricate a value for this kind of type."
+    }
+  ],
+  "mocks_decl": [
+    {
+      "code": "karn.integration.mock_in_integration",
+      "summary": "`mocks` is not allowed in an integration test."
+    },
+    {
+      "code": "karn.mock.duplicate_target",
+      "summary": "A `mocks` target is declared more than once."
+    },
+    {
+      "code": "karn.mock.in_commons_test",
+      "summary": "`mocks` used in a commons test, where there is no dependency to inject."
+    },
+    {
+      "code": "karn.mock.signature_mismatch",
+      "summary": "A `mocks` implementation's signature does not match the capability."
+    },
+    {
+      "code": "karn.mock.unknown_target",
+      "summary": "`mocks` names a capability that is not in scope."
+    },
+    {
+      "code": "karn.parse.empty_mock_body",
+      "summary": "A `mocks` body is empty."
+    }
+  ],
+  "none_expr": [
+    {
+      "code": "karn.types.cannot_infer_option_type_param",
+      "summary": "The value type of `None` could not be inferred."
+    }
+  ],
+  "number_literal": [
+    {
+      "code": "karn.lex.integer_overflow",
+      "summary": "An integer literal is out of range."
+    }
+  ],
+  "ok_expr": [
+    {
+      "code": "karn.types.ok_value_mismatch",
+      "summary": "An `Ok` payload has the wrong type."
+    }
+  ],
+  "param": [
+    {
+      "code": "karn.resolve.duplicate_param",
+      "summary": "A parameter name is repeated."
+    }
+  ],
+  "predicate_name": [
+    {
+      "code": "karn.parse.unknown_predicate",
+      "summary": "An unknown refinement predicate."
+    }
+  ],
+  "provider_decl": [
+    {
+      "code": "karn.provider.dependency_cycle",
+      "summary": "Providers form a capability dependency cycle through `given`."
+    },
+    {
+      "code": "karn.provider.extra_operation",
+      "summary": "A `provides` block implements an operation not in the capability."
+    },
+    {
+      "code": "karn.provider.missing_operation",
+      "summary": "A `provides` block is missing a capability operation."
+    },
+    {
+      "code": "karn.provider.outside_context",
+      "summary": "`provides` was declared outside a context."
+    },
+    {
+      "code": "karn.provider.signature_mismatch",
+      "summary": "A `provides` operation's signature does not match the capability."
+    },
+    {
+      "code": "karn.provider.unknown_capability",
+      "summary": "`provides` names a capability that does not exist."
+    },
+    {
+      "code": "karn.resolve.duplicate_provider",
+      "summary": "A capability is provided more than once."
+    }
+  ],
+  "provider_op": [
+    {
+      "code": "karn.parse.expected_provider_op",
+      "summary": "Expected a provider operation."
+    }
+  ],
+  "question_expr": [
+    {
+      "code": "karn.types.question_error_mismatch",
+      "summary": "`?` propagates an error type incompatible with the function's."
+    },
+    {
+      "code": "karn.types.question_on_non_result",
+      "summary": "`?` was applied to a non-`Result` value."
+    },
+    {
+      "code": "karn.types.question_outside_result",
+      "summary": "`?` used in a function that does not return a `Result`."
+    }
+  ],
+  "queue_handler": [
+    {
+      "code": "karn.parse.queue_in_agent",
+      "summary": "An `on queue` handler was declared in an agent."
+    },
+    {
+      "code": "karn.queue.bad_params",
+      "summary": "An `on queue` handler does not take exactly one `message` parameter."
+    },
+    {
+      "code": "karn.queue.duplicate_consumer",
+      "summary": "Two `on queue` handlers consume the same queue."
+    },
+    {
+      "code": "karn.queue.invalid_name",
+      "summary": "An `on queue` handler has an empty queue name."
+    },
+    {
+      "code": "karn.queue.return_not_effect_result",
+      "summary": "An `on queue` handler does not return `Effect[Result[(), E]]`."
+    }
+  ],
+  "record_construction": [
+    {
+      "code": "karn.resolve.duplicate_field_init",
+      "summary": "A record construction initialises a field twice."
+    },
+    {
+      "code": "karn.resolve.missing_field",
+      "summary": "A record construction omits a required field."
+    },
+    {
+      "code": "karn.resolve.not_a_record_type",
+      "summary": "Record syntax was used on a non-record type."
+    },
+    {
+      "code": "karn.resolve.opaque_record_construction",
+      "summary": "An opaque type was constructed with record syntax."
+    },
+    {
+      "code": "karn.types.field_value_mismatch",
+      "summary": "A record field was given a value of the wrong type."
+    },
+    {
+      "code": "karn.types.opaque_record_construction",
+      "summary": "An opaque type was constructed with record syntax."
+    }
+  ],
+  "record_field": [
+    {
+      "code": "karn.types.field_refinement_not_base",
+      "summary": "An inline field refinement requires a base or refined type."
+    }
+  ],
+  "record_spread": [
+    {
+      "code": "karn.record_spread.field_type_mismatch",
+      "summary": "A record-spread override has the wrong type for the field."
+    },
+    {
+      "code": "karn.record_spread.non_record_base",
+      "summary": "The base of a record spread is not a record."
+    },
+    {
+      "code": "karn.record_spread.type_mismatch",
+      "summary": "A record spread's base is a different record type."
+    },
+    {
+      "code": "karn.record_spread.unknown_field",
+      "summary": "A record spread overrides a field the record does not have."
+    }
+  ],
+  "record_type": [
+    {
+      "code": "karn.resolve.duplicate_field",
+      "summary": "A record declares a field twice."
+    },
+    {
+      "code": "karn.resolve.recursive_record_field",
+      "summary": "A record directly contains a field of its own type."
+    }
+  ],
+  "refined_type": [
+    {
+      "code": "karn.refine.literal_violates",
+      "summary": "A literal does not satisfy the refined type's predicate."
+    }
+  ],
+  "refinement": [
+    {
+      "code": "karn.parse.expected_predicate",
+      "summary": "Expected a refinement predicate."
+    },
+    {
+      "code": "karn.types.empty_refinement",
+      "summary": "A refinement admits no values (contradictory predicates)."
+    },
+    {
+      "code": "karn.types.invalid_regex",
+      "summary": "A `Matches` predicate contains an invalid regular expression."
+    },
+    {
+      "code": "karn.types.inverted_range",
+      "summary": "An `InRange` predicate has its bounds inverted."
+    },
+    {
+      "code": "karn.types.negative_length",
+      "summary": "A length predicate was given a negative value."
+    },
+    {
+      "code": "karn.types.predicate_base_mismatch",
+      "summary": "A predicate does not apply to the type's base (e.g. a string predicate on an `Int`)."
+    }
+  ],
+  "self_expr": [
+    {
+      "code": "karn.parse.self_outside_method",
+      "summary": "`self` used outside a method or handler."
+    },
+    {
+      "code": "karn.resolve.self_outside_method",
+      "summary": "`self` referenced outside a method or handler."
+    }
+  ],
+  "service_decl": [
+    {
+      "code": "karn.parse.empty_service",
+      "summary": "A `service` body is empty."
+    },
+    {
+      "code": "karn.resolve.duplicate_service",
+      "summary": "Two services share a name."
+    },
+    {
+      "code": "karn.service.outside_context",
+      "summary": "A `service` was declared outside a context."
+    },
+    {
+      "code": "karn.service.return_not_effect",
+      "summary": "A service handler's return type is not an `Effect`."
+    }
+  ],
+  "some_expr": [
+    {
+      "code": "karn.types.some_value_mismatch",
+      "summary": "A `Some` payload has the wrong type."
+    }
+  ],
+  "state_decl": [
+    {
+      "code": "karn.agents.bad_state_initialiser",
+      "summary": "An agent state-field initialiser is not a static value of the field's type."
+    },
+    {
+      "code": "karn.agents.non_zeroable_state_field",
+      "summary": "An agent state field has no initialiser and no implicit zero value."
+    }
+  ],
+  "string_literal": [
+    {
+      "code": "karn.lex.bad_escape",
+      "summary": "An invalid escape sequence in a string literal."
+    },
+    {
+      "code": "karn.lex.unterminated_string",
+      "summary": "A string literal is not terminated."
+    }
+  ],
+  "sum_type": [
+    {
+      "code": "karn.resolve.duplicate_variant",
+      "summary": "A sum type declares a variant twice."
+    }
+  ],
+  "test_case": [
+    {
+      "code": "karn.test.duplicate_case_name",
+      "summary": "Two test cases share a description."
+    }
+  ],
+  "test_decl": [
+    {
+      "code": "karn.parse.unexpected_test",
+      "summary": "A `test` appeared where it is not allowed."
+    },
+    {
+      "code": "karn.test.unknown_target",
+      "summary": "A `test` block targets a unit that does not exist."
+    }
+  ],
+  "type_decl": [
+    {
+      "code": "karn.resolve.duplicate_type",
+      "summary": "Two types share a name."
+    }
+  ],
+  "uses_decl": [
+    {
+      "code": "karn.parse.uses_after_decls",
+      "summary": "`uses` appears after other declarations."
+    },
+    {
+      "code": "karn.uses.name_conflict",
+      "summary": "A `uses` name collides with another name."
+    },
+    {
+      "code": "karn.uses.self_reference",
+      "summary": "A commons `uses` itself."
+    },
+    {
+      "code": "karn.uses.target_is_context",
+      "summary": "`uses` targets a context instead of a commons."
+    },
+    {
+      "code": "karn.uses.unknown_commons",
+      "summary": "`uses` names a commons that does not exist."
+    }
+  ],
+  "variant_pattern": [
+    {
+      "code": "karn.types.mixed_pattern_bindings",
+      "summary": "A pattern mixes named and positional bindings."
+    },
+    {
+      "code": "karn.types.pattern_arity",
+      "summary": "A pattern binds the wrong number of payload fields."
+    },
+    {
+      "code": "karn.types.pattern_type_mismatch",
+      "summary": "A pattern's type does not match the matched value."
+    },
+    {
+      "code": "karn.types.unknown_pattern_field",
+      "summary": "A pattern names a field the variant does not have."
+    },
+    {
+      "code": "karn.types.unknown_variant_in_pattern",
+      "summary": "A pattern names a variant the sum type does not have."
+    }
+  ],
+  "wires_decl": [
+    {
+      "code": "karn.integration.duplicate_participant",
+      "summary": "A context is listed more than once in a `wires` clause."
+    },
+    {
+      "code": "karn.integration.too_few_participants",
+      "summary": "An integration test wires fewer than two contexts."
+    },
+    {
+      "code": "karn.integration.unknown_participant",
+      "summary": "A `wires` clause names something that is not a declared context."
+    }
+  ]
+}

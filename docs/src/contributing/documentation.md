@@ -24,7 +24,7 @@ A reference page can embed one grammar production by name. Put a line whose only
 content is the directive:
 
 ```text
-{{#grammar http_handler}}
+\{{#grammar http_handler}}
 ```
 
 The `mdbook-karn-grammar` preprocessor replaces it with an `ebnf` block holding
@@ -32,6 +32,23 @@ that production, rendered from `tree-sitter-karn/src/grammar.json` (the same
 source as the [grammar appendix](../reference/grammar.md)) so it cannot drift
 from the parser. The rendered production is generated — never hand-edit it. An
 unknown rule name fails the build, so a typo cannot silently vanish.
+
+## Embedding a construct's static semantics
+
+A production says what *parses*; the diagnostics say what is *legal beyond
+parsing*. Embed the diagnostics that constrain a construct with:
+
+```text
+\{{#grammar-semantics http_handler}}
+```
+
+The same preprocessor replaces it with a bullet list of the governing
+diagnostics, generated from `docs/grammar-semantics.json`. That file is itself
+generated from the `grammar_symbol` field of each entry in
+`karnc/src/diagnostics.rs` — the single source of the mapping — and regenerated
+by the `diagnostics_registry` test (see below). A construct with no diagnostics
+yields a neutral line rather than failing, since an unconstrained production is
+legitimate; to add or change a mapping, edit `grammar_symbol` and re-bless.
 
 ## The guardrails
 
@@ -66,6 +83,11 @@ Four mechanisms keep the docs honest; all run in CI.
    ```
 
    Never hand-edit a generated page — the header says so, and CI will revert you.
+
+   The `diagnostics_registry` test also generates `docs/grammar-semantics.json`
+   (the rule → diagnostics map behind `{{#grammar-semantics}}`) and checks every
+   `grammar_symbol` names a real grammar rule, so a mistyped mapping fails the
+   build.
 
 3. **Link checking.** `mdbook-linkcheck` validates internal links on every build.
 

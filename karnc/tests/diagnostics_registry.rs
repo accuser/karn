@@ -12,7 +12,13 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use karnc::diagnostics::{REGISTRY, render_markdown};
+use karnc::diagnostics::{REGISTRY, render_grammar_semantics_json, render_markdown};
+
+fn grammar_json() -> String {
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tree-sitter-karn/src/grammar.json");
+    fs::read_to_string(path).expect("read grammar.json")
+}
 
 /// Collect every `"karn.x.y"` string literal across the compiler source,
 /// excluding the registry module itself.
@@ -79,6 +85,39 @@ fn registry_matches_codes_used_in_source() {
         extra.is_empty(),
         "codes in REGISTRY that are no longer used in source: {extra:#?}\n\
          Remove them from karnc/src/diagnostics.rs."
+    );
+}
+
+#[test]
+fn grammar_symbols_are_real_grammar_rules() {
+    let grammar = grammar_json();
+    for info in REGISTRY {
+        for sym in info.grammar_symbol {
+            assert!(
+                karn_grammar::render_rule(&grammar, sym).is_ok(),
+                "diagnostic `{}` maps to `{sym}`, which is not a top-level grammar rule.\n\
+                 Fix the grammar_symbol in karnc/src/diagnostics.rs.",
+                info.code
+            );
+        }
+    }
+}
+
+#[test]
+fn generated_grammar_semantics_json_is_up_to_date() {
+    let file = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../docs/grammar-semantics.json");
+    let rendered = render_grammar_semantics_json();
+
+    if std::env::var_os("KARN_BLESS").is_some() {
+        fs::write(&file, &rendered).unwrap();
+        return;
+    }
+
+    let current = fs::read_to_string(&file).unwrap_or_default();
+    assert_eq!(
+        current, rendered,
+        "docs/grammar-semantics.json is out of date with the registry.\n\
+         Regenerate with: KARN_BLESS=1 cargo test -p karnc --test diagnostics_registry"
     );
 }
 
