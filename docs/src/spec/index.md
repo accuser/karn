@@ -42,9 +42,10 @@ means.
 - [§2 Notation & conventions](conventions.md) — grammar notation; how rules are
   written and linked to diagnostics; the translation-defined model; normative vs
   informative; citation.
-- §3 Lexical grammar — tokens, identifiers, literals, comments, doc-blocks,
-  trivia.
-- §4 Syntactic grammar — the productions, organised by construct.
+- [§3 Lexical grammar](lexical-grammar.md) — tokens, identifiers, literals,
+  comments, doc-blocks, trivia.
+- [§4 Syntactic grammar](syntactic-grammar.md) — the productions, organised by
+  construct.
 - §5 Static semantics — well-formedness per construct, woven to diagnostics.
 - §6 The type system — base, refined, opaque, sum, record, and enum types;
   `Result`, `Option`, `Effect`; refinement and admission.
@@ -56,6 +57,6 @@ means.
   §5 rules.
 - §10 Conformance & test corpus — the `karnc` fixture corpus as the conformance
   suite.
-- §11 Grammar appendix — the complete generated grammar.
+- [§11 Complete grammar](grammar-appendix.md) — the complete generated grammar.
 - Appendix A — Planned features (post-MVP, non-normative).
 - Appendix B — Version history.

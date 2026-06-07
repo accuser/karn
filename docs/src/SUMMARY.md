@@ -104,6 +104,9 @@
 - [The Karn Language Specification](spec/index.md)
   - [§1 Scope & conformance](spec/scope.md)
   - [§2 Notation & conventions](spec/conventions.md)
+  - [§3 Lexical grammar](spec/lexical-grammar.md)
+  - [§4 Syntactic grammar](spec/syntactic-grammar.md)
+  - [§11 Complete grammar](spec/grammar-appendix.md)
 
 ---
 
