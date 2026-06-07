@@ -4,8 +4,16 @@
 //! compiled grammar JSON (`tree-sitter-karn/src/grammar.json`) as input and is
 //! otherwise location-agnostic, so the same renderer feeds both the full
 //! appendix page ([`render_appendix`]) and the per-rule includes embedded in
-//! curated reference pages ([`render_rule`]). Because both come from one
-//! implementation, an embedded production cannot drift from the appendix.
+//! the curated reference page ([`render_production`] / [`render_rule`]). Because
+//! both come from one implementation, an embedded production cannot drift from
+//! the appendix.
+//!
+//! **Display names.** Grammar rule names are parser-internal (`_type_ref`,
+//! `_expression`, …). For the reference we render *readable* names via
+//! [`display_name`]: a trivial `_x ::= y` wrapper collapses to its target, an
+//! optional override applies, otherwise a single leading underscore is stripped.
+//! The transform is applied to both rule heads and the nonterminal references
+//! inside productions, so the whole reference reads as language, not internals.
 //!
 //! See `karnc/tests/grammar_reference.rs` (the appendix generator) and
 //! `mdbook-karn-grammar` (the `{{#grammar <rule>}}` include preprocessor).
@@ -13,7 +21,7 @@
 use std::error::Error;
 use std::fmt;
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 /// An error rendering a grammar production.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,21 +48,58 @@ impl fmt::Display for GrammarError {
 
 impl Error for GrammarError {}
 
+/// Display-name overrides for rules whose mechanical name reads badly. Each key
+/// must be a real top-level rule (checked in tests). Keep this tiny — most rules
+/// read fine after collapsing wrappers and stripping the leading underscore.
+const OVERRIDES: &[(&str, &str)] = &[];
+
+fn rules_of(grammar: &Value) -> Option<&Map<String, Value>> {
+    grammar.get("rules").and_then(Value::as_object)
+}
+
+/// If `name`'s body is a single `SYMBOL` (a trivial `_x ::= y` wrapper), return
+/// the target rule name. Such wrappers are collapsed: they never appear as their
+/// own production, and references to them render as the target's display name.
+fn trivial_wrapper_target<'a>(rules: &'a Map<String, Value>, name: &str) -> Option<&'a str> {
+    let body = rules.get(name)?;
+    if body.get("type").and_then(Value::as_str) == Some("SYMBOL") {
+        body.get("name").and_then(Value::as_str)
+    } else {
+        None
+    }
+}
+
+/// The readable display name of a grammar rule: collapse a trivial-wrapper chain
+/// to its target, apply any override, else strip a single leading underscore.
+fn display_name_in(rules: &Map<String, Value>, name: &str) -> String {
+    if let Some(target) = trivial_wrapper_target(rules, name) {
+        return display_name_in(rules, target);
+    }
+    if let Some((_, disp)) = OVERRIDES.iter().find(|(k, _)| *k == name) {
+        return (*disp).to_string();
+    }
+    name.strip_prefix('_').unwrap_or(name).to_string()
+}
+
 /// Render a grammar node to EBNF text plus a precedence level:
 /// 0 = choice (`a | b`), 1 = sequence (`a b`), 2 = atom / postfix (`x`, `(…)*`).
-fn render(node: &Value) -> (String, u8) {
+/// Nonterminal (`SYMBOL`) references are rendered with their display name.
+fn render(rules: &Map<String, Value>, node: &Value) -> (String, u8) {
     match node.get("type").and_then(Value::as_str).unwrap_or("") {
-        "SYMBOL" => (node["name"].as_str().unwrap_or("?").to_string(), 2),
+        "SYMBOL" => (
+            display_name_in(rules, node["name"].as_str().unwrap_or("?")),
+            2,
+        ),
         "STRING" => (format!("\"{}\"", node["value"].as_str().unwrap_or("")), 2),
         "PATTERN" => (format!("/{}/", node["value"].as_str().unwrap_or("")), 2),
         "BLANK" => ("ε".to_string(), 2),
         // Wrappers that don't affect the surface grammar: render their content.
         "PREC" | "PREC_LEFT" | "PREC_RIGHT" | "PREC_DYNAMIC" | "TOKEN" | "IMMEDIATE_TOKEN"
-        | "FIELD" | "ALIAS" => render(&node["content"]),
-        "REPEAT" => (format!("{}*", wrap_atom(&node["content"])), 2),
-        "REPEAT1" => (format!("{}+", wrap_atom(&node["content"])), 2),
+        | "FIELD" | "ALIAS" => render(rules, &node["content"]),
+        "REPEAT" => (format!("{}*", wrap_atom(rules, &node["content"])), 2),
+        "REPEAT1" => (format!("{}+", wrap_atom(rules, &node["content"])), 2),
         "SEQ" => {
-            let parts: Vec<String> = members(node).iter().map(|m| wrap(m, 1)).collect();
+            let parts: Vec<String> = members(node).iter().map(|m| wrap(rules, m, 1)).collect();
             (parts.join(" "), 1)
         }
         "CHOICE" => {
@@ -69,13 +114,13 @@ fn render(node: &Value) -> (String, u8) {
             if has_blank {
                 // An optional: `X?`.
                 if non_blank.len() == 1 {
-                    (format!("{}?", wrap_atom(non_blank[0])), 2)
+                    (format!("{}?", wrap_atom(rules, non_blank[0])), 2)
                 } else {
-                    let inner: Vec<String> = non_blank.iter().map(|m| render(m).0).collect();
+                    let inner: Vec<String> = non_blank.iter().map(|m| render(rules, m).0).collect();
                     (format!("({})?", inner.join(" | ")), 2)
                 }
             } else {
-                let inner: Vec<String> = non_blank.iter().map(|m| render(m).0).collect();
+                let inner: Vec<String> = non_blank.iter().map(|m| render(rules, m).0).collect();
                 (inner.join(" | "), 0)
             }
         }
@@ -88,13 +133,13 @@ fn members(node: &Value) -> Vec<Value> {
 }
 
 /// Wrap so the result can be a postfix operand (`*`, `+`, `?`): needs an atom.
-fn wrap_atom(node: &Value) -> String {
-    wrap(node, 2)
+fn wrap_atom(rules: &Map<String, Value>, node: &Value) -> String {
+    wrap(rules, node, 2)
 }
 
 /// Wrap `node`'s rendering in parens if its level is below `min`.
-fn wrap(node: &Value, min: u8) -> String {
-    let (s, level) = render(node);
+fn wrap(rules: &Map<String, Value>, node: &Value, min: u8) -> String {
+    let (s, level) = render(rules, node);
     if level < min { format!("({s})") } else { s }
 }
 
@@ -107,34 +152,45 @@ fn render_extra(node: &Value) -> String {
     }
 }
 
-/// Render the complete grammar reference page (`docs/src/reference/grammar.md`):
-/// the generated-file header, the notation note, the full `ebnf` block of every
-/// production, and the Tokens & trivia section.
+/// Render the complete grammar reference appendix
+/// (`docs/src/reference/grammar-appendix.md`): the generated-file header, the
+/// notation note, the full `ebnf` block of every production (display names,
+/// trivial wrappers collapsed), and the Tokens & trivia section.
 pub fn render_appendix(grammar_json: &str) -> String {
     let grammar: Value = serde_json::from_str(grammar_json).expect("grammar.json parses");
 
     let mut out = String::new();
-    out.push_str("# Grammar\n\n");
+    out.push_str("# Complete grammar (appendix)\n\n");
     out.push_str(
         "<!-- GENERATED FILE — do not edit by hand.\n     \
          Source: tree-sitter-karn/src/grammar.json, via karnc/tests/grammar_reference.rs.\n     \
          Regenerate with: KARN_BLESS=1 cargo test -p karnc --test grammar_reference -->\n\n",
     );
-    out.push_str("The complete Karn grammar, generated from the `tree-sitter-karn` grammar.\n\n");
+    out.push_str(
+        "The complete Karn grammar, generated from the `tree-sitter-karn` grammar. \
+         For the annotated, per-construct reference see [Syntax & grammar](grammar.md).\n\n",
+    );
     out.push_str("**Notation.** ");
     out.push_str(
         "`\"x\"` a literal token · `/x/` a regular expression · `( … )?` optional · \
          `( … )*` zero or more · `( … )+` one or more · `a | b` choice · `ε` empty. \
-         Rule names beginning with `_` are internal helper rules (inlined into the \
-         syntax tree). `doc_block` is an external token — a `--- … ---` documentation \
-         block.\n\n",
+         Rule names are the readable display names (a leading `_` denotes an \
+         internal helper rule; trivial wrappers are collapsed). `doc_block` is an \
+         external token — a `--- … ---` documentation block.\n\n",
     );
 
     out.push_str("```ebnf\n");
-    if let Some(rules) = grammar.get("rules").and_then(Value::as_object) {
+    if let Some(rules) = rules_of(&grammar) {
         for (name, body) in rules {
-            let (rendered, _) = render(body);
-            out.push_str(&format!("{name} ::= {rendered}\n"));
+            // Trivial wrappers are collapsed into their target.
+            if trivial_wrapper_target(rules, name).is_some() {
+                continue;
+            }
+            let (rendered, _) = render(rules, body);
+            out.push_str(&format!(
+                "{} ::= {rendered}\n",
+                display_name_in(rules, name)
+            ));
         }
     }
     out.push_str("```\n\n");
@@ -158,26 +214,69 @@ pub fn render_appendix(grammar_json: &str) -> String {
     out
 }
 
-/// Render a single top-level production's right-hand side, exactly as it appears
-/// after `name ::= ` in the appendix's EBNF block. Prepend `"{name} ::= "` to
-/// reconstruct the full production line.
+/// Look up a rule body by name, erroring if the grammar is unparseable or the
+/// rule is not a top-level production.
+fn rule_body<'a>(grammar: &'a Value, name: &str) -> Result<&'a Value, GrammarError> {
+    grammar
+        .get("rules")
+        .and_then(Value::as_object)
+        .and_then(|rules| rules.get(name))
+        .ok_or_else(|| GrammarError::UnknownRule(name.to_string()))
+}
+
+/// Render a single production's right-hand side (display names applied), exactly
+/// as it appears after `<name> ::= ` in the appendix's EBNF block.
 ///
 /// Errors if the grammar JSON cannot be parsed, or if `name` is not a top-level
 /// rule of the grammar.
 pub fn render_rule(grammar_json: &str, name: &str) -> Result<String, GrammarError> {
     let grammar: Value =
         serde_json::from_str(grammar_json).map_err(|e| GrammarError::Parse(e.to_string()))?;
-    let body = grammar
+    let rules = grammar
         .get("rules")
         .and_then(Value::as_object)
-        .and_then(|rules| rules.get(name))
         .ok_or_else(|| GrammarError::UnknownRule(name.to_string()))?;
-    Ok(render(body).0)
+    let body = rule_body(&grammar, name)?;
+    Ok(render(rules, body).0)
+}
+
+/// Render a complete production line, `<display name> ::= <rhs>`, as it appears
+/// in the appendix (no surrounding fence). This is what `{{#grammar <rule>}}`
+/// embeds.
+pub fn render_production(grammar_json: &str, name: &str) -> Result<String, GrammarError> {
+    let grammar: Value =
+        serde_json::from_str(grammar_json).map_err(|e| GrammarError::Parse(e.to_string()))?;
+    let rules = grammar
+        .get("rules")
+        .and_then(Value::as_object)
+        .ok_or_else(|| GrammarError::UnknownRule(name.to_string()))?;
+    let body = rule_body(&grammar, name)?;
+    Ok(format!(
+        "{} ::= {}",
+        display_name_in(rules, name),
+        render(rules, body).0
+    ))
+}
+
+/// The readable display name for a top-level rule. Errors if the grammar is
+/// unparseable or `name` is not a top-level rule.
+pub fn display_name(grammar_json: &str, name: &str) -> Result<String, GrammarError> {
+    let grammar: Value =
+        serde_json::from_str(grammar_json).map_err(|e| GrammarError::Parse(e.to_string()))?;
+    let rules = grammar
+        .get("rules")
+        .and_then(Value::as_object)
+        .ok_or_else(|| GrammarError::UnknownRule(name.to_string()))?;
+    if !rules.contains_key(name) {
+        return Err(GrammarError::UnknownRule(name.to_string()));
+    }
+    Ok(display_name_in(rules, name))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::fs;
     use std::path::PathBuf;
 
@@ -187,23 +286,49 @@ mod tests {
         fs::read_to_string(path).expect("read grammar.json")
     }
 
+    fn rules(grammar: &Value) -> &Map<String, Value> {
+        grammar.get("rules").and_then(Value::as_object).unwrap()
+    }
+
     #[test]
-    fn render_rule_known_rules() {
+    fn render_rule_uses_display_names() {
         let g = grammar_json();
+        // `_pattern`/`_expression` render without their leading underscore.
         assert_eq!(
             render_rule(&g, "match_arm").unwrap(),
-            "_pattern \"=>\" _expression \",\"?"
+            "pattern \"=>\" expression \",\"?"
         );
+        // `http_method` is a plain choice, unchanged.
         assert_eq!(
             render_rule(&g, "http_method").unwrap(),
             "\"GET\" | \"POST\" | \"PUT\" | \"PATCH\" | \"DELETE\""
         );
-        // A more involved production exercises sequencing and optionals.
+        // `http_handler` references `_type_ref` and `block` — display, not raw.
+        let http = render_rule(&g, "http_handler").unwrap();
+        assert!(http.contains("type_ref"), "{http}");
+        assert!(!http.contains("_type_ref"), "{http}");
+        assert!(http.contains("block"), "{http}");
+    }
+
+    #[test]
+    fn render_production_includes_display_head() {
+        let g = grammar_json();
         assert_eq!(
-            render_rule(&g, "agent_decl").unwrap(),
-            "\"agent\" identifier \"{\" key_decl state_decl handler* \"}\""
+            render_production(&g, "match_arm").unwrap(),
+            "match_arm ::= pattern \"=>\" expression \",\"?"
         );
-        assert!(render_rule(&g, "http_handler").is_ok());
+    }
+
+    #[test]
+    fn display_name_collapses_and_strips() {
+        let g = grammar_json();
+        // Trivial wrapper `_base_type ::= base_type` collapses to its target.
+        assert_eq!(display_name(&g, "_base_type").unwrap(), "base_type");
+        // Helper rules strip the leading underscore.
+        assert_eq!(display_name(&g, "_expression").unwrap(), "expression");
+        assert_eq!(display_name(&g, "_type_ref").unwrap(), "type_ref");
+        // An ordinary rule is unchanged.
+        assert_eq!(display_name(&g, "http_handler").unwrap(), "http_handler");
     }
 
     #[test]
@@ -223,23 +348,63 @@ mod tests {
         ));
     }
 
-    /// Pins the two renderers to one implementation: every top-level rule's
-    /// reconstructed line must appear verbatim in the appendix.
     #[test]
-    fn every_rule_matches_the_appendix() {
+    fn override_keys_are_real_rules() {
+        let g = grammar_json();
+        for (key, _) in OVERRIDES {
+            assert!(
+                display_name(&g, key).is_ok(),
+                "override key `{key}` is not a top-level rule"
+            );
+        }
+    }
+
+    /// The display transform must not map two displayed productions to the same
+    /// name — that would make the reference ambiguous. Trivial wrappers are
+    /// collapsed and so excluded.
+    #[test]
+    fn display_names_are_unique() {
+        let g = grammar_json();
+        let grammar: Value = serde_json::from_str(&g).unwrap();
+        let rules = rules(&grammar);
+        let mut seen: HashMap<String, String> = HashMap::new();
+        for name in rules.keys() {
+            if trivial_wrapper_target(rules, name).is_some() {
+                continue;
+            }
+            let disp = display_name_in(rules, name);
+            if let Some(prev) = seen.insert(disp.clone(), name.clone()) {
+                panic!("display name `{disp}` for `{name}` collides with `{prev}`");
+            }
+        }
+    }
+
+    /// Pins the two renderers to one implementation: every displayed rule's
+    /// production line must appear verbatim in the appendix, and the appendix
+    /// has exactly one production per non-wrapper rule (wrappers are collapsed,
+    /// nothing is duplicated).
+    #[test]
+    fn every_displayed_rule_matches_the_appendix() {
         let g = grammar_json();
         let appendix = render_appendix(&g);
         let grammar: Value = serde_json::from_str(&g).unwrap();
-        let rules = grammar
-            .get("rules")
-            .and_then(Value::as_object)
-            .expect("grammar has rules");
+        let rules = rules(&grammar);
+
+        let mut displayed = 0;
         for name in rules.keys() {
-            let line = format!("{name} ::= {}", render_rule(&g, name).unwrap());
+            if trivial_wrapper_target(rules, name).is_some() {
+                continue;
+            }
+            displayed += 1;
+            let line = render_production(&g, name).unwrap();
             assert!(
                 appendix.contains(&line),
                 "production for `{name}` not found in appendix:\n{line}"
             );
         }
+
+        // One `::=` per displayed rule — collapsed wrappers added no lines and
+        // no production is duplicated. (No grammar token contains `::=`.)
+        assert_eq!(appendix.matches("::=").count(), displayed);
     }
 }

@@ -1,122 +1,1082 @@
-# Grammar
+# Syntax & grammar
 
-<!-- GENERATED FILE — do not edit by hand.
-     Source: tree-sitter-karn/src/grammar.json, via karnc/tests/grammar_reference.rs.
-     Regenerate with: KARN_BLESS=1 cargo test -p karnc --test grammar_reference -->
+The annotated grammar reference: every Karn construct, with its production, what
+it means, the diagnostics that govern it, and an example. The verbatim machine
+grammar — every production in one block — is the
+[complete grammar appendix](grammar-appendix.md).
 
-The complete Karn grammar, generated from the `tree-sitter-karn` grammar.
+## Notation & conventions
 
-**Notation.** `"x"` a literal token · `/x/` a regular expression · `( … )?` optional · `( … )*` zero or more · `( … )+` one or more · `a | b` choice · `ε` empty. Rule names beginning with `_` are internal helper rules (inlined into the syntax tree). `doc_block` is an external token — a `--- … ---` documentation block.
+Productions are written in EBNF:
 
-```ebnf
-source_file ::= (commons_decl | context_decl | integration_decl | test_decl)+ | _item_fragment+ | _expr_fragment
-_item_fragment ::= _context_body_item | handler | state_decl | key_decl
-_expr_fragment ::= _statement+ _expression? | _expression
-commons_decl ::= "commons" qualified_name ("{" _commons_body_item* "}" | _commons_body_item*)
-context_decl ::= "context" qualified_name ("{" _context_body_item* "}" | _context_body_item*)
-test_decl ::= "test" qualified_name ("{" _test_body_item* "}" | _test_body_item*)
-integration_decl ::= "test" "integration" string_literal ("{" wires_decl _integration_body_item* "}" | wires_decl _integration_body_item*)
-wires_decl ::= "wires" qualified_name ("," qualified_name)*
-_integration_body_item ::= uses_decl | test_case
-qualified_name ::= identifier ("." identifier)*
-_commons_body_item ::= uses_decl | type_decl | fn_decl | capability_decl | provider_decl | service_decl | agent_decl
-_context_body_item ::= uses_decl | consumes_decl | exports_decl | type_decl | fn_decl | capability_decl | provider_decl | service_decl | agent_decl
-_test_body_item ::= uses_decl | consumes_decl | mocks_decl | test_case
-uses_decl ::= "uses" qualified_name
-consumes_decl ::= "consumes" qualified_name ("as" identifier)?
-exports_decl ::= "exports" ("opaque" | "transparent" | "capability") "{" (identifier ("," identifier)*)? ","? "}"
-type_decl ::= "type" identifier "=" _type_body
-_type_body ::= opaque_type | refined_type | record_type | sum_type | enum_type
-opaque_type ::= "opaque" _base_type ("where" refinement)?
-refined_type ::= _base_type ("where" refinement)?
-record_type ::= "{" (record_field ("," record_field)*)? ","? "}"
-record_field ::= identifier ":" _type_ref ("where" refinement)? ("=" _expression)?
-sum_type ::= sum_variant+
-sum_variant ::= "|" constant_name ("(" (variant_payload_field ("," variant_payload_field)*)? ","? ")")?
-variant_payload_field ::= identifier ":" _type_ref
-enum_type ::= "enum" "{" (constant_name ("," constant_name)*)? ","? "}"
-refinement ::= _refinement_pred ("and" _refinement_pred)*
-_refinement_pred ::= pred_call | pred_atom
-pred_call ::= predicate_name "(" (_pred_arg ("," _pred_arg)*)? ")"
-pred_atom ::= predicate_name
-predicate_name ::= "Matches" | "InRange" | "MinLength" | "MaxLength" | "Length" | "NonNegative" | "Positive" | "NonEmpty"
-_pred_arg ::= number_literal | string_literal
-_base_type ::= base_type
-base_type ::= "Int" | "String" | "Bool"
-_type_ref ::= _base_type | unit_type | validation_error_type | generic_type_ref | identifier
-unit_type ::= "(" ")"
-validation_error_type ::= "ValidationError"
-generic_type_ref ::= ("Result" | "Option" | "Effect" | "HttpResult") "[" _type_ref ("," _type_ref)* "]"
-fn_decl ::= "fn" (method_name | identifier) "(" _params? ")" "->" _type_ref block
-method_name ::= identifier "." identifier
-_params ::= (self_param | param) ("," param)* ","?
-self_param ::= "self"
-param ::= identifier ":" _type_ref
-capability_decl ::= "capability" identifier "{" capability_op* "}"
-capability_op ::= "fn" identifier "(" (param ("," param)*)? ","? ")" "->" _type_ref
-provider_decl ::= "provides" identifier "=" identifier given_clause? "{" provider_op* "}"
-provider_op ::= "fn" identifier "(" (param ("," param)*)? ","? ")" "->" _type_ref block
-service_decl ::= "service" identifier "{" handler* "}"
-agent_decl ::= "agent" identifier "{" key_decl state_decl handler* "}"
-key_decl ::= "key" identifier ":" _type_ref
-state_decl ::= "state" "{" (record_field ("," record_field)*)? ","? "}"
-handler ::= call_handler | http_handler | cron_handler | queue_handler
-call_handler ::= "on" "call" identifier? "(" (param ("," param)*)? ","? ")" "->" _type_ref given_clause? block
-http_handler ::= "on" "http" http_method string_literal "(" (param ("," param)*)? ","? ")" "->" _type_ref given_clause? block
-http_method ::= "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
-cron_handler ::= "on" "cron" string_literal "(" (param ("," param)*)? ","? ")" "->" _type_ref given_clause? block
-queue_handler ::= "on" "queue" string_literal "(" (param ("," param)*)? ","? ")" "->" _type_ref given_clause? block
-given_clause ::= "given" qualified_name ("," qualified_name)*
-mocks_decl ::= "mocks" identifier "=" identifier "{" provider_op* "}"
-test_case ::= "test" string_literal block
-block ::= "{" _statement* _expression? "}"
-_statement ::= let_stmt | effect_let_stmt | commit_stmt | assert_expr
-let_stmt ::= "let" _binding_name (":" _type_ref)? "=" _expression
-effect_let_stmt ::= "let" _binding_name (":" _type_ref)? "<-" _expression
-commit_stmt ::= "commit" _expression
-_binding_name ::= identifier | "_"
-_expression ::= if_expr | match_expr | is_expr | assert_expr | binary_expr | unary_expr | _primary
-assert_expr ::= "assert" _expression
-if_expr ::= "if" _expression block "else" (if_expr | block)
-match_expr ::= "match" _expression "{" match_arm* "}"
-match_arm ::= _pattern "=>" _expression ","?
-_pattern ::= wildcard_pattern | variant_pattern
-wildcard_pattern ::= "_"
-variant_pattern ::= (identifier ".")? identifier ("(" (_pattern_binding ("," _pattern_binding)*)? ","? ")")?
-_pattern_binding ::= named_binding | positional_binding
-named_binding ::= identifier ":" (identifier | "_")
-positional_binding ::= identifier | "_"
-is_expr ::= _expression "is" _pattern
-binary_expr ::= _expression "||" _expression | _expression "&&" _expression | _expression ("==" | "!=") _expression | _expression ("<" | "<=" | ">" | ">=") _expression | _expression ("+" | "-") _expression | _expression ("*" | "/") _expression
-unary_expr ::= ("!" | "-") _expression
-_primary ::= paren_expr | method_call | field_access | call | record_construction | record_spread | question_expr | ok_expr | err_expr | some_expr | none_expr | effect_pure_expr | mock_expr | block | number_literal | string_literal | boolean_literal | unit_literal | self_expr | identifier
-paren_expr ::= "(" _expression ")"
-method_call ::= _primary "." identifier "(" (_expression ("," _expression)*)? ","? ")"
-field_access ::= _primary "." identifier
-call ::= identifier "(" (_expression ("," _expression)*)? ","? ")"
-record_construction ::= identifier "{" (field_init ("," field_init)*)? ","? "}"
-field_init ::= identifier ":" _expression | identifier
-record_spread ::= identifier "{" "..." _expression ("," field_init)* ","? "}" | "{" "..." _expression ("," field_init)* ","? "}"
-question_expr ::= _expression "?"
-ok_expr ::= "Ok" "(" _expression ")"
-err_expr ::= "Err" "(" _expression ")"
-some_expr ::= "Some" "(" _expression ")"
-none_expr ::= "None"
-effect_pure_expr ::= "Effect" "." "pure" "(" _expression ")"
-mock_expr ::= "Mock" "[" _type_ref "]" mock_arg?
-mock_arg ::= "(" _expression ("," _expression)* ","? ")" | "{" (field_init ("," field_init)*)? ","? "}"
-self_expr ::= "self"
-identifier ::= /[A-Za-z][A-Za-z0-9_]*/
-constant_name ::= /[A-Z][A-Za-z0-9_]*/
-number_literal ::= /[0-9]+/
-string_literal ::= """ (/[^"\\\n]/ | /\\[nt"\\]/)* """
-boolean_literal ::= "true" | "false"
-unit_literal ::= "(" ")"
-line_comment ::= "--" /[^\n]*/
+`"x"` a literal token · `/x/` a regular expression · `( … )?` optional ·
+`( … )*` zero or more · `( … )+` one or more · `a | b` choice · `ε` empty.
+
+- **Nonterminals** are the unquoted names; each is defined by its own entry on
+  this page. Names are the *display* names of the grammar rules: a leading
+  underscore (an internal helper rule) is dropped and trivial wrappers are
+  collapsed, so productions read as language rather than parser internals. The
+  raw rules and the byte-exact grammar live in the
+  [appendix](grammar-appendix.md).
+- Every production on this page is **generated** from the `tree-sitter-karn`
+  grammar, so it cannot drift from the parser.
+- A production says what *parses*. A **Static semantics** block lists the
+  `karn.*` diagnostics that constrain a construct beyond parsing; each links by
+  code to the [diagnostic index](diagnostics.md). A construct with no such
+  diagnostics says so.
+
+## Lexical grammar
+
+The terminals: identifiers, literals, comments, and the trivia ignored between
+tokens.
+
+### identifier
+
+{{#grammar identifier}}
+
+A name: a letter followed by letters, digits, or underscores. Used for
+declarations, parameters, fields, and bindings.
+
+**Static semantics.**
+{{#grammar-semantics identifier}}
+
+### constant_name
+
+{{#grammar constant_name}}
+
+An upper-case-initial name, used for sum-type variants and enum constants.
+
+### number_literal
+
+{{#grammar number_literal}}
+
+A non-negative integer literal.
+
+**Static semantics.**
+{{#grammar-semantics number_literal}}
+
+### string_literal
+
+{{#grammar string_literal}}
+
+A double-quoted string. The escapes `\n`, `\t`, `\"`, and `\\` are recognised.
+
+**Static semantics.**
+{{#grammar-semantics string_literal}}
+
+### boolean_literal
+
+{{#grammar boolean_literal}}
+
+The two `Bool` values, `true` and `false`.
+
+### unit_literal
+
+{{#grammar unit_literal}}
+
+The unit value `()` — the single value of the unit type.
+
+### line_comment
+
+{{#grammar line_comment}}
+
+A comment from `--` to end of line. Karn uses `--`, never `//`. Comments are
+trivia: ignored between tokens.
+
+A `--- … ---` **doc-block** is an external token attached to the following
+declaration; it, whitespace, and line comments are the trivia ignored between
+tokens (see the appendix's [Tokens & trivia](grammar-appendix.md#tokens--trivia)).
+
+**See also.** [Keywords](keywords.md).
+
+## Top-level & modules
+
+A source file is a `commons` (pure, shareable code) or a `context` (an isolated
+bounded context), or test declarations. The helper *fragment* rules are entry
+points the tooling uses to parse incomplete input; they are not written
+directly.
+
+### source_file
+
+{{#grammar source_file}}
+
+A whole file: one or more top-level declarations, or a fragment (used by editor
+tooling).
+
+**Example.**
+```karn
+commons shop {
+  type Status =
+    | Pending
+    | Shipped(tracking: String)
+    | Cancelled(reason: String)
+
+  fn describe(s: Status) -> String {
+    match s {
+      Pending => "awaiting shipment"
+      Shipped(tracking: t) => t
+      Cancelled(reason: r) => r
+    }
+  }
+}
 ```
 
-## Tokens & trivia
+**See also.** [How a Karn program is shaped](../explanation/how-a-karn-program-is-shaped.md) · [Lay out a project](../how-to/projects/layout.md).
 
-- **Word token:** `identifier`
-- **Ignored between tokens:** `/\s+/`, `line_comment`, `doc_block`
-- **External tokens:** `doc_block`
+### item_fragment
+
+{{#grammar _item_fragment}}
+
+A tooling entry point: a single body item parsed in isolation. Not written by
+hand.
+
+### expr_fragment
+
+{{#grammar _expr_fragment}}
+
+A tooling entry point: statements and/or an expression parsed in isolation. Not
+written by hand.
+
+### commons_decl
+
+{{#grammar commons_decl}}
+
+A `commons` module: pure, dependency-free declarations (types, functions,
+capabilities) shareable across contexts. Body braces are optional at file scope.
+
+### context_decl
+
+{{#grammar context_decl}}
+
+A `context`: a bounded context with its own services, agents, and provided
+capabilities, isolated behind its boundary.
+
+**Example.**
+```karn
+context reaper
+
+service sweeper {
+  on cron "*/5 * * * *" (at: Int) -> Effect[Result[(), String]] {
+    Ok(())
+  }
+}
+```
+
+**Static semantics.**
+{{#grammar-semantics context_decl}}
+
+**See also.** [How a Karn program is shaped](../explanation/how-a-karn-program-is-shaped.md).
+
+### test_decl
+
+{{#grammar test_decl}}
+
+A `test` block targeting a `commons` or `context`, holding its test cases and
+mocks.
+
+**Static semantics.**
+{{#grammar-semantics test_decl}}
+
+**See also.** [Testing](testing.md) · [Write tests and mock collaborators](../how-to/testing/write-tests.md).
+
+### integration_decl
+
+{{#grammar integration_decl}}
+
+A `test integration` block that wires several contexts together and exercises a
+flow across their boundaries.
+
+**Static semantics.**
+{{#grammar-semantics integration_decl}}
+
+**See also.** [Test a flow across Workers](../how-to/testing/integration.md).
+
+### wires_decl
+
+{{#grammar wires_decl}}
+
+Lists the contexts an integration test wires together.
+
+**Static semantics.**
+{{#grammar-semantics wires_decl}}
+
+### integration_body_item
+
+{{#grammar _integration_body_item}}
+
+What may appear in an integration test: `uses` declarations and test cases.
+
+### commons_body_item
+
+{{#grammar _commons_body_item}}
+
+The declarations allowed in a `commons` (no `consumes`, `exports`, or `mocks`).
+
+### context_body_item
+
+{{#grammar _context_body_item}}
+
+The declarations allowed in a `context`, including `consumes` and `exports`.
+
+### test_body_item
+
+{{#grammar _test_body_item}}
+
+The declarations allowed in a `test` block, including `mocks` and test cases.
+
+### qualified_name
+
+{{#grammar qualified_name}}
+
+A dotted name, e.g. `shop.orders` — used to name modules and reference them.
+
+### uses_decl
+
+{{#grammar uses_decl}}
+
+Imports a `commons` so its public names are in scope.
+
+**Static semantics.**
+{{#grammar-semantics uses_decl}}
+
+**See also.** [Define sum, record, and opaque types](../how-to/types/define-types.md).
+
+### consumes_decl
+
+{{#grammar consumes_decl}}
+
+Declares that a context depends on another context's services, optionally under
+an alias.
+
+**Static semantics.**
+{{#grammar-semantics consumes_decl}}
+
+**See also.** [Consume another context's services](../how-to/types/consumes.md).
+
+### exports_decl
+
+{{#grammar exports_decl}}
+
+Controls a context's boundary: which types are exported opaquely or
+transparently, and which capabilities are exported.
+
+**Static semantics.**
+{{#grammar-semantics exports_decl}}
+
+**See also.** [Share a capability across contexts](../how-to/capabilities/share-across-contexts.md).
+
+## Types & refinements
+
+Type declarations and the type references that appear in signatures.
+
+### type_decl
+
+{{#grammar type_decl}}
+
+Names a type as a record, sum, enum, opaque, or refined type.
+
+**Example.**
+```karn,ignore
+type Status =
+  | Pending
+  | Shipped(tracking: String)
+  | Cancelled(reason: String)
+```
+
+**Static semantics.**
+{{#grammar-semantics type_decl}}
+
+**See also.** [Type system](types.md) · [Define sum, record, and opaque types](../how-to/types/define-types.md) · [The type-system philosophy](../explanation/type-system-philosophy.md).
+
+### type_body
+
+{{#grammar _type_body}}
+
+The right-hand side of a `type` declaration: one of the five type forms.
+
+### opaque_type
+
+{{#grammar opaque_type}}
+
+A type whose representation is hidden outside its defining module; constructed
+and inspected only through its API.
+
+**See also.** [Define sum, record, and opaque types](../how-to/types/define-types.md).
+
+### refined_type
+
+{{#grammar refined_type}}
+
+A base or named type narrowed by a `where` refinement, e.g. `Int where
+Positive`.
+
+**Example.**
+```karn,ignore
+type Quantity = Int where InRange(1, 100)
+```
+
+**Static semantics.**
+{{#grammar-semantics refined_type}}
+
+**See also.** [Refined-type API](refined-types.md) · [Define and validate untrusted input](../how-to/refined-types/define-and-validate.md).
+
+### record_type
+
+{{#grammar record_type}}
+
+A product type: named fields, each with a type and optional refinement and
+default.
+
+**Static semantics.**
+{{#grammar-semantics record_type}}
+
+### record_field
+
+{{#grammar record_field}}
+
+One field of a record: a name, a type, an optional inline refinement, and an
+optional default value.
+
+**Static semantics.**
+{{#grammar-semantics record_field}}
+
+### sum_type
+
+{{#grammar sum_type}}
+
+A tagged union of variants, each optionally carrying a payload.
+
+**Static semantics.**
+{{#grammar-semantics sum_type}}
+
+**See also.** [Type system](types.md).
+
+### sum_variant
+
+{{#grammar sum_variant}}
+
+One variant of a sum type: a constant name with an optional payload.
+
+### variant_payload_field
+
+{{#grammar variant_payload_field}}
+
+A named field in a sum-variant payload.
+
+### enum_type
+
+{{#grammar enum_type}}
+
+A sum type whose variants all have no payload.
+
+### refinement
+
+{{#grammar refinement}}
+
+One or more predicates joined by `and`, narrowing a type to the values that
+satisfy them.
+
+**Static semantics.**
+{{#grammar-semantics refinement}}
+
+**See also.** [The refined-literal admission model](../explanation/refined-literal-admission.md).
+
+### refinement_pred
+
+{{#grammar _refinement_pred}}
+
+A single refinement predicate: a predicate call or a bare predicate.
+
+### pred_call
+
+{{#grammar pred_call}}
+
+A predicate with arguments, e.g. `InRange(1, 100)` or `Matches("…")`.
+
+### predicate_name
+
+{{#grammar predicate_name}}
+
+The built-in refinement predicates.
+
+**Static semantics.**
+{{#grammar-semantics predicate_name}}
+
+### pred_arg
+
+{{#grammar _pred_arg}}
+
+An argument to a predicate: a number or string literal.
+
+### base_type
+
+{{#grammar base_type}}
+
+The primitive types `Int`, `String`, and `Bool`.
+
+**Static semantics.**
+{{#grammar-semantics base_type}}
+
+### type_ref
+
+{{#grammar _type_ref}}
+
+A type as it appears in a signature: a base type, a unit, a validation-error
+type, a generic application, or a named type.
+
+### unit_type
+
+{{#grammar unit_type}}
+
+The unit type `()`.
+
+### validation_error_type
+
+{{#grammar validation_error_type}}
+
+`ValidationError` — the error produced when refined-type validation fails.
+
+### generic_type_ref
+
+{{#grammar generic_type_ref}}
+
+A generic type applied to arguments: `Result[T, E]`, `Option[T]`, `Effect[T]`,
+or `HttpResult[T]`.
+
+**Static semantics.**
+{{#grammar-semantics generic_type_ref}}
+
+**See also.** [Work with `Result` and optional values](../how-to/types/result-and-optionals.md).
+
+## Functions, capabilities & providers
+
+Pure functions and methods, the capability interfaces an effectful program
+depends on, and the providers that implement them.
+
+### fn_decl
+
+{{#grammar fn_decl}}
+
+A function or method: a name, parameters, a return type, and a block body.
+
+**Example.**
+```karn
+commons demo {
+  type Id = Int
+
+  fn add(a: Int, b: Int) -> Int {
+    a + b
+  }
+}
+```
+
+**Static semantics.**
+{{#grammar-semantics fn_decl}}
+
+**See also.** [Operators & built-ins](operators.md).
+
+### method_name
+
+{{#grammar method_name}}
+
+A method name, `Type.method`, defining a method on a named type.
+
+### params
+
+{{#grammar _params}}
+
+A parameter list: an optional `self` parameter followed by named parameters.
+
+### self_param
+
+{{#grammar self_param}}
+
+The `self` receiver of a method or handler.
+
+### param
+
+{{#grammar param}}
+
+One parameter: a name and a type.
+
+**Static semantics.**
+{{#grammar-semantics param}}
+
+### capability_decl
+
+{{#grammar capability_decl}}
+
+A capability: an interface of effectful operations a context can depend on.
+
+**Example.**
+```karn
+context demo
+
+capability Logger  { fn info(message: String) -> Effect[()] }
+capability Greeter { fn greet() -> Effect[()] }
+
+provides Logger = ConsoleLogger {
+  fn info(message: String) -> Effect[()] {
+    Effect.pure(())
+  }
+}
+
+provides Greeter = PoliteGreeter given Logger {
+  fn greet() -> Effect[()] {
+    let _ <- Logger.info("hello")
+    Effect.pure(())
+  }
+}
+```
+
+**Static semantics.**
+{{#grammar-semantics capability_decl}}
+
+**See also.** [Capabilities & providers](capabilities.md).
+
+### capability_op
+
+{{#grammar capability_op}}
+
+One operation in a capability: a name, parameters, and a return type (no body).
+
+**Static semantics.**
+{{#grammar-semantics capability_op}}
+
+### provider_decl
+
+{{#grammar provider_decl}}
+
+A `provides` block implementing a capability, optionally `given` other
+capabilities it depends on.
+
+**Static semantics.**
+{{#grammar-semantics provider_decl}}
+
+**See also.** [Compose a provider from other capabilities](../how-to/capabilities/compose-a-provider.md).
+
+### provider_op
+
+{{#grammar provider_op}}
+
+One operation implementation in a provider: a capability operation with a body.
+
+**Static semantics.**
+{{#grammar-semantics provider_op}}
+
+### given_clause
+
+{{#grammar given_clause}}
+
+Declares the capabilities a handler or provider may use.
+
+**Static semantics.**
+{{#grammar-semantics given_clause}}
+
+## Services & handlers
+
+A `service` groups the handlers that respond to calls and external triggers.
+
+### service_decl
+
+{{#grammar service_decl}}
+
+A service: a named group of handlers inside a context.
+
+**Example.**
+```karn
+context notes
+
+service api {
+  on http GET "/ping" () -> Effect[HttpResult[String]] {
+    Ok("pong")
+  }
+
+  on http GET "/notes/:id" (id: String) -> Effect[HttpResult[String]] {
+    NotFound
+  }
+}
+```
+
+**Static semantics.**
+{{#grammar-semantics service_decl}}
+
+### handler
+
+{{#grammar handler}}
+
+A handler: a call, HTTP, cron, or queue entry point.
+
+**Static semantics.**
+{{#grammar-semantics handler}}
+
+### call_handler
+
+{{#grammar call_handler}}
+
+`on call` — an in-process entry point, optionally named, callable across
+contexts.
+
+### http_handler
+
+{{#grammar http_handler}}
+
+`on http` — an HTTP route handler returning `Effect[HttpResult[T]]`.
+
+**Static semantics.**
+{{#grammar-semantics http_handler}}
+
+**See also.** [HTTP](http.md) · [Handle an HTTP request](../how-to/http/handle-request.md).
+
+### http_method
+
+{{#grammar http_method}}
+
+The HTTP methods a route may handle.
+
+**Static semantics.**
+{{#grammar-semantics http_method}}
+
+### cron_handler
+
+{{#grammar cron_handler}}
+
+`on cron` — a scheduled handler returning `Effect[Result[(), E]]`.
+
+**Static semantics.**
+{{#grammar-semantics cron_handler}}
+
+**See also.** [Cron](cron.md) · [Run a task on a schedule](../how-to/cron/handle-cron-trigger.md).
+
+### queue_handler
+
+{{#grammar queue_handler}}
+
+`on queue` — a queue-message handler returning `Effect[Result[(), E]]`.
+
+**Static semantics.**
+{{#grammar-semantics queue_handler}}
+
+**See also.** [Queue](queue.md) · [Process a queued message](../how-to/queue/handle-queue-message.md).
+
+## Agents
+
+An `agent` is a keyed, stateful entity: its state evolves through handlers that
+`commit` new state.
+
+### agent_decl
+
+{{#grammar agent_decl}}
+
+An agent: a key, a state shape, and handlers that read and `commit` state.
+
+**Example.**
+```karn
+context counters
+
+type CounterId = opaque String
+
+agent Counter {
+  key id: CounterId
+
+  state {
+    count: Int,
+  }
+
+  on call current() -> Effect[Int] {
+    self.state.count
+  }
+
+  on call increment() -> Effect[Int] {
+    let next = self.state.count + 1
+    commit { ...self.state, count: next }
+    next
+  }
+}
+```
+
+**Static semantics.**
+{{#grammar-semantics agent_decl}}
+
+**See also.** [Agents](agents.md) · [Build a stateful agent](../how-to/agents/stateful-agent.md) · [The agent model](../explanation/the-agent-model.md).
+
+### key_decl
+
+{{#grammar key_decl}}
+
+The agent's identity: a key field whose value names an instance.
+
+### state_decl
+
+{{#grammar state_decl}}
+
+The agent's state: a record of fields, each with a type and optional default. A
+field with no default must have an implicit zero value.
+
+**Static semantics.**
+{{#grammar-semantics state_decl}}
+
+**See also.** [Model an agent as a state machine](../how-to/agents/state-machine.md).
+
+## Expressions
+
+Karn is expression-oriented: a block's value is its final expression. Operators
+follow the usual precedence (see [Operators & built-ins](operators.md)).
+
+### expression
+
+{{#grammar _expression}}
+
+Any expression: control flow, refinement checks, operators, or a primary.
+
+### primary
+
+{{#grammar _primary}}
+
+The atomic and postfix expressions: literals, names, calls, field and method
+access, constructors, and parenthesised expressions.
+
+### if_expr
+
+{{#grammar if_expr}}
+
+A conditional expression; both branches must have the same type.
+
+**Static semantics.**
+{{#grammar-semantics if_expr}}
+
+### match_expr
+
+{{#grammar match_expr}}
+
+Pattern-matches a value against variants; must be exhaustive.
+
+**Example.**
+```karn,ignore
+match s {
+  Pending => "awaiting shipment"
+  Shipped(tracking: t) => t
+  Cancelled(reason: r) => r
+}
+```
+
+**Static semantics.**
+{{#grammar-semantics match_expr}}
+
+**See also.** [Pattern-match with `match`](../how-to/pattern-matching/match.md).
+
+### is_expr
+
+{{#grammar is_expr}}
+
+A refinement/variant check that also narrows the value's type in the `true`
+branch.
+
+**Static semantics.**
+{{#grammar-semantics is_expr}}
+
+**See also.** [Narrow and bind with `is`](../how-to/pattern-matching/narrow-with-is.md).
+
+### binary_expr
+
+{{#grammar binary_expr}}
+
+The binary operators, in precedence order from `||` to `*`/`/`.
+
+**Static semantics.**
+{{#grammar-semantics binary_expr}}
+
+**See also.** [Operators & built-ins](operators.md).
+
+### unary_expr
+
+{{#grammar unary_expr}}
+
+Logical negation `!` and numeric negation `-`.
+
+### method_call
+
+{{#grammar method_call}}
+
+Calls a method on a value: `receiver.method(args)`.
+
+**Static semantics.**
+{{#grammar-semantics method_call}}
+
+### field_access
+
+{{#grammar field_access}}
+
+Reads a field of a record or agent state: `value.field`.
+
+**Static semantics.**
+{{#grammar-semantics field_access}}
+
+### call
+
+{{#grammar call}}
+
+Calls a function or constructs a variant: `name(args)`.
+
+**Static semantics.**
+{{#grammar-semantics call}}
+
+### record_construction
+
+{{#grammar record_construction}}
+
+Builds a record value: `Type { field: value, … }`.
+
+**Static semantics.**
+{{#grammar-semantics record_construction}}
+
+### field_init
+
+{{#grammar field_init}}
+
+One field in a record construction: `name: value`, or shorthand `name`.
+
+### record_spread
+
+{{#grammar record_spread}}
+
+Builds a record from an existing one, overriding some fields: `{ ...base, field:
+value }`.
+
+**Static semantics.**
+{{#grammar-semantics record_spread}}
+
+### question_expr
+
+{{#grammar question_expr}}
+
+The `?` operator: unwraps a `Result`, propagating the error on failure.
+
+**Static semantics.**
+{{#grammar-semantics question_expr}}
+
+**See also.** [Work with `Result` and optional values](../how-to/types/result-and-optionals.md).
+
+### ok_expr
+
+{{#grammar ok_expr}}
+
+The `Ok` constructor of `Result` (or `HttpResult`).
+
+**Static semantics.**
+{{#grammar-semantics ok_expr}}
+
+### err_expr
+
+{{#grammar err_expr}}
+
+The `Err` constructor of `Result`.
+
+**Static semantics.**
+{{#grammar-semantics err_expr}}
+
+### some_expr
+
+{{#grammar some_expr}}
+
+The `Some` constructor of `Option`.
+
+**Static semantics.**
+{{#grammar-semantics some_expr}}
+
+### none_expr
+
+{{#grammar none_expr}}
+
+The `None` constructor of `Option`.
+
+**Static semantics.**
+{{#grammar-semantics none_expr}}
+
+### effect_pure_expr
+
+{{#grammar effect_pure_expr}}
+
+`Effect.pure(x)` — lifts a pure value into an `Effect`.
+
+### mock_expr
+
+{{#grammar mock_expr}}
+
+`Mock[T]` — fabricates a test value of type `T`, optionally pinned. Valid only
+in test bodies.
+
+**Static semantics.**
+{{#grammar-semantics mock_expr}}
+
+**See also.** [Write tests and mock collaborators](../how-to/testing/write-tests.md).
+
+### mock_arg
+
+{{#grammar mock_arg}}
+
+The pin arguments to a `Mock[T]`: positional values or a record of field pins.
+
+### paren_expr
+
+{{#grammar paren_expr}}
+
+A parenthesised expression, for grouping.
+
+### self_expr
+
+{{#grammar self_expr}}
+
+`self` — the receiver inside a method or agent handler.
+
+**Static semantics.**
+{{#grammar-semantics self_expr}}
+
+## Patterns & matching
+
+The patterns used in `match` arms and `is` checks.
+
+### match_arm
+
+{{#grammar match_arm}}
+
+One arm of a `match`: a pattern, `=>`, and a result expression.
+
+**Static semantics.**
+{{#grammar-semantics match_arm}}
+
+**See also.** [Pattern-match with `match`](../how-to/pattern-matching/match.md).
+
+### pattern
+
+{{#grammar _pattern}}
+
+A pattern: a wildcard or a variant pattern.
+
+### variant_pattern
+
+{{#grammar variant_pattern}}
+
+Matches a sum-type variant, optionally binding its payload fields.
+
+**Static semantics.**
+{{#grammar-semantics variant_pattern}}
+
+### wildcard_pattern
+
+{{#grammar wildcard_pattern}}
+
+`_` — matches anything, binding nothing.
+
+### pattern_binding
+
+{{#grammar _pattern_binding}}
+
+A binding in a variant pattern: named or positional.
+
+### named_binding
+
+{{#grammar named_binding}}
+
+Binds a payload field by name: `field: name` (or `field: _` to ignore).
+
+### positional_binding
+
+{{#grammar positional_binding}}
+
+Binds a payload field by position, or `_` to ignore it.
+
+## Statements
+
+A block is a sequence of statements ending in an optional value expression.
+
+### block
+
+{{#grammar block}}
+
+A braced sequence of statements with an optional trailing expression, which is
+the block's value.
+
+### statement
+
+{{#grammar _statement}}
+
+A statement: a `let`, an effectful `let`, a `commit`, or an assertion.
+
+### let_stmt
+
+{{#grammar let_stmt}}
+
+Binds a pure value: `let name = expr`.
+
+**Static semantics.**
+{{#grammar-semantics let_stmt}}
+
+### effect_let_stmt
+
+{{#grammar effect_let_stmt}}
+
+Binds the result of an effect: `let name <- effect`.
+
+**Static semantics.**
+{{#grammar-semantics effect_let_stmt}}
+
+### commit_stmt
+
+{{#grammar commit_stmt}}
+
+`commit` — writes new agent state. Valid only in an agent handler.
+
+**Static semantics.**
+{{#grammar-semantics commit_stmt}}
+
+### assert_expr
+
+{{#grammar assert_expr}}
+
+`assert` — checks a `Bool` condition in a test case.
+
+**Static semantics.**
+{{#grammar-semantics assert_expr}}
+
+### binding_name
+
+{{#grammar _binding_name}}
+
+The name bound by a `let`: an identifier, or `_` to discard.
+
+## Testing constructs
+
+Test cases, mocks, and integration wiring. See also the top-level
+[`test_decl`](#test_decl) and [`integration_decl`](#integration_decl).
+
+### test_case
+
+{{#grammar test_case}}
+
+A single named test case with a block body, typically ending in `assert`s.
+
+**Example.**
+```karn,ignore
+test "a fresh counter starts at zero" {
+  let n <- Counter(CounterId.unsafe("fresh")).current()
+  assert n == 0
+}
+```
+
+**Static semantics.**
+{{#grammar-semantics test_case}}
+
+**See also.** [Testing](testing.md) · [Write tests and mock collaborators](../how-to/testing/write-tests.md).
+
+### mocks_decl
+
+{{#grammar mocks_decl}}
+
+`mocks` — supplies a test implementation of a capability for the cases in a
+`test` block.
+
+**Static semantics.**
+{{#grammar-semantics mocks_decl}}
+
+**See also.** [Write tests and mock collaborators](../how-to/testing/write-tests.md).

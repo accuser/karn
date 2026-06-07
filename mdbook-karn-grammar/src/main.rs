@@ -39,10 +39,11 @@ struct Sources {
 /// Expand a `{{#grammar <rule>}}` line into an `ebnf` fenced block holding that
 /// production. Exits non-zero on an unknown rule so a typo fails the build.
 fn expand_grammar(rule: &str, grammar_json: &str, out: &mut String) {
-    match karn_grammar::render_rule(grammar_json, rule) {
-        Ok(production) => {
+    match karn_grammar::render_production(grammar_json, rule) {
+        Ok(line) => {
             out.push_str("```ebnf\n");
-            out.push_str(&format!("{rule} ::= {production}\n"));
+            out.push_str(&line);
+            out.push('\n');
             out.push_str("```\n");
         }
         Err(e) => {
@@ -266,7 +267,7 @@ mod tests {
             "missing ebnf fence:\n{content}"
         );
         assert!(
-            content.contains("match_arm ::= _pattern \"=>\" _expression \",\"?"),
+            content.contains("match_arm ::= pattern \"=>\" expression \",\"?"),
             "missing rendered production:\n{content}"
         );
         // Surrounding lines are preserved.

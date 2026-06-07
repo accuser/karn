@@ -1,9 +1,11 @@
-//! Generates the grammar reference page from `tree-sitter-karn/src/grammar.json`
+//! Generates the complete-grammar appendix from `tree-sitter-karn/src/grammar.json`
 //! and keeps it up to date.
 //!
-//! `docs/src/reference/grammar.md` is rendered from the compiled grammar (via
-//! the `karn-grammar` crate), so it cannot drift from the parser. Regenerate
-//! after a grammar change with:
+//! `docs/src/reference/grammar-appendix.md` is rendered from the compiled grammar
+//! (via the `karn-grammar` crate), so it cannot drift from the parser. The
+//! annotated, per-construct reference (`reference/grammar.md`) is authored by
+//! hand but embeds the same generated productions via the `{{#grammar}}`
+//! preprocessor. Regenerate the appendix after a grammar change with:
 //!     KARN_BLESS=1 cargo test -p karnc --test grammar_reference
 
 use std::fs;
@@ -16,8 +18,9 @@ fn grammar_json() -> String {
 }
 
 #[test]
-fn generated_grammar_page_is_up_to_date() {
-    let page = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../docs/src/reference/grammar.md");
+fn generated_grammar_appendix_is_up_to_date() {
+    let page =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../docs/src/reference/grammar-appendix.md");
     let rendered = karn_grammar::render_appendix(&grammar_json());
 
     if std::env::var_os("KARN_BLESS").is_some() {
@@ -28,7 +31,7 @@ fn generated_grammar_page_is_up_to_date() {
     let current = fs::read_to_string(&page).unwrap_or_default();
     assert_eq!(
         current, rendered,
-        "docs/src/reference/grammar.md is out of date with the grammar.\n\
+        "docs/src/reference/grammar-appendix.md is out of date with the grammar.\n\
          Regenerate with: KARN_BLESS=1 cargo test -p karnc --test grammar_reference"
     );
 }
