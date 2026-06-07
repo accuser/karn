@@ -1,4 +1,4 @@
-# 5. Add a stateful agent
+# Add a stateful agent
 
 Everything so far has been stateless: a request comes in, a value goes out,
 nothing is remembered. A URL shortener has to remember — which code maps to which

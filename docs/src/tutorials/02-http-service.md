@@ -1,4 +1,4 @@
-# 2. Build a small HTTP service
+# Build a small HTTP service
 
 In this tutorial we start a **URL shortener** — the running example we will grow
 across the rest of the tutorials. We begin with its HTTP front door: a service

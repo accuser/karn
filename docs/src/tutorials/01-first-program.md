@@ -1,4 +1,4 @@
-# 1. Compile your first program
+# Compile your first program
 
 In this first tutorial we will install nothing new, write a tiny Karn program,
 compile it to TypeScript, and read what the compiler produced. By the end you

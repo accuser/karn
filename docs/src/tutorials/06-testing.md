@@ -1,4 +1,4 @@
-# 6. Test it
+# Test it
 
 A language built around correctness should make tests easy, and Karn builds
 testing in: `test` blocks, `assert`, value fabrication with `Mock[T]`, and

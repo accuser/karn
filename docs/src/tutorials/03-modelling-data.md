@@ -1,4 +1,4 @@
-# 3. Model your data with types
+# Model your data with types
 
 In [Tutorial 2](02-http-service.md) the shortener echoed strings around. Now we
 give it a real data model. Karn gives you three ways to shape data, and choosing

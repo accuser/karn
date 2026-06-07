@@ -1,4 +1,4 @@
-# 4. Make illegal states unrepresentable
+# Make illegal states unrepresentable
 
 The types from [Tutorial 3](03-modelling-data.md) describe the *shape* of the
 shortener's data. **Refined types** go further: they describe which *values* are
