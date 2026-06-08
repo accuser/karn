@@ -17,8 +17,13 @@ together at the end, as in prior increments.
   emitter actually produces, then bless and **read the diff** (`KARN_BLESS=1 cargo
   test -p karnc bless_positive_fixtures`). Blessing without reading is how a bug
   becomes the expected output — this project has been bitten by exactly that.
-- **Additive.** Every existing fixture must still pass unchanged. v0.16 programs
-  compile identically.
+- **Additive — with one intended exception.** Every existing fixture must still pass
+  unchanged and v0.16 programs compile identically, *except* programs that used the
+  now-reserved `karn.*` namespace for a user unit (§3.4). Reserving `karn.*` is a
+  deliberate non-additive change. In this tree, fixtures `64_full_time_commons` and
+  `65_money_uses_time` squatted `commons karn.time`; they were migrated to `chrono.time`
+  (file trees moved, sources updated, `expected/` re-blessed and diffed). Any other
+  fixture must still pass untouched.
 - **Definition of done, per increment** (`docs/src/contributing/testing.md`):
   positive **and** negative fixtures cover the feature and pass; emitted output
   passes the `tsc --strict` gate (`tests/tsc_verify.rs`); every new diagnostic code
@@ -84,8 +89,11 @@ No consumption wiring yet.
 - `karn.context.external_provider` — a bodiless `provides Cap = X` outside an adapter.
 - `karn.adapter.disallowed_item` — a `service`, `agent`, or bodied provider inside an
   adapter (inline pure `type`/`fn`/`uses` are allowed).
-- `karn.reserved_namespace` — any `commons`/`context`/`adapter`/`test` whose qualified
-  name's **first segment** is `karn` (flat-name check on `QualifiedName.parts[0]`).
+- `karn.namespace.reserved` — any `commons`/`context`/`adapter`/`test` whose qualified
+  name's **first segment** is `karn` (flat-name check on `QualifiedName.parts[0]`). (The
+  code is three-segment `karn.<category>.<name>` to satisfy the registry convention the
+  `diagnostics_registry` test enforces; the spec's earlier `karn.reserved_namespace` did
+  not match that regex.)
 - `karn.adapter.no_binding` — an adapter declares ≥1 external provider but has no
   `binding` clause. (Symbol-level resolution is checked in Phase 2 / by tsc.)
 
@@ -254,7 +262,9 @@ generated reference pages include the new keywords and diagnostics.
 | `karn.adapter.provider_has_body` | 1 | error |
 | `karn.context.external_provider` | 1 | error |
 | `karn.adapter.disallowed_item` | 1 | error |
-| `karn.reserved_namespace` | 1 | error |
+| `karn.adapter.duplicate_binding` | 1 | error |
+| `karn.namespace.reserved` | 1 | error |
+| `karn.parse.unexpected_adapter` | 1 | error |
 | `karn.adapter.no_binding` | 1/2 | error |
 | `karn.consumes.capability_name_clash` | 3 | error |
 | `karn.requires.unpinned_dependency` | 3 | error |

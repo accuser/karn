@@ -219,9 +219,14 @@ Karn has no hierarchical namespaces: a dotted unit name (`shop.orders`, `karn.ti
 is a single **flat** identifier, not a tree — `karn` and `karn.time` are *independent*
 units that merely share a leading segment. The toolchain **reserves any unit name whose
 first segment is `karn`**: no user `commons`, `context`, `adapter`, or `test` may be
-named `karn` or `karn.<anything>` (`karn.reserved_namespace`). That keeps the platform
+named `karn` or `karn.<anything>` (`karn.namespace.reserved`). That keeps the platform
 conformance surface (§4.2) unambiguous and makes `consumes karn…` a reliable marker of
 a portable dependency.
+
+> **Migration note.** Reserving `karn.*` is a deliberate, *non-additive* change: any
+> prior program that used `karn` as a leading segment for a user unit (e.g. a
+> `commons karn.time`) no longer compiles and must be renamed off the reserved prefix.
+> This is the one intended exception to "prior programs compile identically."
 
 ### 3.5 Binding resolution — [DECISION J]
 
@@ -553,7 +558,7 @@ consumed units export the same bare name (or one clashes with a local capability
 | `karn.context.external_provider` | new | a bodiless (external) provider outside an adapter |
 | `karn.adapter.disallowed_item` | new | a `service`/`agent`/bodied provider in an adapter |
 | `karn.adapter.no_binding` | new | an adapter declares external providers but no binding clause/module/symbol is resolvable |
-| `karn.reserved_namespace` | new | a user unit whose name's first segment is `karn` |
+| `karn.namespace.reserved` | new | a user unit whose name's first segment is `karn` |
 | `karn.target.vendor_required` | new | a deployment unit using a platform-native capability built for another platform |
 | `karn.target.vendor_conflict` | new | a deployment unit (a context under `workers` / the whole `bundle`) mixing two mutually-exclusive native runtimes |
 | `karn.given.cross_context_unknown_capability` | reused | `consumes U { Cap }` where U doesn't export `Cap` |
