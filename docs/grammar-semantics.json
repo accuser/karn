@@ -550,6 +550,14 @@
   ],
   "provider_decl": [
     {
+      "code": "karn.adapter.provider_has_body",
+      "summary": "A provider inside an `adapter` has a Karn body; adapter providers must be external."
+    },
+    {
+      "code": "karn.context.external_provider",
+      "summary": "A bodiless (external) provider was declared outside an `adapter`."
+    },
+    {
       "code": "karn.provider.dependency_cycle",
       "summary": "Providers form a capability dependency cycle through `given`."
     },

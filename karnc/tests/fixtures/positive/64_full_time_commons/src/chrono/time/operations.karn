@@ -1,4 +1,4 @@
-commons karn.time
+commons chrono.time
 
 ---
 Compute the duration between two timestamps. Returns positive when

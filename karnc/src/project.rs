@@ -76,6 +76,8 @@ pub enum UnitKind {
     Test,
     /// v0.16: a `test integration` multi-Worker integration test.
     Integration,
+    /// v0.17: an `adapter` — the host boundary (capability contract + binding).
+    Adapter,
 }
 
 impl UnitKind {
@@ -85,6 +87,7 @@ impl UnitKind {
             UnitKind::Context => "context",
             UnitKind::Test => "test",
             UnitKind::Integration => "integration test",
+            UnitKind::Adapter => "adapter",
         }
     }
 }
@@ -293,6 +296,51 @@ fn compile_project_inner(
     // user puts them, so the check doesn't apply.
     if split_mode && let Err(e) = check_test_path_alignment(&parsed) {
         errors.extend(e);
+    }
+
+    // v0.17: the `karn` root namespace is reserved for the toolchain. No user
+    // unit of any kind may be named `karn` or `karn.*` (§3.4).
+    for pf in &parsed {
+        let qn = pf.unit.name();
+        if qn.parts.first().is_some_and(|p| p.name == "karn") {
+            errors.push(
+                CompileError::new(
+                    "karn.namespace.reserved",
+                    qn.span,
+                    format!(
+                        "`{}` uses the reserved `karn` namespace — the `karn` root is reserved for the toolchain's conformance surface",
+                        qn.joined()
+                    ),
+                )
+                .with_note("rename the unit so its first segment is not `karn`"),
+            );
+        }
+    }
+
+    // v0.17: an adapter that declares any external provider must name a
+    // `binding` module to supply the implementation symbols (§3.5).
+    for pf in &parsed {
+        if let Some(a) = pf.adapter() {
+            let has_external = a
+                .items
+                .iter()
+                .any(|it| matches!(it, CommonsItem::Provider(p) if p.external));
+            if has_external && a.binding.is_none() {
+                errors.push(
+                    CompileError::new(
+                        "karn.adapter.no_binding",
+                        a.span,
+                        format!(
+                            "adapter `{}` declares an external provider but has no `binding` clause to supply its implementation",
+                            a.name.joined()
+                        ),
+                    )
+                    .with_note(
+                        "add a `binding \"<module>\"` clause naming the TypeScript module that exports the provider symbols",
+                    ),
+                );
+            }
+        }
     }
 
     // -- 4. Build per-unit combined symbol tables. --
@@ -566,7 +614,7 @@ fn compile_project_inner(
     let mut exports_visibility: HashMap<String, HashMap<String, Visibility>> = HashMap::new();
     for (name, indices) in &groups {
         let kind = *kinds.get(name).unwrap();
-        if kind != UnitKind::Context {
+        if kind != UnitKind::Context && kind != UnitKind::Adapter {
             // Commons may not have exports clauses (parsed grammar prevents it
             // at the parser level), but in case any sneak in, skip.
             continue;
@@ -574,10 +622,7 @@ fn compile_project_inner(
         let local = unit_tables.get(name).unwrap();
         let mut seen: HashMap<String, (Visibility, Span)> = HashMap::new();
         for &i in indices {
-            let Some(ctx) = parsed[i].context() else {
-                continue;
-            };
-            for clause in &ctx.exports {
+            for clause in parsed[i].exports() {
                 // v0.15: `exports capability { ... }` clauses are validated
                 // separately (§4.1); 6b handles only type exports.
                 let ExportKind::Type(clause_vis) = clause.kind else {
@@ -657,16 +702,15 @@ fn compile_project_inner(
     // -- 6b'. Validate `exports capability { … }` clauses (v0.15 §4.1): each
     //          name must be a capability the context declares *and* provides. --
     for (name, indices) in &groups {
-        if kinds.get(name) != Some(&UnitKind::Context) {
+        if kinds.get(name) != Some(&UnitKind::Context)
+            && kinds.get(name) != Some(&UnitKind::Adapter)
+        {
             continue;
         }
         let local = unit_tables.get(name).unwrap();
         let mut seen: HashMap<String, Span> = HashMap::new();
         for &i in indices {
-            let Some(ctx) = parsed[i].context() else {
-                continue;
-            };
-            for clause in &ctx.exports {
+            for clause in parsed[i].exports() {
                 if !matches!(clause.kind, ExportKind::Capability) {
                     continue;
                 }
@@ -723,6 +767,11 @@ fn compile_project_inner(
     for (name, table) in &unit_tables {
         let _ = name;
         for (cap_name, provider) in &table.providers {
+            // v0.17: an external provider has no Karn body to match against the
+            // capability — its implementation is the binding, checked by `tsc`.
+            if provider.external {
+                continue;
+            }
             let Some(cap) = table.capabilities.get(cap_name) else {
                 errors.push(
                     CompileError::new(
@@ -1711,6 +1760,7 @@ impl ParsedFile {
         match &self.unit {
             SourceUnit::Commons(c) => &c.items,
             SourceUnit::Context(c) => &c.items,
+            SourceUnit::Adapter(a) => &a.items,
             SourceUnit::Test(_) | SourceUnit::Integration(_) => {
                 // Tests don't contribute CommonsItem items; the production
                 // pipeline never asks them to. Return a singleton empty vec.
@@ -1724,6 +1774,7 @@ impl ParsedFile {
         match &self.unit {
             SourceUnit::Commons(c) => &c.uses,
             SourceUnit::Context(c) => &c.uses,
+            SourceUnit::Adapter(a) => &a.uses,
             SourceUnit::Test(t) => &t.uses,
             SourceUnit::Integration(i) => &i.uses,
         }
@@ -1733,6 +1784,8 @@ impl ParsedFile {
         match &self.unit {
             SourceUnit::Commons(_) => &[],
             SourceUnit::Context(c) => &c.consumes,
+            // Adapters don't `consumes` in this increment.
+            SourceUnit::Adapter(_) => &[],
             // An integration test's participant edges are resolved separately
             // (the harness root consumes every participant); it has no
             // `consumes` of its own.
@@ -1740,9 +1793,19 @@ impl ParsedFile {
         }
     }
 
-    fn context(&self) -> Option<&Context> {
+    /// `exports` clauses, for the unit kinds that have them (contexts and
+    /// adapters). Empty for commons/tests.
+    fn exports(&self) -> &[ExportsDecl] {
         match &self.unit {
-            SourceUnit::Context(c) => Some(c),
+            SourceUnit::Context(c) => &c.exports,
+            SourceUnit::Adapter(a) => &a.exports,
+            _ => &[],
+        }
+    }
+
+    fn adapter(&self) -> Option<&AdapterDecl> {
+        match &self.unit {
+            SourceUnit::Adapter(a) => Some(a),
             _ => None,
         }
     }
@@ -1793,6 +1856,13 @@ impl ParsedFile {
                 i.form,
                 i.span,
             ),
+            SourceUnit::Adapter(a) => (
+                a.name.clone(),
+                a.uses.clone(),
+                a.documentation.clone(),
+                a.form,
+                a.span,
+            ),
         };
         Commons {
             name,
@@ -1825,6 +1895,7 @@ fn parse_file(root: &Path, path: &Path) -> Result<ParsedFile, Vec<CompileError>>
         SourceUnit::Context(_) => UnitKind::Context,
         SourceUnit::Test(_) => UnitKind::Test,
         SourceUnit::Integration(_) => UnitKind::Integration,
+        SourceUnit::Adapter(_) => UnitKind::Adapter,
     };
     let rel = path.strip_prefix(root).unwrap_or(path).to_path_buf();
     Ok(ParsedFile {
@@ -2255,9 +2326,10 @@ fn build_unit_table(
         }
     }
     // v0.15: collect the names a context exports as capabilities.
+    // v0.17: adapters export capabilities too.
     for &i in indices {
-        if let Some(ctx) = parsed[i].context() {
-            for clause in &ctx.exports {
+        {
+            for clause in parsed[i].exports() {
                 if matches!(clause.kind, ExportKind::Capability) {
                     for n in &clause.names {
                         table.exported_capabilities.insert(n.name.clone());
@@ -2271,11 +2343,11 @@ fn build_unit_table(
         for item in parsed[i].items() {
             match item {
                 CommonsItem::Capability(c) => {
-                    if kind != UnitKind::Context {
+                    if kind != UnitKind::Context && kind != UnitKind::Adapter {
                         errors.push(CompileError::new(
                             "karn.capability.outside_context",
                             c.span,
-                            "`capability` declarations are only allowed inside a context, not a commons",
+                            "`capability` declarations are only allowed inside a context or adapter",
                         ));
                         continue;
                     }
@@ -2293,13 +2365,39 @@ fn build_unit_table(
                     }
                 }
                 CommonsItem::Provider(p) => {
-                    if kind != UnitKind::Context {
-                        errors.push(CompileError::new(
-                            "karn.provider.outside_context",
-                            p.span,
-                            "`provides` declarations are only allowed inside a context, not a commons",
-                        ));
-                        continue;
+                    match kind {
+                        UnitKind::Context => {
+                            // v0.17: a bodiless (external) provider is only legal
+                            // inside an adapter.
+                            if p.external {
+                                errors.push(CompileError::new(
+                                    "karn.context.external_provider",
+                                    p.span,
+                                    "an external (bodiless) provider is only allowed inside an `adapter` — a context provider must have a Karn body",
+                                ));
+                                continue;
+                            }
+                        }
+                        UnitKind::Adapter => {
+                            // v0.17: an adapter provider must be external — its
+                            // implementation comes from the binding.
+                            if !p.external {
+                                errors.push(CompileError::new(
+                                    "karn.adapter.provider_has_body",
+                                    p.span,
+                                    "a provider inside an `adapter` must be external (no body) — its implementation is supplied by the binding",
+                                ));
+                                continue;
+                            }
+                        }
+                        _ => {
+                            errors.push(CompileError::new(
+                                "karn.provider.outside_context",
+                                p.span,
+                                "`provides` declarations are only allowed inside a context or adapter",
+                            ));
+                            continue;
+                        }
                     }
                     if let Some(prev) = table.providers.get(&p.capability.name) {
                         errors.push(
@@ -2318,6 +2416,14 @@ fn build_unit_table(
                     }
                 }
                 CommonsItem::Service(s) => {
+                    if kind == UnitKind::Adapter {
+                        errors.push(CompileError::new(
+                            "karn.adapter.disallowed_item",
+                            s.span,
+                            "an `adapter` may not declare a `service` — adapters contain only capabilities, boundary types, external providers, and helpers",
+                        ));
+                        continue;
+                    }
                     if kind != UnitKind::Context {
                         errors.push(CompileError::new(
                             "karn.service.outside_context",
@@ -2340,6 +2446,14 @@ fn build_unit_table(
                     }
                 }
                 CommonsItem::Agent(a) => {
+                    if kind == UnitKind::Adapter {
+                        errors.push(CompileError::new(
+                            "karn.adapter.disallowed_item",
+                            a.span,
+                            "an `adapter` may not declare an `agent` — adapters contain only capabilities, boundary types, external providers, and helpers",
+                        ));
+                        continue;
+                    }
                     if kind != UnitKind::Context {
                         errors.push(CompileError::new(
                             "karn.agent.outside_context",

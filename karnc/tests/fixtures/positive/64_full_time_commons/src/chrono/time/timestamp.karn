@@ -1,4 +1,4 @@
-commons karn.time
+commons chrono.time
 
 ---
 A point in time, opaque integer milliseconds since Unix epoch.

@@ -32,6 +32,23 @@ pub struct DiagnosticInfo {
 
 /// Every diagnostic code the compiler emits, sorted by code.
 pub const REGISTRY: &[DiagnosticInfo] = &[
+    d(
+        "karn.adapter.disallowed_item",
+        "An `adapter` declared a `service`, `agent`, or other item it may not contain.",
+    ),
+    d(
+        "karn.adapter.duplicate_binding",
+        "An `adapter` declared more than one `binding` clause.",
+    ),
+    d(
+        "karn.adapter.no_binding",
+        "An `adapter` declares an external provider but no `binding` module to supply it.",
+    ),
+    dg(
+        "karn.adapter.provider_has_body",
+        "A provider inside an `adapter` has a Karn body; adapter providers must be external.",
+        &["provider_decl"],
+    ),
     dg(
         "karn.agent.construction_arity",
         "An agent was constructed with the wrong number of key arguments.",
@@ -163,6 +180,11 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
     d(
         "karn.context.external_construction",
         "A context-owned type was constructed from outside that context.",
+    ),
+    dg(
+        "karn.context.external_provider",
+        "A bodiless (external) provider was declared outside an `adapter`.",
+        &["provider_decl"],
     ),
     d(
         "karn.context.opaque_inspection",
@@ -409,6 +431,10 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "`Mock[T]` cannot fabricate a value for this kind of type.",
         &["mock_expr"],
     ),
+    d(
+        "karn.namespace.reserved",
+        "A user unit is named `karn` or `karn.*`; the `karn` root is reserved for the toolchain.",
+    ),
     dg(
         "karn.parse.consumes_after_decls",
         "`consumes` appears after other declarations.",
@@ -533,6 +559,10 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "karn.parse.self_outside_method",
         "`self` used outside a method or handler.",
         &["self_expr"],
+    ),
+    d(
+        "karn.parse.unexpected_adapter",
+        "An `adapter` appeared where it is not allowed.",
     ),
     dg(
         "karn.parse.unexpected_context",

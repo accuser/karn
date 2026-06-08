@@ -30,7 +30,24 @@ pub fn outline(source: &str) -> Vec<DocumentSymbol> {
         SourceUnit::Context(c) => vec![context_symbol(source, &c)],
         SourceUnit::Test(t) => vec![test_symbol(source, &t)],
         SourceUnit::Integration(i) => vec![integration_symbol(source, &i)],
+        SourceUnit::Adapter(a) => vec![adapter_symbol(source, &a)],
     }
+}
+
+fn adapter_symbol(source: &str, a: &AdapterDecl) -> DocumentSymbol {
+    let children: Vec<DocumentSymbol> = a
+        .items
+        .iter()
+        .map(|item| item_symbol(source, item))
+        .collect();
+    make_symbol(
+        a.name.joined(),
+        detail_from_doc(&a.documentation),
+        SymbolKind::MODULE,
+        span_to_range(source, a.span),
+        span_to_range(source, a.name.span),
+        children,
+    )
 }
 
 fn integration_symbol(source: &str, i: &IntegrationDecl) -> DocumentSymbol {

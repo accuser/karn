@@ -1294,6 +1294,7 @@ fn write_header(out: &mut String, commons: &TypedCommons, ctx: &EmitProjectCtx) 
         UnitKind::Context => "context",
         UnitKind::Test => "test",
         UnitKind::Integration => "integration test",
+        UnitKind::Adapter => "adapter",
     };
     writeln!(out, "// {kind} {}", commons.commons.name.joined()).unwrap();
     writeln!(out).unwrap();
@@ -1873,6 +1874,12 @@ fn emit_capability(out: &mut String, c: &CapabilityDecl) {
 }
 
 fn emit_provider(out: &mut String, p: &ProviderDecl, commons: &TypedCommons, ctx: &EmitProjectCtx) {
+    // v0.17: an external (bodiless) provider inside an adapter is supplied by
+    // the adapter's binding — the compiler emits no class for it. Its symbol is
+    // imported and constructed by the consumer's compose (§6.1, Phase 2).
+    if p.external {
+        return;
+    }
     emit_doc_block(out, p.documentation.as_deref(), 0);
     writeln!(
         out,

@@ -1,4 +1,4 @@
-commons karn.time
+commons chrono.time
 
 ---
 A length of time in milliseconds. Can be negative (representing past intervals).
