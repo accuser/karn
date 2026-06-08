@@ -1,0 +1,518 @@
+# Karn LSP — Specification
+
+A Language Server Protocol implementation for Karn. Provides syntax highlighting (via tree-sitter, specified separately in `karn-tree-sitter-spec.md`), live diagnostics, hover, go-to-definition, formatting, and a status-bar integration. Initial scope is VS Code only.
+
+This is the first tooling increment for Karn — a pause from language development to make the language usable in practice. The compiler reaches v0.5 (intra-context behavioural layer); the LSP makes that capability accessible through an editor.
+
+---
+
+## 1. Scope
+
+### In scope
+
+- **Project discovery** via `karn.toml` at the project root.
+- **Tree-sitter syntax highlighting** (specified in `karn-tree-sitter-spec.md`).
+- **Live diagnostics** — compile errors and warnings shown as the user types, with debouncing. Configurable to on-save for users on slow machines.
+- **Hover** — type information, declarations, and doc blocks shown on cursor hover.
+- **Go-to-definition** — F12 / Cmd-click jumps from a name to its declaration, across files in a project.
+- **Format-on-save** — canonical formatting applied when files are saved; available as a manual command.
+- **`karnc fmt` CLI command** — format Karn source files from the command line.
+- **Document symbols** — outline view of a file's declarations, shown in VS Code's outline pane.
+- **Status-bar integration** — VS Code status bar shows the project name and Karn compiler version.
+- **VS Code extension** packaged for local sideload.
+
+### Out of scope (deferred to later tooling increments)
+
+- Autocomplete (substantial work — requires understanding valid completions at every cursor position).
+- Workspace symbol search.
+- Inlay hints (showing inferred types inline).
+- Code lenses (e.g., "show service handlers" markers).
+- Quick fixes / code actions.
+- Refactorings (rename, extract function, etc.).
+- Semantic tokens (type-aware highlighting beyond tree-sitter's syntactic level).
+- Editor commands beyond what LSP standard provides (no "Karn: Build" / "Karn: Run tests" yet — those come later).
+- Marketplace publication.
+- Editor support beyond VS Code.
+- Configuration formats other than `karn.toml` (no `.yaml`, no `.json` for now).
+
+---
+
+## 2. Project model
+
+### 2.1 Project discovery
+
+A Karn project is a directory containing `karn.toml` at its root. The LSP discovers the project root by walking upward from any open `.karn` file until it finds `karn.toml`. If none is found before the filesystem root, the LSP treats the file as a single-file project (no workspace features) and shows a warning.
+
+### 2.2 `karn.toml` schema
+
+```toml
+[project]
+name    = "my-karn-project"     # required
+version = "0.1.0"               # optional, free-form
+
+[paths]
+src = "src"                     # source root (default: "src")
+out = "out"                     # compiled TypeScript output (default: "out")
+
+[fmt]
+indent             = "tab"      # "tab" (default) or "spaces"
+indent_width       = 1          # number of tabs / spaces per level (default: 1 for tab, 2 for spaces)
+max_line_width     = 100        # soft target for line wrapping (default: 100)
+trailing_comma     = true       # trailing comma in multi-line lists (default: true)
+
+[lsp]
+diagnostics_mode   = "live"     # "live" (default) or "on_save"
+diagnostics_debounce_ms = 300   # debounce delay for live mode (default: 300)
+```
+
+All fields are optional. A minimal `karn.toml` is:
+
+```toml
+[project]
+name = "my-karn-project"
+```
+
+The LSP applies defaults for everything else. The file's *presence* is what marks the project root; its contents are advisory.
+
+Future configuration alternatives (`.yaml`, `.json`) are not supported in this increment but the schema is designed to translate cleanly.
+
+### 2.3 Workspace discovery
+
+Once the project root is found, the LSP discovers all `.karn` files under the configured `src` directory (recursive). These files form the project's source corpus. The LSP loads, parses, resolves, and type-checks them all on startup.
+
+File watching is enabled for the `src` directory. Changes (file added, removed, modified externally) trigger re-discovery and re-resolution of affected files.
+
+---
+
+## 3. LSP capabilities
+
+### 3.1 Syntax highlighting
+
+Provided via a tree-sitter grammar (see `karn-tree-sitter-spec.md`). The VS Code extension ships the compiled tree-sitter grammar. VS Code natively supports tree-sitter for syntax highlighting when configured.
+
+The tree-sitter grammar covers all Karn syntactic forms from v0 through v0.5. Highlighting groups follow standard tree-sitter conventions (`@keyword`, `@type`, `@function`, etc.) mapped to VS Code theme tokens.
+
+### 3.2 Live diagnostics
+
+The LSP server runs the existing Karn compiler on the project's source corpus and reports errors and warnings as LSP diagnostics back to the editor.
+
+**Behaviour:**
+- On project load: full compile, all errors surfaced.
+- On file change (in editor): re-compile the affected commons or context.
+  - If the changed file is a fragment of a multi-file unit, re-compile the whole unit.
+  - If the changed file is consumed by other units (commons used by other commons, or context consumed by other contexts), re-compile those too.
+- Debounce: configurable (default 300ms). The LSP waits for the user to pause typing before running diagnostics.
+- Reported back via `textDocument/publishDiagnostics`.
+
+**Severity levels:**
+- *Error* — compile errors that prevent valid output (type errors, unresolved references, etc.).
+- *Warning* — compile warnings (unused capabilities in `given`, orphan doc blocks, etc.).
+- *Hint* — suggestions (not currently used; reserved for future).
+
+**Error recovery:** The LSP shows *all* errors in a file, not just the first one. This requires the parser and checker to recover and continue after errors rather than bail. If the existing compiler doesn't do this fully, extending it is part of this increment.
+
+**Diagnostics include:**
+- Primary message (the error description).
+- Primary range (the source span).
+- Secondary ranges where helpful (e.g., the conflicting declaration, the type mismatch source).
+- Error category code (e.g., `karn.types.if_branch_mismatch`) included in the diagnostic for filterability.
+
+**Configuration:** Users can set `[lsp].diagnostics_mode = "on_save"` to disable live diagnostics. In on-save mode, diagnostics run only when the file is saved.
+
+### 3.3 Hover
+
+On cursor hover over a name, the LSP returns information via `textDocument/hover`. Specifically:
+
+**On a type name:**
+- The type's declaration (the source form, formatted).
+- Any attached doc block.
+- For exported context types: the visibility (`opaque` or `transparent`).
+- For opaque types: a note that the representation is hidden.
+
+```
+type Money = { minorUnits: Int where NonNegative, currency: CurrencyCode }
+
+---
+The Money type represents an amount in a specific currency...
+---
+```
+
+**On a function or method name:**
+- The full signature.
+- The doc block.
+- For methods: whether instance or static.
+- For service handlers: the `given` clause.
+
+**On a variable / `let` binding:**
+- The inferred or declared type.
+
+**On a field access:**
+- The field's declared type, plus any inline refinement.
+
+**On a capability name:**
+- The capability's declaration with all operations.
+- The doc block.
+- The available providers in the current context.
+
+**On a keyword:** nothing (hovers only fire on identifiers).
+
+Hover content is rendered as Markdown by the editor. The LSP returns `MarkupContent` with `MarkupKind.Markdown`.
+
+**Markdown layout.** Hover content follows a consistent structure:
+
+1. A fenced code block (```` ```karn ```` ) containing the declaration's source form (formatted via the canonical formatter so it matches the project's style).
+2. A blank line.
+3. The attached doc-block content (if any), as plain Markdown.
+4. For types with additional metadata (exported visibility, opaque representation note, etc.), a short list below the doc content.
+
+Example for a `Money` record type:
+
+````markdown
+```karn
+type Money = {
+  minorUnits: Int where NonNegative,
+  currency:   CurrencyCode,
+}
+```
+
+The Money type represents an amount in a specific currency. The minorUnits
+field is the smallest indivisible unit of the currency.
+
+— exported transparently from `commerce.payment`
+````
+
+Hover content stays compact — typically under twenty lines. For declarations that are long (e.g., a capability with many operations), the full declaration is rendered; the editor's hover popup handles overflow with scrolling.
+
+### 3.4 Go-to-definition
+
+`textDocument/definition` returns the location of a name's declaration.
+
+**Resolution:**
+- Type names → the `type` declaration.
+- Function names → the `fn` declaration.
+- Method names (`value.method()`) → the method's `fn TypeName.method` declaration.
+- Field names (`record.field`) → the field's declaration in the record type.
+- Variant names (`Pending`, `Ok`, etc.) → the variant's declaration in the sum type.
+- Capability names → the `capability` declaration.
+- Service operation names → the service's `on call` handler (the `on` keyword's location).
+- Agent names → the `agent` declaration.
+
+**Cross-file (required).** Definitions in other files within the same project must be resolved. The returned location points to the correct file and source range. This is a hard requirement — the language explicitly supports multi-file commons (v0.3) and context consumes graphs (v0.4); navigation that doesn't cross file boundaries is unusable for any non-trivial project. The LSP's project module (which loads all `.karn` files at startup) already has the symbol tables needed; the definition lookup walks those tables, not just the open file's local tables.
+
+**Imported names:** When a context uses a commons, names from the commons resolve back to the commons declaration (not to the context's rebranded copy — the original source location is more useful).
+
+### 3.5 Formatter
+
+The Karn formatter applies canonical style to source files.
+
+**Style rules (the defaults; all configurable via `karn.toml`):**
+
+- **Indentation:** tabs by default. One tab per nesting level. (This is for accessibility — users set their preferred tab width in VS Code; tab-based indentation respects that, space-based indentation does not.)
+- **Brace style:** K&R / same-line. `if cond {` on one line, not `if cond` then `{` on the next.
+- **Trailing commas:** present in multi-line records, sums, parameter lists, argument lists.
+- **Blank lines:** one blank line between top-level declarations (types, functions, services, agents, capabilities, providers). No blank lines between fields within a record or arms within a match.
+- **Doc blocks:** immediately above the declaration they document, no blank line between. Doc content has the common indent stripped (per v0.3's clarification).
+- **Spacing:** one space around binary operators (`a + b`, not `a+b`); one space after commas; no space inside parens.
+- **Line width:** soft target of 100 columns; the formatter wraps long lines where natural (after commas in long parameter lists, at `&&`/`||` boundaries in long expressions). For lists with delimiters (parameter lists, argument lists, record fields, exports clauses), the formatter emits single-line form when it fits within the line width and multi-line form otherwise. Multi-line form uses trailing commas; single-line form does not.
+
+**Idempotency:** Running the formatter twice produces the same result. This is a requirement.
+
+**Preservation:**
+- Comments preserve their position relative to surrounding code.
+- Doc blocks preserve their content verbatim (only the indentation is normalised).
+- The semantic meaning of the code is preserved (same AST after parse → format → re-parse).
+
+**Comment-preservation implementation requirement.** The formatter must not drop line comments (`-- ...`). This is a hard requirement — dropping user comments is data loss, which destroys trust in format-on-save and ultimately in the canonical-style discipline. Implementing this requires the lexer to emit comments as trivia tokens (or similar) so that the parser/formatter can track their positions and emit them in the formatted output. A side-pass scan of original source is acceptable as a fallback but trivia-tracking is the principled approach.
+
+Specifically:
+- Comments before a top-level declaration go above the declaration in the formatted output (with the doc block, if any, between the comment and the declaration).
+- Comments at the end of a line stay on that line (`expr  -- note`).
+- Comments on their own line within a block preserve their position relative to surrounding statements.
+- Multi-line groups of comments stay together.
+
+Doc blocks (`---`) are separate from line comments and are already preserved via the AST.
+
+**Integration:**
+
+- **Format-on-save:** the LSP responds to `textDocument/formatting` requests. VS Code with `editor.formatOnSave: true` calls this on every save. The LSP returns the formatted document as a single text edit.
+- **Range formatting:** `textDocument/rangeFormatting` formats a selected range. Useful for "format this function." Implemented best-effort — the formatter operates on whole declarations, so the returned range may be slightly wider than requested.
+- **CLI:** `karnc fmt [file...]` formats files in place. `karnc fmt -` reads from stdin, writes to stdout.
+
+### 3.6 Status-bar integration
+
+The VS Code extension shows two status-bar items when a Karn file is open:
+
+- **Project name** — from `karn.toml`'s `[project].name`. Clicking opens `karn.toml`.
+- **Compiler version** — the version of the bundled `karnc` binary. Clicking does nothing (informational).
+
+If `karn.toml` is missing, the project-name slot shows "no project" (clicking suggests creating one).
+
+The status bar items only appear when the active editor has a `.karn` file open.
+
+### 3.7 Document symbols
+
+The LSP responds to `textDocument/documentSymbol` requests with a hierarchical outline of the file's declarations. This populates VS Code's "Outline" pane (in the explorer sidebar) and powers the "Go to Symbol in File" command (Cmd-Shift-O).
+
+**Symbols and their kinds:**
+
+The LSP maps Karn declarations to LSP `SymbolKind` values:
+
+- `commons` declaration → `Module` (top-level container).
+- `context` declaration → `Module`.
+- `type T = ...` → `Struct` (for records), `Enum` (for sums), `Class` (for opaque types), `TypeParameter` (for refined values).
+- `fn name(...) -> T` (free function) → `Function`.
+- `fn TypeName.method(...)` → `Method` (nested under the type).
+- `capability X { ... }` → `Interface`, with operations as `Method` children.
+- `provides X = Y { ... }` → `Object`, with operations as `Method` children.
+- `service X { ... }` → `Class`, with handlers as `Method` children.
+- `agent X { ... }` → `Class`, with the state block as `Property` children and handlers as `Method` children.
+- Record fields → `Field` children of their type.
+- Sum variants → `EnumMember` children of their type.
+
+**Hierarchy:**
+
+The top-level container (commons or context) is the root. All other declarations are children. Methods nest under their type; record fields nest under the record; variants nest under the sum.
+
+For multi-file commons or contexts, each file has its own document symbol tree — the LSP returns symbols for the current file only. The outline view shows the contents of the current file.
+
+**Ranges:**
+
+Each symbol carries two ranges:
+- `range` — the full extent of the declaration (from the `type`/`fn`/etc. keyword to the closing brace).
+- `selectionRange` — the identifier itself (the name being declared).
+
+Clicking a symbol in the outline jumps to the `selectionRange`. The `range` is used for highlighting and breadcrumb display.
+
+**Documentation:**
+
+If a declaration has an attached doc block, its content (truncated to one line if multi-line) appears as the symbol's detail. VS Code shows this alongside the symbol name in the outline.
+
+---
+
+## 4. Implementation architecture
+
+### 4.1 Component layout
+
+The tooling project consists of four components:
+
+```
+karn-tooling/
+├── tree-sitter-karn/        -- Tree-sitter grammar (separate sub-project)
+│   ├── grammar.js
+│   └── ...
+├── karn-lsp/                -- LSP server binary (Rust, in the compiler workspace)
+│   ├── src/main.rs
+│   ├── src/handlers/        -- LSP request handlers
+│   └── ...
+├── karn-fmt/                -- Formatter (Rust, in the compiler workspace; used by both LSP and CLI)
+│   └── src/lib.rs
+└── vscode-karn/             -- VS Code extension (TypeScript)
+    ├── package.json
+    ├── src/extension.ts
+    └── ...
+```
+
+The tree-sitter grammar lives in its own repo / subdirectory because tree-sitter has its own build tooling (`tree-sitter generate`, `tree-sitter test`).
+
+The LSP server and formatter live in the existing compiler workspace as new Rust crates. They depend on the compiler's existing modules (parser, resolver, checker).
+
+The VS Code extension is a minimal TypeScript project that activates the LSP and ships the tree-sitter grammar.
+
+### 4.2 Dependencies
+
+**For `karn-lsp`:**
+- `tower-lsp` — LSP server framework for Rust. Handles protocol plumbing.
+- `tokio` — async runtime (tower-lsp uses it).
+- The existing compiler modules (in-tree dependency).
+
+**For `karn-fmt`:**
+- The existing compiler's AST and parser (in-tree dependency).
+- `std::fmt` for output rendering.
+
+**For the tree-sitter grammar:**
+- `tree-sitter-cli` (npm package; used for development and code generation).
+- No runtime dependencies beyond tree-sitter itself.
+
+**For the VS Code extension:**
+- `vscode` (`@types/vscode`) — VS Code API.
+- `vscode-languageclient` — LSP client for VS Code.
+- `tree-sitter-karn` (the compiled grammar).
+
+### 4.3 LSP protocol surface
+
+The LSP server declares support for these capabilities:
+
+```
+textDocument.synchronization: Full
+textDocument.publishDiagnostics
+textDocument.hover
+textDocument.definition
+textDocument.formatting
+textDocument.rangeFormatting
+textDocument.documentSymbol
+workspace.workspaceFolders
+workspace.didChangeWatchedFiles
+```
+
+Not declared (out of scope for this increment):
+- completion, completionItem/resolve
+- workspaceSymbol
+- codeAction, codeLens, inlayHint
+- rename, prepareRename
+- semanticTokens
+- references
+- signatureHelp
+
+### 4.4 Error recovery for diagnostics
+
+The LSP needs the parser and checker to recover and continue after errors so multiple errors can be reported. The existing compiler may currently bail at first error in each phase; extending it to recover is part of this increment.
+
+**Parser recovery:** Skip to the next synchronisation point (closing brace, semicolon, top-level declaration keyword) and continue. Each recovered region produces a separate parse error but doesn't prevent parsing the rest.
+
+**Resolver recovery:** Continue resolving even when individual names fail (mark them as unresolved in the AST). The checker then sees an annotated AST with both resolved and unresolved nodes.
+
+**Checker recovery:** Continue type-checking even when individual expressions fail. Unresolved types propagate but don't cascade — once an unresolved type is encountered, further errors on the same expression are suppressed to reduce noise.
+
+The result: a parse-resolve-check pipeline that produces a complete list of errors per file, not just the first.
+
+### 4.5 Performance targets
+
+- **Project load:** under 2 seconds for projects with ~100 source files. Larger projects are out of scope for performance optimisation in this increment.
+- **Live diagnostics:** under 100ms for a single-file change (post-debounce). The 300ms debounce plus 100ms diagnostics = response within ~400ms after the user pauses typing.
+- **Hover:** under 50ms for any hover query.
+- **Go-to-definition:** under 100ms.
+- **Format:** under 200ms for a 1000-line file.
+
+These are targets, not requirements. If real-world performance falls short, the on-save fallback for diagnostics is the immediate mitigation; deeper optimisations (incremental compilation, persistent caches) come later.
+
+---
+
+## 5. The VS Code extension
+
+### 5.1 Activation
+
+The extension activates when:
+- A workspace folder contains a `karn.toml` file, OR
+- A `.karn` file is opened.
+
+On activation:
+1. Locate the `karnc-lsp` binary (bundled with the extension or installed separately — for first cut, bundled).
+2. Start the LSP server as a child process.
+3. Connect via stdio.
+4. Register file watchers on `**/*.karn` and `karn.toml`.
+5. Register the tree-sitter grammar for `.karn` files.
+6. Show status-bar items.
+
+### 5.2 Configuration
+
+The extension reads VS Code settings under the `karn.*` namespace:
+
+```json
+{
+  "karn.executablePath": "karnc-lsp",    // path to the LSP server binary
+  "karn.trace.server": "off"             // "off" | "messages" | "verbose"
+}
+```
+
+VS Code's built-in `editor.formatOnSave` is honoured for format-on-save behaviour.
+
+### 5.3 Logging
+
+LSP server logs to `~/.karn-lsp.log` at warning level by default. The `karn.trace.server` setting can crank this to verbose for debugging.
+
+The extension exposes a "Karn LSP" output channel in VS Code for protocol-level traces.
+
+---
+
+## 6. Testing strategy
+
+### 6.1 Tree-sitter grammar tests
+
+The tree-sitter project includes its own test infrastructure (`tree-sitter test`). Tests are organised by syntactic form:
+
+- `corpus/v0.txt` — refined types, pure functions (v0 syntax).
+- `corpus/v0.1.txt` — let, if/else, Result, etc.
+- `corpus/v0.2.txt` — records, sums, methods, match, is, Option.
+- `corpus/v0.3.txt` — opaque, multi-file, doc blocks, uses.
+- `corpus/v0.4.txt` — contexts, exports, consumes.
+- `corpus/v0.5.txt` — Effect, capabilities, providers, services, agents, commit.
+
+Each test is an input source plus the expected parse tree. `tree-sitter test` verifies.
+
+### 6.2 LSP tests
+
+The LSP server has unit tests for individual handlers (hover, definition, formatting) using synthetic in-memory documents. End-to-end tests use the existing fixture corpus from the compiler — verifying that fixtures produce the expected diagnostics, hover content, and so on.
+
+### 6.3 Formatter tests
+
+The formatter is tested via snapshot tests using `insta` (same pattern as the existing compiler). For each input file, the expected formatted output is checked in. The formatter is run on the input; the result is diffed against the snapshot.
+
+Idempotency tests: for each input, run the formatter twice and verify the output is identical between runs.
+
+### 6.4 VS Code extension tests
+
+Minimal — VS Code's testing infrastructure is verbose. For first cut, manual smoke tests:
+- Open a fixture in VS Code with the extension installed.
+- Verify highlighting appears.
+- Verify diagnostics show.
+- Verify hover works on a few identifiers.
+- Verify go-to-definition works.
+- Verify format-on-save works.
+
+A more thorough test suite can come later if the extension grows complex.
+
+---
+
+## 7. Build and distribution
+
+### 7.1 Building
+
+The Rust components build via standard `cargo build --release` from the compiler workspace. Outputs:
+- `target/release/karnc` — the compiler CLI (already exists).
+- `target/release/karnc-lsp` — the LSP server.
+- The formatter lives as a library used by both `karnc` (for `karnc fmt`) and `karnc-lsp` (for the formatting capability).
+
+The tree-sitter grammar builds via `tree-sitter generate` in the grammar directory. Output: `tree-sitter-karn.so` (or `.dylib`/`.dll` per platform).
+
+The VS Code extension builds via `npm run package` in its directory. Output: `karn-vscode-<version>.vsix`.
+
+### 7.2 Installation
+
+For local sideload:
+
+1. Build all three components.
+2. Place `karnc-lsp` in a location on `PATH` (or configure `karn.executablePath` in VS Code).
+3. Install the VS Code extension: `code --install-extension karn-vscode-<version>.vsix`.
+
+A bundled installer (single script or installer package) is not in scope for this increment; manual install is acceptable for first cut.
+
+### 7.3 Updates
+
+Updates are manual: rebuild, reinstall. Auto-update via a marketplace is deferred.
+
+---
+
+## 8. What's deferred (future tooling increments)
+
+After this increment, the language has working tooling for the v0.5 surface. Future tooling work:
+
+**Tooling v2 (probably after v0.6):**
+- Autocomplete (the substantial missing feature).
+- Semantic tokens (semantic highlighting).
+- Editor commands ("Karn: Build", "Karn: Run tests").
+
+Document symbols are shipped in v1.1 (§3.7) — they're cheap to implement
+(AST walk) and unlock VS Code's outline view.
+
+**Tooling v3:**
+- Workspace symbol search.
+- Refactorings (rename, extract).
+- Inlay hints.
+- Code actions / quick fixes.
+
+**Tooling v4:**
+- Marketplace publication.
+- Auto-update infrastructure.
+- Editor support beyond VS Code (Neovim, Helix, etc. — the tree-sitter grammar enables this; the LSP works in any LSP-capable editor; the question is which extensions to package and maintain).
+
+These come as practice surfaces the need.

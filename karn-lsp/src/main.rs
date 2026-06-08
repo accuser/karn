@@ -1,6 +1,6 @@
 //! `karnc-lsp` — Karn Language Server.
 //!
-//! Implements the LSP capabilities listed in `karn-lsp-spec.md` §4.3:
+//! Implements the LSP capabilities listed in `design/karn-lsp-spec.md` §4.3:
 //! synchronisation (Full), diagnostics, hover, go-to-definition, formatting,
 //! range formatting, and file watching. Built on `tower-lsp`.
 //!
@@ -284,7 +284,7 @@ impl LanguageServer for Backend {
             None => {
                 // Fall back to a project-wide scan (v1.1). Required so
                 // `uses` / `consumes` names resolve across file boundaries
-                // per `karn-lsp-spec.md` §3.4.
+                // per `design/karn-lsp-spec.md` §3.4.
                 let src_root = self.project_src_root().await;
                 match src_root
                     .and_then(|root| crate::symbols::describe_symbol_cross_file(&root, &uri, &name))
@@ -392,7 +392,7 @@ impl LanguageServer for Backend {
         &self,
         params: DocumentSymbolParams,
     ) -> JsonRpcResult<Option<DocumentSymbolResponse>> {
-        // v1.1 — outline view + Cmd-Shift-O. See `karn-lsp-spec.md` §3.7.
+        // v1.1 — outline view + Cmd-Shift-O. See `design/karn-lsp-spec.md` §3.7.
         let uri = params.text_document.uri;
         let text = {
             let s = self.state.read().await;

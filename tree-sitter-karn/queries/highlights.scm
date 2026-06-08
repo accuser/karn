@@ -1,7 +1,7 @@
 ; Karn highlighting queries.
 ;
 ; Maps grammar nodes to standard tree-sitter highlighting groups. See
-; karn-tree-sitter-spec.md §2 for the group inventory.
+; design/karn-tree-sitter-spec.md §2 for the group inventory.
 
 ; -- Keywords --
 
