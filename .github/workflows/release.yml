@@ -1,13 +1,33 @@
 name: Release
 
-# Cut a release by pushing a version tag that matches the unified tooling
-# version, e.g. `git tag v0.16.0 && git push origin v0.16.0`. One tag releases
-# every artifact: the binaries (GitHub Release), the crates (crates.io), and the
-# tree-sitter grammar (npm). Pre-release tags like v0.16.0-rc1 work too.
+# Two-phase release, so the irreversible registry publishes stay behind a
+# deliberate manual step (the no-cost stand-in for an environment approval gate,
+# which needs GitHub Enterprise on a private repo):
+#
+#   1. Push a version tag matching the manifests, e.g.
+#        git tag v0.16.0 && git push origin v0.16.0
+#      -> builds binaries and cuts the GitHub Release automatically.
+#   2. Once you've eyeballed that release, manually publish to the registries
+#      from the Actions tab ("Run workflow"), or:
+#        gh workflow run release.yml --ref v0.16.0 \
+#          -f publish_crates=true -f publish_npm=true
+#      Run it against the *tag* ref so the tag/version guard still applies.
+#
+# Pre-release tags like v0.16.0-rc1 work for phase 1 too.
 on:
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+*"
+  workflow_dispatch:
+    inputs:
+      publish_crates:
+        description: "Publish the crates to crates.io"
+        type: boolean
+        default: true
+      publish_npm:
+        description: "Publish the tree-sitter grammar to npm"
+        type: boolean
+        default: true
 
 # Never run two releases for the same tag at once, and don't cancel one midway
 # (publishing to crates.io/npm is irreversible).
@@ -34,13 +54,17 @@ jobs:
           node-version: "20"
       - name: Install TypeScript
         run: npm install -g typescript
-      - name: Tag matches workspace version
+      - name: Check tag/version match
         run: |
-          tag="${GITHUB_REF_NAME#v}"   # strip leading v
-          base="${tag%%-*}"            # drop any -rc1 / -beta suffix
           ver="$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')"
-          echo "tag=$tag base=$base manifest=$ver"
-          test "$base" = "$ver" || { echo "::error::tag $tag does not match workspace version $ver"; exit 1; }
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            tag="${GITHUB_REF_NAME#v}"   # strip leading v
+            base="${tag%%-*}"            # drop any -rc1 / -beta suffix
+            echo "ref=tag $GITHUB_REF_NAME  manifest=$ver"
+            test "$base" = "$ver" || { echo "::error::tag $GITHUB_REF_NAME does not match workspace version $ver"; exit 1; }
+          else
+            echo "::notice::manual dispatch from $GITHUB_REF_NAME — will publish manifest version $ver"
+          fi
       - name: Run tests
         run: cargo test --workspace
         env:
@@ -51,6 +75,7 @@ jobs:
   binaries:
     name: Build ${{ matrix.target }}
     needs: verify
+    if: github.event_name == 'push' # phase 1: tag push only
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -109,6 +134,7 @@ jobs:
   github-release:
     name: Publish GitHub Release
     needs: binaries
+    if: github.event_name == 'push' # phase 1: tag push only
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -122,13 +148,13 @@ jobs:
 
   # Publish the four crates in dependency order. Modern cargo waits for each
   # crate to appear in the index before returning, so the next publish resolves.
-  # Gated on the `release` environment — add required reviewers in repo settings
-  # to make crates.io publishing a manual approval (it cannot be undone).
+  # Phase 2: runs only on a manual dispatch with publish_crates checked — the
+  # deliberate gate before this irreversible step.
   publish-crates:
     name: Publish to crates.io
     needs: verify
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_crates
     runs-on: ubuntu-latest
-    environment: release
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.95.0
@@ -142,16 +168,17 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-  # Publish the tree-sitter grammar (node bindings + grammar source) to npm,
-  # behind the `release` environment. Uses the NPM_TOKEN for now; once the first
-  # version is live you can configure a Trusted Publisher on npmjs.com and the
-  # CLI will switch to OIDC automatically (id-token permission + npm >= 11.5.1
-  # are already wired below), at which point NPM_TOKEN can be removed.
+  # Publish the tree-sitter grammar (node bindings + grammar source) to npm.
+  # Phase 2: runs only on a manual dispatch with publish_npm checked. Uses the
+  # NPM_TOKEN for now; once the first version is live you can configure a Trusted
+  # Publisher on npmjs.com and the CLI will switch to OIDC automatically
+  # (id-token permission + npm >= 11.5.1 are already wired below), at which point
+  # NPM_TOKEN can be removed.
   publish-npm:
     name: Publish to npm
     needs: verify
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_npm
     runs-on: ubuntu-latest
-    environment: release
     permissions:
       contents: read
       id-token: write # OIDC trusted publishing (once configured on npmjs.com)
