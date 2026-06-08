@@ -526,6 +526,7 @@ fn single_file_ctx() -> EmitProjectCtx {
         target: BuildTarget::Bundle,
         boundary_type_owners: HashMap::new(),
         local_agents: HashSet::new(),
+        consumed_adapters: HashSet::new(),
     }
 }
 
@@ -1169,15 +1170,23 @@ fn emit_cross_context_namespace_imports(
             .and_then(|m| m.values().next().cloned())
             .unwrap_or_else(|| {
                 // No imported declaration pins the path (e.g. a capability-only
-                // consumed context, v0.15). Fall back to the context's own
-                // module: its per-Worker handlers in workers mode, or its
-                // <segment>.karn source in bundle mode.
-                match ctx.target {
-                    BuildTarget::Workers => crate::project::worker_handlers_source_path(q),
-                    BuildTarget::Bundle => {
-                        let mut p = EmitProjectCtx::commons_path(q);
-                        p.set_extension("karn");
-                        p
+                // consumed context, v0.15). Fall back to the unit's own module:
+                // its per-Worker handlers in workers mode, or its <segment>.karn
+                // source in bundle mode. v0.17: a consumed *adapter* is not a
+                // Worker — its capability types live in its root module
+                // (`<adapter>.ts`) in both targets.
+                if ctx.consumed_adapters.contains(q.as_str()) {
+                    let mut p = EmitProjectCtx::commons_path(q);
+                    p.set_extension("karn");
+                    p
+                } else {
+                    match ctx.target {
+                        BuildTarget::Workers => crate::project::worker_handlers_source_path(q),
+                        BuildTarget::Bundle => {
+                            let mut p = EmitProjectCtx::commons_path(q);
+                            p.set_extension("karn");
+                            p
+                        }
                     }
                 }
             });

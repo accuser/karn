@@ -50,6 +50,35 @@ pub struct ProjectOutput {
     pub files: Vec<CompiledFile>,
 }
 
+/// v0.17: a resolved adapter binding — the user-authored `.binding.ts` module
+/// that supplies an adapter's external provider symbols. Copied verbatim into
+/// the output beside the adapter's emitted interface module so that `tsc`
+/// checks the `implements` contract and compose can import the symbols.
+struct AdapterBinding {
+    /// Output path, relative to the output root (e.g. `tokens.binding.ts`).
+    output_path: PathBuf,
+    /// Verbatim TypeScript content read from the source tree.
+    content: String,
+}
+
+/// Normalise a relative path by resolving `.` and `..` components, so a binding
+/// clause like `./tokens.binding.ts` beside `src/tokens.karn` yields the output
+/// path `tokens.binding.ts`.
+fn normalize_rel(p: &Path) -> PathBuf {
+    let mut out: Vec<std::ffi::OsString> = Vec::new();
+    for c in p.components() {
+        match c {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                out.pop();
+            }
+            Component::Normal(s) => out.push(s.to_os_string()),
+            Component::RootDir | Component::Prefix(_) => {}
+        }
+    }
+    out.iter().collect()
+}
+
 /// The build target. Determines how cross-context calls and per-context
 /// modules are emitted (v0.8). Bundle mode is the default — all contexts
 /// emit into one TypeScript bundle and cross-context calls are direct
@@ -343,6 +372,45 @@ fn compile_project_inner(
         }
     }
 
+    // v0.17: resolve each adapter's binding module (relative to the adapter's
+    // source file) and read it, so compose can import the external provider
+    // symbols and the binding is copied into the output for the `tsc` gate.
+    let mut adapter_bindings: HashMap<String, AdapterBinding> = HashMap::new();
+    for pf in &parsed {
+        let Some(a) = pf.adapter() else { continue };
+        let Some(b) = &a.binding else { continue };
+        let adapter_dir = pf.source_path.parent().unwrap_or(Path::new(""));
+        let out_rel = normalize_rel(&adapter_dir.join(&b.module));
+        let src_abs = src_root.join(&out_rel);
+        match fs::read_to_string(&src_abs) {
+            Ok(content) => {
+                adapter_bindings.insert(
+                    a.name.joined(),
+                    AdapterBinding {
+                        output_path: out_rel,
+                        content,
+                    },
+                );
+            }
+            Err(e) => {
+                errors.push(
+                    CompileError::new(
+                        "karn.adapter.no_binding",
+                        b.module_span,
+                        format!(
+                            "adapter `{}` names binding module `{}`, which could not be read ({e})",
+                            a.name.joined(),
+                            b.module
+                        ),
+                    )
+                    .with_note(
+                        "the binding path is resolved relative to the adapter's source file; author the `.binding.ts` there",
+                    ),
+                );
+            }
+        }
+    }
+
     // -- 4. Build per-unit combined symbol tables. --
     let mut unit_tables: HashMap<String, UnitTable> = HashMap::new();
     for (name, indices) in &groups {
@@ -440,13 +508,15 @@ fn compile_project_inner(
                     continue;
                 }
                 let target_kind = *kinds.get(&target).unwrap();
-                if target_kind != UnitKind::Context {
+                // v0.17: `consumes` may target a context or an adapter (the host
+                // boundary). It may not target a commons (use `uses` for that).
+                if target_kind != UnitKind::Context && target_kind != UnitKind::Adapter {
                     errors.push(
                         CompileError::new(
                             "karn.consumes.target_is_commons",
                             c.span,
                             format!(
-                                "`consumes {target}` targets a commons — `consumes` may only target a context"
+                                "`consumes {target}` targets a commons — `consumes` may only target a context or adapter"
                             ),
                         )
                         .with_note(
@@ -1280,6 +1350,13 @@ fn compile_project_inner(
                     .get(name)
                     .map(|t| t.agents.keys().cloned().collect())
                     .unwrap_or_default(),
+                consumed_adapters: unit_consumes
+                    .get(name)
+                    .into_iter()
+                    .flatten()
+                    .filter(|t| kinds.get(*t) == Some(&UnitKind::Adapter))
+                    .cloned()
+                    .collect(),
             };
             let ts = emitter::emit_project(&typed, &emit_ctx);
             let output_path = if workers_mode && kind == UnitKind::Context {
@@ -1360,6 +1437,7 @@ fn compile_project_inner(
                 &unit_consumes,
                 &unit_consumes_aliases,
                 &unit_tables,
+                &adapter_bindings,
             ) {
                 compiled.push(CompiledFile {
                     source_path: PathBuf::from("compose.karn"),
@@ -1385,14 +1463,34 @@ fn compile_project_inner(
                     .cloned()
                     .unwrap_or_default();
                 let entry_ts = emitter::emit_worker_entry(ctx_name, table);
+                let binding_modules: HashMap<String, String> = adapter_bindings
+                    .iter()
+                    .map(|(n, b)| {
+                        (
+                            n.clone(),
+                            b.output_path
+                                .with_extension("js")
+                                .to_string_lossy()
+                                .to_string(),
+                        )
+                    })
+                    .collect();
                 let compose_ts = emitter::emit_worker_compose(
                     ctx_name,
                     table,
                     &consumes_targets,
                     &aliases,
                     &unit_tables,
+                    &binding_modules,
                 );
-                let wrangler = emitter::emit_wrangler_toml(ctx_name, table, &consumes_targets);
+                // Adapters are not Workers, so they get no Service Binding in
+                // the consumer's wrangler config — drop them from the list.
+                let service_consumes: Vec<String> = consumes_targets
+                    .iter()
+                    .filter(|t| !binding_modules.contains_key(*t))
+                    .cloned()
+                    .collect();
+                let wrangler = emitter::emit_wrangler_toml(ctx_name, table, &service_consumes);
                 compiled.push(CompiledFile {
                     source_path: PathBuf::from(format!("workers/{dashes}/<index>")),
                     output_path: PathBuf::from(format!("workers/{dashes}/index.ts")),
@@ -1410,6 +1508,20 @@ fn compile_project_inner(
                 });
             }
         }
+    }
+
+    // v0.17: copy each adapter binding verbatim into the output, beside the
+    // adapter's emitted interface module, so compose's import resolves and the
+    // `tsc` gate checks the `implements` contract.
+    let mut binding_names: Vec<&String> = adapter_bindings.keys().collect();
+    binding_names.sort();
+    for name in binding_names {
+        let b = &adapter_bindings[name];
+        compiled.push(CompiledFile {
+            source_path: b.output_path.clone(),
+            output_path: b.output_path.clone(),
+            typescript: b.content.clone(),
+        });
     }
 
     // Runtime + tsconfig: emit once per project. The runtime sits at the
@@ -1498,6 +1610,12 @@ fn instantiate_provider_expr(
     else {
         return format!("new {ns}.{cap}()");
     };
+    // v0.17: an external (adapter) provider's class lives in the binding module,
+    // not the adapter's interface module — instantiate it from the binding
+    // namespace (`<adapter>__binding`, imported by the composition root).
+    if provider.external {
+        return format!("new {ns}__binding.{}()", provider.provider_name.name);
+    }
     if provider.given.is_empty() {
         return format!("new {ns}.{}()", provider.provider_name.name);
     }
@@ -1538,6 +1656,7 @@ fn emit_composition_root(
     unit_consumes: &HashMap<String, Vec<String>>,
     unit_consumes_aliases: &HashMap<String, HashMap<String, String>>,
     unit_tables: &HashMap<String, UnitTable>,
+    adapter_bindings: &HashMap<String, AdapterBinding>,
 ) -> Option<String> {
     // Identify contexts that consume something whose surface has services.
     let mut needs_compose = false;
@@ -1597,6 +1716,25 @@ fn emit_composition_root(
         let dir = commons_dir_for(ctx_name).to_string_lossy().to_string();
         let ns = ctx_name.replace('.', "_");
         out.push_str(&format!("import * as {ns} from \"./{dir}.js\";\n"));
+    }
+    // v0.17: import each consumed adapter's binding module — the external
+    // provider classes live there, not in the adapter's interface module.
+    let mut consumed_adapters: Vec<&String> = unit_consumes
+        .iter()
+        .filter(|(name, _)| kinds.get(*name) == Some(&UnitKind::Context))
+        .flat_map(|(_, targets)| targets.iter())
+        .filter(|t| adapter_bindings.contains_key(*t))
+        .collect();
+    consumed_adapters.sort();
+    consumed_adapters.dedup();
+    for adapter in &consumed_adapters {
+        let ns = adapter.replace('.', "_");
+        let module = adapter_bindings[*adapter]
+            .output_path
+            .with_extension("js")
+            .to_string_lossy()
+            .to_string();
+        out.push_str(&format!("import * as {ns}__binding from \"./{module}\";\n"));
     }
     out.push('\n');
 
@@ -3269,6 +3407,10 @@ pub struct EmitProjectCtx {
     /// to recognise `Agent(key)` construction and `agent_instance.method(...)`
     /// dispatch.
     pub local_agents: HashSet<String>,
+    /// v0.17: consumed unit names that are adapters. An adapter is not a Worker,
+    /// so in workers mode its capability types are imported from its root module
+    /// (`<adapter>.ts`), not from a per-Worker `handlers.ts`.
+    pub consumed_adapters: HashSet<String>,
 }
 
 /// Where a boundary-crossing type was declared.
