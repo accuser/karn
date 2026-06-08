@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: dtolnay/rust-toolchain@1.100.0
         with:
           components: rustfmt
       # No build/cache: rustfmt parses, it doesn't compile.
@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: dtolnay/rust-toolchain@1.100.0
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: dtolnay/rust-toolchain@1.100.0
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-node@v4
         with:
@@ -77,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: dtolnay/rust-toolchain@1.100.0
       - uses: Swatinem/rust-cache@v2
       # Pin mdBook to 0.4.x (mdbook-linkcheck targets it; 0.5 changed the
       # renderer protocol). Mirrors pages.yml so broken docs fail on the PR,
@@ -104,7 +104,7 @@ jobs:
       - uses: actions/checkout@v4
       # Define the toolchain explicitly (rust-toolchain.toml would otherwise
       # trigger an implicit download when `cargo audit` dispatches in-repo).
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: dtolnay/rust-toolchain@1.100.0
       # Prebuilt binary — avoids compiling cargo-audit from source on every run.
       - uses: taiki-e/install-action@v2
         with:
