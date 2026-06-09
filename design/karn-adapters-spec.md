@@ -586,6 +586,28 @@ A local `provides Clock = FixedClock { … }` emits `class FixedClock implements
 and compose constructs that; `mocks Clock` substitutes in the test build. `Clock.now()`
 lowers to `deps.Clock.now()` in every case.
 
+**Consuming an adapter is in-process, never RPC (verified, fixtures 176/177).** This is
+the emitter-level reading of §5.3: an adapter is *not* a deployment unit. A consumed
+*context* in `--target workers` is a separate Worker reached over a Service Binding, but
+a consumed *adapter* is wired in-process via its binding. Concretely, for a consumer of
+an adapter:
+
+- the binding `.binding.ts` is **copied verbatim into the output** beside the adapter's
+  emitted interface module, so the `import` resolves and `tsc --strict` checks the
+  `implements` contract;
+- compose instantiates the external provider from the binding module
+  (`new tokens__binding.JoseJwt()`) — in `workers` it imports the binding at the out
+  root (`../../tokens.binding.js`), in `bundle` at `./tokens.binding.js`;
+- the consumer imports the adapter's capability **types** from the adapter's root module
+  (`tokens.ts`), *not* from a per-Worker `handlers.ts` (an adapter has none);
+- a consumed adapter therefore produces **no Service Binding** — no `Env` entry, no
+  `wrangler.toml` binding — in either target. Only consumed *contexts* do.
+
+This also means a consumer may construct an adapter's **transparent** boundary types
+(e.g. `Jwt.sign(Claims { … }, secret)` in §8) — confirmed to compile and type-check;
+transparent export affords field-level construction at the consumer, the binding is the
+*privileged* constructor only for the stricter cases (refined types, §4.4).
+
 ### 6.2 Platform target (a new axis) and deploy bindings
 
 The deploy **platform** (cloudflare / node / deno) is a **new selection axis** this

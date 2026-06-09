@@ -143,6 +143,28 @@ the `implements` and the symbol's existence.
 **Done when.** Both wire correctly and type-check under `tsc --strict`; the binding
 import path is correct in both bundle and workers topologies.
 
+**Findings folded back (Phase 2, implemented).**
+
+- **Allow an adapter as a `consumes` target** — the v0.15 gate rejected anything but a
+  context (`karn.consumes.target_is_commons`); it now accepts a context *or* an adapter.
+- **The binding is copied verbatim into the output**, beside the adapter's interface
+  module, so the `import` resolves and `tsc` checks `implements`. `karn.adapter.no_binding`
+  also fires when the named module can't be read.
+- **A consumed adapter is in-process, never RPC** (the emitter reading of §5.3 — see the
+  spec's new §6.1 note). In `--target workers` this means an adapter consumer gets: no
+  Service Binding (`Env` entry), no `wrangler.toml` binding, capability-type imports from
+  the adapter's **root** module (`tokens.ts`, via a new `EmitProjectCtx.consumed_adapters`
+  used in the cross-context namespace-import fallback), and external-provider
+  instantiation from `../../<adapter>.binding.js`. Only consumed *contexts* become
+  Service Bindings.
+- **Transparent boundary-type construction in a consumer is allowed** (verified): the §8
+  example `Jwt.sign(Claims { … }, secret)` compiles and type-checks. Fixtures 176/177 use
+  primitive capability args only to stay minimal; the boundary-type path (sum + record)
+  is exercised in Phase 5.
+- **No `noUnusedLocals`** in the emitted `tsconfig`, so an occasionally-unused
+  `import { type ServiceBinding }` in an adapter-only consumer's compose is harmless under
+  the gate. If that flag is ever enabled, prune the import for adapter-only composes.
+
 ---
 
 ## Phase 3 — `consumes U { Cap, … }` flattening, clash detection, dep stub
