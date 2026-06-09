@@ -33,7 +33,7 @@ karnc compile <INPUT> --output <OUTPUT> [--target <TARGET>] [--platform <PLATFOR
 | `INPUT` | yes | — | Input `.karn` file, or directory project root |
 | `--output` (`-o`) | yes | — | Output `.ts` file (for single-file input) or output root directory (for project input) |
 | `--target` | no | `bundle` | Build target. `bundle` (default) produces a single deployment unit; `workers` produces one Cloudflare Worker per context with Service Binding plumbing (v0.8) (one of: bundle, workers) |
-| `--platform` | no | `cloudflare` | Deploy platform selecting the `karn` surface binding (v0.17). A new axis, distinct from `--target`. The MVP supports `cloudflare` only (one of: cloudflare) |
+| `--platform` | no | `cloudflare` | Deploy platform selecting the `karn` surface binding (v0.17). A new axis, distinct from `--target`. The MVP supports `cloudflare` only (one of: cloudflare, node) |
 
 ## `karnc fmt`
 

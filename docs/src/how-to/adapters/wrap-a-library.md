@@ -10,9 +10,14 @@ Name the adapter for the capability it provides. Declare the capability, any
 boundary types, and an external (bodiless) `provides`. Name the binding module
 and pin its npm dependency.
 
+Configuration the binding needs — here the signing secret — is a **capability
+dependency** (`consumes karn { Secrets }` + `given Secrets`), not an operation
+parameter (v0.18).
+
 ```karn,ignore
 adapter tokens {
   binding "./tokens.binding.ts" requires { "jose": "^5" }
+  consumes karn { Secrets }
 
   exports capability  { Jwt }
   exports transparent { Claims, JwtError }
@@ -21,11 +26,11 @@ adapter tokens {
   type JwtError = enum { Invalid, Expired }
 
   capability Jwt {
-    fn sign(claims: Claims, secret: String) -> Effect[String]
-    fn verify(token: String, secret: String) -> Effect[Result[Claims, JwtError]]
+    fn sign(claims: Claims) -> Effect[String]
+    fn verify(token: String) -> Effect[Result[Claims, JwtError]]
   }
 
-  provides Jwt = JoseJwt
+  provides Jwt = JoseJwt given Secrets
 }
 ```
 
@@ -37,35 +42,47 @@ names. `implements Jwt` against the generated interface is the contract — `tsc
 constructors** (`Ok`/`Err`, the sum type's `JwtError.Invalid`, a `Claims` object
 literal) — never hand-rolled tag shapes.
 
+The provider's `given` names arrive as a **by-name deps object** in the class
+constructor — the keys are the `given` names, and `tsc` checks them.
+
 ```typescript
 // tokens.binding.ts
 import * as jose from "jose";
 import type { Jwt, Claims } from "./tokens.js";
 import { JwtError } from "./tokens.js";          // emitted variant constructors
+import type { Secrets } from "./karn.js";
 import { Ok, Err, type Result } from "./runtime.js";
 
 export class JoseJwt implements Jwt {
-  async sign(claims: Claims, secret: string): Promise<string> {
+  constructor(private deps: { Secrets: Secrets }) {}
+
+  async sign(claims: Claims): Promise<string> {
     return await new jose.SignJWT({ ...claims })
       .setProtectedHeader({ alg: "HS256" })
-      .sign(new TextEncoder().encode(secret));
+      .sign(new TextEncoder().encode(await this.secret()));
   }
-  async verify(token: string, secret: string): Promise<Result<Claims, JwtError>> {
+  async verify(token: string): Promise<Result<Claims, JwtError>> {
     try {
       const { payload } = await jose.jwtVerify(
         token,
-        new TextEncoder().encode(secret),
+        new TextEncoder().encode(await this.secret()),
       );
       return Ok({ sub: String(payload.sub), exp: Number(payload.exp) });
     } catch {
       return Err(JwtError.Invalid);
     }
   }
+
+  private async secret(): Promise<string> {
+    const s = await this.deps.Secrets.get("JWT_SECRET");
+    return s.tag === "Some" ? s.value : "";
+  }
 }
 ```
 
 A **remote API** is the same shape with no npm dependency — drop the `requires`
-clause and call `fetch` in the binding, mapping the response to a `Result`.
+clause and take `given karn.Fetch` instead of calling the global `fetch`,
+mapping the typed `Response` to a `Result`.
 
 ## 3. Consume it
 
@@ -74,8 +91,8 @@ context auth.sessions {
   consumes tokens { Jwt }      -- flatten `Jwt` into the local namespace
 
   service login {
-    on call(secret: String) -> Effect[String] given Jwt {
-      let token <- Jwt.sign(Claims { sub: "u1", exp: 0 }, secret)
+    on call() -> Effect[String] given Jwt {
+      let token <- Jwt.sign(Claims { sub: "u1", exp: 0 })
       token
     }
   }

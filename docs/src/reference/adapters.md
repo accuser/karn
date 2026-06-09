@@ -16,6 +16,7 @@ providers are **external** (bodiless).
 ```karn,ignore
 adapter tokens {
   binding "./tokens.binding.ts" requires { "jose": "^5" }
+  consumes karn { Secrets }     -- v0.18: adapter-to-adapter dependency
 
   exports capability  { Jwt }
   exports transparent { Claims, JwtError }
@@ -24,11 +25,11 @@ adapter tokens {
   type JwtError = enum { Invalid, Expired }
 
   capability Jwt {
-    fn sign(claims: Claims, secret: String) -> Effect[String]
-    fn verify(token: String, secret: String) -> Effect[Result[Claims, JwtError]]
+    fn sign(claims: Claims) -> Effect[String]
+    fn verify(token: String) -> Effect[Result[Claims, JwtError]]
   }
 
-  provides Jwt = JoseJwt        -- external: no body; supplied by the binding
+  provides Jwt = JoseJwt given Secrets   -- external: no body; supplied by the binding
 }
 ```
 
@@ -39,6 +40,44 @@ adapter tokens {
   the compiler emits no class, and the binding must `export class Name implements
   Cap`. The `implements` is checked by `tsc --strict` — that is the contract
   between the two halves.
+- **`consumes U { Cap, … }`** (v0.18) brings another adapter's capabilities into
+  scope for the adapter's providers — see
+  [Adapter dependencies](#adapter-dependencies) below.
+
+## Adapter dependencies
+
+An adapter may depend on **another adapter's** capabilities (v0.18). Its
+`consumes` is restricted on two axes, each with its own diagnostic:
+
+- **braced form only** — an adapter has no services to call, so the whole-unit
+  and `as Alias` forms are rejected (`karn.adapter.consumes_requires_selection`);
+- **adapter targets only** — an adapter may not consume a *context*
+  (`karn.adapter.consumes_context`).
+
+An external provider names its dependencies with the ordinary `given`; compose
+builds a **by-name deps object** and passes it to the binding class
+constructor:
+
+```typescript
+// tokens.binding.ts — keys are the `given` names, checked by tsc
+export class JoseJwt implements Jwt {
+  constructor(private deps: { Secrets: Secrets }) {}
+  // … this.deps.Secrets.get("JWT_SECRET") …
+}
+```
+
+```typescript
+// compose.ts (generated) — the dependency is instantiated recursively
+const Jwt = new tokens__binding.JoseJwt({
+  Secrets: new karn__binding.SecretsProvider(),
+});
+```
+
+The wiring is transitive: depending on a capability pulls its provider's
+binding into the compose (and *its* dependencies, recursively). This is how
+config and IO reach a binding — a secret or an HTTP client is a capability
+dependency (`given karn.Secrets`, `given karn.Fetch`), never an operation
+parameter or an env read in application code.
 
 ## The three flavours
 
@@ -48,10 +87,32 @@ adapter tokens {
 | **The `karn` surface** | one per platform, toolchain-supplied | portable |
 | **Vendor adapter** | one, vendor-only | platform-locked |
 
-The **`karn` surface** is the reserved, agnostic conformance core
-(`Clock`, `Random`, `Logger`, …) shipped with the toolchain; consuming only
-`karn` keeps code portable. The `karn` root namespace is reserved — no user unit
-may be named `karn` or `karn.*`.
+The **`karn` surface** is the reserved, agnostic conformance core shipped with
+the toolchain; consuming only `karn` keeps code portable. The `karn` root
+namespace is reserved — no user unit may be named `karn` or `karn.*`. As of
+v0.18 it carries the full ambient set:
+
+| Capability | Ops | Notes |
+|---|---|---|
+| `Clock` | `now() -> Effect[Int]` | |
+| `Random` | `uuid() -> Effect[Uuid]`, `int(lo, hi) -> Effect[Int]` | `Uuid` is refined |
+| `Logger` | `info(msg)`, `error(msg)` | |
+| `Fetch` | `send(req: Request) -> Effect[Result[Response, FetchError]]` | typed core; see below |
+| `Secrets` | `get(name: String) -> Effect[Option[String]]` | env-backed per platform |
+
+`Fetch`'s `Request` carries `method` (`Method` enum), `url`, and
+`contentType`/`authorization`/`body` as `Option[String]` fields; a general
+`headers` list is deferred until Karn has a sequence type, and widening
+`Request` later is additive.
+
+### Platforms
+
+The deploy **platform** (`--platform {cloudflare,node}`, default `cloudflare`)
+selects which `karn-<platform>.ts` binding is linked. It is distinct from
+`--target {bundle,workers}`, which chooses emit topology. Because the `karn`
+contract names canonical provider symbols, the generated compose is
+platform-identical — only the imported binding module differs. Porting Karn to
+a new runtime means implementing this one adapter's interfaces.
 
 ## Consuming an adapter
 
@@ -64,9 +125,9 @@ context auth.sessions {
   consumes tokens { Jwt }      -- library adapter; bare `Jwt` in scope
 
   service login {
-    on call(secret: String) -> Effect[String] given Jwt, Logger {
+    on call() -> Effect[String] given Jwt, Logger {
       let _     <- Logger.info("issuing token")
-      let token <- Jwt.sign(Claims { sub: "u1", exp: 0 }, secret)
+      let token <- Jwt.sign(Claims { sub: "u1", exp: 0 })
       token
     }
   }
