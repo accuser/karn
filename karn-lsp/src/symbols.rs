@@ -254,7 +254,7 @@ pub fn describe_symbol_cross_file(
 
 /// Recursively collect every `.karn` file under `root`. Returns an empty
 /// vector if the root is missing or unreadable.
-fn walk_karn_files(root: &Path) -> Vec<PathBuf> {
+pub(crate) fn walk_karn_files(root: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     while let Some(dir) = stack.pop() {
