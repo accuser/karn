@@ -294,6 +294,21 @@ through emitted constructors (no raw `{ tag: … }` / `as` casts — §4.4).
 **Done when.** Grammar/format/highlight all handle the new surface; docs build; the
 generated reference pages include the new keywords and diagnostics.
 
+**Findings folded back (Phase 6, implemented).**
+
+- **No `tree-sitter` on PATH, but a local binary** ships in
+  `tree-sitter-karn/node_modules/.bin` — use it (`./node_modules/.bin/tree-sitter
+  generate|test`) rather than hand-editing `src/grammar.json`.
+- **Adding a grammar rule is a three-touch change** beyond `grammar.js`: a
+  `{{#grammar <rule>}}` entry in `grammar.md` (bijection), the embeddable-rule
+  *count* in `karn-grammar`'s unit test, and a re-bless of `grammar-appendix.md`.
+- **The LSP had no completion provider** for any construct (only hover / definition
+  / formatting / symbols). It was added in a follow-up: a `completion` module +
+  `completionProvider` capability covering `consumes ` (units incl. `karn`),
+  `consumes U { … }` (U's exported capabilities), and `given ` (in-scope
+  capabilities). Adapter hover / go-to-definition / document-symbols had a baseline
+  and were extended in Phase 1.
+
 ---
 
 ## Diagnostics added this increment (register all in `diagnostics.rs`)
