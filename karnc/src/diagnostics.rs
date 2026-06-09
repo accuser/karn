@@ -33,6 +33,16 @@ pub struct DiagnosticInfo {
 /// Every diagnostic code the compiler emits, sorted by code.
 pub const REGISTRY: &[DiagnosticInfo] = &[
     dg(
+        "karn.adapter.consumes_context",
+        "An `adapter` consumed a context; adapter dependencies are adapter-to-adapter.",
+        &["consumes_decl"],
+    ),
+    dg(
+        "karn.adapter.consumes_requires_selection",
+        "An `adapter` used a whole-unit or aliased `consumes`; adapters must select capabilities with `consumes U { Cap, … }`.",
+        &["consumes_decl"],
+    ),
+    dg(
         "karn.adapter.disallowed_item",
         "An `adapter` declared a `service`, `agent`, or other item it may not contain.",
         &["adapter_decl"],

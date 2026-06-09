@@ -606,17 +606,35 @@ fn compile_project_inner(
         for &i in indices {
             for c in parsed[i].consumes() {
                 let target = c.target.joined();
-                if kind != UnitKind::Context {
+                if kind != UnitKind::Context && kind != UnitKind::Adapter {
                     errors.push(
                         CompileError::new(
                             "karn.consumes.in_commons",
                             c.span,
                             format!(
-                                "`consumes` is only valid inside a context, not a commons `{name}`",
+                                "`consumes` is only valid inside a context or adapter, not a commons `{name}`",
                             ),
                         )
                         .with_note(
-                            "commons declare vocabulary; only contexts can declare behavioural dependencies",
+                            "commons declare vocabulary; only contexts and adapters can declare behavioural dependencies",
+                        ),
+                    );
+                    continue;
+                }
+                // v0.18: an adapter's `consumes` is the braced capability-selection
+                // form only — an adapter has no services to RPC-call, so the
+                // whole-unit and `as Alias` forms are meaningless inside one.
+                if kind == UnitKind::Adapter && c.selected.is_none() {
+                    errors.push(
+                        CompileError::new(
+                            "karn.adapter.consumes_requires_selection",
+                            c.span,
+                            format!(
+                                "an adapter's `consumes` must select capabilities — write `consumes {target} {{ Cap, … }}`",
+                            ),
+                        )
+                        .with_note(
+                            "adapters depend on capabilities, never on services; the whole-unit and aliased forms are context-only",
                         ),
                     );
                     continue;
@@ -652,11 +670,34 @@ fn compile_project_inner(
                     );
                     continue;
                 }
+                // v0.18: adapter dependencies are adapter-to-adapter (spec §4.5) —
+                // an adapter consuming a *context* would pull service logic into
+                // the host boundary.
+                if kind == UnitKind::Adapter && target_kind == UnitKind::Context {
+                    errors.push(
+                        CompileError::new(
+                            "karn.adapter.consumes_context",
+                            c.span,
+                            format!(
+                                "adapter `{name}` cannot `consumes` the context `{target}` — adapter dependencies are adapter-to-adapter"
+                            ),
+                        )
+                        .with_note(
+                            "an adapter may only depend on capabilities exported by other adapters (e.g. the `karn` surface)",
+                        ),
+                    );
+                    continue;
+                }
                 if target == *name {
+                    let kind_word = if kind == UnitKind::Adapter {
+                        "adapter"
+                    } else {
+                        "context"
+                    };
                     errors.push(CompileError::new(
                         "karn.consumes.self_reference",
                         c.span,
-                        format!("context `{name}` cannot `consumes` itself"),
+                        format!("{kind_word} `{name}` cannot `consumes` itself"),
                     ));
                     continue;
                 }
@@ -1334,8 +1375,10 @@ fn compile_project_inner(
 
             // Cross-context info (v0.6) for contexts: consumed contexts,
             // aliases, services, and types. Computed once below; reused
-            // for the resolver, checker, and emitter.
-            let cross_context_for_file = if kind == UnitKind::Context {
+            // for the resolver, checker, and emitter. v0.18: adapters get it
+            // too, so an external provider's `given` resolves against the
+            // adapter's flattened consumed capabilities (spec §4.5).
+            let cross_context_for_file = if kind == UnitKind::Context || kind == UnitKind::Adapter {
                 let mut cci = build_cross_context_info(
                     name,
                     &unit_consumes,
@@ -1382,9 +1425,12 @@ fn compile_project_inner(
             }
 
             // v0.5: check capability/provider/service/agent declarations.
+            // v0.18: adapters run these too — an external provider's `given`
+            // resolves through the same path as a bodied provider's (the
+            // service/agent checks are vacuous for adapters, which have none).
             let mut typed = typed;
             let unit_table_owned = unit_tables.get(name).cloned();
-            if kind == UnitKind::Context
+            if (kind == UnitKind::Context || kind == UnitKind::Adapter)
                 && let Some(table) = unit_table_owned.as_ref()
             {
                 let v0_5_errs = check_v0_5_declarations(&mut typed, table, &cross_context_for_file);
@@ -3237,7 +3283,7 @@ fn dfs_consumes(
                 ),
             )
             .with_note(
-                "contexts must form an acyclic dependency graph; remove one of the `consumes` clauses or restructure",
+                "units must form an acyclic `consumes` graph; remove one of the `consumes` clauses or restructure",
             ));
         }
         return;

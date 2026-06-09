@@ -1,0 +1,1 @@
+karn.context.consumes_cycle

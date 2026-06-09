@@ -1,0 +1,12 @@
+adapter alpha {
+  binding "./alpha.binding.ts"
+  consumes beta { B }
+
+  exports capability { A }
+
+  capability A {
+    fn a() -> Effect[Int]
+  }
+
+  provides A = AImpl given B
+}
