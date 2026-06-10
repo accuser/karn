@@ -20,7 +20,7 @@
 //!      `uses` cycles trivial — there is no order-of-evaluation, only
 //!      declarative mixin.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
@@ -606,17 +606,35 @@ fn compile_project_inner(
         for &i in indices {
             for c in parsed[i].consumes() {
                 let target = c.target.joined();
-                if kind != UnitKind::Context {
+                if kind != UnitKind::Context && kind != UnitKind::Adapter {
                     errors.push(
                         CompileError::new(
                             "karn.consumes.in_commons",
                             c.span,
                             format!(
-                                "`consumes` is only valid inside a context, not a commons `{name}`",
+                                "`consumes` is only valid inside a context or adapter, not a commons `{name}`",
                             ),
                         )
                         .with_note(
-                            "commons declare vocabulary; only contexts can declare behavioural dependencies",
+                            "commons declare vocabulary; only contexts and adapters can declare behavioural dependencies",
+                        ),
+                    );
+                    continue;
+                }
+                // v0.18: an adapter's `consumes` is the braced capability-selection
+                // form only — an adapter has no services to RPC-call, so the
+                // whole-unit and `as Alias` forms are meaningless inside one.
+                if kind == UnitKind::Adapter && c.selected.is_none() {
+                    errors.push(
+                        CompileError::new(
+                            "karn.adapter.consumes_requires_selection",
+                            c.span,
+                            format!(
+                                "an adapter's `consumes` must select capabilities — write `consumes {target} {{ Cap, … }}`",
+                            ),
+                        )
+                        .with_note(
+                            "adapters depend on capabilities, never on services; the whole-unit and aliased forms are context-only",
                         ),
                     );
                     continue;
@@ -652,11 +670,34 @@ fn compile_project_inner(
                     );
                     continue;
                 }
+                // v0.18: adapter dependencies are adapter-to-adapter (spec §4.5) —
+                // an adapter consuming a *context* would pull service logic into
+                // the host boundary.
+                if kind == UnitKind::Adapter && target_kind == UnitKind::Context {
+                    errors.push(
+                        CompileError::new(
+                            "karn.adapter.consumes_context",
+                            c.span,
+                            format!(
+                                "adapter `{name}` cannot `consumes` the context `{target}` — adapter dependencies are adapter-to-adapter"
+                            ),
+                        )
+                        .with_note(
+                            "an adapter may only depend on capabilities exported by other adapters (e.g. the `karn` surface)",
+                        ),
+                    );
+                    continue;
+                }
                 if target == *name {
+                    let kind_word = if kind == UnitKind::Adapter {
+                        "adapter"
+                    } else {
+                        "context"
+                    };
                     errors.push(CompileError::new(
                         "karn.consumes.self_reference",
                         c.span,
-                        format!("context `{name}` cannot `consumes` itself"),
+                        format!("{kind_word} `{name}` cannot `consumes` itself"),
                     ));
                     continue;
                 }
@@ -1334,8 +1375,10 @@ fn compile_project_inner(
 
             // Cross-context info (v0.6) for contexts: consumed contexts,
             // aliases, services, and types. Computed once below; reused
-            // for the resolver, checker, and emitter.
-            let cross_context_for_file = if kind == UnitKind::Context {
+            // for the resolver, checker, and emitter. v0.18: adapters get it
+            // too, so an external provider's `given` resolves against the
+            // adapter's flattened consumed capabilities (spec §4.5).
+            let cross_context_for_file = if kind == UnitKind::Context || kind == UnitKind::Adapter {
                 let mut cci = build_cross_context_info(
                     name,
                     &unit_consumes,
@@ -1382,9 +1425,12 @@ fn compile_project_inner(
             }
 
             // v0.5: check capability/provider/service/agent declarations.
+            // v0.18: adapters run these too — an external provider's `given`
+            // resolves through the same path as a bodied provider's (the
+            // service/agent checks are vacuous for adapters, which have none).
             let mut typed = typed;
             let unit_table_owned = unit_tables.get(name).cloned();
-            if kind == UnitKind::Context
+            if (kind == UnitKind::Context || kind == UnitKind::Adapter)
                 && let Some(table) = unit_table_owned.as_ref()
             {
                 let v0_5_errs = check_v0_5_declarations(&mut typed, table, &cross_context_for_file);
@@ -1661,6 +1707,9 @@ fn compile_project_inner(
                     &unit_tables,
                     &binding_modules,
                     &flattened,
+                    &unit_consumes,
+                    &unit_consumes_aliases,
+                    &unit_flattened,
                 );
                 // Adapters are not Workers, so they get no Service Binding in
                 // the consumer's wrangler config — drop them from the list.
@@ -1791,58 +1840,105 @@ fn handler_cross_caps(
 /// capability `cap` declared in `provider_ctx`, recursively wiring its `given`
 /// dependencies — local sibling providers and cross-context capability
 /// providers alike. Stateless providers, so fresh instances per use are fine.
-fn instantiate_provider_expr(
+///
+/// v0.18 (spec §4.5/§5.1): a *bare* `given` name resolves through the
+/// provider's own unit's flattened-capability map (`Fetch` → `karn`), falling
+/// back to the unit itself; an *external* provider's deps are built the same
+/// way and passed to the binding class constructor by name. Every unit whose
+/// namespace the expression references is recorded in `referenced_units` so
+/// the caller can emit the matching imports (the transitive given-closure).
+///
+/// `workers_ns` selects the namespace convention: a bodied provider's class
+/// lives in `{ns}` under the bundle root but `handlers_{ns}` in a Worker
+/// compose; external (binding) classes are `{ns}__binding` in both. When
+/// `env_ident` is set (workers), env-taking first-party providers receive it
+/// as a constructor argument.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn instantiate_provider_expr(
     provider_ctx: &str,
     cap: &str,
     unit_tables: &HashMap<String, UnitTable>,
     unit_consumes: &HashMap<String, Vec<String>>,
     unit_consumes_aliases: &HashMap<String, HashMap<String, String>>,
+    unit_flattened: &HashMap<String, HashMap<String, String>>,
+    workers_ns: bool,
+    env_ident: Option<&str>,
+    referenced_units: &mut BTreeSet<String>,
 ) -> String {
     let ns = provider_ctx.replace('.', "_");
+    let bodied_ns = if workers_ns {
+        format!("handlers_{ns}")
+    } else {
+        ns.clone()
+    };
+    referenced_units.insert(provider_ctx.to_string());
     let Some(provider) = unit_tables
         .get(provider_ctx)
         .and_then(|t| t.providers.get(cap))
     else {
-        return format!("new {ns}.{cap}()");
+        return format!("new {bodied_ns}.{cap}()");
     };
+    // Build the by-name deps object from the provider's `given`, if any.
+    let deps_obj = if provider.given.is_empty() {
+        None
+    } else {
+        let consumed = unit_consumes.get(provider_ctx).cloned().unwrap_or_default();
+        let aliases = unit_consumes_aliases
+            .get(provider_ctx)
+            .cloned()
+            .unwrap_or_default();
+        let flattened = unit_flattened
+            .get(provider_ctx)
+            .cloned()
+            .unwrap_or_default();
+        let deps: Vec<String> = provider
+            .given
+            .iter()
+            .map(|g| {
+                let target_ctx = match g.prefix() {
+                    Some(p) => resolve_consume_prefix(&p, &consumed, &aliases)
+                        .unwrap_or_else(|| provider_ctx.to_string()),
+                    None => flattened
+                        .get(g.key())
+                        .cloned()
+                        .unwrap_or_else(|| provider_ctx.to_string()),
+                };
+                let expr = instantiate_provider_expr(
+                    &target_ctx,
+                    g.key(),
+                    unit_tables,
+                    unit_consumes,
+                    unit_consumes_aliases,
+                    unit_flattened,
+                    workers_ns,
+                    env_ident,
+                    referenced_units,
+                );
+                format!("{}: {}", g.key(), expr)
+            })
+            .collect();
+        Some(format!("{{ {} }}", deps.join(", ")))
+    };
+    let mut args: Vec<String> = deps_obj.into_iter().collect();
+    // v0.18: env-taking first-party providers (e.g. the karn surface's
+    // SecretsProvider) receive the Worker `env` explicitly — decision [B].
+    if provider.external
+        && provider_ctx == crate::firstparty::KARN_UNIT
+        && crate::firstparty::provider_takes_env(&provider.provider_name.name)
+        && let Some(env) = env_ident
+    {
+        args.push(env.to_string());
+    }
+    let class = &provider.provider_name.name;
+    let args = args.join(", ");
     // v0.17: an external (adapter) provider's class lives in the binding module,
     // not the adapter's interface module — instantiate it from the binding
     // namespace (`<adapter>__binding`, imported by the composition root).
     if provider.external {
-        return format!("new {ns}__binding.{}()", provider.provider_name.name);
+        format!("new {ns}__binding.{class}({args})")
+    } else {
+        format!("new {bodied_ns}.{class}({args})")
     }
-    if provider.given.is_empty() {
-        return format!("new {ns}.{}()", provider.provider_name.name);
-    }
-    let consumed = unit_consumes.get(provider_ctx).cloned().unwrap_or_default();
-    let aliases = unit_consumes_aliases
-        .get(provider_ctx)
-        .cloned()
-        .unwrap_or_default();
-    let deps: Vec<String> = provider
-        .given
-        .iter()
-        .map(|g| {
-            let target_ctx = match g.prefix() {
-                Some(p) => resolve_consume_prefix(&p, &consumed, &aliases)
-                    .unwrap_or_else(|| provider_ctx.to_string()),
-                None => provider_ctx.to_string(),
-            };
-            let expr = instantiate_provider_expr(
-                &target_ctx,
-                g.key(),
-                unit_tables,
-                unit_consumes,
-                unit_consumes_aliases,
-            );
-            format!("{}: {}", g.key(), expr)
-        })
-        .collect();
-    format!(
-        "new {ns}.{}({{ {} }})",
-        provider.provider_name.name,
-        deps.join(", ")
-    )
 }
 
 fn emit_composition_root(
@@ -1884,10 +1980,15 @@ fn emit_composition_root(
             let aliases = unit_consumes_aliases.get(name).cloned().unwrap_or_default();
             let flattened = unit_flattened.get(name).cloned().unwrap_or_default();
             if !handler_cross_caps(table, &consumed, &aliases, &flattened).is_empty()
-                || table
-                    .providers
-                    .values()
-                    .any(|p| p.given.iter().any(|g| g.is_cross_context()))
+                || table.providers.values().any(|p| {
+                    p.given.iter().any(|g| {
+                        g.is_cross_context()
+                            // v0.18: a bare given flattened from `consumes U
+                            // { Cap }` is cross-unit too — its provider lives
+                            // in the consumed unit.
+                            || (g.prefix().is_none() && flattened.contains_key(g.key()))
+                    })
+                })
             {
                 needs_compose = true;
                 break;
@@ -1904,36 +2005,12 @@ fn emit_composition_root(
         .collect();
     contexts.sort();
 
+    // The composeApp body is built first so the provider expressions can
+    // record every unit namespace they reference (v0.18: an external
+    // provider's `given` may pull in *another* adapter's binding — the
+    // transitive given-closure — which must then be imported).
+    let mut referenced_units: BTreeSet<String> = BTreeSet::new();
     let mut out = String::new();
-    out.push_str("// Generated by karnc — do not edit by hand.\n");
-    out.push_str("// composition root\n\n");
-
-    // Import every context as a namespace.
-    for ctx_name in &contexts {
-        let dir = commons_dir_for(ctx_name).to_string_lossy().to_string();
-        let ns = ctx_name.replace('.', "_");
-        out.push_str(&format!("import * as {ns} from \"./{dir}.js\";\n"));
-    }
-    // v0.17: import each consumed adapter's binding module — the external
-    // provider classes live there, not in the adapter's interface module.
-    let mut consumed_adapters: Vec<&String> = unit_consumes
-        .iter()
-        .filter(|(name, _)| kinds.get(*name) == Some(&UnitKind::Context))
-        .flat_map(|(_, targets)| targets.iter())
-        .filter(|t| adapter_bindings.contains_key(*t))
-        .collect();
-    consumed_adapters.sort();
-    consumed_adapters.dedup();
-    for adapter in &consumed_adapters {
-        let ns = adapter.replace('.', "_");
-        let module = adapter_bindings[*adapter]
-            .output_path
-            .with_extension("js")
-            .to_string_lossy()
-            .to_string();
-        out.push_str(&format!("import * as {ns}__binding from \"./{module}\";\n"));
-    }
-    out.push('\n');
 
     out.push_str("export function composeApp() {\n");
 
@@ -1989,6 +2066,10 @@ fn emit_composition_root(
                         unit_tables,
                         unit_consumes,
                         unit_consumes_aliases,
+                        unit_flattened,
+                        false,
+                        None,
+                        &mut referenced_units,
                     )
                 )
             })
@@ -2017,6 +2098,10 @@ fn emit_composition_root(
                         unit_tables,
                         unit_consumes,
                         unit_consumes_aliases,
+                        unit_flattened,
+                        false,
+                        None,
+                        &mut referenced_units,
                     )
                 ));
             }
@@ -2080,6 +2165,45 @@ fn emit_composition_root(
     out.push_str("  };\n");
     out.push_str("}\n");
 
+    // Assemble the header now that the body has recorded which units its
+    // provider expressions reference.
+    let mut header = String::new();
+    header.push_str("// Generated by karnc — do not edit by hand.\n");
+    header.push_str("// composition root\n\n");
+
+    // Import every context as a namespace.
+    for ctx_name in &contexts {
+        let dir = commons_dir_for(ctx_name).to_string_lossy().to_string();
+        let ns = ctx_name.replace('.', "_");
+        header.push_str(&format!("import * as {ns} from \"./{dir}.js\";\n"));
+    }
+    // v0.17: import each consumed adapter's binding module — the external
+    // provider classes live there, not in the adapter's interface module.
+    // v0.18: plus every adapter the provider expressions referenced through
+    // the transitive given-closure (an adapter's external provider may depend
+    // on another adapter's capability, spec §4.5).
+    let mut consumed_adapters: Vec<String> = unit_consumes
+        .iter()
+        .filter(|(name, _)| kinds.get(*name) == Some(&UnitKind::Context))
+        .flat_map(|(_, targets)| targets.iter().cloned())
+        .chain(referenced_units.iter().cloned())
+        .filter(|t| adapter_bindings.contains_key(t))
+        .collect();
+    consumed_adapters.sort();
+    consumed_adapters.dedup();
+    for adapter in &consumed_adapters {
+        let ns = adapter.replace('.', "_");
+        let module = adapter_bindings[adapter]
+            .output_path
+            .with_extension("js")
+            .to_string_lossy()
+            .to_string();
+        header.push_str(&format!("import * as {ns}__binding from \"./{module}\";\n"));
+    }
+    header.push('\n');
+
+    let out = format!("{header}{out}");
+
     Some(out)
 }
 
@@ -2126,8 +2250,8 @@ impl ParsedFile {
         match &self.unit {
             SourceUnit::Commons(_) => &[],
             SourceUnit::Context(c) => &c.consumes,
-            // Adapters don't `consumes` in this increment.
-            SourceUnit::Adapter(_) => &[],
+            // v0.18: adapter-to-adapter capability dependencies (spec §4.5).
+            SourceUnit::Adapter(a) => &a.consumes,
             // An integration test's participant edges are resolved separately
             // (the harness root consumes every participant); it has no
             // `consumes` of its own.
@@ -3237,7 +3361,7 @@ fn dfs_consumes(
                 ),
             )
             .with_note(
-                "contexts must form an acyclic dependency graph; remove one of the `consumes` clauses or restructure",
+                "units must form an acyclic `consumes` graph; remove one of the `consumes` clauses or restructure",
             ));
         }
         return;

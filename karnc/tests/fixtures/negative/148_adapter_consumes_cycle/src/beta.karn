@@ -1,0 +1,12 @@
+adapter beta {
+  binding "./beta.binding.ts"
+  consumes alpha { A }
+
+  exports capability { B }
+
+  capability B {
+    fn b() -> Effect[Int]
+  }
+
+  provides B = BImpl given A
+}

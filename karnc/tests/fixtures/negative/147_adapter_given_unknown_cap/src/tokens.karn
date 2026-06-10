@@ -1,0 +1,11 @@
+adapter tokens {
+  binding "./tokens.binding.ts"
+
+  exports capability { Jwt }
+
+  capability Jwt {
+    fn verify(token: String) -> Effect[String]
+  }
+
+  provides Jwt = JwksJwt given Fetch
+}

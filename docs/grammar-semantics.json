@@ -146,6 +146,14 @@
   ],
   "consumes_decl": [
     {
+      "code": "karn.adapter.consumes_context",
+      "summary": "An `adapter` consumed a context; adapter dependencies are adapter-to-adapter."
+    },
+    {
+      "code": "karn.adapter.consumes_requires_selection",
+      "summary": "An `adapter` used a whole-unit or aliased `consumes`; adapters must select capabilities with `consumes U { Cap, … }`."
+    },
+    {
       "code": "karn.consumes.alias_conflict",
       "summary": "Two `consumes` aliases collide."
     },

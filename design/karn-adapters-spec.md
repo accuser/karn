@@ -11,17 +11,17 @@ Adapters come in three flavours, all the same kind:
 
 - **Library adapters** — user-authored, a single npm-backed binding that runs on
   any target (`tokens` over `panva/jose`; `weather` over `fetch`).
-- **The `karn` surface** — first-party; the **agnostic** capabilities Karn
-  guarantees on every platform (`Clock`, `Random`, `Logger`, `Fetch`), with **one
-  binding per platform**. It is the *platform conformance surface*; its `karn` root
-  namespace is **reserved for the toolchain**. Code that consumes only `karn` is
-  portable.
-- **Vendor adapters** — first-party; a platform's full surface (`cloudflare` with
-  `Kv`, `R2`, `Queue`, …; later `aws`), each a single vendor-only binding. Consuming a
-  **platform-native** one **locks its deployment unit to that platform** — a deliberate
-  commitment, scoped per deployment unit (a context under `--target workers`, the whole
-  bundle under the default `bundle`) rather than inherited through a `consumes` edge
-  (§5.3).
+- **The `karn` surface** — first-party; the **ambient** primitives Karn guarantees on
+  every platform (`Clock`, `Random`, `Logger`, `Secrets`, `Fetch`), with **one binding
+  per platform**. It is the *platform conformance surface*; its `karn` root namespace is
+  **reserved for the toolchain**. Code that consumes only `karn` is portable. The
+  surface is *ambient only* — no infrastructure ([§1.2], [O]).
+- **Platform adapters** — first-party; a platform's **real** infrastructure capabilities
+  as they actually are (`cloudflare` with `Kv`, `Queue`, …; later `aws`) — no portable
+  intersection. Consuming one **locks its deployment unit to that platform** — a
+  deliberate commitment, scoped per deployment unit (a context under `--target workers`,
+  the whole bundle under the default `bundle`), propagating along `given` edges but not
+  across service-consume RPC edges (§4.5, §5.3).
 
 A consumer `consumes` any of them and uses the capabilities by bare name, unaware
 of how they are implemented; the only thing that varies is *portability*. This
@@ -38,8 +38,12 @@ contexts; provided/consumed capabilities), the Tier-3 platform-bindings passage 
 the Anti-Corruption-Layer discussion, `karn-type-system.md` §2.1.2, and v0.12
 provider composition.
 
-This is a **design draft for review**. Choices marked **[DECISION]** are the
-language-defining calls to settle before implementation; they are collected in §12.
+**Status.** This is the **as-built spec for v0.17** (merged as #18) *plus* the forward
+design for v0.18 (platform adapters, config-as-capability, locking enforcement). §12
+records the settled calls (▸); forward/v0.18 material is marked inline (e.g. the §1.2
+design note, the §5 diagnostics rows, §10's `(v0.18)` markers) so a reader can tell
+*record* from *proposal*. Items still genuinely open carry a **[DECISION]** letter and
+live in §12.
 
 ---
 
@@ -58,32 +62,48 @@ in the compiler. Two consequences:
   it in *any* context would punch an FFI hole through the language's core property
   — that user source is pure and safe by construction.
 
-`provides` outside a context is already rejected (`diagnostics.rs:617`); a
-capability already compiles to a TypeScript `interface` plus an injection token
-(`emit_capability`, `emitter.rs:1844`); a provider already compiles to `class X
-implements <Interface>` (`emit_provider`, `emitter.rs:1875`). The adapter fills the
+`provides` outside a context is already rejected (`karn.provider.outside_context`,
+`diagnostics.rs:~654`); a capability already compiles to a TypeScript `interface` plus
+an injection token (`emit_capability`, `emitter.rs:~1854`); a provider already compiles
+to `class X implements <Interface>` (`emit_provider`, `emitter.rs:~1885`). The adapter
+fills the
 gap with one new declaration kind permitted to bind a capability to an external
 implementation — and nothing else gains that power.
 
-### 1.2 Why not one agnostic platform — three tiers of portability
+### 1.2 Embrace the platform — two tiers, not three
 
-Making "the platform" a single agnostic surface under-serves real targets, because
-platform capabilities fall into three portability tiers:
+> **Design note (post-v0.17, under review).** An earlier draft of this section
+> proposed *three* portability tiers and a lossy portable "tier-2" port (a
+> `karn.Kv` with selectable platform adapters). That is **dropped**. The reasoning
+> and the simpler model it leaves are below; §§4.3, 5.3, 6.2, 12[I] follow from it.
 
-1. **Universal** — `Clock`, `Random`, `Logger`, `Fetch`. Identical semantics
-   everywhere. An agnostic contract is *correct* and loses nothing.
-2. **Common-shape, different-impl** — a KV store (Cloudflare KV vs DynamoDB vs
-   Redis), a blob store (R2 vs S3), a queue. A portable abstraction is *possible*
-   but lossy: the intersection, not the union.
-3. **Vendor-unique** — Workers AI, Vectorize, Hyperdrive; Step Functions. No
-   cross-platform equivalent; an agnostic contract is *impossible*.
+Platform capabilities split by how portable they *genuinely* are — two tiers:
 
-So agnostic is right for tier 1, a compromise for tier 2, a non-starter for tier 3.
-The resolution is to split: the **`karn` surface** carries tier 1 (portable, one
-binding per platform); **vendor adapters** carry tiers 2–3 (full power,
-platform-locked). The cost is visible at the `consumes` line. (Karn is not fully
-vendor-neutral at its core anyway: agents are Durable-Object-shaped. The split
-governs the *ambient-services* layer, not a claim that any program ports anywhere.)
+1. **Ambient primitives** — `Clock`, `Random`, `Logger`, `Secrets`, `Fetch`.
+   Identical on every runtime; abstracting them costs nothing. These are the
+   **`karn` surface**: portable, one binding per platform.
+2. **Infrastructure** — KV, queues, blob storage, databases, and vendor-unique
+   services (Durable Objects, Workers AI; DynamoDB, SQS, Step Functions).
+   Semantics differ enough across platforms that a portable abstraction is a leaky
+   lowest-common-denominator that lies about what's underneath. These live in
+   **platform adapters** (`cloudflare`, `aws`) with **honest, platform-shaped
+   capabilities** — not a neutered intersection.
+
+Karn ships **no portable infrastructure layer**. A project targets a platform and
+uses that platform's features — `consumes cloudflare { Kv, Queue }` — which is the
+normal, expected case; the platform commitment is one greppable `consumes` line.
+Imposing a guessed lowest-common-denominator port is a rod for the language's back:
+it serves a cross-serverless portability story few projects want, at the cost of
+real complexity (a selectable-provider mechanism, a foreign-capability provision
+rule) and a dishonest abstraction.
+
+**Portability, when a project genuinely needs it, is a user-authored adapter.** A
+developer targeting both Cloudflare and AWS writes their own `myapp.store` adapter
+over `cloudflare.Kv` and `aws.Dynamo`, choosing *their* lowest common denominator
+for *their* needs — using the same adapter mechanism. The language provides the
+tools; it does not impose the abstraction. (Karn is platform-shaped at its core
+anyway — agents are Durable-Object-shaped — so a universal-portability claim was
+never honest.)
 
 ### 1.3 The adapter model — three strata, one seam
 
@@ -122,7 +142,7 @@ An adapter is not a context: it has no services, agents, or logic. Its own kind 
 
 - The `adapter` kind (§3): co-located contract + external providers + boundary types
   + `exports`; a named **binding** (§3.5); the reserved `karn` name prefix (§3.4).
-- The **`karn` surface** (§4.2), **vendor adapters** (§4.3, target-locked §5.3), and
+- The **`karn` surface** (§4.2), **platform adapters** (§4.3, target-locked §5.3), and
   **library adapters** (§4.1).
 - The **binding as privileged constructor** of its boundary types (§4.4).
 - A minimal **platform-target axis** (§6.2), distinct from the existing
@@ -132,9 +152,11 @@ An adapter is not a context: it has no services, agents, or logic. Its own kind 
 
 **Out of scope (deferred).**
 
-- **Env-backed capabilities** — vendor `Kv`, `Secrets`/`Env`, `Queue`, and `Fetch`'s
-  full request/response surface — need the manifest→`wrangler` path (§6.2). Most
-  vendor capabilities are env-backed, so **vendor adapters land with this tier**.
+- **The first platform adapter** (`cloudflare`: `Kv`, `Queue`) and the `karn` ambient
+  additions (`Secrets`, `Fetch`) — these are v0.18. They bring adapter `consumes` +
+  external-provider `given` wiring ([N]), config-as-capability ([M]), the binding
+  reading `env` explicitly with `wrangler.toml` stanzas derived from platform-adapter
+  metadata (no `needs`, §4.3), and live platform-lock enforcement.
 - **Additional platforms** (Node, Deno) — the MVP is `cloudflare`-only; the axis
   exists so they are additive.
 - **Durable Object state as a capability**; **decorate/wrap overrides** (§7.2);
@@ -147,8 +169,8 @@ An adapter is not a context: it has no services, agents, or logic. Its own kind 
 | Flavour | Binding(s) | Portability | Reserved? | Example |
 |---|---|---|---|---|
 | Library adapter | one, npm-backed | runs anywhere | no | `tokens` (jose), `weather` (fetch) |
-| `karn` surface | one per platform | portable | **yes** (`karn.*`) | `Clock`, `Random`, `Logger`, `Fetch` |
-| Vendor adapter | one, vendor-only | **platform-locked** | no | `cloudflare` (`Kv`, `R2`), later `aws` |
+| `karn` surface | one per platform | portable | **yes** (`karn.*`) | `Clock`, `Random`, `Logger`, `Secrets`, `Fetch` ([O]) |
+| Platform adapter | one, platform-only | **platform-locked** | no | `cloudflare` (`Kv`, `Queue`), later `aws` |
 
 Mechanism (the same for all three): contract `capability Cap { … }`; external
 `provides Cap = Sym`; a named `binding "<module>"`; bring into scope with `consumes U
@@ -199,12 +221,13 @@ capability as binding-supplied. A *bodied* provider in an adapter is
 consumes-decl ::= 'consumes' qualified-name                    -- whole, qualified (v0.4)
                 | 'consumes' qualified-name 'as' identifier     -- aliased, qualified (v0.6)
                 | 'consumes' qualified-name '{' name-list '}'   -- NEW: selected caps, bare names
+name-list     ::= identifier (',' identifier)* ','?
 ```
 
 ```karn
 consumes karn       { Clock, Logger }   -- portable
 consumes tokens     { Jwt }             -- library adapter
-consumes cloudflare { Kv }              -- vendor: locks this context to the cloudflare platform
+consumes cloudflare { Kv }              -- platform adapter: locks this context to cloudflare (v0.18)
 ```
 
 Each listed name must be a capability the unit **exports**; it enters the consumer's
@@ -256,7 +279,7 @@ adapter tokens {
 - The **`karn` surface** omits the clause: its binding is **platform-keyed** and
   resolved by the toolchain (`karn` → the active platform's `karn-<platform>.ts`,
   §6.2). It is the *only* case with no fixed module.
-- A **vendor adapter** *does* name its single binding with the same clause — the
+- A **platform adapter** *does* name its single binding with the same clause — the
   module is bundled with the toolchain rather than user-written, but naming it keeps
   resolution uniform (one binding, named, greppable), matching §4.3.
 
@@ -269,7 +292,7 @@ adapter tokens {
 
 The contract is always target-agnostic; the *binding set* differs — one for a
 library adapter (§4.1), one per platform for the `karn` surface (§4.2), one
-vendor-only binding for a vendor adapter (§4.3). §4.4 governs how a binding may
+vendor-only binding for a platform adapter (§4.3). §4.4 governs how a binding may
 construct the boundary types.
 
 ### 4.1 A library adapter — `tokens` over `panva/jose`
@@ -294,7 +317,7 @@ adapter tokens {                       -- library adapters: named for the capabi
 ```
 
 The compiler emits the interface + token any capability produces (`emit_capability`,
-`emitter.rs:1844`), and *no* class for `JoseJwt`:
+`emitter.rs:~1854`), and *no* class for `JoseJwt`:
 
 ```ts
 // tokens.ts (generated)
@@ -385,7 +408,7 @@ export class RandomProvider implements Random {
 
 (`Effect[Int]` lowers to `Promise<number>`; `Effect[()]` lowers to `Promise<void>` —
 `ts_type_ref` maps `Unit` to `void` in the emitted interface, so the binding's
-`Promise<void>` matches under `--strict`; verified at `emitter.rs:4371` and fixture
+`Promise<void>` matches under `--strict`; verified at `ts_type_ref`, `emitter.rs:~4418`, and fixture
 `170`'s `now(): Promise<number>`.) Because the contract names canonical symbols,
 every platform's binding exports the same names and the generated compose is
 **platform-identical** — only the imported binding module changes (§6.2). The `karn`
@@ -404,57 +427,83 @@ implementing this one adapter's interfaces, with no change to consumer or domain
 > read as contract obligations (`ClockProvider`) or are platform-chosen via a manifest
 > is [DECISION H].
 
-### 4.3 Vendor adapters — a platform's full surface
+### 4.3 Platform adapters — a platform's real capabilities
 
-First-party, a **single vendor-only binding**, and **platform-locked** (§5.3):
+A platform adapter (`cloudflare`, later `aws`) is first-party, has a **single binding
+tied to that platform**, and exposes that platform's capabilities **as they actually
+are** — no portable intersection. Consuming one *is* the platform commitment (§5.3).
 
 ```karn
-adapter cloudflare {                -- vendor adapter: named for the vendor (naming note, §12)
-  binding "./cloudflare.binding.ts" -- first-party but bundled with the toolchain
-  exports capability { Kv }
+adapter cloudflare {
+  binding "./cloudflare.binding.ts"        -- first-party; bundled with the toolchain
+  exports capability { Kv, Queue }
 
   capability Kv {
     fn get(key: String)                -> Effect[Option[String]]
     fn put(key: String, value: String) -> Effect[()]
   }
+  capability Queue {
+    fn send(body: String) -> Effect[()]     -- producer side; the consumer is the `on queue` handler
+  }
 
-  provides Kv = WorkersKv
+  provides Kv    = WorkersKv
+  provides Queue = WorkersQueue
 }
 ```
 
+The binding reads `env` **itself** — explicitly, in its own TypeScript — for the
+platform resources it needs. There is **no `needs` clause and no compiler "inject env"
+magic**: a platform binding is the one place that reads `env`, and it does so in code
+you can see (compose passes `env`, which it already threads, to these first-party
+bindings).
+
 ```ts
-// cloudflare.binding.ts   (env-backed: needs a KV namespace binding — §6.2)
+// cloudflare.binding.ts
 import type { Kv } from "./cloudflare.js";
 import { Some, None, type Option } from "./runtime.js";
 
 export class WorkersKv implements Kv {
-  constructor(private ns: KVNamespace) {}
+  constructor(private env: { KV: KVNamespace }) {}      // reads env explicitly
   async get(key: string): Promise<Option<string>> {
-    const v = await this.ns.get(key);
+    const v = await this.env.KV.get(key);
     return v === null ? None : Some(v);
   }
-  async put(key: string, value: string): Promise<void> { await this.ns.put(key, value); }
+  async put(key: string, value: string): Promise<void> { await this.env.KV.put(key, value); }
 }
 ```
 
-Most vendor capabilities are **env-backed** (a KV namespace from `env`), so vendor
-adapters land with the env-backed tier (§6.2); the env-free `karn` core is the MVP. A
-parallel `adapter aws { Dynamo, S3, … }` is an independent unit with its own binding —
-no requirement to match `cloudflare`.
+The compiler's jobs here are **derived, not injected**, and all are *visible outputs*:
+type `env.KV` in the generated `Env`, emit the `[[kv_namespaces]]` `wrangler.toml`
+stanza, and record the platform lock — all from the platform adapter's own first-party
+metadata. The application never touches `env`; it just `consumes cloudflare { Kv }`
+and `given Kv`.
+
+A parallel `adapter aws { Dynamo, Sqs, … }` is an independent unit with its own
+binding — no requirement to match `cloudflare`, and **no shared `Kv` port**. A project
+that wants to abstract across both writes its own adapter (§1.2).
 
 ### 4.4 The binding as privileged constructor of boundary types
 
-A binding *constructs* its adapter's boundary types — `Ok(claims)`, `Err(Invalid)`,
-`Some(v)`. That deliberately pierces Karn's construction discipline (transparent
-export means consumers may *read*, not *construct*; construction is reserved to the
-defining unit and enforced by the type system — design-notes §§155/336). **Inside a
-binding that rule does not apply**: the binding *is* the host boundary, and only
-`tsc` checks shape there. Stated plainly, **the binding is a privileged constructor
-of its adapter's boundary types.**
+A binding constructs its adapter's boundary types. For **transparent** types this is
+*not* a privilege: transparent export already affords field-level construction at any
+consumer (verified — §6.1; the §8 example builds `Claims { … }` inside `auth.sessions`).
+The binding's privilege bites only on the **stricter** kinds Karn otherwise restricts:
 
-To keep hand-written bindings from coupling to the emitter's internal ADT lowering,
-bindings construct boundary values **only through the emitted constructors**, never
-open-coded tags:
+- **Refined** types — construction must run the validating `.of` predicate; a raw cast
+  or `.unsafe` mints a value the rest of Karn trusts as validated without checking it
+  (detailed below). This is where the binding is genuinely a privileged constructor, and
+  the `.of` discipline exists to contain it.
+- **Opaque** types — token-only outside the defining unit (`Visibility::Opaque`); only
+  the defining unit may construct one. A binding that builds an opaque boundary type
+  steps outside that rule, and only `tsc` checks shape there.
+
+So **the binding is a privileged constructor relative to refined and opaque boundary
+types** — not transparent records, which any consumer may build (design-notes §§155/336
+describe the restricted cases).
+
+Whichever kind it builds, a binding constructs boundary values **only through the
+emitted constructors**, never open-coded tags — so hand-written bindings do not couple
+to the emitter's internal ADT lowering:
 
 - `Result` / `Option` via `Ok`/`Err`/`Some`/`None` imported from `runtime.js`
   (`{ tag: "Ok", value }` etc. — `emitter.rs:57`).
@@ -465,9 +514,9 @@ open-coded tags:
   `tsc` checks it).
 
 Writing `{ tag: "Invalid" }` by hand is disallowed by convention — it would break the
-moment the lowering changes. ([DECISION] — if record construction ever needs more than
-an object literal, the runtime should export record constructors too, on the same
-principle.)
+moment the lowering changes. (Design note, not a pending decision: if record
+construction ever needs more than an object literal, the runtime should export record
+constructors too, on the same principle.)
 
 **Refined boundary types are a sharper case.** A refined type emits a *branded* alias
 with a validating constructor `T.of(v) -> Result[T, ValidationError]` (plus a `T.unsafe`
@@ -483,6 +532,40 @@ a value it believes valid: the `karn` surface's `Random.uuid()` ([G]) returns a 
 defence-in-depth rather than being trusted away. So this rule is **live in the MVP**, not
 latent.
 
+### 4.5 Adapter-to-adapter capability dependencies
+
+An adapter's external provider may depend on **another adapter's capability** via the
+ordinary `given` — the same by-name `deps` object v0.12 already uses (the
+`emit_provider` deps object, `emitter.rs:~1910`). This is how config and IO reach a binding *without* an env clause:
+a `Secrets`/`Fetch` capability (on the `karn` surface) is just another dependency.
+
+```karn
+adapter tokens {
+  binding "./tokens.binding.ts" requires { "jose": "^5" }
+  consumes karn { Fetch, Secrets }          -- adapters may consume capabilities (NEW; v0.17 had no consumes)
+  exports capability  { Jwt }
+  exports transparent { Claims, JwtError }
+  type Claims = { sub: String, exp: Int }   type JwtError = | Invalid | Expired
+  capability Jwt { fn verify(token: String) -> Effect[Result[Claims, JwtError]] }
+  provides Jwt = JwksJwt given Fetch, Secrets   -- key fetched from a JWKS service; URL from Secrets
+}
+```
+
+The binding receives them in the by-name `deps` object (`constructor(private deps: {
+Fetch: Fetch; Secrets: Secrets })`, reads `this.deps.Fetch` — keys are the `given`
+names, checked by `tsc`; nothing positional). Compose assembles the object by
+instantiating the depended-on providers, recursing through the v0.15 provider graph;
+the external branch of `instantiate_provider_expr` (`project.rs`) must build and pass
+the `deps` object rather than short-circuiting to a no-arg constructor.
+
+**Lock propagates along `given` edges, because they are in-process.** That recursion
+instantiates the whole closure in *one* compose, so depending on a platform-native
+capability pulls its binding into your deployment unit and locks it (§5.3). A
+service-consume edge (`consumes B` to call B's services) is Service-Binding **RPC** —
+a separate Worker — so it does *not* propagate lock. **Two new mechanisms** this needs
+(neither in v0.17): adapters gain `consumes` (`AdapterDecl` has no `consumes` field
+today), and external providers gain real `given` wiring.
+
 ---
 
 ## 5. Static semantics
@@ -491,7 +574,7 @@ latent.
 
 For `consumes U { C1, … }` in a consumer: `U` must be consumable and (for an adapter)
 linked; each `Ci` must be a capability `U` **exports** (`karn.given.cross_context_unknown_capability`,
-`diagnostics.rs:240`, reused); each `Ci` enters the consumer's local capability
+`diagnostics.rs:~270`, reused); each `Ci` enters the consumer's local capability
 namespace under its bare name (the **net-new** flattening path — §3.3 — over which
 clash detection runs, §5.4).
 
@@ -538,37 +621,37 @@ runtimes — *within a context* under `workers`, *anywhere in the bundle* under 
 
 Two things hold in both modes:
 
-- **Not every vendor capability locks.** A *remote vendor API* (AWS S3 over HTTPS) is
-  reachable from any platform — an ordinary **library adapter** (env-backed for
-  credentials), no lock. Only **platform-native runtime bindings** (`Kv`, DO) lock; the
-  "vendor adapter" category splits into *platform-native* (locks) and *remote-API*
-  (library, no lock).
+- **A remote vendor API is not a platform adapter.** AWS S3 over HTTPS is reachable
+  from any runtime — wrap it as an ordinary **library adapter** (its credentials arrive
+  as a `given karn.Secrets` capability), and it does **not** lock. Only **platform-native
+  runtime bindings** (`Kv`, Queue, Durable Objects) lock — and those are exactly what a
+  **platform adapter** exposes.
 - The `karn` surface and library adapters impose no platform constraint at all.
 
 > **MVP note.** The `karn` core (`Clock`, `Random`, `Logger`) has **no** platform-native
 > capabilities, so the whole bundle-vs-workers locking distinction is **latent this
-> increment**; it goes live only with the first vendor adapter.
+> increment**; it goes live only with the first platform adapter.
 
 ### 5.4 Flattening scope — [DECISION D]
 
-`consumes U { Cap }` flattening is defined for any exporting unit. Collision when two
-consumed units export the same bare name (or one clashes with a local capability):
-**reject (recommended)** — `karn.consumes.capability_name_clash`, resolved by qualified
-`given U.Cap` or `consumes U as Alias`; versus **adapter-only flattening**.
+`consumes U { Cap }` flattening is defined for any exporting unit (per [D], general — not
+adapter-only). A collision — two consumed units exporting the same bare name, or one
+clashing with a local capability — is **rejected** with `karn.consumes.capability_name_clash`,
+resolved by the qualified `given U.Cap` form or `consumes U as Alias`.
 
 ### Diagnostic codes
 
 | Code | Status | Cause |
 |---|---|---|
-| `karn.adapter.provider_has_body` | new | a provider inside an `adapter` has a Karn body |
-| `karn.context.external_provider` | new | a bodiless (external) provider outside an adapter |
-| `karn.adapter.disallowed_item` | new | a `service`/`agent`/bodied provider in an adapter |
-| `karn.adapter.no_binding` | new | an adapter declares external providers but no binding clause/module/symbol is resolvable |
-| `karn.namespace.reserved` | new | a user unit whose name's first segment is `karn` |
-| `karn.target.vendor_required` | new | a deployment unit using a platform-native capability built for another platform |
-| `karn.target.vendor_conflict` | new | a deployment unit (a context under `workers` / the whole `bundle`) mixing two mutually-exclusive native runtimes |
+| `karn.adapter.provider_has_body` | new (v0.17) | a provider inside an `adapter` has a Karn body |
+| `karn.context.external_provider` | new (v0.17) | a bodiless (external) provider outside an adapter |
+| `karn.adapter.disallowed_item` | new (v0.17) | a `service` or `agent` in an adapter (a bodied provider is `provider_has_body`) |
+| `karn.adapter.no_binding` | new (v0.17) | an adapter declares external providers but no binding clause/module/symbol is resolvable |
+| `karn.namespace.reserved` | new (v0.17) | a user unit whose name's first segment is `karn` |
+| `karn.target.vendor_required` | **v0.18 (deferred)** | a deployment unit using a platform-native capability built for another platform |
+| `karn.target.vendor_conflict` | **v0.18 (deferred)** | a deployment unit (a context under `workers` / the whole `bundle`) mixing two mutually-exclusive native runtimes |
 | `karn.given.cross_context_unknown_capability` | reused | `consumes U { Cap }` where U doesn't export `Cap` |
-| `karn.consumes.capability_name_clash` | new | two flattened bare names collide |
+| `karn.consumes.capability_name_clash` | new (v0.17) | two flattened bare names collide |
 
 ---
 
@@ -626,23 +709,25 @@ minimal one — the MVP is **not** target-free.
   Cloudflare Workers). Platform selection is a one-entry stub; the toolchain links
   `karn-cloudflare.ts`. The `karn-<platform>.ts` naming and the selection point are
   introduced now so Node/Deno are additive.
-- **Selection** (strawman `--platform cloudflare`, defaulting to `cloudflare`) picks
+- **Selection** (the shipped `--platform cloudflare`, defaulting to `cloudflare`) picks
   which `karn-<platform>.ts` links. Because the `karn` contract names canonical
   symbols, the Karn-side compose is platform-identical; only the import differs.
-- **Env-backed** capabilities (vendor `Kv`, `Secrets`, `Queue`) need a binding threaded
-  from `env`; the adapter manifest declares the requirement and the compiler both
-  constructs the provider with it (`new cf.WorkersKv(env.KV)`) and emits the matching
-  `wrangler.toml` stanza — the reason env-backed capabilities (and most vendor
-  adapters) are deferred.
+- **Platform resources from `env`.** A platform adapter's binding reads `env`
+  **itself** (§4.3) — there is no `needs` clause and no per-resource injection. Compose
+  passes `env` (which it already threads) to these first-party bindings; the compiler's
+  derived work is to type the resource field in `Env` and emit the `wrangler.toml`
+  stanza, both from the platform adapter's first-party metadata. Config a *library*
+  adapter needs (a secret, a JWKS URL) arrives as an ordinary `given karn.Secrets` /
+  `given karn.Fetch` capability (§4.5), never as `env` at the application layer.
 
 ### 6.3 Binding distribution — [DECISION F]
 
 - **Library adapter**: the binding is a **user input** named by the `binding` clause
   (§3.5); its npm deps fold into `package.json`.
-- **`karn` surface / vendor adapter**: the toolchain **supplies** the binding (`karn`
-  per platform; a vendor adapter one binding). Whether first-party bindings are
-  **emitted into the project** (inspectable, no hidden dependency — recommended) or
-  shipped as a **published package** is the open call here.
+- **`karn` surface / platform adapter**: the toolchain **supplies** the binding (`karn`
+  per platform; a platform adapter one binding), and per [F] first-party bindings are
+  **emitted into the project** (inspectable, no hidden dependency) — not a published
+  package.
 
 ---
 
@@ -749,8 +834,8 @@ The foreign **code** is the named bindings (`tokens.binding.ts`, the toolchain's
 ## 9. The MVP capability set
 
 Prove the mechanism on the **env-free `karn` core** first — no `wrangler` wiring —
-plus `tokens`/`weather` as library exemplars. Vendor adapters follow with the
-env-backed tier.
+plus `tokens`/`weather` as library exemplars. The `cloudflare` platform adapter and
+the `karn` ambient additions (`Secrets`, `Fetch`) follow in v0.18 (§13).
 
 | Capability | Adapter | Ops | Binding maps to |
 |---|---|---|---|
@@ -764,6 +849,12 @@ env-backed tier.
 `Fetch` joins the `karn` core as a fast follow (env-free, but real request/response
 type design). ID-result typing ([DECISION G]): refined (`Uuid`) vs plain `String`.
 
+> **`weather` in v0.17.** Because `karn.Fetch`/`Secrets` only arrive in v0.18, the v0.17
+> `weather` binding necessarily calls the global `fetch` directly and takes its URL/key
+> as plain operation parameters. That is legitimate — a binding is host code — and it is
+> the exact case [M]/[N] tidy up: in v0.18 `weather`/`tokens` are revised to `given
+> karn.Fetch, karn.Secrets` instead (§13).
+
 ---
 
 ## 10. Implementation notes
@@ -774,8 +865,8 @@ type design). ID-result typing ([DECISION G]): refined (`Uuid`) vs plain `String
 |---|---|---|
 | AST | `ast.rs` | new `Adapter` `SourceUnit`; optional `ProviderDecl.body`; `binding` decl |
 | Parser | `parser.rs` | `adapter q { … }`; `binding "<path>" requires {…}`; bodiless `provides`; adapter item rules; reject `karn`/`karn.*` user units |
-| Resolver | `resolver.rs` | flatten selected caps to bare names; carry binding module + provider symbols; record vendor-adapter platform; compute effective platform transitively |
-| Checker | `project.rs` / `checker.rs` | adapter item rules; bodiless-vs-bodied placement; clash; platform-lock propagation + conflict; treat external provider as "provided" |
+| Resolver | `resolver.rs` | flatten selected caps to bare names; carry binding module + provider symbols. *(v0.18: record platform-adapter platform; compute effective platform transitively.)* |
+| Checker | `project.rs` / `checker.rs` | adapter item rules; bodiless-vs-bodied placement; clash; treat external provider as "provided". *(v0.18: platform-lock propagation + conflict.)* |
 | Emitter | `emitter.rs` `emit_provider` | emit no class for external providers; emit interfaces/types/exports as usual |
 | Emitter (compose) | `emitter/workers.rs` | import provider from the resolved binding module; construct; deps; partial-link for mocks; `env` threading (later) |
 | Platform axis | `cli.rs` / `project.rs` | a minimal `--platform` (MVP: `cloudflare` only), distinct from `--target {bundle,workers}`; select `karn-<platform>.ts` |
@@ -809,10 +900,10 @@ type design). ID-result typing ([DECISION G]): refined (`Uuid`) vs plain `String
 3. A `tokens` adapter compiles; its `binding` module resolves; `implements Jwt`; npm
    dep reaches `package.json`; a consumer signs a token; the binding constructs results
    via emitted constructors only.
-4. A deployment unit using a platform-native capability builds only for that platform;
+4. **(v0.18, not this increment — latent until the first platform adapter ships, §5.3.)**
+   A deployment unit using a platform-native capability builds only for that platform;
    under `workers` a context that merely `consumes` it over RPC stays unlocked; two
-   mutually-exclusive native runtimes in one deployment unit (a context under `workers`,
-   anywhere in the `bundle`) conflict.
+   mutually-exclusive native runtimes in one deployment unit conflict.
 5. A user unit named `karn`/`karn.*` is rejected.
 6. Override and `mocks` beat the default per precedence; a mocked-cap test partially
    links the binding.
@@ -825,8 +916,8 @@ type design). ID-result typing ([DECISION G]): refined (`Uuid`) vs plain `String
 - **tree-sitter** / **vscode** / **karn-fmt**: the `adapter` unit, the `binding`
   clause, bodiless `provides`, braced `consumes`; corpus + idempotency fixtures;
   keyword list gains `adapter`.
-- **karn-lsp**: `consumes ` autocompletes the `karn` surface, vendor adapters and
-  project adapters; capability/hover from the contract; surface a vendor adapter's
+- **karn-lsp**: `consumes ` autocompletes the `karn` surface, platform adapters and
+  project adapters; capability/hover from the contract; surface a platform adapter's
   platform lock and a unit's **effective platform** (§5.3).
 - **Docs**: an "Adapters" reference (three flavours, the `karn` surface, vendor
   adapters, reserved `karn` prefix, binding resolution, the privileged-constructor rule,
@@ -858,17 +949,36 @@ type design). ID-result typing ([DECISION G]): refined (`Uuid`) vs plain `String
    `.of`, even as a trusted generator (§4.4).
 8. **[H] `karn` provider symbols** — ▸ canonical, contract-flavoured names (e.g.
    `ClockProvider`; avoid impl-flavoured `SystemClock`), not per-platform manifest.
-9. **[I] Tier-2 portability** — ▸ vendor-only for v1; no lossy portable port yet.
+9. **[I] Infrastructure portability** — ▸ **no portable infrastructure port at all**
+   (collapses the old "tier 2", §1.2). The `karn` surface is *ambient primitives only*;
+   infrastructure (KV, queues, storage, DB) lives in platform adapters with honest,
+   platform-shaped capabilities. Portability, where wanted, is a **user-authored**
+   abstraction adapter, not a language feature. (Supersedes an interim draft that
+   proposed a portable `karn.Kv` with selectable providers.)
 10. **[J] Binding resolution** — ▸ an explicit `binding "<module>"` clause (greppable,
     rename-safe).
 11. **[K] Platform lock** — ▸ per **deployment unit**: a context under `--target workers`
     (the `consumes` RPC edge doesn't propagate lock), the whole program under the default
-    `bundle` (co-location locks the shared bundle). Platform-native bindings lock,
-    remote-API library adapters don't; cross-platform RPC is a future extension (§5.3).
+    `bundle` (co-location locks the shared bundle). Lock propagates along `given`/capability
+    edges (in-process), not service-consume (RPC) edges (§4.5). Platform-native bindings
+    lock, remote-API library adapters don't; cross-platform RPC is a future extension (§5.3).
+12. **[M] Binding configuration** — ▸ **no `needs` clause.** A binding's dependencies are
+    all `given` capabilities (the v0.12 by-name `deps` object). Config/IO is a capability
+    (`karn.Secrets`, `karn.Fetch`); `env` is read **only** inside first-party `karn`/platform
+    bindings, explicitly, never injected into application adapters (§4.3, §4.5). (An
+    interim `needs <kind> "NAME"` clause was considered and rejected — it conflated config
+    with vendor wrangler bindings and would grow with every platform resource type.)
+13. **[N] Adapter-to-adapter dependencies** — ▸ adapters gain `consumes`, and an external
+    provider's `given` is wired through the `deps` object (§4.5). Two genuinely new
+    mechanisms over v0.17 (`AdapterDecl` has no `consumes`; the external-provider branch of
+    `instantiate_provider_expr` currently passes no deps).
+14. **[O] `karn` surface scope** — ▸ ambient primitives only: `Clock`, `Random`, `Logger`,
+    `Secrets`, `Fetch`. No infrastructure capability ever joins the `karn` surface; a `karn`
+    capability may not depend on a platform-native one (it must stay portable).
 
 **Still open:**
 
-12. **[L] Adapter dependency trust** — direction set (declared `requires` deps pinned and
+15. **[L] Adapter dependency trust** — direction set (declared `requires` deps pinned and
     surfaced for review), but the full allow-list / confirmation policy is TBD. A
     supply-chain surface (a malicious adapter could declare `requires { "evil": "*" }`),
     load-bearing because third-party library adapters are a goal.
@@ -876,7 +986,7 @@ type design). ID-result typing ([DECISION G]): refined (`Uuid`) vs plain `String
 **Naming-convention note.** The three flavours name themselves differently — `tokens`
 (by capability), `cloudflare` (by vendor), `karn` (by toolchain). Since the doc makes
 naming carry meaning, this is a mild inconsistency; the working rule is *library
-adapters by capability, vendor adapters by vendor, the reserved surface as `karn`*.
+adapters by capability, platform adapters by vendor, the reserved surface as `karn`*.
 Worth stating in docs rather than pretending it's uniform.
 
 ---
@@ -887,8 +997,15 @@ Worth stating in docs rather than pretending it's uniform.
   clause, `consumes U { … }`, the reserved `karn` prefix, a minimal `--platform`
   (cloudflare), and the env-free `karn` core (`Clock`, `Random`, `Logger`), plus
   `tokens`/`weather` library exemplars.
-- **Next:** `Fetch` on the `karn` core; then the env-backed tier and the first
-  **vendor adapter** (`cloudflare`: `Kv`, `Queue`, …) with the manifest→`wrangler`
-  path and the platform-locking rule.
-- **Later:** more `karn` platforms (Node, Deno); an `aws` vendor adapter; shared/
+- **Next — split into two slices** (see `grammar-increments/karn-mvp-grammar-v0.18.md`):
+  - **v0.18 (wiring + ambient):** `Secrets` + `Fetch` on the `karn` ambient surface;
+    **adapters `consumes` + external-provider `given` wiring** (§4.5, [N]); a second
+    platform value (`--platform node`) so the platform axis is observable.
+    (Config-as-capability, [M], means the existing `tokens`/`weather` adapters are
+    revised to drop their secret/URL params.)
+  - **v0.19 (platform):** the first **platform adapter** `cloudflare` (`Kv`, `Queue`)
+    with its binding reading `env` explicitly and the `wrangler.toml` stanzas derived
+    from platform-adapter metadata (no `needs`, no injection); platform-lock
+    enforcement going live.
+- **Later:** more `karn` platforms (Node, Deno); an `aws` platform adapter; shared/
   singleton provider instances; the decorate/wrap override; a public binding ABI.
