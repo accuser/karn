@@ -217,6 +217,7 @@ pub fn check_handler_body(
         given_remaining,
         given_used: HashSet::new(),
         in_test_body: false,
+        type_vars: HashSet::new(),
     };
     // Check the body and validate it matches the return type.
     let Some(body_ty) = type_of_block(body, Some(&return_ty), &mut ctx) else {
@@ -673,6 +674,10 @@ pub struct Ctx<'a> {
     /// True when the body being checked is a test case body. Permits
     /// `assert` statements (v0.7).
     pub in_test_body: bool,
+    /// v0.20a: the enclosing function's type parameters (rigid vars), so
+    /// nested explicit type arguments (`identity[A](x)` inside a generic
+    /// body) resolve. Empty outside generic fn bodies.
+    pub type_vars: HashSet<String>,
 }
 
 /// Per-capability info for checker dispatch within a handler body.
@@ -728,7 +733,30 @@ fn check_fn(
     expr_types: &mut HashMap<Span, Ty>,
     errors: &mut Vec<CompileError>,
 ) {
-    let return_ty = match resolve_type_ref(&f.return_type, &input.types) {
+    // v0.20a: the fn's type parameters are *rigid* type variables while
+    // checking its own body. A type param shadowing a declared type is
+    // confusing — diagnose the collision.
+    let vars: HashSet<String> = f
+        .type_params
+        .iter()
+        .map(|tp| tp.name.name.clone())
+        .collect();
+    for tp in &f.type_params {
+        if input.types.contains_key(&tp.name.name) {
+            errors.push(
+                CompileError::new(
+                    "karn.generics.type_arg_mismatch",
+                    tp.span,
+                    format!(
+                        "type parameter `{}` shadows the declared type of the same name",
+                        tp.name.name
+                    ),
+                )
+                .with_note("rename the type parameter"),
+            );
+        }
+    }
+    let return_ty = match resolve_type_ref_in(&f.return_type, &input.types, &vars) {
         Some(t) => t,
         None => return,
     };
@@ -741,7 +769,7 @@ fn check_fn(
         param_scope.insert("self".to_string(), self_ty);
     }
     for p in &f.params {
-        if let Some(ty) = resolve_type_ref(&p.type_ref, &input.types) {
+        if let Some(ty) = resolve_type_ref_in(&p.type_ref, &input.types, &vars) {
             param_scope.insert(p.name.name.clone(), ty);
         }
     }
@@ -761,6 +789,7 @@ fn check_fn(
         given_remaining: HashSet::new(),
         given_used: HashSet::new(),
         in_test_body: false,
+        type_vars: vars.clone(),
     };
     let Some(body_ty) = type_of_block(&f.body, Some(&return_ty), &mut ctx) else {
         return;
@@ -798,6 +827,111 @@ pub fn named_ty(decl: &TypeDecl) -> Ty {
     Ty::Named {
         name: decl.name.name.clone(),
         kind,
+    }
+}
+
+/// v0.20a: like [`resolve_type_ref`], with a set of in-scope **type
+/// parameters**: a `Named` reference matching one resolves to [`Ty::Var`]
+/// (checked before the type-table lookup — a type parameter shadows a
+/// same-named declaration; the collision is diagnosed at the declaration).
+pub fn resolve_type_ref_in(
+    r: &TypeRef,
+    types: &HashMap<String, TypeDecl>,
+    vars: &HashSet<String>,
+) -> Option<Ty> {
+    match r {
+        TypeRef::Named(id) if vars.contains(&id.name) => Some(Ty::Var(id.name.clone())),
+        TypeRef::Result(t, e, _) => Some(Ty::Result(
+            Box::new(resolve_type_ref_in(t, types, vars)?),
+            Box::new(resolve_type_ref_in(e, types, vars)?),
+        )),
+        TypeRef::Option(t, _) => Some(Ty::Option(Box::new(resolve_type_ref_in(t, types, vars)?))),
+        TypeRef::Effect(t, _) => Some(Ty::Effect(Box::new(resolve_type_ref_in(t, types, vars)?))),
+        TypeRef::HttpResult(t, _) => Some(Ty::HttpResult(Box::new(resolve_type_ref_in(
+            t, types, vars,
+        )?))),
+        TypeRef::Fn(params, ret, _) => {
+            let params: Option<Vec<Ty>> = params
+                .iter()
+                .map(|p| resolve_type_ref_in(p, types, vars))
+                .collect();
+            Some(Ty::Fn {
+                params: params?,
+                ret: Box::new(resolve_type_ref_in(ret, types, vars)?),
+            })
+        }
+        _ => resolve_type_ref(r, types),
+    }
+}
+
+/// v0.20a: substitute type variables in `t` per `subst`. Must be total when
+/// instantiating a call (the uninferable check runs first); an unbound Var
+/// passes through unchanged for partial substitution during inference.
+fn substitute(t: &Ty, subst: &HashMap<String, Ty>) -> Ty {
+    match t {
+        Ty::Var(n) => subst.get(n).cloned().unwrap_or_else(|| t.clone()),
+        Ty::Result(a, b) => Ty::Result(
+            Box::new(substitute(a, subst)),
+            Box::new(substitute(b, subst)),
+        ),
+        Ty::Option(a) => Ty::Option(Box::new(substitute(a, subst))),
+        Ty::Effect(a) => Ty::Effect(Box::new(substitute(a, subst))),
+        Ty::HttpResult(a) => Ty::HttpResult(Box::new(substitute(a, subst))),
+        Ty::Fn { params, ret } => Ty::Fn {
+            params: params.iter().map(|p| substitute(p, subst)).collect(),
+            ret: Box::new(substitute(ret, subst)),
+        },
+        _ => t.clone(),
+    }
+}
+
+/// v0.20a: does `t` still contain a type variable?
+fn contains_var(t: &Ty) -> bool {
+    match t {
+        Ty::Var(_) => true,
+        Ty::Result(a, b) => contains_var(a) || contains_var(b),
+        Ty::Option(a) | Ty::Effect(a) | Ty::HttpResult(a) => contains_var(a),
+        Ty::Fn { params, ret } => params.iter().any(contains_var) || contains_var(ret),
+        _ => false,
+    }
+}
+
+/// v0.20a: argument-directed unification. Walks `pattern` (possibly
+/// Var-bearing) against the ground `actual`; a Var binds on first sight and
+/// must match its prior binding **exactly** afterwards (keep inference dumb
+/// and predictable — the explicit `name[T](…)` form is the pressure valve).
+/// Returns false on a conflict; structural mismatches are NOT reported here —
+/// the post-substitution `compatible` check owns those diagnostics.
+fn unify(pattern: &Ty, actual: &Ty, subst: &mut HashMap<String, Ty>) -> bool {
+    match (pattern, actual) {
+        (Ty::Var(n), a) => match subst.get(n) {
+            Some(bound) => bound == a,
+            None => {
+                subst.insert(n.clone(), a.clone());
+                true
+            }
+        },
+        (Ty::Result(a1, b1), Ty::Result(a2, b2)) => unify(a1, a2, subst) && unify(b1, b2, subst),
+        (Ty::Option(a1), Ty::Option(a2))
+        | (Ty::Effect(a1), Ty::Effect(a2))
+        | (Ty::HttpResult(a1), Ty::HttpResult(a2)) => unify(a1, a2, subst),
+        (
+            Ty::Fn {
+                params: p1,
+                ret: r1,
+            },
+            Ty::Fn {
+                params: p2,
+                ret: r2,
+            },
+        ) => {
+            p1.len() == p2.len()
+                && p1.iter().zip(p2).all(|(a, b)| unify(a, b, subst))
+                && unify(r1, r2, subst)
+        }
+        // Ground-vs-ground: any pair is fine here; `compatible` owns the
+        // real check after substitution.
+        _ => true,
     }
 }
 
@@ -909,6 +1043,7 @@ pub fn check_state_initialiser(
             given_remaining: HashSet::new(),
             given_used: HashSet::new(),
             in_test_body: false,
+            type_vars: HashSet::new(),
         };
         type_of(init, Some(&field_ty), &mut ctx)
     };
@@ -1197,7 +1332,11 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
             }
         }
         ExprKind::Paren(inner) => type_of(inner, expected, ctx),
-        ExprKind::Call { name, args, .. } => {
+        ExprKind::Call {
+            name,
+            type_args,
+            args,
+        } => {
             // v0.9: HttpResult variant call. Prefer HttpResult when the
             // surrounding type implies it; otherwise defer to fn/user-variant
             // resolution and only fall back to HttpResult when nothing else
@@ -1221,7 +1360,7 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
             {
                 check_http_variant(expr.span, v, args, expected, ctx)
             } else {
-                check_call(name, args, expr.span, ctx)
+                check_call(name, type_args, args, expr.span, ctx)
             }
         }
         ExprKind::UnaryOp(op, inner) => check_unary(*op, inner, expr.span, ctx),
@@ -1851,9 +1990,30 @@ fn check_binop(op: BinOp, lhs: &Expr, rhs: &Expr, ctx: &mut Ctx) -> Option<Ty> {
     }
 }
 
-fn check_call(name: &Ident, args: &[Expr], span: Span, ctx: &mut Ctx) -> Option<Ty> {
+fn check_call(
+    name: &Ident,
+    type_args: &[TypeRef],
+    args: &[Expr],
+    span: Span,
+    ctx: &mut Ctx,
+) -> Option<Ty> {
     if let Some(fn_decl) = ctx.input.fns.get(&name.name).cloned() {
-        return check_call_against_fn(name, &fn_decl, args, ctx);
+        return check_call_against_fn(name, &fn_decl, type_args, args, ctx);
+    }
+    // v0.20a: explicit type arguments only apply to (generic) functions.
+    if !type_args.is_empty() {
+        ctx.errors.push(CompileError::new(
+            "karn.generics.type_arg_mismatch",
+            span,
+            format!(
+                "`{}` is not a generic function — it takes no type arguments",
+                name.name
+            ),
+        ));
+        for a in args {
+            let _ = type_of(a, None, ctx);
+        }
+        return None;
     }
     // Could be a bare variant constructor with payload.
     let owners: Vec<TypeDecl> = ctx
@@ -2039,12 +2199,20 @@ fn check_lambda(lambda: &LambdaExpr, expected: Option<&Ty>, ctx: &mut Ctx) -> Op
 
     ctx.scopes.push(scope);
 
+    // v0.20a generics: an expected return that still carries a type
+    // variable (pass 2 of inference — the lambda's result is what binds it)
+    // is treated as unconstrained: the body types bottom-up and the caller's
+    // unify captures the variable.
+    let ret_constrained = expected_fn
+        .as_ref()
+        .is_some_and(|(_, er)| !contains_var(er));
+
     // Decide the body's effectfulness BEFORE typing it: the effect gates
     // (`bind_in_pure_context`, `capability_in_pure_context`, the fn-value
     // gate) fire during typing off `ctx.effectful`.
     let body_effectful = match &expected_fn {
-        Some((_, er)) => er.is_effect(),
-        None => body_performs_effects(&lambda.body, ctx),
+        Some((_, er)) if ret_constrained => er.is_effect(),
+        _ => body_performs_effects(&lambda.body, ctx),
     };
 
     // Frame swap (save/restore — the capability map and given-tracking stay
@@ -2056,16 +2224,19 @@ fn check_lambda(lambda: &LambdaExpr, expected: Option<&Ty>, ctx: &mut Ctx) -> Op
     let saved_commit_seen = ctx.commit_seen;
     ctx.effectful = body_effectful;
     ctx.return_ty = match &expected_fn {
-        Some((_, er)) => er.clone(),
+        Some((_, er)) if ret_constrained => er.clone(),
         // Placeholder: no diagnostic path can consult it — the pre-scan sets
         // `effectful` whenever a `<-` exists, so `bind_in_pure_context`'s
         // return-type label is unreachable here.
-        None => Ty::Unit,
+        _ => Ty::Unit,
     };
     ctx.return_ty_span = lambda.span;
     ctx.commit_seen = false;
 
-    let body_expected = expected_fn.as_ref().map(|(_, er)| er.clone());
+    let body_expected = match &expected_fn {
+        Some((_, er)) if ret_constrained => Some(er.clone()),
+        _ => None,
+    };
     let body_ty = type_of(&lambda.body, body_expected.as_ref(), ctx);
 
     ctx.effectful = saved_effectful;
@@ -2076,6 +2247,20 @@ fn check_lambda(lambda: &LambdaExpr, expected: Option<&Ty>, ctx: &mut Ctx) -> Op
     ctx.scopes.pop();
 
     match expected_fn {
+        // Var-bearing expected return: report the actual function type and
+        // let the caller's unify bind the variable.
+        Some((eps, _)) if !ret_constrained => {
+            let bt = body_ty?;
+            let ret = if body_effectful && !bt.is_effect() {
+                Ty::Effect(Box::new(bt))
+            } else {
+                bt
+            };
+            Some(Ty::Fn {
+                params: eps,
+                ret: Box::new(ret),
+            })
+        }
         Some((eps, er)) => {
             if let Some(bt) = body_ty.as_ref() {
                 // A pure body against an effectful expected return auto-lifts
@@ -2290,12 +2475,218 @@ fn check_value_application(
     Some(ret.clone())
 }
 
-fn check_call_against_fn(
+/// v0.20a: instantiate and check a call to a generic function. Two-pass
+/// argument-directed inference: pass 1 types every **non-lambda** argument
+/// left-to-right against the (possibly still Var-bearing) expected — safe
+/// because every expected-driven feature in `type_of` matches concrete
+/// variants, so a Var falls through benignly (pinned by a unit test) — and
+/// unifies; pass 2 types **lambda** arguments against the now-substituted
+/// expecteds (a lambda whose expected params are still Var-bearing is
+/// uninferable) and unifies the result, capturing return-position variables.
+/// Conflicts demand exact equality (`karn.generics.type_arg_mismatch`); the
+/// explicit `name[T](…)` form builds the substitution directly.
+fn check_generic_call(
     name: &Ident,
     fn_decl: &FnDecl,
+    type_args: &[TypeRef],
     args: &[Expr],
     ctx: &mut Ctx,
 ) -> Option<Ty> {
+    let vars: HashSet<String> = fn_decl
+        .type_params
+        .iter()
+        .map(|tp| tp.name.name.clone())
+        .collect();
+    if fn_decl.params.len() != args.len() {
+        for a in args {
+            let _ = type_of(a, None, ctx);
+        }
+        return None;
+    }
+    let var_params: Vec<Option<Ty>> = fn_decl
+        .params
+        .iter()
+        .map(|p| resolve_type_ref_in(&p.type_ref, &ctx.input.types, &vars))
+        .collect();
+    let ret_pattern = resolve_type_ref_in(&fn_decl.return_type, &ctx.input.types, &vars)?;
+
+    let mut subst: HashMap<String, Ty> = HashMap::new();
+    if !type_args.is_empty() {
+        if type_args.len() != fn_decl.type_params.len() {
+            ctx.errors.push(CompileError::new(
+                "karn.generics.type_arg_mismatch",
+                name.span,
+                format!(
+                    "`{}` takes {} type argument(s), but {} were given",
+                    name.name,
+                    fn_decl.type_params.len(),
+                    type_args.len()
+                ),
+            ));
+            return None;
+        }
+        for (tp, ta) in fn_decl.type_params.iter().zip(type_args) {
+            // Resolve explicit type args with the *enclosing* fn's type
+            // params in scope, so `identity[A](x)` inside a generic body
+            // works.
+            let ty = resolve_type_ref_in(ta, &ctx.input.types, &ctx.type_vars)?;
+            subst.insert(tp.name.name.clone(), ty);
+        }
+    }
+
+    let mut arg_tys: Vec<Option<Ty>> = vec![None; args.len()];
+    // Pass 1 — non-lambda arguments.
+    for (i, arg) in args.iter().enumerate() {
+        if matches!(arg.kind, ExprKind::Lambda(_)) {
+            continue;
+        }
+        let expected = var_params[i].as_ref().map(|p| substitute(p, &subst));
+        let ty = type_of(arg, expected.as_ref(), ctx);
+        if let (Some(pattern), Some(actual)) = (var_params[i].as_ref(), ty.as_ref())
+            && !unify(pattern, actual, &mut subst)
+        {
+            ctx.errors.push(CompileError::new(
+                "karn.generics.type_arg_mismatch",
+                arg.span,
+                format!(
+                    "argument {} infers a type for `{}`'s type parameter that conflicts with an earlier argument — annotate with `{}[T](…)`",
+                    i + 1,
+                    name.name,
+                    name.name
+                ),
+            ));
+            return None;
+        }
+        arg_tys[i] = ty;
+    }
+    // Pass 2 — lambda arguments, against substituted expecteds.
+    for (i, arg) in args.iter().enumerate() {
+        if !matches!(arg.kind, ExprKind::Lambda(_)) {
+            continue;
+        }
+        let expected = var_params[i].as_ref().map(|p| substitute(p, &subst));
+        let params_unconstrained = matches!(
+            expected.as_ref(),
+            Some(Ty::Fn { params, .. }) if params.iter().any(contains_var)
+        );
+        let fully_annotated = matches!(
+            &arg.kind,
+            ExprKind::Lambda(l) if l.params.iter().all(|p| p.type_ref.is_some())
+        );
+        if params_unconstrained && !fully_annotated {
+            ctx.errors.push(
+                CompileError::new(
+                    "karn.generics.uninferable_type_arg",
+                    arg.span,
+                    format!(
+                        "the lambda's parameter types depend on `{}`'s type parameters, which the other arguments do not determine",
+                        name.name
+                    ),
+                )
+                .with_note("annotate the lambda's parameters, or give explicit type arguments: `name[T](…)`"),
+            );
+            return None;
+        }
+        // A fully-annotated lambda grounds the variables itself: type it
+        // bottom-up and let unify capture them.
+        let ty = if params_unconstrained {
+            type_of(arg, None, ctx)
+        } else {
+            type_of(arg, expected.as_ref(), ctx)
+        };
+        if let (Some(pattern), Some(actual)) = (var_params[i].as_ref(), ty.as_ref())
+            && !unify(pattern, actual, &mut subst)
+        {
+            ctx.errors.push(CompileError::new(
+                "karn.generics.type_arg_mismatch",
+                arg.span,
+                format!(
+                    "the lambda's type conflicts with `{}`'s inferred type arguments",
+                    name.name
+                ),
+            ));
+            return None;
+        }
+        arg_tys[i] = ty;
+    }
+    // Every type parameter must now be determined.
+    for tp in &fn_decl.type_params {
+        if !subst.contains_key(&tp.name.name) {
+            ctx.errors.push(
+                CompileError::new(
+                    "karn.generics.uninferable_type_arg",
+                    name.span,
+                    format!(
+                        "type parameter `{}` of `{}` is neither inferable from the arguments nor given explicitly",
+                        tp.name.name, name.name
+                    ),
+                )
+                .with_label(tp.span, "declared here")
+                .with_note("give explicit type arguments: `name[T](…)`"),
+            );
+            return None;
+        }
+    }
+    // Final compatibility over the fully-ground parameter types.
+    let mut ok = true;
+    for (i, (pattern, arg)) in var_params.iter().zip(args).enumerate() {
+        let (Some(pattern), Some(arg_ty)) = (pattern.as_ref(), arg_tys[i].as_ref()) else {
+            continue;
+        };
+        let ground = substitute(pattern, &subst);
+        if !compatible(arg_ty, &ground) {
+            ctx.errors.push(CompileError::new(
+                "karn.types.argument_mismatch",
+                arg.span,
+                format!(
+                    "argument {} to `{}` has type `{}`, but `{}` is expected",
+                    i + 1,
+                    name.name,
+                    arg_ty.display(),
+                    ground.display()
+                ),
+            ));
+            ok = false;
+        }
+    }
+    if !ok {
+        return None;
+    }
+    let ret = substitute(&ret_pattern, &subst);
+    debug_assert!(
+        !contains_var(&ret),
+        "uninferable check guarantees a ground return"
+    );
+    Some(ret)
+}
+
+fn check_call_against_fn(
+    name: &Ident,
+    fn_decl: &FnDecl,
+    type_args: &[TypeRef],
+    args: &[Expr],
+    ctx: &mut Ctx,
+) -> Option<Ty> {
+    // v0.20a: generic functions take the instantiation path; the
+    // non-generic path below runs byte-identically to v0.19 (the additive
+    // guard). Explicit type args on a non-generic fn are rejected.
+    if !fn_decl.type_params.is_empty() {
+        return check_generic_call(name, fn_decl, type_args, args, ctx);
+    }
+    if !type_args.is_empty() {
+        ctx.errors.push(CompileError::new(
+            "karn.generics.type_arg_mismatch",
+            name.span,
+            format!(
+                "`{}` is not a generic function — it takes no type arguments",
+                name.name
+            ),
+        ));
+        for a in args {
+            let _ = type_of(a, None, ctx);
+        }
+        return None;
+    }
     if fn_decl.params.len() != args.len() {
         for a in args {
             let _ = type_of(a, None, ctx);
@@ -4695,5 +5086,68 @@ fn regex_matches_empty(pattern: &str) -> bool {
     match Regex::new(&format!("^(?:{pattern})$")) {
         Ok(re) => re.is_match(""),
         Err(_) => false,
+    }
+}
+
+#[cfg(test)]
+mod generics_tests {
+    use super::*;
+
+    fn var(n: &str) -> Ty {
+        Ty::Var(n.to_string())
+    }
+    fn int() -> Ty {
+        Ty::Base(BaseType::Int)
+    }
+
+    #[test]
+    fn unify_binds_and_holds() {
+        let mut s = HashMap::new();
+        assert!(unify(&var("A"), &int(), &mut s));
+        assert_eq!(s.get("A"), Some(&int()));
+        // Same binding again: fine. A different one: conflict.
+        assert!(unify(&var("A"), &int(), &mut s));
+        assert!(!unify(&var("A"), &Ty::Base(BaseType::String), &mut s));
+    }
+
+    #[test]
+    fn unify_walks_structure() {
+        let mut s = HashMap::new();
+        let pattern = Ty::Fn {
+            params: vec![var("A")],
+            ret: Box::new(Ty::Effect(Box::new(var("B")))),
+        };
+        let actual = Ty::Fn {
+            params: vec![int()],
+            ret: Box::new(Ty::Effect(Box::new(Ty::Base(BaseType::String)))),
+        };
+        assert!(unify(&pattern, &actual, &mut s));
+        assert_eq!(s.get("A"), Some(&int()));
+        assert_eq!(s.get("B"), Some(&Ty::Base(BaseType::String)));
+    }
+
+    #[test]
+    fn substitute_grounds_fully() {
+        let mut s = HashMap::new();
+        s.insert("A".to_string(), int());
+        let t = Ty::Option(Box::new(Ty::Fn {
+            params: vec![var("A")],
+            ret: Box::new(var("A")),
+        }));
+        let g = substitute(&t, &s);
+        assert!(!contains_var(&g));
+    }
+
+    /// The §2 invariant (pinned per the plan): every expected-driven feature
+    /// in `type_of` matches *concrete* `Ty` variants, so a Var-bearing
+    /// expected imposes no constraint — `compatible` must simply reject
+    /// Var-vs-ground pairs rather than panic or accept.
+    #[test]
+    fn var_bearing_expected_is_benign() {
+        assert!(!compatible(&int(), &var("A")));
+        assert!(!compatible(&var("A"), &int()));
+        // Rigid vars: name equality only.
+        assert!(compatible(&var("A"), &var("A")));
+        assert!(!compatible(&var("A"), &var("B")));
     }
 }

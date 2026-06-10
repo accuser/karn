@@ -5476,6 +5476,7 @@ fn check_integration_case_body(
         given_remaining: HashSet::new(),
         given_used: HashSet::new(),
         in_test_body: true,
+        type_vars: std::collections::HashSet::new(),
     };
     let _ = checker::type_of_block(&case.body, Some(&return_ty), &mut ctx);
 }
@@ -6111,6 +6112,7 @@ fn check_test_case_body(
         given_remaining: given_declared.iter().cloned().collect(),
         given_used: HashSet::new(),
         in_test_body: true,
+        type_vars: std::collections::HashSet::new(),
     };
     let _ = checker::type_of_block(&case.body, Some(&return_ty), &mut ctx);
     // Don't enforce return-type equality; the test runner discards the

@@ -1799,9 +1799,23 @@ fn emit_free_fn(out: &mut String, f: &FnDecl, commons: &TypedCommons) {
     } else {
         ""
     };
+    // v0.20a: erased TS generics — the type parameters print verbatim and
+    // exist only at TS type-check time (no runtime dispatch).
+    let generics = if f.type_params.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<{}>",
+            f.type_params
+                .iter()
+                .map(|tp| tp.name.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    };
     writeln!(
         out,
-        "export {async_kw}function {name}({params}): {ret} {{",
+        "export {async_kw}function {name}{generics}({params}): {ret} {{",
         name = name.name,
         params = params.join(", "),
         ret = ts_type_ref(&f.return_type),

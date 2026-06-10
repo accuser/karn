@@ -282,6 +282,21 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         &["exports_decl"],
     ),
     dg(
+        "karn.generics.no_bounds",
+        "A type parameter carries a bound (`[A: …]`); bounded generics are not in v0.20a.",
+        &["fn_decl"],
+    ),
+    dg(
+        "karn.generics.no_generic_types",
+        "A `type` declaration carries a type-parameter list; generic type declarations are not in v0.20a (type parameters belong to functions).",
+        &["type_decl"],
+    ),
+    dg(
+        "karn.generics.type_arg_mismatch",
+        "Inferred or explicit type arguments conflict, have the wrong arity, target a non-generic function, or a type parameter shadows a declared type.",
+        &["call"],
+    ),
+    dg(
         "karn.generics.uninferable_type_arg",
         "A generic function's type parameter could not be inferred from the arguments and was not given explicitly (`name[T](…)`); a bare generic function also cannot be passed as a value in v0.20a.",
         &["call"],

@@ -441,6 +441,8 @@ module.exports = grammar({
       seq(
         "fn",
         field("name", choice($.method_name, $.identifier)),
+        // v0.20a: optional `[A, B]` type parameters (functions only).
+        optional(seq("[", sep1(field("type_param", $.identifier), ","), "]")),
         "(",
         optional($._params),
         ")",
@@ -835,6 +837,8 @@ module.exports = grammar({
         PREC.postfix,
         seq(
           field("name", $.identifier),
+          // v0.20a: optional explicit type arguments — `name[T, U](…)`.
+          optional(seq("[", sep1(field("type_arg", $._type_ref), ","), "]")),
           "(",
           optional(sep1(field("arg", $._expression), ",")),
           optional(","),

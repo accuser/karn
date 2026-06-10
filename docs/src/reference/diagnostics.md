@@ -6,7 +6,7 @@
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../how-to/troubleshooting/index.md).
 
-There are **244** codes in total.
+There are **247** codes in total.
 
 ## Agents
 
@@ -162,6 +162,9 @@ There are **244** codes in total.
 | `karn.adapter.duplicate_binding` | An `adapter` declared more than one `binding` clause. | [`binding_decl`](grammar.md#rule-binding_decl) |
 | `karn.adapter.no_binding` | An `adapter` declares an external provider but no `binding` module to supply it. | [`adapter_decl`](grammar.md#rule-adapter_decl) |
 | `karn.adapter.provider_has_body` | A provider inside an `adapter` has a Karn body; adapter providers must be external. | [`provider_decl`](grammar.md#rule-provider_decl) |
+| `karn.generics.no_bounds` | A type parameter carries a bound (`[A: …]`); bounded generics are not in v0.20a. | [`fn_decl`](grammar.md#rule-fn_decl) |
+| `karn.generics.no_generic_types` | A `type` declaration carries a type-parameter list; generic type declarations are not in v0.20a (type parameters belong to functions). | [`type_decl`](grammar.md#rule-type_decl) |
+| `karn.generics.type_arg_mismatch` | Inferred or explicit type arguments conflict, have the wrong arity, target a non-generic function, or a type parameter shadows a declared type. | [`call`](grammar.md#rule-call) |
 | `karn.generics.uninferable_type_arg` | A generic function's type parameter could not be inferred from the arguments and was not given explicitly (`name[T](…)`); a bare generic function also cannot be passed as a value in v0.20a. | [`call`](grammar.md#rule-call) |
 | `karn.integration.duplicate_participant` | A context is listed more than once in a `wires` clause. | [`wires_decl`](grammar.md#rule-wires_decl) |
 | `karn.integration.duplicate_suite` | Two integration tests share the same suite name. | [`integration_decl`](grammar.md#rule-integration_decl) |

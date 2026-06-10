@@ -2274,6 +2274,20 @@ impl<'a> Parser<'a> {
     fn parse_type_decl(&mut self) -> Result<TypeDecl, CompileError> {
         let kw = self.expect(TokenKind::Type, "to start a type declaration")?;
         let name = self.expect_ident("after `type`")?;
+        // v0.20a (Open-narrow): generic *type* declarations stay rejected —
+        // `List`/`Map` (built-in) remain the only generic types.
+        if self.peek_kind() == Some(TokenKind::LBracket) {
+            let open = self.bump().unwrap();
+            return Err(CompileError::new(
+                "karn.generics.no_generic_types",
+                open.span,
+                format!(
+                    "type `{}` declares type parameters — generic type declarations are not in v0.20a (type parameters belong to functions)",
+                    name.name
+                ),
+            )
+            .with_note("only functions take type parameters (`fn name[A, B](…)`); the built-in generic types are fixed"));
+        }
         self.expect(TokenKind::Eq, "after the type name")?;
         // Dispatch on the head token to decide which kind of type body to parse:
         //   `{ ... }`         → record body (v0.2)
@@ -2624,6 +2638,36 @@ impl<'a> Parser<'a> {
         } else {
             FnName::Free(first)
         };
+        // v0.20a: optional `[A, B]` type parameters (free functions only —
+        // generic methods are checked semantically; bounds are rejected here
+        // with `karn.generics.no_bounds`).
+        let mut type_params = Vec::new();
+        if self.peek_kind() == Some(TokenKind::LBracket) {
+            self.bump();
+            loop {
+                let p = self.expect_ident("as a type parameter name")?;
+                if self.peek_kind() == Some(TokenKind::Colon) {
+                    let colon = self.bump().unwrap();
+                    return Err(CompileError::new(
+                        "karn.generics.no_bounds",
+                        colon.span,
+                        format!(
+                            "type parameter `{}` carries a bound — bounded generics are not in v0.20a",
+                            p.name
+                        ),
+                    )
+                    .with_note("type parameters are unconstrained; remove the `: …` bound"));
+                }
+                type_params.push(TypeParam {
+                    span: p.span,
+                    name: p,
+                });
+                if self.eat(TokenKind::Comma).is_none() {
+                    break;
+                }
+            }
+            self.expect(TokenKind::RBracket, "to close the type-parameter list")?;
+        }
         self.expect(TokenKind::LParen, "after the function name")?;
         // For methods, the first parameter may be the special `self` keyword.
         let mut params = Vec::new();
@@ -2664,7 +2708,7 @@ impl<'a> Parser<'a> {
         let body = self.parse_block("to open the function body")?;
         let span = kw.span.merge(body.span);
         Ok(FnDecl {
-            type_params: Vec::new(),
+            type_params,
             name,
             params,
             return_type,
@@ -3473,6 +3517,46 @@ impl<'a> Parser<'a> {
                 // v0.9.4: `Mock[T]` / `Mock[T](args)` — test-context construction.
                 if ident.name == "Mock" && self.peek_kind() == Some(TokenKind::LBracket) {
                     return self.parse_mock_expr(ident.span);
+                }
+                // v0.20a: explicit type arguments — `name[T, U](…)`.
+                // Bare `name[T]` without an argument list is reserved.
+                if self.peek_kind() == Some(TokenKind::LBracket) {
+                    self.bump();
+                    let mut type_args = Vec::new();
+                    loop {
+                        type_args.push(self.parse_type_ref("as a type argument")?);
+                        if self.eat(TokenKind::Comma).is_none() {
+                            break;
+                        }
+                    }
+                    let close =
+                        self.expect(TokenKind::RBracket, "to close the type-argument list")?;
+                    if self.peek_kind() != Some(TokenKind::LParen) {
+                        return Err(CompileError::new(
+                            "karn.parse.expected_token",
+                            close.span,
+                            "type arguments must be followed by an argument list — `name[T](…)`",
+                        )
+                        .with_note("a bare `name[T]` value form is reserved"));
+                    }
+                    self.bump();
+                    let mut args = Vec::new();
+                    if self.peek_kind() != Some(TokenKind::RParen) {
+                        args.push(self.parse_expr()?);
+                        while self.eat(TokenKind::Comma).is_some() {
+                            args.push(self.parse_expr()?);
+                        }
+                    }
+                    let close_paren =
+                        self.expect(TokenKind::RParen, "to close the argument list")?;
+                    return Ok(Expr {
+                        kind: ExprKind::Call {
+                            name: ident.clone(),
+                            type_args,
+                            args,
+                        },
+                        span: ident.span.merge(close_paren.span),
+                    });
                 }
                 if self.peek_kind() == Some(TokenKind::LParen) {
                     self.bump();

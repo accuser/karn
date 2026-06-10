@@ -17,7 +17,7 @@
 //! On success returns a [`ResolvedCommons`] — the original AST plus
 //! symbol tables the type checker consumes.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::ast::*;
 use crate::error::CompileError;
@@ -451,9 +451,16 @@ fn check_fn_refs(
     errors: &mut Vec<CompileError>,
 ) {
     // Parameter types resolve.
+    // v0.20a: the fn's type parameters are legal named references in its
+    // own signature and body annotations.
+    let type_params: HashSet<String> = f
+        .type_params
+        .iter()
+        .map(|tp| tp.name.name.clone())
+        .collect();
     let mut seen_params: HashMap<&str, &Ident> = HashMap::new();
     for p in &f.params {
-        check_type_ref_resolves(&p.type_ref, types, errors);
+        check_type_ref_resolves_in(&p.type_ref, types, &type_params, errors);
         if let Some(prev) = seen_params.get(p.name.name.as_str()) {
             errors.push(
                 CompileError::new(
@@ -467,7 +474,7 @@ fn check_fn_refs(
             seen_params.insert(p.name.name.as_str(), &p.name);
         }
     }
-    check_type_ref_resolves(&f.return_type, types, errors);
+    check_type_ref_resolves_in(&f.return_type, types, &type_params, errors);
 
     // Build the initial scope: parameters plus `self` (for instance methods).
     let mut params: HashMap<String, ()> =
@@ -507,32 +514,44 @@ fn check_type_ref_resolves(
     types: &HashMap<String, TypeDecl>,
     errors: &mut Vec<CompileError>,
 ) {
+    check_type_ref_resolves_in(r, types, &HashSet::new(), errors)
+}
+
+/// v0.20a: like [`check_type_ref_resolves`], with the enclosing function's
+/// type parameters in scope — a `Named` reference matching one is a type
+/// variable, not an unknown type.
+fn check_type_ref_resolves_in(
+    r: &TypeRef,
+    types: &HashMap<String, TypeDecl>,
+    type_params: &HashSet<String>,
+    errors: &mut Vec<CompileError>,
+) {
     match r {
         TypeRef::Base(_, _) => {}
         // v0.20a: a function type's components must each resolve.
         TypeRef::Fn(params, ret, _) => {
             for p in params {
-                check_type_ref_resolves(p, types, errors);
+                check_type_ref_resolves_in(p, types, type_params, errors);
             }
-            check_type_ref_resolves(ret, types, errors);
+            check_type_ref_resolves_in(ret, types, type_params, errors);
         }
         TypeRef::Named(id) => {
-            if !types.contains_key(&id.name) {
+            if !types.contains_key(&id.name) && !type_params.contains(&id.name) {
                 errors.push(unknown_type_error(id));
             }
         }
         TypeRef::Result(t, e, _) => {
-            check_type_ref_resolves(t, types, errors);
-            check_type_ref_resolves(e, types, errors);
+            check_type_ref_resolves_in(t, types, type_params, errors);
+            check_type_ref_resolves_in(e, types, type_params, errors);
         }
         TypeRef::Option(t, _) => {
-            check_type_ref_resolves(t, types, errors);
+            check_type_ref_resolves_in(t, types, type_params, errors);
         }
         TypeRef::Effect(t, _) => {
-            check_type_ref_resolves(t, types, errors);
+            check_type_ref_resolves_in(t, types, type_params, errors);
         }
         TypeRef::HttpResult(t, _) => {
-            check_type_ref_resolves(t, types, errors);
+            check_type_ref_resolves_in(t, types, type_params, errors);
         }
         TypeRef::ValidationError(_) => {}
         TypeRef::Unit(_) => {}
