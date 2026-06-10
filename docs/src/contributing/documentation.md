@@ -238,7 +238,10 @@ instalment document. The per-increment-file practice is retired and the old
 instalments have been **removed** (their history is in version control;
 Appendix B records the lineage); the spec, with the
 [changelog](../reference/changelog.md) and the decision records, is the record.
-Much of the spec stays current for free:
+An increment's *design draft* is a **transient proposal** in
+`design/proposals/`: merged for sign-off before implementation, consumed by it,
+and deleted by the PR that lands the increment (the lifecycle is documented in
+that directory's README). Much of the spec stays current for free:
 the `{{#grammar}}` productions (§3/§4/§11) and the `{{#grammar-semantics}}`
 diagnostic links (§5) re-render from the grammar and the registry, so syntax and
 the diagnostic catalogue never drift. The **prose** is hand-maintained — when

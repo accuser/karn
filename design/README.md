@@ -6,6 +6,9 @@ the canonical, reader-facing spec and reference.
 
 ## Current state
 
+- [`proposals/`](proposals/README.md) — **active increment proposals**: the
+  transient sign-off artefact for an increment, deleted by the PR that
+  implements it.
 - [`decisions/`](decisions/README.md) — the **decision records**: one ADR per
   language-defining call, harvested from the retired increment instalments and
   added per increment going forward.
