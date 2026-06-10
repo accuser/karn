@@ -11,14 +11,17 @@ cumulative working snapshots of the language as it grew, and are no longer the
 place to look — the normative definition is this specification, and the history is
 the catalogue below.
 
-The per-increment history — the notable change in each version from v0.5 through
-the v0.16 final MVP increment — is the
+The per-increment history — the notable change in each version from v0.5
+onwards, including the post-MVP increments — is the
 [version compatibility & changelog](../reference/changelog.md). It is reused here
 rather than duplicated; this appendix adds only the framing that the
-specification, not the instalments, is now authoritative.
+specification, not the instalments, is authoritative *for the MVP it covers*.
 
 > [!NOTE]
-> The maintenance discipline follows from this: a future increment updates **this
-> specification** (and the generated grammar, diagnostics, and changelog it draws
-> on), rather than adding a new standalone instalment document. This note is
+> Post-MVP increments — **v0.17 (adapters)** and **v0.18 (adapter dependencies &
+> the ambient surface)** — shipped with their own increment specifications
+> (`design/karn-adapters-spec.md`, `design/grammar-increments/`), which remain
+> their normative definition until folded into this specification ([§1.1's
+> note](scope.md)). The generated artefacts this spec draws on (grammar
+> appendix, diagnostics catalogue, changelog) already track them. This note is
 > informative.

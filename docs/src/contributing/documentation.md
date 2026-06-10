@@ -221,7 +221,10 @@ The [Karn Language Specification](../spec/index.md) lives in `docs/src/spec/`. I
 is the **normative** definition of the language for the shipped MVP (v0–v0.16),
 distinct in register from the friendly [grammar reference](../reference/grammar.md):
 the reference is per-construct lookup, the spec is the complete citable
-definition. The two share their generated facts.
+definition. The two share their generated facts. (Post-MVP increments — v0.17
+adapters, v0.18 adapter dependencies — are normatively defined by their increment
+specifications until folded into the spec; see the spec's
+[Scope §1.1](../spec/scope.md).)
 
 It is **translation-defined** — syntax by the grammar, static semantics by the
 `karn.*` well-formedness rules, dynamic meaning by emission plus the runtime

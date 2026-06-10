@@ -14,10 +14,17 @@ does not specify the compiler's internals, its command-line surface beyond the
 build contract, or any particular editor tooling.
 
 > [!NOTE]
-> Planned, post-MVP features — events, sagas, and additional storage kinds — are
-> **out of scope** and are not part of the normative language. They are sketched
-> in a future planned-features appendix purely to record design intent. Nothing
-> in this paragraph is normative.
+> The language has continued past the MVP this specification covers: **v0.17
+> (adapters — the host boundary)** and **v0.18 (adapter dependencies & the
+> ambient surface)** are **shipped** but not yet folded into this document.
+> Until they are, their normative definition is their increment specifications
+> (`design/karn-adapters-spec.md`, `design/grammar-increments/`), with friendly
+> coverage in the [Adapters reference](../reference/adapters.md); the shared
+> [grammar appendix](grammar-appendix.md) already includes their productions.
+> Planned-but-unshipped features — events, sagas, and additional storage kinds —
+> remain **out of scope** and are not part of the normative language; they are
+> sketched in a planned-features appendix purely to record design intent.
+> Nothing in this paragraph is normative.
 
 ## §1.2 Conformance language
 
