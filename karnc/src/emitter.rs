@@ -1027,7 +1027,7 @@ fn collect_refs_in_expr(
                 }
             }
         }
-        ExprKind::Call(name, args) => {
+        ExprKind::Call { name, args, .. } => {
             record_name_ref(&name.name, local_to_file, ctx, out);
             // A payload-carrying bare variant call (`Won(prize)`) lowers to
             // `Type.Variant(…)` — import the owning sum type too.
@@ -3208,7 +3208,11 @@ fn emit_statement(out: &mut String, stmt: &Statement, cx: &mut LowerCtx, indent:
             // Track `let x = AgentName(key)` so subsequent `x.method(args)`
             // calls can dispatch through the agent class.
             if l.name.name != "_"
-                && let ExprKind::Call(name, ctor_args) = &l.value.kind
+                && let ExprKind::Call {
+                    name,
+                    args: ctor_args,
+                    ..
+                } = &l.value.kind
                 && cx.local_agents.contains(&name.name)
                 && ctor_args.len() == 1
             {
@@ -3368,7 +3372,7 @@ fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
             }
             id.name.clone()
         }
-        ExprKind::Call(name, args) => {
+        ExprKind::Call { name, args, .. } => {
             // Bare variant constructor with payload → qualify.
             let args_lowered: Vec<String> = args.iter().map(|a| lower_expr(a, stmts, cx)).collect();
             // v0.9: HttpResult variant call.
@@ -3641,7 +3645,11 @@ fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
             // `__makeAgent(<key>).method(args, deps)`. Works in service and
             // agent-handler bodies (deps is the handler's deps parameter) and
             // test bodies (deps is the locally-built makeTestDeps record).
-            if let ExprKind::Call(name, ctor_args) = &receiver.kind
+            if let ExprKind::Call {
+                name,
+                args: ctor_args,
+                ..
+            } = &receiver.kind
                 && cx.local_agents.contains(&name.name)
             {
                 let key_arg = ctor_args
@@ -4152,7 +4160,7 @@ fn simple_expr(e: &Expr) -> bool {
         ExprKind::Ok(i) | ExprKind::Err(i) | ExprKind::Some(i) => simple_expr(i),
         ExprKind::Paren(i) | ExprKind::UnaryOp(_, i) => simple_expr(i),
         ExprKind::BinOp(_, l, r) => simple_expr(l) && simple_expr(r),
-        ExprKind::Call(_, args) | ExprKind::ConstructorCall { args, .. } => {
+        ExprKind::Call { args, .. } | ExprKind::ConstructorCall { args, .. } => {
             args.iter().all(simple_expr)
         }
         ExprKind::MethodCall { receiver, args, .. } => {

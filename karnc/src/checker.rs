@@ -1132,14 +1132,14 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
                 if http_implied || !user_owns {
                     check_http_variant(id.span, v, &[], expected, ctx)
                 } else {
-                    check_ident(id, ctx)
+                    check_ident(id, expected, ctx)
                 }
             } else {
-                check_ident(id, ctx)
+                check_ident(id, expected, ctx)
             }
         }
         ExprKind::Paren(inner) => type_of(inner, expected, ctx),
-        ExprKind::Call(name, args) => {
+        ExprKind::Call { name, args, .. } => {
             // v0.9: HttpResult variant call. Prefer HttpResult when the
             // surrounding type implies it; otherwise defer to fn/user-variant
             // resolution and only fall back to HttpResult when nothing else
@@ -1291,7 +1291,8 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
     ty
 }
 
-fn check_ident(id: &Ident, ctx: &mut Ctx) -> Option<Ty> {
+fn check_ident(id: &Ident, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> {
+    let _ = expected; // v0.20a P2 consumes this (named functions as values)
     if let Some(ty) = ctx.lookup(id.name.as_str()) {
         return Some(ty);
     }

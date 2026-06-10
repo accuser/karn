@@ -1302,7 +1302,7 @@ fn expr_with_prec(e: &Expr, parent_prec: u8) -> String {
         ExprKind::BoolLit(b) => b.to_string(),
         ExprKind::UnitLit => "()".to_string(),
         ExprKind::Ident(id) => id.name.clone(),
-        ExprKind::Call(name, args) => {
+        ExprKind::Call { name, args, .. } => {
             let parts: Vec<String> = args.iter().map(|a| expr_with_prec(a, 0)).collect();
             format!("{}({})", name.name, parts.join(", "))
         }

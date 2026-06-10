@@ -951,7 +951,12 @@ pub enum ExprKind {
     StrLit(String),
     BoolLit(bool),
     Ident(Ident),
-    Call(Ident, Vec<Expr>),
+    Call {
+        name: Ident,
+        /// v0.20a: explicit type arguments (`name[T](…)`); empty when absent.
+        type_args: Vec<TypeRef>,
+        args: Vec<Expr>,
+    },
     BinOp(BinOp, Box<Expr>, Box<Expr>),
     UnaryOp(UnaryOp, Box<Expr>),
     Paren(Box<Expr>),

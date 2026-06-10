@@ -746,7 +746,7 @@ fn check_expr_references(
                 );
             }
         }
-        ExprKind::Call(name, args) => {
+        ExprKind::Call { name, args, .. } => {
             match fns.get(&name.name) {
                 Some(decl) => {
                     if decl.params.len() != args.len() {

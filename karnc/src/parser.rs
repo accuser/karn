@@ -3350,7 +3350,11 @@ impl<'a> Parser<'a> {
                     }
                     let close = self.expect(TokenKind::RParen, "to close the argument list")?;
                     Ok(Expr {
-                        kind: ExprKind::Call(ident.clone(), args),
+                        kind: ExprKind::Call {
+                            name: ident.clone(),
+                            type_args: Vec::new(),
+                            args,
+                        },
                         span: ident.span.merge(close.span),
                     })
                 } else if self.peek_kind() == Some(TokenKind::LBrace)

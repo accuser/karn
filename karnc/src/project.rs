@@ -3930,7 +3930,7 @@ fn walk_expr_for_constraints(
         ExprKind::Is { value, pattern: _ } => {
             walk_expr_for_constraints(value, typed, consumed, local, errors);
         }
-        ExprKind::Call(_, args) => {
+        ExprKind::Call { args, .. } => {
             for a in args {
                 walk_expr_for_constraints(a, typed, consumed, local, errors);
             }
