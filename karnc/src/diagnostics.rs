@@ -599,10 +599,6 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "A reserved keyword was used as an identifier.",
         &["identifier"],
     ),
-    d(
-        "karn.parse.reserved_syntax",
-        "Use of syntax reserved for a future version (e.g. `[` for generics).",
-    ),
     dg(
         "karn.parse.self_outside_method",
         "`self` used outside a method or handler.",
@@ -1049,6 +1045,10 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "A `let` value does not match its type annotation.",
         &["let_stmt"],
     ),
+    d(
+        "karn.types.list_element_mismatch",
+        "A list-literal element has a different type from the list's element type.",
+    ),
     dg(
         "karn.types.match_arm_mismatch",
         "A `match` arm has a different type from the others.",
@@ -1151,6 +1151,14 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
     d(
         "karn.types.type_mismatch",
         "Two types that were required to match did not.",
+    ),
+    d(
+        "karn.types.uninferable_element_type",
+        "An empty `[]` (or `List.empty()` / `Map.empty()`) has no expected type to infer its element type from.",
+    ),
+    d(
+        "karn.types.unkeyable_map_key",
+        "A `Map` key type is not value-keyable (`String`, `Int`, or a refined/opaque type over them).",
     ),
     dg(
         "karn.types.unknown_field",
