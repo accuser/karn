@@ -7029,62 +7029,6 @@ fn ts_type_ref_emit_qualified(
     }
 }
 
-#[cfg(test)]
-mod platform_lock_tests {
-    use super::{LockViolation, Platform, lock_violation};
-    use std::collections::BTreeMap;
-
-    fn native(entries: &[(Platform, &str)]) -> BTreeMap<Platform, String> {
-        entries
-            .iter()
-            .map(|(p, u)| (*p, (*u).to_string()))
-            .collect()
-    }
-
-    #[test]
-    fn empty_closure_imposes_no_lock() {
-        assert_eq!(lock_violation(&native(&[]), Platform::Node), None);
-    }
-
-    #[test]
-    fn matching_platform_is_fine() {
-        let n = native(&[(Platform::Cloudflare, "karn.cloudflare")]);
-        assert_eq!(lock_violation(&n, Platform::Cloudflare), None);
-    }
-
-    #[test]
-    fn mismatched_platform_is_required() {
-        let n = native(&[(Platform::Cloudflare, "karn.cloudflare")]);
-        assert_eq!(
-            lock_violation(&n, Platform::Node),
-            Some(LockViolation::Required {
-                needed: Platform::Cloudflare,
-                unit: "karn.cloudflare".to_string(),
-            })
-        );
-    }
-
-    // The conflict arm is not yet reachable end-to-end (only one platform
-    // ships native capabilities until `karn.aws`); the rule is exercised here
-    // with a synthetic two-platform set so it does not ship untested
-    // (proposal v0.19, review call).
-    #[test]
-    fn two_platforms_conflict_regardless_of_selection() {
-        let n = native(&[
-            (Platform::Cloudflare, "karn.cloudflare"),
-            (Platform::Node, "karn.synthetic"),
-        ]);
-        let v = lock_violation(&n, Platform::Cloudflare);
-        assert_eq!(
-            v,
-            Some(LockViolation::Conflict {
-                a: (Platform::Cloudflare, "karn.cloudflare".to_string()),
-                b: (Platform::Node, "karn.synthetic".to_string()),
-            })
-        );
-    }
-}
-
 /// v0.20a: function types are confined to non-boundary positions — fn/lambda
 /// parameters, returns, and locals. Walk a type reference and reject any
 /// function type found in a position that would serialise, persist, or cross
@@ -7192,5 +7136,61 @@ pub(crate) fn check_function_type_boundary_items(
                 CommonsItem::Fn(_) | CommonsItem::Provider(_) => {}
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod platform_lock_tests {
+    use super::{LockViolation, Platform, lock_violation};
+    use std::collections::BTreeMap;
+
+    fn native(entries: &[(Platform, &str)]) -> BTreeMap<Platform, String> {
+        entries
+            .iter()
+            .map(|(p, u)| (*p, (*u).to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn empty_closure_imposes_no_lock() {
+        assert_eq!(lock_violation(&native(&[]), Platform::Node), None);
+    }
+
+    #[test]
+    fn matching_platform_is_fine() {
+        let n = native(&[(Platform::Cloudflare, "karn.cloudflare")]);
+        assert_eq!(lock_violation(&n, Platform::Cloudflare), None);
+    }
+
+    #[test]
+    fn mismatched_platform_is_required() {
+        let n = native(&[(Platform::Cloudflare, "karn.cloudflare")]);
+        assert_eq!(
+            lock_violation(&n, Platform::Node),
+            Some(LockViolation::Required {
+                needed: Platform::Cloudflare,
+                unit: "karn.cloudflare".to_string(),
+            })
+        );
+    }
+
+    // The conflict arm is not yet reachable end-to-end (only one platform
+    // ships native capabilities until `karn.aws`); the rule is exercised here
+    // with a synthetic two-platform set so it does not ship untested
+    // (proposal v0.19, review call).
+    #[test]
+    fn two_platforms_conflict_regardless_of_selection() {
+        let n = native(&[
+            (Platform::Cloudflare, "karn.cloudflare"),
+            (Platform::Node, "karn.synthetic"),
+        ]);
+        let v = lock_violation(&n, Platform::Cloudflare);
+        assert_eq!(
+            v,
+            Some(LockViolation::Conflict {
+                a: (Platform::Cloudflare, "karn.cloudflare".to_string()),
+                b: (Platform::Node, "karn.synthetic".to_string()),
+            })
+        );
     }
 }
