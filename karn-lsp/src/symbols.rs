@@ -283,7 +283,11 @@ fn type_ref_str(t: &TypeRef) -> String {
                 1 if !matches!(params[0], TypeRef::Fn(..)) => type_ref_str(&params[0]),
                 _ => format!(
                     "({})",
-                    params.iter().map(type_ref_str).collect::<Vec<_>>().join(", ")
+                    params
+                        .iter()
+                        .map(type_ref_str)
+                        .collect::<Vec<_>>()
+                        .join(", ")
                 ),
             };
             format!("{lhs} -> {}", type_ref_str(ret))
