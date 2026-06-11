@@ -39,6 +39,9 @@ export function deserialise_Order(json: JsonValue, path: string = "$"): Result<O
   if (typeof obj["total"] !== "number") {
     return Err({ kind: "StructuralMismatch", path: `${path}.total`, expected: "number", actual: typeof obj["total"] });
   }
+  if (!Number.isInteger(obj["total"])) {
+    return Err({ kind: "StructuralMismatch", path: `${path}.total`, expected: "integer", actual: String(obj["total"]) });
+  }
   const __total = obj["total"];
   const __r_tags = deserialise_Map_String_Int(obj["tags"], `${path}.tags`);
   if (__r_tags.tag === "Err") return __r_tags;
@@ -134,6 +137,9 @@ export function deserialise_Map_String_Int(json: JsonValue, path: string = "$"):
   const __k = entryK;
   if (typeof entryV !== "number") {
     return Err({ kind: "StructuralMismatch", path: `${path}[${i}][1]`, expected: "number", actual: typeof entryV });
+  }
+  if (!Number.isInteger(entryV)) {
+    return Err({ kind: "StructuralMismatch", path: `${path}[${i}][1]`, expected: "integer", actual: String(entryV) });
   }
   const __v = entryV;
   out.set(__k, __v);

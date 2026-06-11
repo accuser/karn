@@ -51,8 +51,12 @@ structurally validated as it crosses ([§6.5](type-system.md#65-type-compatibili
 - `serialise_` of a `Float` field **throws** on a non-finite value (a
   contract violation): `JSON.stringify(NaN)` would otherwise silently
   produce `null` and break the round-trip.
-- A bare `Int` field continues to validate as `typeof "number"` only;
-  the integer re-validation belongs to refined types' `.of`.
+- **v0.22b (ADR 0049): a bare `Int` field additionally requires
+  `Number.isInteger`** — at record/nested fields *and* workers handler
+  params. A previously-accepted `{qty: 1.5}` now fails with a
+  `StructuralMismatch` expecting an `integer`; with `Float` in the
+  language there is no excuse for fractional `Int`s, and codec and `.of`
+  agree (as 0040 aligned them for `Float`).
 
 ## §7.3 Construct emission
 
@@ -256,6 +260,21 @@ module already has:
 | `x.clamp(lo, hi)` | `Math.min(Math.max(x, lo), hi)` |
 | `f.isNaN()`/`f.isFinite()` | `Number.isNaN`/`Number.isFinite` |
 | `Int.parse`/`Float.parse` | a typed IIFE over `Number(s)` (full-string), rejecting empty/whitespace input, non-safe-integers (`Int`) and non-finite values (`Float`) |
+
+### §7.3.9 The typed JSON codec (v0.22b)
+
+`Json.encode(v)` lowers to `JSON.stringify(serialise_<T>(v))` for the
+value's checked type; `Json.decode[T](s)` to a typed IIFE that
+`JSON.parse`s (a throw becomes a `Malformed` `JsonError`), dispatches to
+`deserialise_<T>`, and maps a `BoundaryError` into the uniform
+`kind`/`path`/`message` record (ADR 0047). The per-type
+`serialise_`/`deserialise_` helpers and any generic instantiations
+(`deserialise_List_Order`, …) are emitted **module-locally** into each
+module whose code calls the codec — the same closure machinery as the
+workers boundary path, deduped against helpers that path already emitted.
+The codec runtime types (`JsonError`, `JsonValue`, `BoundaryError`) are
+imported only by modules that use the codec, so non-codec modules emit
+byte-identically to v0.22a.
 
 ## §7.4 The runtime library
 

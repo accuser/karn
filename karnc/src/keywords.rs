@@ -19,6 +19,10 @@ pub const KEYWORDS: &[KeywordInfo] = &[
     k("Err", "The error variant of `Result`."),
     k("Float", "The floating-point base type."),
     k("Int", "The integer base type."),
+    k(
+        "JsonError",
+        "The JSON-decode error type, `Result[T, JsonError]` from `Json.decode`.",
+    ),
     k("None", "The empty variant of `Option`."),
     k("Ok", "The success variant of `Result`."),
     k("Option", "The optional-value type, `Option[T]`."),

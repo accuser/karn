@@ -535,7 +535,7 @@ fn http_value_serialiser(t: &TypeRef) -> String {
             format!("handlers.serialise_{inst_name}")
         }
         TypeRef::Effect(inner, _) => http_value_serialiser(inner),
-        TypeRef::HttpResult(_, _) | TypeRef::ValidationError(_) => {
+        TypeRef::HttpResult(_, _) | TypeRef::ValidationError(_) | TypeRef::JsonError(_) => {
             "(v: any) => v as JsonValue".to_string()
         }
     }
@@ -554,6 +554,12 @@ fn deserialise_call(t: &TypeRef, json_expr: &str, path: &str) -> String {
                 BaseType::Bool => "boolean",
                 BaseType::Float => "number",
             };
+            // v0.22b: bare `Int` params validate integrality (ADR 0049).
+            if *b == BaseType::Int {
+                return format!(
+                    "(typeof {json_expr} === \"number\" && Number.isInteger({json_expr}) ? Ok({json_expr}) : Err({{ kind: \"StructuralMismatch\", path: \"{path}\", expected: \"integer\", actual: String({json_expr}) }}) as Result<any, BoundaryError>)"
+                );
+            }
             // v0.21: boundary `Float` values are finite (ADR 0040).
             if *b == BaseType::Float {
                 return format!(
@@ -575,7 +581,10 @@ fn deserialise_call(t: &TypeRef, json_expr: &str, path: &str) -> String {
             format!("handlers.deserialise_{inst_name}({json_expr}, \"{path}\")")
         }
         TypeRef::Effect(inner, _) => deserialise_call(inner, json_expr, path),
-        TypeRef::HttpResult(_, _) | TypeRef::ValidationError(_) | TypeRef::Unit(_) => {
+        TypeRef::HttpResult(_, _)
+        | TypeRef::ValidationError(_)
+        | TypeRef::JsonError(_)
+        | TypeRef::Unit(_) => {
             format!("Ok({json_expr} as any) as Result<any, BoundaryError>")
         }
     }
@@ -605,7 +614,7 @@ fn serialise_call(t: &TypeRef, value: &str) -> String {
         // Unit serialises to JSON `null` (the value is `void`, which cannot be
         // cast to `JsonValue` under `tsc --strict`).
         TypeRef::Unit(_) => "null".to_string(),
-        TypeRef::HttpResult(_, _) | TypeRef::ValidationError(_) => {
+        TypeRef::HttpResult(_, _) | TypeRef::ValidationError(_) | TypeRef::JsonError(_) => {
             format!("{value} as JsonValue")
         }
     }
@@ -626,6 +635,7 @@ fn inner_ts_name(t: &TypeRef) -> String {
         TypeRef::List(a, _) => format!("List_{}", inner_ts_name(a)),
         TypeRef::Map(k, v, _) => format!("Map_{}_{}", inner_ts_name(k), inner_ts_name(v)),
         TypeRef::ValidationError(_) => "ValidationError".to_string(),
+        TypeRef::JsonError(_) => "JsonError".to_string(),
         TypeRef::Unit(_) => "Unit".to_string(),
     }
 }

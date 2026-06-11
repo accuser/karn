@@ -562,7 +562,7 @@ fn check_type_ref_resolves_in(
             check_type_ref_resolves_in(v, types, type_params, errors);
             check_map_key_keyable(k, types, type_params, errors);
         }
-        TypeRef::ValidationError(_) => {}
+        TypeRef::ValidationError(_) | TypeRef::JsonError(_) => {}
         TypeRef::Unit(_) => {}
     }
 }
@@ -1388,6 +1388,7 @@ fn check_expr_references(
             receiver,
             method,
             args,
+            ..
         } => {
             // v0.9: `HttpResult.Variant(args)` — qualified HttpResult constructor.
             if let ExprKind::Ident(id) = &receiver.kind
@@ -1422,19 +1423,21 @@ fn check_expr_references(
             // numeric parse statics, `Int.parse(…)` / `Float.parse(…)`.
             if let ExprKind::Ident(id) = &receiver.kind
                 && !name_in_scope(&id.name, params, scopes)
-                && matches!(id.name.as_str(), "List" | "Map" | "Int" | "Float")
+                && matches!(id.name.as_str(), "List" | "Map" | "Int" | "Float" | "Json")
                 && !types.contains_key(&id.name)
             {
-                let only = match id.name.as_str() {
-                    "List" | "Map" => "empty",
-                    _ => "parse",
+                let allowed: &[&str] = match id.name.as_str() {
+                    "List" | "Map" => &["empty"],
+                    "Json" => &["encode", "decode"],
+                    _ => &["parse"],
                 };
-                if method.name != only {
+                let only = allowed.join("`/`");
+                if !allowed.contains(&method.name.as_str()) {
                     errors.push(CompileError::new(
                         "karn.resolve.unknown_static_member",
                         method.span,
                         format!(
-                            "the built-in `{}` type has no static method named `{}` — `{only}` is the only static",
+                            "the built-in `{}` type has no static method named `{}` — the statics are `{only}`",
                             id.name, method.name
                         ),
                     ));

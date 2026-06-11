@@ -45,6 +45,9 @@ export function deserialise_Quote(json: JsonValue, path: string = "$"): Result<Q
   if (typeof obj["qty"] !== "number") {
     return Err({ kind: "StructuralMismatch", path: `${path}.qty`, expected: "number", actual: typeof obj["qty"] });
   }
+  if (!Number.isInteger(obj["qty"])) {
+    return Err({ kind: "StructuralMismatch", path: `${path}.qty`, expected: "integer", actual: String(obj["qty"]) });
+  }
   const __qty = obj["qty"];
   return Ok({ sku: __sku, price: __price, qty: __qty } as Quote);
 }

@@ -59,6 +59,9 @@ pub enum TokenKind {
     Result,
     #[token("ValidationError")]
     ValidationError,
+    // v0.22b keyword
+    #[token("JsonError")]
+    JsonError,
     // v0.2 keywords
     #[token("enum")]
     Enum,
@@ -270,6 +273,7 @@ impl TokenKind {
             Err => "`Err`",
             Result => "`Result`",
             ValidationError => "`ValidationError`",
+            JsonError => "`JsonError`",
             Enum => "`enum`",
             Match => "`match`",
             Option => "`Option`",

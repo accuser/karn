@@ -1,0 +1,5 @@
+commons bad {
+  fn f(xs: List[Int]) -> Int {
+    xs.length[Int]()
+  }
+}

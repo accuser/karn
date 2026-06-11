@@ -1,0 +1,36 @@
+commons orders {
+  type Status =
+    | Pending
+    | Shipped(tracking: String)
+
+  type Order = {
+    id: String,
+    price: Float,
+    qty: Int,
+    status: Status,
+    tags: List[String],
+  }
+
+  fn save(o: Order) -> String {
+    Json.encode(o)
+  }
+
+  fn load(s: String) -> Result[Order, JsonError] {
+    Json.decode[Order](s)
+  }
+
+  fn loadInferred(s: String) -> Result[Order, JsonError] {
+    Json.decode(s)
+  }
+
+  fn loadMany(s: String) -> Result[List[Order], JsonError] {
+    Json.decode[List[Order]](s)
+  }
+
+  fn describe(s: String) -> String {
+    match Json.decode[Order](s) {
+      Ok(o) => o.id
+      Err(e) => e.kind.concat(" at ").concat(e.path).concat(": ").concat(e.message)
+    }
+  }
+}

@@ -550,6 +550,10 @@
   ],
   "method_call": [
     {
+      "code": "karn.types.json_uncodable",
+      "summary": "A `Json.encode`/`Json.decode` target type cannot pass through the typed JSON codec (functions, effects, error builtins)."
+    },
+    {
       "code": "karn.types.method_arity",
       "summary": "A method was called with the wrong number of arguments."
     },

@@ -24,7 +24,7 @@ export default {
             const __r_id = (typeof argsObj["id"] === "string" ? Ok(argsObj["id"]) : Err({ kind: "StructuralMismatch", path: "$.id", expected: "string", actual: typeof argsObj["id"] }) as Result<any, BoundaryError>);
             if (__r_id.tag === "Err") return new Response(JSON.stringify(__r_id.error), { status: 400, headers: { "content-type": "application/json" } });
             const id = __r_id.value;
-            const __r_cents = (typeof argsObj["cents"] === "number" ? Ok(argsObj["cents"]) : Err({ kind: "StructuralMismatch", path: "$.cents", expected: "number", actual: typeof argsObj["cents"] }) as Result<any, BoundaryError>);
+            const __r_cents = (typeof argsObj["cents"] === "number" && Number.isInteger(argsObj["cents"]) ? Ok(argsObj["cents"]) : Err({ kind: "StructuralMismatch", path: "$.cents", expected: "integer", actual: String(argsObj["cents"]) }) as Result<any, BoundaryError>);
             if (__r_cents.tag === "Err") return new Response(JSON.stringify(__r_cents.error), { status: 400, headers: { "content-type": "application/json" } });
             const cents = __r_cents.value;
             const result = await surface.place(id, cents);

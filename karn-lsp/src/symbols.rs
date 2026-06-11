@@ -302,6 +302,7 @@ fn type_ref_str(t: &TypeRef) -> String {
         TypeRef::List(t, _) => format!("List[{}]", type_ref_str(t)),
         TypeRef::Map(k, v, _) => format!("Map[{}, {}]", type_ref_str(k), type_ref_str(v)),
         TypeRef::ValidationError(_) => "ValidationError".to_string(),
+        TypeRef::JsonError(_) => "JsonError".to_string(),
         TypeRef::Unit(_) => "()".to_string(),
     }
 }

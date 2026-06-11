@@ -115,6 +115,9 @@ export function deserialise_Result_Int_OrderError(json: JsonValue, path: string 
   if (typeof obj["value"] !== "number") {
     return Err({ kind: "StructuralMismatch", path: `${path}.value`, expected: "number", actual: typeof obj["value"] });
   }
+  if (!Number.isInteger(obj["value"])) {
+    return Err({ kind: "StructuralMismatch", path: `${path}.value`, expected: "integer", actual: String(obj["value"]) });
+  }
   const __v = obj["value"];
     return Ok(Ok(__v) as Result<number, OrderError>);
   } else if (obj["kind"] === "Err") {

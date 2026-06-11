@@ -197,6 +197,9 @@ export function deserialise_Response(json: JsonValue, path: string = "$"): Resul
   if (typeof obj["status"] !== "number") {
     return Err({ kind: "StructuralMismatch", path: `${path}.status`, expected: "number", actual: typeof obj["status"] });
   }
+  if (!Number.isInteger(obj["status"])) {
+    return Err({ kind: "StructuralMismatch", path: `${path}.status`, expected: "integer", actual: String(obj["status"]) });
+  }
   const __status = obj["status"];
   if (typeof obj["body"] !== "string") {
     return Err({ kind: "StructuralMismatch", path: `${path}.body`, expected: "string", actual: typeof obj["body"] });

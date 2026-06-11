@@ -56,5 +56,8 @@ supersedes the old one, the way 0016 supersedes the interim portability tiers.
 | [0042](0042-operand-typed-division.md) | Operand-typed division; non-finite arithmetic is host-defined | Accepted (v0.21) |
 | [0043](0043-float-literals.md) | Float literals: fraction/exponent, digit-both-sides, reject overflow, store the lexeme | Accepted (v0.21) |
 | [0044](0044-refinement-over-float.md) | Refinement over `Float`: float bounds, numeric predicates extend, bounds match the base | Accepted (v0.21) |
+| [0045](0045-typed-json-codec.md) | The typed JSON codec: compiler-backed, no untyped `Json`; type-app on statics | Accepted (v0.22b) |
 | [0046](0046-string-kernel.md) | The string kernel: built-in methods, UTF-16 code units, pinned footguns | Accepted (v0.22a) |
+| [0047](0047-jsonerror-compiler-known.md) | `JsonError`: a compiler-known, Karn-inspectable record | Accepted (v0.22b) |
 | [0048](0048-combinators-as-kernel-methods.md) | `Option`/`Result` combinators and numeric helpers are kernel methods | Accepted (v0.22a) |
+| [0049](0049-bare-int-boundary-integrality.md) | Bare-`Int` boundary fields validate integrality (wire-contract tightening) | Accepted (v0.22b) |

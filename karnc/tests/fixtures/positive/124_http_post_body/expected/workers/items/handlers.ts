@@ -44,6 +44,9 @@ export function deserialise_CreateItem(json: JsonValue, path: string = "$"): Res
   if (typeof obj["quantity"] !== "number") {
     return Err({ kind: "StructuralMismatch", path: `${path}.quantity`, expected: "number", actual: typeof obj["quantity"] });
   }
+  if (!Number.isInteger(obj["quantity"])) {
+    return Err({ kind: "StructuralMismatch", path: `${path}.quantity`, expected: "integer", actual: String(obj["quantity"]) });
+  }
   const __quantity = obj["quantity"];
   return Ok({ name: __name, quantity: __quantity } as CreateItem);
 }

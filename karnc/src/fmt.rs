@@ -1250,6 +1250,7 @@ fn type_ref_to_string(t: &TypeRef) -> String {
             format!("Map[{}, {}]", type_ref_to_string(k), type_ref_to_string(v))
         }
         TypeRef::ValidationError(_) => "ValidationError".to_string(),
+        TypeRef::JsonError(_) => "JsonError".to_string(),
         TypeRef::Unit(_) => "()".to_string(),
         TypeRef::Fn(params, ret, _) => {
             let lhs = match params.len() {
@@ -1444,11 +1445,24 @@ fn expr_with_prec(e: &Expr, parent_prec: u8) -> String {
         ExprKind::MethodCall {
             receiver,
             method,
+            type_args,
             args,
         } => {
+            let targs = if type_args.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "[{}]",
+                    type_args
+                        .iter()
+                        .map(type_ref_to_string)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            };
             let parts: Vec<String> = args.iter().map(|a| expr_with_prec(a, 0)).collect();
             format!(
-                "{}.{}({})",
+                "{}.{}{targs}({})",
                 expr_with_prec(receiver, 8),
                 method.name,
                 parts.join(", ")

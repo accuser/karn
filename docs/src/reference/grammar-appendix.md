@@ -96,7 +96,7 @@ primary ::= lambda_expr | paren_expr | method_call | field_access | call | recor
 lambda_expr ::= "(" (lambda_param ("," lambda_param)*)? ")" "=>" (expression | block)
 lambda_param ::= identifier (":" type_ref)?
 paren_expr ::= "(" expression ")"
-method_call ::= primary "." identifier "(" (expression ("," expression)*)? ","? ")"
+method_call ::= primary "." identifier ("[" type_ref ("," type_ref)* "]")? "(" (expression ("," expression)*)? ","? ")"
 field_access ::= primary "." identifier
 call ::= identifier ("[" type_ref ("," type_ref)* "]")? "(" (expression ("," expression)*)? ","? ")"
 list_literal ::= "[" (expression ("," expression)* ","?)? "]"
