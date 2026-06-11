@@ -83,6 +83,11 @@ comparison stable); `deny.toml`; `rust-version = "1.85"` in the workspace manife
   run — add it (or an `exceptions` entry).
 - **crates.io OIDC** needs a one-time Trusted Publisher configured per crate (karn-grammar,
   karnc, karn-fmt, karn-lsp) before the next publish; keep `CARGO_REGISTRY_TOKEN` until then.
+- **Renaming a CI job requires a matching ruleset update** — the `main protection` ruleset
+  pins required checks *by job name*, and a required check that no longer exists waits as
+  "Expected" forever (hit on this PR: the old "Test suite (workspace, …)" name vs the new
+  matrix legs). The required set is now the eleven always-on jobs; `dependency-review` is
+  deliberately unrequired (it skips while the repo is private).
 
 ---
 
