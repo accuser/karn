@@ -85,7 +85,10 @@ fn collect_type_names(t: &TypeRef, stack: &mut Vec<String>) {
             collect_type_names(k, stack);
             collect_type_names(v, stack);
         }
-        TypeRef::Base(_, _) | TypeRef::ValidationError(_) | TypeRef::Unit(_) => {}
+        TypeRef::Base(_, _)
+        | TypeRef::ValidationError(_)
+        | TypeRef::JsonError(_)
+        | TypeRef::Unit(_) => {}
     }
 }
 
@@ -339,6 +342,18 @@ fn emit_field_deserialise(out: &mut String, name: &str, t: &TypeRef, json: &str,
             )
             .unwrap();
             writeln!(out, "  }}").unwrap();
+            // v0.22b: bare `Int` fields validate integrality (ADR 0049) —
+            // with `Float` in the language there is no excuse for a
+            // fractional `Int` from the wire.
+            if *b == BaseType::Int {
+                writeln!(out, "  if (!Number.isInteger({json})) {{").unwrap();
+                writeln!(
+                    out,
+                    "    return Err({{ kind: \"StructuralMismatch\", path: {path_expr}, expected: \"integer\", actual: String({json}) }});"
+                )
+                .unwrap();
+                writeln!(out, "  }}").unwrap();
+            }
             // v0.21: boundary `Float` values are finite (ADR 0040) —
             // `JSON.parse("1e999")` yields `Infinity`, which must not be
             // admitted from the wire.
@@ -409,7 +424,10 @@ fn emit_field_deserialise(out: &mut String, name: &str, t: &TypeRef, json: &str,
             writeln!(out, "  if (__r_{name}.tag === \"Err\") return __r_{name};").unwrap();
             writeln!(out, "  const __{name} = __r_{name}.value;").unwrap();
         }
-        TypeRef::Effect(_, _) | TypeRef::ValidationError(_) | TypeRef::HttpResult(_, _) => {
+        TypeRef::Effect(_, _)
+        | TypeRef::ValidationError(_)
+        | TypeRef::JsonError(_)
+        | TypeRef::HttpResult(_, _) => {
             writeln!(out, "  const __{name} = {json} as any;").unwrap();
         }
         TypeRef::Unit(_) => {
@@ -444,7 +462,10 @@ fn serialise_field_expr(t: &TypeRef, value: &str) -> String {
             inner_ts_name(k),
             inner_ts_name(v)
         ),
-        TypeRef::Effect(_, _) | TypeRef::ValidationError(_) | TypeRef::HttpResult(_, _) => {
+        TypeRef::Effect(_, _)
+        | TypeRef::ValidationError(_)
+        | TypeRef::JsonError(_)
+        | TypeRef::HttpResult(_, _) => {
             format!("{value} as JsonValue")
         }
         TypeRef::Unit(_) => "null".to_string(),
@@ -466,7 +487,113 @@ fn inner_ts_name(t: &TypeRef) -> String {
         TypeRef::List(a, _) => format!("List_{}", inner_ts_name(a)),
         TypeRef::Map(k, v, _) => format!("Map_{}_{}", inner_ts_name(k), inner_ts_name(v)),
         TypeRef::ValidationError(_) => "ValidationError".to_string(),
+        TypeRef::JsonError(_) => "JsonError".to_string(),
         TypeRef::Unit(_) => "Unit".to_string(),
+    }
+}
+
+/// v0.22b: the codec closure for a set of `Json.encode`/`Json.decode[T]`
+/// target type-refs — the named types needing per-type helpers (transitively
+/// through record fields and sum payloads) plus the generic instantiations
+/// needing specialised helpers. The same closure logic as the boundary
+/// collectors, rooted at expressions instead of service signatures.
+pub fn collect_codec_closure(
+    roots: &[TypeRef],
+    types: &std::collections::HashMap<String, TypeDecl>,
+) -> (Vec<String>, Vec<GenericInst>) {
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut names: Vec<String> = Vec::new();
+    let mut stack: Vec<String> = Vec::new();
+    for r in roots {
+        collect_type_names(r, &mut stack);
+    }
+    while let Some(name) = stack.pop() {
+        if !seen.insert(name.clone()) {
+            continue;
+        }
+        names.push(name.clone());
+        let Some(decl) = types.get(&name) else {
+            continue;
+        };
+        match &decl.body {
+            TypeBody::Record(r) => {
+                for f in &r.fields {
+                    collect_type_names(&f.type_ref, &mut stack);
+                }
+            }
+            TypeBody::Sum(s) => {
+                for v in &s.variants {
+                    for p in &v.payload {
+                        collect_type_names(&p.type_ref, &mut stack);
+                    }
+                }
+            }
+            TypeBody::Refined { .. } | TypeBody::Opaque { .. } => {}
+        }
+    }
+    names.sort();
+
+    let mut insts: Vec<GenericInst> = Vec::new();
+    let mut inst_seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for r in roots {
+        walk_generic_inst(r, &mut insts, &mut inst_seen);
+    }
+    for name in &names {
+        let Some(decl) = types.get(name) else {
+            continue;
+        };
+        match &decl.body {
+            TypeBody::Record(r) => {
+                for f in &r.fields {
+                    walk_generic_inst(&f.type_ref, &mut insts, &mut inst_seen);
+                }
+            }
+            TypeBody::Sum(s) => {
+                for v in &s.variants {
+                    for p in &v.payload {
+                        walk_generic_inst(&p.type_ref, &mut insts, &mut inst_seen);
+                    }
+                }
+            }
+            TypeBody::Refined { .. } | TypeBody::Opaque { .. } => {}
+        }
+    }
+    (names, insts)
+}
+
+/// v0.22b: an expression-form serialise for a codec target — the same
+/// dispatch as a record field's serialisation.
+pub fn serialise_expr(t: &TypeRef, value: &str) -> String {
+    serialise_field_expr(t, value)
+}
+
+/// v0.22b: an expression-form deserialise call for a codec target. Named
+/// types and generic instantiations go through their (module-local)
+/// helpers; bases inline the structural check.
+pub fn deserialise_expr(t: &TypeRef, json: &str, path: &str) -> String {
+    match t {
+        TypeRef::Named(id) => format!("deserialise_{}({json}, \"{path}\")", id.name),
+        TypeRef::Result(..) | TypeRef::Option(..) | TypeRef::List(..) | TypeRef::Map(..) => {
+            format!("deserialise_{}({json}, \"{path}\")", inner_ts_name(t))
+        }
+        TypeRef::Base(b, _) => {
+            let typeof_str = match b {
+                BaseType::Int => "number",
+                BaseType::String => "string",
+                BaseType::Bool => "boolean",
+                BaseType::Float => "number",
+            };
+            let extra = match b {
+                BaseType::Float => " && Number.isFinite(__v)",
+                BaseType::Int => " && Number.isInteger(__v)",
+                _ => "",
+            };
+            format!(
+                "((__v) => typeof __v === \"{typeof_str}\"{extra} ? Ok(__v) : Err({{ kind: \"StructuralMismatch\", path: \"{path}\", expected: \"{typeof_str}\", actual: typeof __v }} as BoundaryError))({json})"
+            )
+        }
+        // Everything else is rejected by the checker's codec-domain rule.
+        _ => unreachable!("non-codable type reached the Json codec lowering"),
     }
 }
 
@@ -830,6 +957,7 @@ fn ts_inner_type(t: &TypeRef) -> String {
             format!("ReadonlyMap<{}, {}>", ts_inner_type(k), ts_inner_type(v))
         }
         TypeRef::ValidationError(_) => "ValidationError".to_string(),
+        TypeRef::JsonError(_) => "JsonError".to_string(),
         TypeRef::Unit(_) => "void".to_string(),
     }
 }

@@ -3890,6 +3890,7 @@ fn walk_expr_for_constraints(
             receiver,
             method,
             args,
+            ..
         } => {
             // `T.method(...)` written as MethodCall with receiver Ident(T).
             if let ExprKind::Ident(id) = &receiver.kind
@@ -4591,6 +4592,7 @@ fn type_refs_match(a: &TypeRef, b: &TypeRef) -> bool {
         (TypeRef::Effect(t1, _), TypeRef::Effect(t2, _)) => type_refs_match(t1, t2),
         (TypeRef::HttpResult(t1, _), TypeRef::HttpResult(t2, _)) => type_refs_match(t1, t2),
         (TypeRef::ValidationError(_), TypeRef::ValidationError(_)) => true,
+        (TypeRef::JsonError(_), TypeRef::JsonError(_)) => true,
         (TypeRef::Unit(_), TypeRef::Unit(_)) => true,
         _ => false,
     }
@@ -4958,6 +4960,7 @@ fn ts_type_ref_display(r: &TypeRef) -> String {
             ts_type_ref_display(v)
         ),
         TypeRef::ValidationError(_) => "ValidationError".to_string(),
+        TypeRef::JsonError(_) => "JsonError".to_string(),
         TypeRef::Unit(_) => "()".to_string(),
         TypeRef::Fn(params, ret, _) => {
             let lhs = match params.len() {
@@ -5582,7 +5585,7 @@ fn emit_integration_module(
         ""
     };
     out.push_str(&format!(
-        "import {{ Ok, Err, Some, None, callService, type Result, type Option, type ValidationError, type JsonValue, type ServiceBinding{agent_imports} }} from \"{runtime_import}\";\n"
+        "import {{ Ok, Err, Some, None, callService, type Result, type Option, type ValidationError, type JsonError, type JsonValue, type BoundaryError, type ServiceBinding{agent_imports} }} from \"{runtime_import}\";\n"
     ));
 
     // Per-participant: workers handler namespace + Worker entry default export.
@@ -7042,6 +7045,7 @@ fn ts_type_ref_emit(r: &TypeRef) -> String {
             )
         }
         TypeRef::ValidationError(_) => "ValidationError".to_string(),
+        TypeRef::JsonError(_) => "JsonError".to_string(),
         TypeRef::Unit(_) => "void".to_string(),
     }
 }
@@ -7115,6 +7119,7 @@ fn ts_type_ref_emit_qualified(
             ts_type_ref_emit_qualified(v, scope_type_names, scope_ns)
         ),
         TypeRef::ValidationError(_) => "ValidationError".to_string(),
+        TypeRef::JsonError(_) => "JsonError".to_string(),
         TypeRef::Unit(_) => "void".to_string(),
     }
 }
@@ -7149,7 +7154,11 @@ fn reject_fn_types(r: &TypeRef, what: &str, errors: &mut Vec<CompileError>) {
         | TypeRef::Effect(a, _)
         | TypeRef::HttpResult(a, _)
         | TypeRef::List(a, _) => reject_fn_types(a, what, errors),
-        TypeRef::Base(..) | TypeRef::Named(_) | TypeRef::ValidationError(_) | TypeRef::Unit(_) => {}
+        TypeRef::Base(..)
+        | TypeRef::Named(_)
+        | TypeRef::ValidationError(_)
+        | TypeRef::JsonError(_)
+        | TypeRef::Unit(_) => {}
     }
 }
 

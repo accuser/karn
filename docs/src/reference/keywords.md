@@ -6,7 +6,7 @@
 
 Every reserved keyword, with a one-line description. Reserved words cannot be used as identifiers.
 
-There are **52** reserved keywords.
+There are **53** reserved keywords.
 
 | Keyword | Meaning |
 |---|---|
@@ -15,6 +15,7 @@ There are **52** reserved keywords.
 | `Err` | The error variant of `Result`. |
 | `Float` | The floating-point base type. |
 | `Int` | The integer base type. |
+| `JsonError` | The JSON-decode error type, `Result[T, JsonError]` from `Json.decode`. |
 | `None` | The empty variant of `Option`. |
 | `Ok` | The success variant of `Result`. |
 | `Option` | The optional-value type, `Option[T]`. |

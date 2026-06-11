@@ -108,6 +108,13 @@ surface.
 the error type produced by a refined or opaque `.of` constructor when validation
 fails.
 
+`JsonError` (v0.22b) is the error type produced by `Json.decode`
+([§5.2](static-semantics.md#52-well-typedness)) — a compiler-known **record**
+with `String` fields `kind`, `path`, and `message`, inspectable by ordinary
+field access. Like `ValidationError` it is a built-in name, not a declarable
+shape; neither error builtin passes through the JSON codec itself
+(`karn.types.json_uncodable`).
+
 > [!NOTE]
 > The `Ok` and `Err` constructors are shared between `Result` and `HttpResult`;
 > where the target is ambiguous a program must qualify the constructor

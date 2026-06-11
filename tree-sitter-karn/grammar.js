@@ -824,6 +824,9 @@ module.exports = grammar({
           field("receiver", $._primary),
           ".",
           field("method", $.identifier),
+          // v0.22b: optional explicit type arguments on a qualified static —
+          // `Json.decode[T](…)` (same-line rule as `call` type application).
+          optional(seq("[", sep1(field("type_arg", $._type_ref), ","), "]")),
           "(",
           optional(sep1(field("arg", $._expression), ",")),
           optional(","),

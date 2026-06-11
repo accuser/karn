@@ -163,6 +163,55 @@ commons checkout {
 }
 ```
 
+**The typed JSON codec** (v0.22b, ADR 0045). `Json.encode(v) -> String` and
+`Json.decode[T](s) -> Result[T, JsonError]` are compiler-backed statics on
+the built-in `Json` module: `encode` dispatches to the generated
+`serialise_<T>` for the value's checked type; `decode` to `JSON.parse` +
+`deserialise_<T>`. The **domain of `T`** (and of `encode`'s argument) is any
+boundary-legal shape — base types, named types, and the built-in containers
+over them; functions, effects, `HttpResult`, the error builtins, and type
+variables are `karn.types.json_uncodable`. `decode`'s target is given
+explicitly (`Json.decode[Order](s)`, any boundary-legal type-ref including
+`Json.decode[List[Order]]`) or inferred from an expected
+`Result[T, JsonError]`; with neither, `karn.generics.uninferable_type_arg`.
+`encode` is `-> String` but **throws on a value containing a non-finite
+`Float`** — the 0040 contract violation, documented rather than `Result`-ified
+(the program itself created that state). A user-declared type named `Json`
+shadows the built-in module.
+
+**`JsonError`** (v0.22b, ADR 0047). The decode error is a compiler-known
+record — `kind`, `path`, `message`, all `String` — putting a boundary
+failure in the program's hands for the first time (the `ValidationError`
+precedent). `kind` is `"Malformed"` for unparseable input, else the
+boundary kind (`"StructuralMismatch"`, `"RefinementViolation"`); `path` is
+the tracked field path (`$.items[2].qty`); decode failures are runtime
+values, never compile diagnostics.
+
+```karn
+commons store {
+  type Item = {
+    sku: String,
+    price: Float,
+    qty: Int,
+  }
+
+  fn snapshot(i: Item) -> String {
+    Json.encode(i)
+  }
+
+  fn restore(s: String) -> Result[Item, JsonError] {
+    Json.decode[Item](s)
+  }
+
+  fn restoreError(s: String) -> String {
+    match Json.decode[Item](s) {
+      Ok(i) => i.sku
+      Err(e) => e.kind.concat(" at ").concat(e.path)
+    }
+  }
+}
+```
+
 **Generic instantiation** (v0.20a). A generic function's type arguments are
 inferred from its arguments by argument-directed unification: non-lambda
 arguments first, left to right; lambda arguments after, against the

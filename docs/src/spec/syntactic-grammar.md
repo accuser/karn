@@ -533,6 +533,13 @@ when immediately followed by `.`; a bare `Int` in expression position remains
 a parse error. (`List.empty()` needs no such rule: `List` is lexically an
 ordinary identifier.)
 
+v0.22b: a method call accepts **explicit type arguments** —
+`Json.decode[Order](s)` — under the same same-line-`[` rule as `call` type
+application (0039): a `[` opening a new line is a list literal. In v0.22b
+only the `Json.decode` static consumes them; type arguments on any other
+method are `karn.generics.type_arg_mismatch` (generic *user* methods remain
+deferred). The bare `name[T]` value form stays reserved.
+
 ### §4.6.9 field_access
 
 {{#grammar field_access}}

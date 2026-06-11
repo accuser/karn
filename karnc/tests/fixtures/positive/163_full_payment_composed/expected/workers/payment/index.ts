@@ -17,7 +17,7 @@ export default {
         switch (servicePath) {
           case "authorise": {
             const args = await request.json() as JsonValue;
-            const __r_amount = (typeof args === "number" ? Ok(args) : Err({ kind: "StructuralMismatch", path: "$", expected: "number", actual: typeof args }) as Result<any, BoundaryError>);
+            const __r_amount = (typeof args === "number" && Number.isInteger(args) ? Ok(args) : Err({ kind: "StructuralMismatch", path: "$", expected: "integer", actual: String(args) }) as Result<any, BoundaryError>);
             if (__r_amount.tag === "Err") return new Response(JSON.stringify(__r_amount.error), { status: 400, headers: { "content-type": "application/json" } });
             const amount = __r_amount.value;
             const result = await surface.authorise(amount);

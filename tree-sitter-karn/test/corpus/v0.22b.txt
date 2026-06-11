@@ -1,0 +1,31 @@
+==========================
+Type application on a qualified static (v0.22b)
+==========================
+
+commons p {
+	fn load(s: String) -> Result[Order, JsonError] {
+		Json.decode[Order](s)
+	}
+}
+
+--------------------------
+
+(source_file
+  (commons_decl
+    name: (qualified_name
+      (identifier))
+    (fn_decl
+      name: (identifier)
+      (param
+        name: (identifier)
+        type: (base_type))
+      return_type: (generic_type_ref
+        name: (builtin_type)
+        arg: (identifier)
+        arg: (identifier))
+      body: (block
+        tail: (method_call
+          receiver: (identifier)
+          method: (identifier)
+          type_arg: (identifier)
+          arg: (identifier))))))

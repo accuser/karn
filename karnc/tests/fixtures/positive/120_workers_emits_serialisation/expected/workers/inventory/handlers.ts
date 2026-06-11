@@ -100,6 +100,9 @@ export function deserialise_StockItem(json: JsonValue, path: string = "$"): Resu
   if (typeof obj["quantity"] !== "number") {
     return Err({ kind: "StructuralMismatch", path: `${path}.quantity`, expected: "number", actual: typeof obj["quantity"] });
   }
+  if (!Number.isInteger(obj["quantity"])) {
+    return Err({ kind: "StructuralMismatch", path: `${path}.quantity`, expected: "integer", actual: String(obj["quantity"]) });
+  }
   const __quantity = obj["quantity"];
   return Ok({ sku: __sku, quantity: __quantity } as StockItem);
 }

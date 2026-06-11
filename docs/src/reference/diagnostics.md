@@ -6,7 +6,7 @@
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../how-to/troubleshooting/index.md).
 
-There are **252** codes in total.
+There are **253** codes in total.
 
 ## Agents
 
@@ -345,6 +345,7 @@ There are **252** codes in total.
 | `karn.types.is_base_mismatch` | An `is` refinement check is applied to a value of the wrong base type. | [`is_expr`](grammar.md#rule-is_expr) |
 | `karn.types.is_non_sum` | `is` was applied to a value that is not a sum type. | [`is_expr`](grammar.md#rule-is_expr) |
 | `karn.types.is_unknown_variant` | `is` names a variant the type does not have. | [`is_expr`](grammar.md#rule-is_expr) |
+| `karn.types.json_uncodable` | A `Json.encode`/`Json.decode` target type cannot pass through the typed JSON codec (functions, effects, error builtins). | [`method_call`](grammar.md#rule-method_call) |
 | `karn.types.lambda_mismatch` | A lambda's parameter count, parameter annotations, or body type do not match the expected function type. | [`lambda_expr`](grammar.md#rule-lambda_expr) |
 | `karn.types.let_annotation_mismatch` | A `let` value does not match its type annotation. | [`let_stmt`](grammar.md#rule-let_stmt) |
 | `karn.types.list_element_mismatch` | A list-literal element has a different type from the list's element type. | [`list_literal`](grammar.md#rule-list_literal) |

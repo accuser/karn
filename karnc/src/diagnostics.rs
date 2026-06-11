@@ -1046,6 +1046,11 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         &["is_expr"],
     ),
     dg(
+        "karn.types.json_uncodable",
+        "A `Json.encode`/`Json.decode` target type cannot pass through the typed JSON codec (functions, effects, error builtins).",
+        &["method_call"],
+    ),
+    dg(
         "karn.types.lambda_mismatch",
         "A lambda's parameter count, parameter annotations, or body type do not match the expected function type.",
         &["lambda_expr"],

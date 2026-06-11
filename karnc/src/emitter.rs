@@ -74,6 +74,17 @@ export interface ValidationError {
   readonly value: unknown;
 }
 
+// v0.22b: the JSON-decode error (ADR 0047) — BoundaryError's information
+// (the discriminating kind and the tracked field path) flattened into a
+// uniform, Karn-inspectable record. `kind` is "Malformed" for a JSON.parse
+// failure, else the BoundaryError kind ("StructuralMismatch",
+// "RefinementViolation").
+export interface JsonError {
+  readonly kind: string;
+  readonly path: string;
+  readonly message: string;
+}
+
 export interface DurableObjectStorage {
   get<T>(key: string): Promise<T | undefined>;
   put(key: string, value: unknown): Promise<void>;
@@ -503,6 +514,14 @@ pub fn emit(commons: &TypedCommons) -> String {
             emit_free_fn(&mut out, f, commons);
         }
     }
+    // v0.22b: module-local codec helpers for Json.encode/decode targets.
+    emit_json_codec_helpers(
+        &mut out,
+        commons,
+        &dummy_ctx,
+        &HashSet::new(),
+        &HashSet::new(),
+    );
     out
 }
 
@@ -621,17 +640,288 @@ pub fn emit_project(commons: &TypedCommons, ctx: &EmitProjectCtx) -> String {
     // serialise/deserialise helpers for every type that crosses a
     // boundary. The commons modules likewise carry helpers for their
     // own commons-declared boundary types.
-    if matches!(ctx.target, BuildTarget::Workers) {
-        emit_boundary_helpers(&mut out, commons, ctx);
-    }
+    let (boundary_names, boundary_insts) = if matches!(ctx.target, BuildTarget::Workers) {
+        emit_boundary_helpers(&mut out, commons, ctx)
+    } else {
+        (HashSet::new(), HashSet::new())
+    };
+    // v0.22b: module-local codec helpers for this file's Json.encode/decode
+    // targets, deduped against the workers boundary helpers above.
+    emit_json_codec_helpers(&mut out, commons, ctx, &boundary_names, &boundary_insts);
     out
+}
+
+/// v0.22b: pre-order expression visitor — visits `e`, then every
+/// sub-expression, including statements and tails of nested blocks.
+fn walk_exprs(e: &Expr, f: &mut impl FnMut(&Expr)) {
+    f(e);
+    match &e.kind {
+        ExprKind::IntLit(_)
+        | ExprKind::FloatLit { .. }
+        | ExprKind::StrLit(_)
+        | ExprKind::BoolLit(_)
+        | ExprKind::Ident(_)
+        | ExprKind::None
+        | ExprKind::UnitLit => {}
+        ExprKind::Lambda(l) => walk_exprs(&l.body, f),
+        ExprKind::EffectPure(i)
+        | ExprKind::Assert(i)
+        | ExprKind::UnaryOp(_, i)
+        | ExprKind::Paren(i)
+        | ExprKind::Ok(i)
+        | ExprKind::Err(i)
+        | ExprKind::Some(i)
+        | ExprKind::Question(i) => walk_exprs(i, f),
+        ExprKind::Mock { args, .. }
+        | ExprKind::Call { args, .. }
+        | ExprKind::ConstructorCall { args, .. } => {
+            for a in args {
+                walk_exprs(a, f);
+            }
+        }
+        ExprKind::ListLit(elems) => {
+            for el in elems {
+                walk_exprs(el, f);
+            }
+        }
+        ExprKind::RecordConstruction { fields, .. } => {
+            for fld in fields {
+                if let Some(v) = &fld.value {
+                    walk_exprs(v, f);
+                }
+            }
+        }
+        ExprKind::RecordSpread {
+            base, overrides, ..
+        } => {
+            walk_exprs(base, f);
+            for fld in overrides {
+                if let Some(v) = &fld.value {
+                    walk_exprs(v, f);
+                }
+            }
+        }
+        ExprKind::BinOp(_, l, r) => {
+            walk_exprs(l, f);
+            walk_exprs(r, f);
+        }
+        ExprKind::Block(b) => walk_block_exprs(b, f),
+        ExprKind::If {
+            cond,
+            then_block,
+            else_block,
+        } => {
+            walk_exprs(cond, f);
+            walk_block_exprs(then_block, f);
+            walk_block_exprs(else_block, f);
+        }
+        ExprKind::FieldAccess { receiver, .. } => walk_exprs(receiver, f),
+        ExprKind::MethodCall { receiver, args, .. } => {
+            walk_exprs(receiver, f);
+            for a in args {
+                walk_exprs(a, f);
+            }
+        }
+        ExprKind::Match { discriminant, arms } => {
+            walk_exprs(discriminant, f);
+            for arm in arms {
+                match &arm.body {
+                    MatchBody::Expr(e) => walk_exprs(e, f),
+                    MatchBody::Block(b) => walk_block_exprs(b, f),
+                }
+            }
+        }
+        ExprKind::Is { value, .. } => walk_exprs(value, f),
+    }
+}
+
+fn walk_block_exprs(b: &Block, f: &mut impl FnMut(&Expr)) {
+    for s in &b.statements {
+        match s {
+            Statement::Let(l) | Statement::EffectLet(l) => walk_exprs(&l.value, f),
+            Statement::Commit(c) => walk_exprs(&c.value, f),
+            Statement::Assert(a) => walk_exprs(&a.value, f),
+        }
+    }
+    walk_exprs(&b.tail, f);
+}
+
+/// v0.22b: whether any signature or type declaration in this file names
+/// `JsonError` — drives the conditional `type JsonError` runtime import.
+fn file_mentions_json_error(commons: &TypedCommons) -> bool {
+    fn in_type_ref(t: &TypeRef) -> bool {
+        match t {
+            TypeRef::JsonError(_) => true,
+            TypeRef::Result(a, b, _) | TypeRef::Map(a, b, _) => in_type_ref(a) || in_type_ref(b),
+            TypeRef::Option(a, _)
+            | TypeRef::Effect(a, _)
+            | TypeRef::HttpResult(a, _)
+            | TypeRef::List(a, _) => in_type_ref(a),
+            TypeRef::Fn(params, ret, _) => params.iter().any(in_type_ref) || in_type_ref(ret),
+            TypeRef::Base(..)
+            | TypeRef::Named(_)
+            | TypeRef::ValidationError(_)
+            | TypeRef::Unit(_) => false,
+        }
+    }
+    let sig = |params: &[Param], ret: &TypeRef| {
+        params.iter().any(|p| in_type_ref(&p.type_ref)) || in_type_ref(ret)
+    };
+    commons.commons.items.iter().any(|item| match item {
+        CommonsItem::Fn(f) => sig(&f.params, &f.return_type),
+        CommonsItem::Service(s) => s.handlers.iter().any(|h| sig(&h.params, &h.return_type)),
+        CommonsItem::Agent(a) => a.handlers.iter().any(|h| sig(&h.params, &h.return_type)),
+        CommonsItem::Provider(p) => p.ops.iter().any(|op| sig(&op.params, &op.return_type)),
+        CommonsItem::Type(t) => match &t.body {
+            TypeBody::Record(r) => r.fields.iter().any(|f| in_type_ref(&f.type_ref)),
+            TypeBody::Sum(s) => s
+                .variants
+                .iter()
+                .any(|v| v.payload.iter().any(|p| in_type_ref(&p.type_ref))),
+            TypeBody::Refined { .. } | TypeBody::Opaque { .. } => false,
+        },
+        _ => false,
+    })
+}
+
+/// v0.22b: a checker `Ty` rendered back to a `TypeRef` for the codec
+/// machinery (which is `TypeRef`-driven). `None` for types the codec
+/// rejects anyway (functions, effects, type variables).
+fn ty_to_type_ref(t: &Ty) -> Option<TypeRef> {
+    let sp = crate::span::Span::new(0, 0);
+    Some(match t {
+        Ty::Base(b) => TypeRef::Base(*b, sp),
+        Ty::Named { name, .. } => TypeRef::Named(Ident {
+            name: name.clone(),
+            span: sp,
+        }),
+        Ty::Result(a, b) => TypeRef::Result(
+            Box::new(ty_to_type_ref(a)?),
+            Box::new(ty_to_type_ref(b)?),
+            sp,
+        ),
+        Ty::Option(a) => TypeRef::Option(Box::new(ty_to_type_ref(a)?), sp),
+        Ty::List(a) => TypeRef::List(Box::new(ty_to_type_ref(a)?), sp),
+        Ty::Map(k, v) => TypeRef::Map(
+            Box::new(ty_to_type_ref(k)?),
+            Box::new(ty_to_type_ref(v)?),
+            sp,
+        ),
+        Ty::Unit => TypeRef::Unit(sp),
+        Ty::ValidationError => TypeRef::ValidationError(sp),
+        Ty::JsonError => TypeRef::JsonError(sp),
+        Ty::Effect(_) | Ty::HttpResult(_) | Ty::Fn { .. } | Ty::Var(_) => return None,
+    })
+}
+
+/// v0.22b: collect the `Json.encode`/`Json.decode[T]` target type-refs in
+/// this file's bodies — the roots of the module-local codec-helper closure.
+fn collect_json_codec_roots(commons: &TypedCommons) -> Vec<TypeRef> {
+    let mut roots: Vec<TypeRef> = Vec::new();
+    {
+        let mut visit = |e: &Expr| {
+            let ExprKind::MethodCall {
+                receiver,
+                method,
+                args,
+                ..
+            } = &e.kind
+            else {
+                return;
+            };
+            let ExprKind::Ident(id) = &receiver.kind else {
+                return;
+            };
+            if id.name != "Json" {
+                return;
+            }
+            match method.name.as_str() {
+                "decode" => {
+                    if let Some(Ty::Result(t, _)) = commons.expr_types.get(&e.span)
+                        && let Some(tr) = ty_to_type_ref(t)
+                    {
+                        roots.push(tr);
+                    }
+                }
+                "encode" => {
+                    if let Some(a) = args.first()
+                        && let Some(t) = commons.expr_types.get(&a.span)
+                        && let Some(tr) = ty_to_type_ref(t)
+                    {
+                        roots.push(tr);
+                    }
+                }
+                _ => {}
+            }
+        };
+        for item in &commons.commons.items {
+            match item {
+                CommonsItem::Fn(f) => walk_block_exprs(&f.body, &mut visit),
+                CommonsItem::Service(s) => {
+                    for h in &s.handlers {
+                        walk_block_exprs(&h.body, &mut visit);
+                    }
+                }
+                CommonsItem::Agent(a) => {
+                    for h in &a.handlers {
+                        walk_block_exprs(&h.body, &mut visit);
+                    }
+                }
+                CommonsItem::Provider(p) => {
+                    for op in &p.ops {
+                        walk_block_exprs(&op.body, &mut visit);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    roots
+}
+
+/// v0.22b: module-local serialise/deserialise helpers for the types this
+/// file's `Json.encode`/`Json.decode[T]` calls reference (ADR 0045). The
+/// closure machinery is shared with the workers boundary path; `skip_names`
+/// / `skip_insts` dedupe against helpers that path already emitted into
+/// this module.
+fn emit_json_codec_helpers(
+    out: &mut String,
+    commons: &TypedCommons,
+    ctx: &EmitProjectCtx,
+    skip_names: &HashSet<String>,
+    skip_insts: &HashSet<String>,
+) {
+    use serialisation::{collect_codec_closure, emit_generic_helpers, emit_helpers_for_owner};
+    let roots = collect_json_codec_roots(commons);
+    if roots.is_empty() {
+        return;
+    }
+    let (names, insts) = collect_codec_closure(&roots, &commons.types);
+    let names: Vec<String> = names
+        .into_iter()
+        .filter(|n| !skip_names.contains(n))
+        .collect();
+    emit_helpers_for_owner(out, &names, &commons.types, &ctx.commons_name);
+    let insts: Vec<serialisation::GenericInst> = insts
+        .into_iter()
+        .filter(|i| !skip_insts.contains(&i.ts_name()))
+        .collect();
+    if !insts.is_empty() {
+        emit_generic_helpers(out, &insts);
+    }
 }
 
 /// Emit boundary serialise/deserialise helpers (v0.8 §3.4 / §5.2) for
 /// every named type declared in this file that flows through a
 /// cross-context call, plus the specialised generic helpers for any
-/// Result/Option instantiation used at the boundary.
-fn emit_boundary_helpers(out: &mut String, commons: &TypedCommons, ctx: &EmitProjectCtx) {
+/// Result/Option instantiation used at the boundary. Returns the emitted
+/// (or locally-bound) helper type names and generic-instantiation names so
+/// the v0.22b codec emission can dedupe against them.
+fn emit_boundary_helpers(
+    out: &mut String,
+    commons: &TypedCommons,
+    ctx: &EmitProjectCtx,
+) -> (HashSet<String>, HashSet<String>) {
     use serialisation::{
         collect_boundary_types, collect_generic_instantiations, emit_generic_helpers,
         emit_helpers_for_owner,
@@ -725,6 +1015,10 @@ fn emit_boundary_helpers(out: &mut String, commons: &TypedCommons, ctx: &EmitPro
         // in handler signatures or in boundary-type fields (v0.18).
         let insts = collect_generic_instantiations(&services, &boundary_types_all, &commons.types);
         emit_generic_helpers(out, &insts);
+        (
+            boundary_types_all.into_iter().collect(),
+            insts.iter().map(|i| i.ts_name()).collect(),
+        )
     } else {
         // Commons/adapters: emit helpers for every type declared in this
         // file, plus (v0.18) the generic instantiations their fields use —
@@ -736,6 +1030,10 @@ fn emit_boundary_helpers(out: &mut String, commons: &TypedCommons, ctx: &EmitPro
         emit_helpers_for_owner(out, &locally, &commons.types, ctx.commons_name.as_str());
         let insts = collect_generic_instantiations(&HashMap::new(), &locally, &commons.types);
         emit_generic_helpers(out, &insts);
+        (
+            locally.into_iter().collect(),
+            insts.iter().map(|i| i.ts_name()).collect(),
+        )
     }
 }
 
@@ -1109,6 +1407,7 @@ fn collect_refs_in_expr(
             receiver,
             method: _,
             args,
+            ..
         } => {
             if let ExprKind::Ident(id) = &receiver.kind {
                 record_name_ref(&id.name, local_to_file, ctx, out);
@@ -1414,6 +1713,14 @@ fn write_header(out: &mut String, commons: &TypedCommons, ctx: &EmitProjectCtx) 
             "type Option",
             "type ValidationError",
         ];
+        // v0.22b: the codec types are imported only when the file uses the
+        // `Json` codec (or names `JsonError` in a signature) — keeping every
+        // non-codec module's header byte-identical to v0.22a.
+        let uses_codec = !collect_json_codec_roots(commons).is_empty();
+        let mentions_json_error = file_mentions_json_error(commons);
+        if uses_codec || mentions_json_error {
+            parts.push("type JsonError");
+        }
         if has_agent {
             // v0.9.2: agent-declaring files lower instantiation through the
             // `makeAgent` helper and a per-agent `StateRegistry`, and the
@@ -1435,6 +1742,11 @@ fn write_header(out: &mut String, commons: &TypedCommons, ctx: &EmitProjectCtx) 
             parts.push("type ServiceBinding");
             parts.push("callService");
             parts.push("boundaryError");
+        } else if uses_codec {
+            // v0.22b: the bundle-mode codec helpers reference JsonValue and
+            // BoundaryError.
+            parts.push("type JsonValue");
+            parts.push("type BoundaryError");
         }
         writeln!(
             out,
@@ -1452,9 +1764,18 @@ fn write_header_single(out: &mut String, commons: &TypedCommons) {
     writeln!(out, "// commons {}", commons.commons.name.joined()).unwrap();
     writeln!(out).unwrap();
     if !commons.commons.items.is_empty() {
+        // v0.22b: codec imports only when the file uses the `Json` codec.
+        let uses_codec = !collect_json_codec_roots(commons).is_empty();
+        let codec_imports = if uses_codec {
+            ", type JsonError, type JsonValue, type BoundaryError"
+        } else if file_mentions_json_error(commons) {
+            ", type JsonError"
+        } else {
+            ""
+        };
         writeln!(
             out,
-            "import {{ Ok, Err, Some, None, type Result, type Option, type ValidationError }} from \"./runtime.js\";",
+            "import {{ Ok, Err, Some, None, type Result, type Option, type ValidationError{codec_imports} }} from \"./runtime.js\";",
         )
         .unwrap();
         writeln!(out).unwrap();
@@ -2611,6 +2932,7 @@ fn workers_inner_ts_name(t: &TypeRef) -> String {
             workers_inner_ts_name(v)
         ),
         TypeRef::ValidationError(_) => "ValidationError".to_string(),
+        TypeRef::JsonError(_) => "JsonError".to_string(),
         TypeRef::Unit(_) => "Unit".to_string(),
     }
 }
@@ -3647,6 +3969,7 @@ fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
         ExprKind::MethodCall {
             receiver,
             method,
+            type_args: _,
             args,
         } => {
             // v0.9: explicit `HttpResult.Variant(args)` construction. The
@@ -3676,6 +3999,44 @@ fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
                         return format!("new Map<{}, {}>()", ts_ty(k), ts_ty(v));
                     }
                     _ => {}
+                }
+            }
+            // v0.22b: the typed JSON codec (ADR 0045). `encode` dispatches
+            // to the module-local `serialise_*` helpers + `JSON.stringify`;
+            // `decode[T]` to `JSON.parse` + `deserialise_*`, mapping a parse
+            // failure to a `Malformed` JsonError and a BoundaryError to the
+            // uniform `kind`/`path`/`message` record (ADR 0047).
+            if let ExprKind::Ident(id) = &receiver.kind
+                && id.name == "Json"
+                && args.len() == 1
+            {
+                if method.name == "encode"
+                    && let Some(arg_ty) = cx.commons.expr_types.get(&args[0].span).cloned()
+                    && let Some(tref) = ty_to_type_ref(&arg_ty)
+                {
+                    let v = lower_expr(&args[0], stmts, cx);
+                    let ser = serialisation::serialise_expr(&tref, &v);
+                    return format!("JSON.stringify({ser})");
+                }
+                if method.name == "decode"
+                    && let Some(Ty::Result(t, _)) = cx.commons.expr_types.get(&e.span).cloned()
+                    && let Some(tref) = ty_to_type_ref(&t)
+                {
+                    let ts = ts_ty(&t);
+                    let des = serialisation::deserialise_expr(&tref, "__j", "$");
+                    let arg = lower_expr(&args[0], stmts, cx);
+                    return format!(
+                        "((__s: string): Result<{ts}, JsonError> => {{ \
+                         let __j: JsonValue; \
+                         try {{ __j = JSON.parse(__s) as JsonValue; }} \
+                         catch (__e) {{ return Err({{ kind: \"Malformed\", path: \"$\", message: String(__e) }}); }} \
+                         const __r = {des}; \
+                         if (__r.tag === \"Ok\") return Ok(__r.value as {ts}); \
+                         const __be = __r.error; \
+                         return Err({{ kind: __be.kind, \
+                         path: (__be.kind === \"StructuralMismatch\" || __be.kind === \"RefinementViolation\") ? __be.path : \"$\", \
+                         message: __be.kind === \"StructuralMismatch\" ? `expected ${{__be.expected}}, got ${{String(__be.actual)}}` : __be.kind === \"RefinementViolation\" ? __be.violation.message : __be.details }}); }})({arg})"
+                    );
                 }
             }
             // v0.22a: the numeric parse statics — `Int.parse(s)` /
@@ -5111,6 +5472,7 @@ pub(crate) fn ts_type_ref(r: &TypeRef) -> String {
             format!("ReadonlyMap<{}, {}>", ts_type_ref(k), ts_type_ref(v))
         }
         TypeRef::ValidationError(_) => "ValidationError".to_string(),
+        TypeRef::JsonError(_) => "JsonError".to_string(),
         TypeRef::Unit(_) => "void".to_string(),
         // v0.20a: a function type lowers to a TS function type. Positional
         // parameter names (`a0`, `a1`, …) — TS requires names in function
@@ -5151,6 +5513,7 @@ fn ts_ty(t: &Ty) -> String {
         Ty::List(t) => format!("readonly {}[]", ts_ty(t)),
         Ty::Map(k, v) => format!("ReadonlyMap<{}, {}>", ts_ty(k), ts_ty(v)),
         Ty::ValidationError => "ValidationError".to_string(),
+        Ty::JsonError => "JsonError".to_string(),
         Ty::Unit => "void".to_string(),
         Ty::Fn { params, ret } => {
             let params: Vec<String> = params

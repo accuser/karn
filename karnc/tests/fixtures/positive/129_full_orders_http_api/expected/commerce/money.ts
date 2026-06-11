@@ -57,6 +57,9 @@ export function deserialise_Money(json: JsonValue, path: string = "$"): Result<M
   if (typeof obj["minorUnits"] !== "number") {
     return Err({ kind: "StructuralMismatch", path: `${path}.minorUnits`, expected: "number", actual: typeof obj["minorUnits"] });
   }
+  if (!Number.isInteger(obj["minorUnits"])) {
+    return Err({ kind: "StructuralMismatch", path: `${path}.minorUnits`, expected: "integer", actual: String(obj["minorUnits"]) });
+  }
   const __minorUnits = obj["minorUnits"];
   const __r_currency = deserialise_CurrencyCode(obj["currency"], `${path}.currency`);
   if (__r_currency.tag === "Err") return __r_currency;

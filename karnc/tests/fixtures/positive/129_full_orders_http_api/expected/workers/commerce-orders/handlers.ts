@@ -133,6 +133,9 @@ export function deserialise_CreateOrderRequest(json: JsonValue, path: string = "
   if (typeof obj["amountMinor"] !== "number") {
     return Err({ kind: "StructuralMismatch", path: `${path}.amountMinor`, expected: "number", actual: typeof obj["amountMinor"] });
   }
+  if (!Number.isInteger(obj["amountMinor"])) {
+    return Err({ kind: "StructuralMismatch", path: `${path}.amountMinor`, expected: "integer", actual: String(obj["amountMinor"]) });
+  }
   const __amountMinor = obj["amountMinor"];
   const __r_currency = deserialise_CurrencyCode(obj["currency"], `${path}.currency`);
   if (__r_currency.tag === "Err") return __r_currency;
@@ -187,6 +190,9 @@ export function deserialise_OrderView(json: JsonValue, path: string = "$"): Resu
   const __status = obj["status"];
   if (typeof obj["totalMinor"] !== "number") {
     return Err({ kind: "StructuralMismatch", path: `${path}.totalMinor`, expected: "number", actual: typeof obj["totalMinor"] });
+  }
+  if (!Number.isInteger(obj["totalMinor"])) {
+    return Err({ kind: "StructuralMismatch", path: `${path}.totalMinor`, expected: "integer", actual: String(obj["totalMinor"]) });
   }
   const __totalMinor = obj["totalMinor"];
   return Ok({ status: __status, totalMinor: __totalMinor } as OrderView);

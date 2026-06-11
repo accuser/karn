@@ -1,0 +1,6 @@
+commons bad {
+  fn f(s: String) -> Bool {
+    let r = Json.decode(s)
+    true
+  }
+}

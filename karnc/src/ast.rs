@@ -971,6 +971,10 @@ pub enum TypeRef {
     /// `ValidationError` — the built-in error type used by refined-type
     /// constructors (v0.1).
     ValidationError(Span),
+    /// `JsonError` — the built-in JSON-decode error type (v0.22b). A
+    /// uniform record (`kind`/`path`/`message`, all `String`) the codec
+    /// maps `BoundaryError` variants and parse failures into.
+    JsonError(Span),
     /// `()` — the unit type (v0.5).
     Unit(Span),
     /// `A -> B` / `(A, B) -> C` / `() -> B` — a function type (v0.20a).
@@ -992,6 +996,7 @@ impl TypeRef {
             TypeRef::List(_, s) => *s,
             TypeRef::Map(_, _, s) => *s,
             TypeRef::ValidationError(s) => *s,
+            TypeRef::JsonError(s) => *s,
             TypeRef::Unit(s) => *s,
             TypeRef::Fn(_, _, s) => *s,
         }
@@ -1066,6 +1071,10 @@ pub enum ExprKind {
     MethodCall {
         receiver: Box<Expr>,
         method: Ident,
+        /// v0.22b: explicit type arguments on a qualified static
+        /// (`Json.decode[T](…)`); empty when absent. The same-line-`[`
+        /// rule applies as for `Call` type application (0039).
+        type_args: Vec<TypeRef>,
         args: Vec<Expr>,
     },
     /// `match disc { arm+ }` — pattern matching (v0.2).

@@ -44,6 +44,9 @@ pub enum Ty {
     Map(Box<Ty>, Box<Ty>),
     /// `ValidationError` — built-in error type.
     ValidationError,
+    /// `JsonError` — built-in JSON-decode error type (v0.22b). A uniform
+    /// record: `kind`/`path`/`message`, all `String`.
+    JsonError,
     /// `()` — the unit type (v0.5).
     Unit,
     /// `A -> B` — a function type (v0.20a). Effectful iff `ret` is
@@ -91,6 +94,7 @@ impl Ty {
             Ty::List(t) => format!("List[{}]", t.display()),
             Ty::Map(k, v) => format!("Map[{}, {}]", k.display(), v.display()),
             Ty::ValidationError => "ValidationError".to_string(),
+            Ty::JsonError => "JsonError".to_string(),
             Ty::Unit => "()".to_string(),
             Ty::Fn { params, ret } => {
                 let params = match params.len() {
@@ -1122,6 +1126,7 @@ pub fn resolve_type_ref(r: &TypeRef, types: &HashMap<String, TypeDecl>) -> Optio
             Some(Ty::Map(Box::new(k), Box::new(v)))
         }
         TypeRef::ValidationError(_) => Some(Ty::ValidationError),
+        TypeRef::JsonError(_) => Some(Ty::JsonError),
         TypeRef::Unit(_) => Some(Ty::Unit),
     }
 }
@@ -1150,6 +1155,7 @@ pub fn compatible(t: &Ty, u: &Ty) -> bool {
         (Ty::List(a), Ty::List(b)) => compatible(a, b),
         (Ty::Map(k1, v1), Ty::Map(k2, v2)) => k1 == k2 && compatible(v1, v2),
         (Ty::ValidationError, Ty::ValidationError) => true,
+        (Ty::JsonError, Ty::JsonError) => true,
         (Ty::Unit, Ty::Unit) => true,
         // v0.20a: function types — **contravariant** in parameters, covariant
         // in the return type. `compatible(t, u)` is "t usable where u is
@@ -1648,6 +1654,7 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
         ExprKind::MethodCall {
             receiver,
             method,
+            type_args,
             args,
         } => {
             // v0.9: `HttpResult.Variant(args)` — explicit HttpResult construction.
@@ -1666,7 +1673,7 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
                     None
                 }
             } else {
-                check_method_call(receiver, method, args, expr.span, expected, ctx)
+                check_method_call(receiver, method, type_args, args, expr.span, expected, ctx)
             }
         }
         ExprKind::Match { discriminant, arms } => {
@@ -2601,6 +2608,7 @@ fn body_performs_effects(e: &Expr, ctx: &Ctx) -> bool {
             receiver,
             method,
             args,
+            ..
         } => {
             if let ExprKind::Ident(id) = &receiver.kind
                 && ctx.capabilities.contains_key(&id.name)
@@ -4022,6 +4030,152 @@ fn check_result_kernel_method(
     }
 }
 
+/// v0.22b: whether a type can pass through the typed JSON codec — every
+/// boundary-serialisable shape: bases, named types, and the built-in
+/// generic containers over them. Functions, effects, `HttpResult`, the
+/// error builtins, and type variables cannot.
+fn json_codable(t: &Ty) -> bool {
+    match t {
+        Ty::Base(_) | Ty::Named { .. } | Ty::Unit => true,
+        Ty::Result(a, b) => json_codable(a) && json_codable(b),
+        Ty::Option(a) | Ty::List(a) => json_codable(a),
+        Ty::Map(k, v) => json_codable(k) && json_codable(v),
+        Ty::Fn { .. }
+        | Ty::Effect(_)
+        | Ty::HttpResult(_)
+        | Ty::ValidationError
+        | Ty::JsonError
+        | Ty::Var(_) => false,
+    }
+}
+
+/// v0.22b: type the `Json` codec statics (ADR 0045). `encode(v) -> String`
+/// over any codable value (it throws on a non-finite `Float`, per 0040 —
+/// documented, not typed); `decode[T](s) -> Result[T, JsonError]` with `T`
+/// explicit (`Json.decode[Order](s)`) or inferred from an expected
+/// `Result[T, JsonError]`.
+fn check_json_static(
+    method: &Ident,
+    type_args: &[TypeRef],
+    args: &[Expr],
+    span: Span,
+    expected: Option<&Ty>,
+    ctx: &mut Ctx,
+) -> Option<Ty> {
+    let arity1 = |ctx: &mut Ctx| {
+        if args.len() != 1 {
+            ctx.errors.push(CompileError::new(
+                "karn.types.method_arity",
+                span,
+                format!(
+                    "`Json.{}` takes 1 argument, got {}",
+                    method.name,
+                    args.len()
+                ),
+            ));
+            for a in args {
+                let _ = type_of(a, None, ctx);
+            }
+            return false;
+        }
+        true
+    };
+    match method.name.as_str() {
+        "encode" => {
+            if !type_args.is_empty() {
+                ctx.errors.push(CompileError::new(
+                    "karn.generics.type_arg_mismatch",
+                    span,
+                    "`Json.encode` takes no type arguments — its type comes from the value",
+                ));
+            }
+            if !arity1(ctx) {
+                return None;
+            }
+            let t = type_of(&args[0], None, ctx)?;
+            if !json_codable(&t) {
+                ctx.errors.push(
+                    CompileError::new(
+                        "karn.types.json_uncodable",
+                        args[0].span,
+                        format!("`{}` cannot be encoded as JSON", t.display()),
+                    )
+                    .with_note(
+                        "the codec covers base types, named types, and the built-in \
+                         containers over them — not functions, effects, or error builtins",
+                    ),
+                );
+                return None;
+            }
+            Some(Ty::Base(BaseType::String))
+        }
+        "decode" => {
+            if !arity1(ctx) {
+                return None;
+            }
+            check_arg(
+                &args[0],
+                &Ty::Base(BaseType::String),
+                "the `Json.decode` input",
+                ctx,
+            );
+            let t = match type_args {
+                [one] => resolve_type_ref(one, &ctx.input.types)?,
+                [] => match expected {
+                    Some(Ty::Result(t, e)) if **e == Ty::JsonError => (**t).clone(),
+                    _ => {
+                        ctx.errors.push(
+                            CompileError::new(
+                                "karn.generics.uninferable_type_arg",
+                                span,
+                                "cannot infer the target type of `Json.decode`",
+                            )
+                            .with_note(
+                                "give it explicitly (`Json.decode[Order](s)`) or use the \
+                                 result where a `Result[T, JsonError]` is expected",
+                            ),
+                        );
+                        return None;
+                    }
+                },
+                _ => {
+                    ctx.errors.push(CompileError::new(
+                        "karn.generics.type_arg_mismatch",
+                        span,
+                        format!(
+                            "`Json.decode` takes exactly one type argument, got {}",
+                            type_args.len()
+                        ),
+                    ));
+                    return None;
+                }
+            };
+            if !json_codable(&t) || t == Ty::Unit {
+                ctx.errors.push(
+                    CompileError::new(
+                        "karn.types.json_uncodable",
+                        span,
+                        format!("`{}` cannot be decoded from JSON", t.display()),
+                    )
+                    .with_note(
+                        "the codec covers base types, named types, and the built-in \
+                         containers over them — not functions, effects, or error builtins",
+                    ),
+                );
+                return None;
+            }
+            Some(Ty::Result(Box::new(t), Box::new(Ty::JsonError)))
+        }
+        _ => {
+            // The resolver owns the unknown-static diagnostic.
+            for a in args {
+                let _ = type_of(a, None, ctx);
+            }
+            None
+        }
+    }
+}
+
 /// v0.22a: type the numeric parse statics — `Int.parse(s)` /
 /// `Float.parse(s)` (`-> Option[T]`, ADR 0048). Parsing is full-string
 /// (trailing garbage is `None`, unlike `parseFloat`); an out-of-safe-range
@@ -4709,6 +4863,23 @@ fn check_field_access(receiver: &Expr, field: &Ident, ctx: &mut Ctx) -> Option<T
         }
         return Some(Ty::Base(*base));
     }
+    // v0.22b: `JsonError` is a compiler-known record (ADR 0047) — uniform
+    // `String` fields so a decode failure is inspectable in Karn.
+    if recv_ty == Ty::JsonError {
+        return match field.name.as_str() {
+            "kind" | "path" | "message" => Some(Ty::Base(BaseType::String)),
+            other => {
+                ctx.errors.push(CompileError::new(
+                    "karn.types.unknown_field",
+                    field.span,
+                    format!(
+                        "`JsonError` has no field `{other}` — its fields are `kind`, `path`, `message`"
+                    ),
+                ));
+                None
+            }
+        };
+    }
     let Ty::Named {
         name,
         kind: NamedKind::Record,
@@ -4745,11 +4916,33 @@ fn check_field_access(receiver: &Expr, field: &Ident, ctx: &mut Ctx) -> Option<T
 fn check_method_call(
     receiver: &Expr,
     method: &Ident,
+    type_args: &[TypeRef],
     args: &[Expr],
     span: Span,
     expected: Option<&Ty>,
     ctx: &mut Ctx,
 ) -> Option<Ty> {
+    // v0.22b: explicit type arguments apply only to the `Json.decode[T]`
+    // static — every other method/static takes none (the 0039/0045 rule;
+    // generic *user* methods remain deferred). A user-declared type named
+    // `Json` shadows the codec module and takes no type arguments.
+    if !type_args.is_empty()
+        && !matches!(&receiver.kind, ExprKind::Ident(id) if id.name == "Json"
+            && !ctx.input.types.contains_key("Json"))
+    {
+        ctx.errors.push(CompileError::new(
+            "karn.generics.type_arg_mismatch",
+            span,
+            format!(
+                "`{}` is not a generic method — it takes no type arguments",
+                method.name
+            ),
+        ));
+        for a in args {
+            let _ = type_of(a, None, ctx);
+        }
+        return None;
+    }
     // v0.6: cross-context service call. Two shapes:
     //   - `Alias.service(args)`           where Alias is from `consumes X as Alias`
     //   - `prefix.tail.service(args)`     where `prefix.tail` is a consumed context's
@@ -4837,6 +5030,14 @@ fn check_method_call(
         && (id.name == "Int" || id.name == "Float")
     {
         return check_numeric_parse_static(id, method, args, span, ctx);
+    }
+    // v0.22b: the typed JSON codec statics (ADR 0045).
+    if let ExprKind::Ident(id) = &receiver.kind
+        && id.name == "Json"
+        && ctx.lookup("Json").is_none()
+        && !ctx.input.types.contains_key("Json")
+    {
+        return check_json_static(method, type_args, args, span, expected, ctx);
     }
     // v0.20b: `insert`/`prepend` return their receiver's collection type —
     // propagate an expected collection type down the chain so
@@ -5759,7 +5960,7 @@ fn rebrand_return_type(t: &Ty, caller_types: &HashMap<String, TypeDecl>) -> Ty {
             Box::new(rebrand_return_type(k, caller_types)),
             Box::new(rebrand_return_type(v, caller_types)),
         ),
-        Ty::Base(_) | Ty::ValidationError | Ty::Unit => t.clone(),
+        Ty::Base(_) | Ty::ValidationError | Ty::JsonError | Ty::Unit => t.clone(),
         // v0.20a: function types are confined to non-boundary positions
         // (`karn.types.function_at_boundary`), so a cross-context return can
         // never carry one; Vars never escape call checking.
@@ -5790,6 +5991,7 @@ fn structurally_compatible_inner(
     match (arg, param) {
         (Ty::Base(a), Ty::Base(b)) => a == b,
         (Ty::ValidationError, Ty::ValidationError) => true,
+        (Ty::JsonError, Ty::JsonError) => true,
         (Ty::Unit, Ty::Unit) => true,
         (Ty::Result(t1, e1), Ty::Result(t2, e2)) => {
             structurally_compatible_inner(t1, t2, arg_types, param_types, visited)

@@ -3156,6 +3156,10 @@ impl<'a> Parser<'a> {
                     self.bump();
                     Ok(TypeRef::ValidationError(t.span))
                 }
+                TokenKind::JsonError => {
+                    self.bump();
+                    Ok(TypeRef::JsonError(t.span))
+                }
                 TokenKind::Option => {
                     self.bump();
                     if self.peek_kind() != Some(TokenKind::LBracket) {
@@ -3497,6 +3501,34 @@ impl<'a> Parser<'a> {
                         )));
                     }
                     let member = self.expect_ident("after `.` in field access or method call")?;
+                    // v0.22b: explicit type arguments on a method/static —
+                    // `Json.decode[T](…)`. The v0.20b same-line-`[` rule
+                    // applies: a `[` opening a new line is a list literal.
+                    let type_args = if self.peek_kind() == Some(TokenKind::LBracket)
+                        && !self.next_token_on_new_line(member.span)
+                    {
+                        self.bump();
+                        let mut type_args = Vec::new();
+                        loop {
+                            type_args.push(self.parse_type_ref("as a type argument")?);
+                            if self.eat(TokenKind::Comma).is_none() {
+                                break;
+                            }
+                        }
+                        let close =
+                            self.expect(TokenKind::RBracket, "to close the type-argument list")?;
+                        if self.peek_kind() != Some(TokenKind::LParen) {
+                            return Err(CompileError::new(
+                                "karn.parse.expected_token",
+                                close.span,
+                                "type arguments must be followed by an argument list — `name[T](…)`",
+                            )
+                            .with_note("a bare `name[T]` value form is reserved"));
+                        }
+                        type_args
+                    } else {
+                        Vec::new()
+                    };
                     if self.peek_kind() == Some(TokenKind::LParen) {
                         // Method call: `receiver.method(args)`.
                         self.bump();
@@ -3514,6 +3546,7 @@ impl<'a> Parser<'a> {
                             kind: ExprKind::MethodCall {
                                 receiver: Box::new(e),
                                 method: member,
+                                type_args,
                                 args,
                             },
                             span,

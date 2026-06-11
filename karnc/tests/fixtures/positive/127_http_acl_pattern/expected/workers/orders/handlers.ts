@@ -77,6 +77,9 @@ export function deserialise_CreateOrder(json: JsonValue, path: string = "$"): Re
   if (typeof obj["itemCount"] !== "number") {
     return Err({ kind: "StructuralMismatch", path: `${path}.itemCount`, expected: "number", actual: typeof obj["itemCount"] });
   }
+  if (!Number.isInteger(obj["itemCount"])) {
+    return Err({ kind: "StructuralMismatch", path: `${path}.itemCount`, expected: "integer", actual: String(obj["itemCount"]) });
+  }
   const __itemCount = obj["itemCount"];
   return Ok({ itemCount: __itemCount } as CreateOrder);
 }
