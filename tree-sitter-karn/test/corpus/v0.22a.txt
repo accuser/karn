@@ -1,0 +1,49 @@
+==========================
+Numeric parse statics and kernel-method chains (v0.22a)
+==========================
+
+commons text {
+	fn parseOrZero(s: String) -> Int {
+		Int.parse(s).getOrElse(0)
+	}
+
+	fn shout(s: String) -> String {
+		s.trim().toUpper().concat("!")
+	}
+}
+
+--------------------------
+
+(source_file
+  (commons_decl
+    name: (qualified_name
+      (identifier))
+    (fn_decl
+      name: (identifier)
+      (param
+        name: (identifier)
+        type: (base_type))
+      return_type: (base_type)
+      body: (block
+        tail: (method_call
+          receiver: (method_call
+            receiver: (identifier)
+            method: (identifier)
+            arg: (identifier))
+          method: (identifier)
+          arg: (number_literal))))
+    (fn_decl
+      name: (identifier)
+      (param
+        name: (identifier)
+        type: (base_type))
+      return_type: (base_type)
+      body: (block
+        tail: (method_call
+          receiver: (method_call
+            receiver: (method_call
+              receiver: (identifier)
+              method: (identifier))
+            method: (identifier))
+          method: (identifier)
+          arg: (string_literal))))))

@@ -3619,7 +3619,9 @@ fn check_list_kernel_method(
 /// v0.21: type a built-in numeric kernel method (ADR 0041). Conversions are
 /// value methods on the bare base types: `Int -> Float` is total
 /// (`toFloat`); `Float -> Int` is one of four named, lossy roundings — there
-/// is deliberately no ambiguous `toInt`.
+/// is deliberately no ambiguous `toInt`. v0.22a (ADR 0048) extends the
+/// kernel with `abs`/`min`/`max`/`clamp` on both numeric types and
+/// `isNaN`/`isFinite` on `Float`.
 fn check_numeric_kernel_method(
     method: &Ident,
     args: &[Expr],
@@ -3627,15 +3629,26 @@ fn check_numeric_kernel_method(
     span: Span,
     ctx: &mut Ctx,
 ) -> Option<Ty> {
-    let known = match (base, method.name.as_str()) {
-        (BaseType::Int, "toFloat") => Some(Ty::Base(BaseType::Float)),
-        (BaseType::Float, "round" | "floor" | "ceil" | "truncate") => Some(Ty::Base(BaseType::Int)),
+    let b = Ty::Base(base);
+    // (parameter types, return type)
+    let sig: Option<(Vec<Ty>, Ty)> = match (base, method.name.as_str()) {
+        (BaseType::Int, "toFloat") => Some((vec![], Ty::Base(BaseType::Float))),
+        (BaseType::Float, "round" | "floor" | "ceil" | "truncate") => {
+            Some((vec![], Ty::Base(BaseType::Int)))
+        }
+        (_, "abs") => Some((vec![], b.clone())),
+        (_, "min" | "max") => Some((vec![b.clone()], b.clone())),
+        (_, "clamp") => Some((vec![b.clone(), b.clone()], b.clone())),
+        (BaseType::Float, "isNaN" | "isFinite") => Some((vec![], Ty::Base(BaseType::Bool))),
         _ => None,
     };
-    let Some(ret) = known else {
+    let Some((params, ret)) = sig else {
         let kernel = match base {
-            BaseType::Int => "`toFloat`",
-            _ => "`round`, `floor`, `ceil`, `truncate`",
+            BaseType::Int => "`toFloat`, `abs`, `min`, `max`, `clamp`",
+            _ => {
+                "`round`, `floor`, `ceil`, `truncate`, `abs`, `min`, `max`, `clamp`, \
+                 `isNaN`, `isFinite`"
+            }
         };
         ctx.errors.push(CompileError::new(
             "karn.types.method_not_found",
@@ -3651,14 +3664,16 @@ fn check_numeric_kernel_method(
         }
         return None;
     };
-    if !args.is_empty() {
+    if args.len() != params.len() {
         ctx.errors.push(CompileError::new(
             "karn.types.method_arity",
             span,
             format!(
-                "`{}.{}` takes 0 arguments, got {}",
+                "`{}.{}` takes {} argument{}, got {}",
                 base.name(),
                 method.name,
+                params.len(),
+                if params.len() == 1 { "" } else { "s" },
                 args.len()
             ),
         ));
@@ -3667,7 +3682,391 @@ fn check_numeric_kernel_method(
         }
         return None;
     }
+    for (a, p) in args.iter().zip(&params) {
+        check_arg(
+            a,
+            p,
+            &format!("the `{}.{}` argument", base.name(), method.name),
+            ctx,
+        );
+    }
     Some(ret)
+}
+
+/// v0.22a: type a built-in `String` kernel method (ADR 0046). `String` is
+/// opaque (no char access), so its operations are compiler built-ins
+/// lowering to TS string methods — the 0034/0037 hybrid posture. Semantics
+/// are UTF-16 code units, except `chars()` (code points, normatively).
+fn check_string_kernel_method(
+    method: &Ident,
+    args: &[Expr],
+    span: Span,
+    ctx: &mut Ctx,
+) -> Option<Ty> {
+    let s = Ty::Base(BaseType::String);
+    let int = Ty::Base(BaseType::Int);
+    let boolean = Ty::Base(BaseType::Bool);
+    let strings = Ty::List(Box::new(s.clone()));
+    // (parameter types, return type)
+    let sig: Option<(Vec<Ty>, Ty)> = match method.name.as_str() {
+        "length" => Some((vec![], int.clone())),
+        "split" => Some((vec![s.clone()], strings.clone())),
+        "trim" | "toUpper" | "toLower" => Some((vec![], s.clone())),
+        "contains" | "startsWith" | "endsWith" => Some((vec![s.clone()], boolean)),
+        "replace" => Some((vec![s.clone(), s.clone()], s.clone())),
+        "slice" => Some((vec![int.clone(), int.clone()], s.clone())),
+        "indexOf" => Some((vec![s.clone()], Ty::Option(Box::new(int)))),
+        "chars" => Some((vec![], strings)),
+        "concat" => Some((vec![s.clone()], s.clone())),
+        _ => None,
+    };
+    let Some((params, ret)) = sig else {
+        ctx.errors.push(CompileError::new(
+            "karn.types.method_not_found",
+            method.span,
+            format!(
+                "the built-in `String` type has no method `{}` — the kernel is \
+                 `length`, `split`, `trim`, `contains`, `startsWith`, `endsWith`, \
+                 `replace`, `slice`, `indexOf`, `toUpper`, `toLower`, `chars`, `concat`",
+                method.name
+            ),
+        ));
+        for a in args {
+            let _ = type_of(a, None, ctx);
+        }
+        return None;
+    };
+    if args.len() != params.len() {
+        ctx.errors.push(CompileError::new(
+            "karn.types.method_arity",
+            span,
+            format!(
+                "`String.{}` takes {} argument{}, got {}",
+                method.name,
+                params.len(),
+                if params.len() == 1 { "" } else { "s" },
+                args.len()
+            ),
+        ));
+        for a in args {
+            let _ = type_of(a, None, ctx);
+        }
+        return None;
+    }
+    for (a, p) in args.iter().zip(&params) {
+        check_arg(a, p, &format!("the `String.{}` argument", method.name), ctx);
+    }
+    Some(ret)
+}
+
+/// v0.22a: type a function-valued kernel argument (the 0048 combinators —
+/// `map`/`andThen`/`mapErr`). Parameter types are known from the receiver;
+/// the return is read from the actual: an expected return carrying a
+/// flexible variable lets a lambda type bottom-up (the v0.20a pass-2 rule),
+/// and `unify` captures it here. Returns the function's return type.
+fn check_kernel_fn_arg(arg: &Expr, params: Vec<Ty>, label: &str, ctx: &mut Ctx) -> Option<Ty> {
+    const RET_VAR: &str = "__kernel_ret";
+    let expected = Ty::Fn {
+        params: params.clone(),
+        ret: Box::new(Ty::Var(RET_VAR.to_string())),
+    };
+    let actual = type_of(arg, Some(&expected), ctx)?;
+    let mut subst: HashMap<String, Ty> = HashMap::new();
+    if unify(&expected, &actual, &mut subst)
+        && let Some(ret) = subst.get(RET_VAR).cloned()
+    {
+        // `unify` is permissive ground-vs-ground; re-check the whole shape.
+        let want = Ty::Fn {
+            params,
+            ret: Box::new(ret.clone()),
+        };
+        if compatible(&actual, &want) {
+            return Some(ret);
+        }
+    }
+    ctx.errors.push(CompileError::new(
+        "karn.types.argument_mismatch",
+        arg.span,
+        format!(
+            "{label} expects a function over the receiver's value, but got `{}`",
+            actual.display()
+        ),
+    ));
+    None
+}
+
+/// v0.22a: type a built-in `Option[T]` kernel method (ADR 0048) — the
+/// combinators as value methods on the compiler-known receiver (collision-
+/// free, unlike free functions imported by bare name).
+fn check_option_kernel_method(
+    method: &Ident,
+    args: &[Expr],
+    inner: &Ty,
+    span: Span,
+    ctx: &mut Ctx,
+) -> Option<Ty> {
+    let arity = |n: usize, ctx: &mut Ctx| {
+        if args.len() != n {
+            ctx.errors.push(CompileError::new(
+                "karn.types.method_arity",
+                span,
+                format!(
+                    "`Option.{}` takes {n} argument{}, got {}",
+                    method.name,
+                    if n == 1 { "" } else { "s" },
+                    args.len()
+                ),
+            ));
+            for a in args {
+                let _ = type_of(a, None, ctx);
+            }
+            return false;
+        }
+        true
+    };
+    match method.name.as_str() {
+        "map" => {
+            if !arity(1, ctx) {
+                return None;
+            }
+            let ret = check_kernel_fn_arg(
+                &args[0],
+                vec![inner.clone()],
+                "the `Option.map` function",
+                ctx,
+            )?;
+            Some(Ty::Option(Box::new(ret)))
+        }
+        "andThen" => {
+            if !arity(1, ctx) {
+                return None;
+            }
+            let ret = check_kernel_fn_arg(
+                &args[0],
+                vec![inner.clone()],
+                "the `Option.andThen` function",
+                ctx,
+            )?;
+            match ret {
+                Ty::Option(_) => Some(ret),
+                other => {
+                    ctx.errors.push(CompileError::new(
+                        "karn.types.argument_mismatch",
+                        args[0].span,
+                        format!(
+                            "the `Option.andThen` function must return an `Option`, but returns `{}`",
+                            other.display()
+                        ),
+                    ));
+                    None
+                }
+            }
+        }
+        "getOrElse" => {
+            if !arity(1, ctx) {
+                return None;
+            }
+            check_arg(&args[0], inner, "the `Option.getOrElse` fallback", ctx);
+            Some(inner.clone())
+        }
+        "isSome" => {
+            if !arity(0, ctx) {
+                return None;
+            }
+            Some(Ty::Base(BaseType::Bool))
+        }
+        "okOr" => {
+            if !arity(1, ctx) {
+                return None;
+            }
+            let err = type_of(&args[0], None, ctx)?;
+            Some(Ty::Result(Box::new(inner.clone()), Box::new(err)))
+        }
+        _ => {
+            ctx.errors.push(CompileError::new(
+                "karn.types.method_not_found",
+                method.span,
+                format!(
+                    "the built-in `Option[{}]` type has no method `{}` — the kernel is \
+                     `map`, `andThen`, `getOrElse`, `isSome`, `okOr`",
+                    inner.display(),
+                    method.name
+                ),
+            ));
+            for a in args {
+                let _ = type_of(a, None, ctx);
+            }
+            None
+        }
+    }
+}
+
+/// v0.22a: type a built-in `Result[T, E]` kernel method (ADR 0048).
+fn check_result_kernel_method(
+    method: &Ident,
+    args: &[Expr],
+    ok: &Ty,
+    err: &Ty,
+    span: Span,
+    ctx: &mut Ctx,
+) -> Option<Ty> {
+    let arity = |n: usize, ctx: &mut Ctx| {
+        if args.len() != n {
+            ctx.errors.push(CompileError::new(
+                "karn.types.method_arity",
+                span,
+                format!(
+                    "`Result.{}` takes {n} argument{}, got {}",
+                    method.name,
+                    if n == 1 { "" } else { "s" },
+                    args.len()
+                ),
+            ));
+            for a in args {
+                let _ = type_of(a, None, ctx);
+            }
+            return false;
+        }
+        true
+    };
+    match method.name.as_str() {
+        "map" => {
+            if !arity(1, ctx) {
+                return None;
+            }
+            let ret =
+                check_kernel_fn_arg(&args[0], vec![ok.clone()], "the `Result.map` function", ctx)?;
+            Some(Ty::Result(Box::new(ret), Box::new(err.clone())))
+        }
+        "andThen" => {
+            if !arity(1, ctx) {
+                return None;
+            }
+            let ret = check_kernel_fn_arg(
+                &args[0],
+                vec![ok.clone()],
+                "the `Result.andThen` function",
+                ctx,
+            )?;
+            match ret {
+                Ty::Result(b, e2) => {
+                    if !compatible(&e2, err) && !compatible(err, &e2) {
+                        ctx.errors.push(CompileError::new(
+                            "karn.types.argument_mismatch",
+                            args[0].span,
+                            format!(
+                                "the `Result.andThen` function's error type `{}` does not match the receiver's `{}`",
+                                e2.display(),
+                                err.display()
+                            ),
+                        ));
+                        return None;
+                    }
+                    Some(Ty::Result(b, Box::new(err.clone())))
+                }
+                other => {
+                    ctx.errors.push(CompileError::new(
+                        "karn.types.argument_mismatch",
+                        args[0].span,
+                        format!(
+                            "the `Result.andThen` function must return a `Result`, but returns `{}`",
+                            other.display()
+                        ),
+                    ));
+                    None
+                }
+            }
+        }
+        "mapErr" => {
+            if !arity(1, ctx) {
+                return None;
+            }
+            let ret = check_kernel_fn_arg(
+                &args[0],
+                vec![err.clone()],
+                "the `Result.mapErr` function",
+                ctx,
+            )?;
+            Some(Ty::Result(Box::new(ok.clone()), Box::new(ret)))
+        }
+        "getOrElse" => {
+            if !arity(1, ctx) {
+                return None;
+            }
+            check_arg(&args[0], ok, "the `Result.getOrElse` fallback", ctx);
+            Some(ok.clone())
+        }
+        "isOk" => {
+            if !arity(0, ctx) {
+                return None;
+            }
+            Some(Ty::Base(BaseType::Bool))
+        }
+        _ => {
+            ctx.errors.push(CompileError::new(
+                "karn.types.method_not_found",
+                method.span,
+                format!(
+                    "the built-in `Result[{}, {}]` type has no method `{}` — the kernel is \
+                     `map`, `andThen`, `mapErr`, `getOrElse`, `isOk`",
+                    ok.display(),
+                    err.display(),
+                    method.name
+                ),
+            ));
+            for a in args {
+                let _ = type_of(a, None, ctx);
+            }
+            None
+        }
+    }
+}
+
+/// v0.22a: type the numeric parse statics — `Int.parse(s)` /
+/// `Float.parse(s)` (`-> Option[T]`, ADR 0048). Parsing is full-string
+/// (trailing garbage is `None`, unlike `parseFloat`); an out-of-safe-range
+/// `Int` or non-finite `Float` is `None`.
+fn check_numeric_parse_static(
+    type_name: &Ident,
+    method: &Ident,
+    args: &[Expr],
+    span: Span,
+    ctx: &mut Ctx,
+) -> Option<Ty> {
+    if method.name != "parse" {
+        // The resolver owns the unknown-static diagnostic; don't double up.
+        for a in args {
+            let _ = type_of(a, None, ctx);
+        }
+        return None;
+    }
+    if args.len() != 1 {
+        ctx.errors.push(CompileError::new(
+            "karn.types.method_arity",
+            span,
+            format!(
+                "`{}.parse` takes 1 argument, got {}",
+                type_name.name,
+                args.len()
+            ),
+        ));
+        for a in args {
+            let _ = type_of(a, None, ctx);
+        }
+        return None;
+    }
+    check_arg(
+        &args[0],
+        &Ty::Base(BaseType::String),
+        &format!("the `{}.parse` argument", type_name.name),
+        ctx,
+    );
+    let inner = if type_name.name == "Int" {
+        BaseType::Int
+    } else {
+        BaseType::Float
+    };
+    Some(Ty::Option(Box::new(Ty::Base(inner))))
 }
 
 /// v0.20b: type a built-in `Map[K, V]` kernel method.
@@ -4431,6 +4830,14 @@ fn check_method_call(
     {
         return check_collection_static(id, method, args, span, expected, ctx);
     }
+    // v0.22a: the numeric parse statics — `Int.parse(s)` / `Float.parse(s)`.
+    // The parser only admits these keywords in receiver position when
+    // followed by `.`, so the Ident shape here is exactly the static form.
+    if let ExprKind::Ident(id) = &receiver.kind
+        && (id.name == "Int" || id.name == "Float")
+    {
+        return check_numeric_parse_static(id, method, args, span, ctx);
+    }
     // v0.20b: `insert`/`prepend` return their receiver's collection type —
     // propagate an expected collection type down the chain so
     // `let m: Map[String, Int] = Map.empty().insert("a", 1)` infers.
@@ -4455,6 +4862,17 @@ fn check_method_call(
         // bare base types (a refined value reaches them via `.raw`).
         Ty::Base(base @ (BaseType::Int | BaseType::Float)) => {
             return check_numeric_kernel_method(method, args, base, span, ctx);
+        }
+        // v0.22a: the string kernel (ADR 0046).
+        Ty::Base(BaseType::String) => {
+            return check_string_kernel_method(method, args, span, ctx);
+        }
+        // v0.22a: the Option/Result combinators as kernel methods (ADR 0048).
+        Ty::Option(inner) => {
+            return check_option_kernel_method(method, args, &inner, span, ctx);
+        }
+        Ty::Result(ok, err) => {
+            return check_result_kernel_method(method, args, &ok, &err, span, ctx);
         }
         _ => {}
     }

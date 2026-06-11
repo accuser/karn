@@ -3678,6 +3678,28 @@ fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
                     _ => {}
                 }
             }
+            // v0.22a: the numeric parse statics — `Int.parse(s)` /
+            // `Float.parse(s)` (ADR 0048). Full-string parse via `Number(…)`
+            // (which, unlike `parseFloat`, rejects trailing garbage); an
+            // empty/whitespace-only string would coerce to `0`, so it is
+            // rejected first. `Int` requires a safe integer (the honest
+            // runtime "overflow → None"); `Float` requires finite (the 0040
+            // posture).
+            if let ExprKind::Ident(id) = &receiver.kind
+                && (id.name == "Int" || id.name == "Float")
+                && method.name == "parse"
+                && args.len() == 1
+            {
+                let s = lower_expr(&args[0], stmts, cx);
+                let guard = if id.name == "Int" {
+                    "Number.isSafeInteger(__n)"
+                } else {
+                    "Number.isFinite(__n)"
+                };
+                return format!(
+                    "((__s: string) => {{ const __n = __s.trim() === \"\" ? Number.NaN : Number(__s); return {guard} ? Some(__n) : None; }})({s})"
+                );
+            }
             // v0.15 cross-context capability call: `B.Cap.op(args)` /
             // `Alias.Cap.op(args)`. The provider is instantiated locally in
             // the composition root, so this lowers to an in-process
@@ -3827,21 +3849,32 @@ fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
                     // v0.21: the numeric kernel. `toFloat` is the identity
                     // at runtime (the Int/Float distinction is erased);
                     // the four `Float -> Int` roundings map onto `Math.*`.
-                    Ty::Base(BaseType::Int) if method.name == "toFloat" && args.is_empty() => {
-                        return lower_expr(receiver, stmts, cx);
+                    // v0.22a extends it (abs/min/max/clamp, isNaN/isFinite).
+                    Ty::Base(BaseType::Int | BaseType::Float) => {
+                        if let Some(s) = lower_numeric_kernel(receiver, method, args, stmts, cx) {
+                            return s;
+                        }
                     }
-                    Ty::Base(BaseType::Float)
-                        if matches!(
-                            method.name.as_str(),
-                            "round" | "floor" | "ceil" | "truncate"
-                        ) && args.is_empty() =>
-                    {
-                        let recv = lower_expr(receiver, stmts, cx);
-                        let f = match method.name.as_str() {
-                            "truncate" => "trunc",
-                            other => other,
-                        };
-                        return format!("Math.{f}({recv})");
+                    // v0.22a: the string kernel (ADR 0046).
+                    Ty::Base(BaseType::String) => {
+                        if let Some(s) = lower_string_kernel(receiver, method, args, stmts, cx) {
+                            return s;
+                        }
+                    }
+                    // v0.22a: Option/Result combinators (ADR 0048).
+                    Ty::Option(inner) => {
+                        if let Some(s) =
+                            lower_option_kernel(e, receiver, method, args, inner, stmts, cx)
+                        {
+                            return s;
+                        }
+                    }
+                    Ty::Result(ok, err) => {
+                        if let Some(s) =
+                            lower_result_kernel(e, receiver, method, args, ok, err, stmts, cx)
+                        {
+                            return s;
+                        }
                     }
                     _ => {}
                 }
@@ -4318,6 +4351,254 @@ fn lower_list_kernel(
             Some(format!(
                 "(async (__xs: readonly {elem_ts}[], __acc: {acc_ts}, __f: (acc: {acc_ts}, x: {elem_ts}) => Promise<{acc_ts}>) => {{ for (const __x of __xs) __acc = await __f(__acc, __x); return __acc; }})({recv}, {init}, {f})"
             ))
+        }
+        _ => None,
+    }
+}
+
+/// v0.21/v0.22a: lower a built-in numeric kernel method. `toFloat` is the
+/// identity at runtime (the Int/Float distinction is erased); everything
+/// else maps onto `Math.*` / `Number.*`.
+fn lower_numeric_kernel(
+    receiver: &Expr,
+    method: &Ident,
+    args: &[Expr],
+    stmts: &mut Vec<String>,
+    cx: &mut LowerCtx,
+) -> Option<String> {
+    match (method.name.as_str(), args) {
+        ("toFloat", []) => Some(lower_expr(receiver, stmts, cx)),
+        ("round" | "floor" | "ceil" | "abs", []) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            Some(format!("Math.{}({recv})", method.name))
+        }
+        ("truncate", []) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            Some(format!("Math.trunc({recv})"))
+        }
+        ("min" | "max", [other]) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            let other = lower_expr(other, stmts, cx);
+            Some(format!("Math.{}({recv}, {other})", method.name))
+        }
+        ("clamp", [lo, hi]) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            let lo = lower_expr(lo, stmts, cx);
+            let hi = lower_expr(hi, stmts, cx);
+            Some(format!("Math.min(Math.max({recv}, {lo}), {hi})"))
+        }
+        ("isNaN" | "isFinite", []) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            Some(format!("Number.{}({recv})", method.name))
+        }
+        _ => None,
+    }
+}
+
+/// v0.22a: lower a built-in `String` kernel method (ADR 0046). Pinned
+/// semantics: `replace` is replace-**all** (`replaceAll`); `chars()` is
+/// code **points** (`[...s]`), not code units; `slice` clamps negative
+/// indices to `0` (no TS wrap-around); `indexOf` turns `-1` into `None`.
+fn lower_string_kernel(
+    receiver: &Expr,
+    method: &Ident,
+    args: &[Expr],
+    stmts: &mut Vec<String>,
+    cx: &mut LowerCtx,
+) -> Option<String> {
+    match (method.name.as_str(), args) {
+        ("length", []) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            Some(format!("({recv}).length"))
+        }
+        ("trim", []) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            Some(format!("{recv}.trim()"))
+        }
+        ("toUpper", []) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            Some(format!("{recv}.toUpperCase()"))
+        }
+        ("toLower", []) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            Some(format!("{recv}.toLowerCase()"))
+        }
+        ("chars", []) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            Some(format!("[...{recv}]"))
+        }
+        ("split", [sep]) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            let sep = lower_expr(sep, stmts, cx);
+            Some(format!("{recv}.split({sep})"))
+        }
+        ("contains", [sub]) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            let sub = lower_expr(sub, stmts, cx);
+            Some(format!("{recv}.includes({sub})"))
+        }
+        ("startsWith" | "endsWith", [sub]) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            let sub = lower_expr(sub, stmts, cx);
+            Some(format!("{recv}.{}({sub})", method.name))
+        }
+        ("concat", [other]) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            let other = lower_expr(other, stmts, cx);
+            Some(format!("{recv}.concat({other})"))
+        }
+        ("replace", [from, to]) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            let from = lower_expr(from, stmts, cx);
+            let to = lower_expr(to, stmts, cx);
+            Some(format!("{recv}.replaceAll({from}, {to})"))
+        }
+        ("slice", [lo, hi]) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            let lo = lower_expr(lo, stmts, cx);
+            let hi = lower_expr(hi, stmts, cx);
+            Some(format!(
+                "{recv}.slice(Math.max(0, {lo}), Math.max(0, {hi}))"
+            ))
+        }
+        ("indexOf", [sub]) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            let sub = lower_expr(sub, stmts, cx);
+            Some(format!(
+                "((__i: number) => __i < 0 ? None : Some(__i))({recv}.indexOf({sub}))"
+            ))
+        }
+        _ => None,
+    }
+}
+
+/// v0.22a: lower a built-in `Option[T]` kernel method (ADR 0048). Typed
+/// IIFEs in the v0.20b posture — no runtime imports beyond the
+/// `Some`/`None`/`Ok`/`Err` constructors every module already has.
+#[allow(clippy::too_many_arguments)]
+fn lower_option_kernel(
+    e: &Expr,
+    receiver: &Expr,
+    method: &Ident,
+    args: &[Expr],
+    inner: &Ty,
+    stmts: &mut Vec<String>,
+    cx: &mut LowerCtx,
+) -> Option<String> {
+    let t = ts_ty(inner);
+    match (method.name.as_str(), args) {
+        ("map", [f]) => {
+            // The call's checked type is `Option[B]` — peel for B.
+            let b = match cx.commons.expr_types.get(&e.span) {
+                Some(Ty::Option(b)) => ts_ty(b),
+                _ => "unknown".to_string(),
+            };
+            let recv = lower_expr(receiver, stmts, cx);
+            let f = lower_expr(f, stmts, cx);
+            Some(format!(
+                "((__o: Option<{t}>, __f: (x: {t}) => {b}) => __o.tag === \"Some\" ? Some(__f(__o.value)) : None)({recv}, {f})"
+            ))
+        }
+        ("andThen", [f]) => {
+            let b = match cx.commons.expr_types.get(&e.span) {
+                Some(Ty::Option(b)) => ts_ty(b),
+                _ => "unknown".to_string(),
+            };
+            let recv = lower_expr(receiver, stmts, cx);
+            let f = lower_expr(f, stmts, cx);
+            Some(format!(
+                "((__o: Option<{t}>, __f: (x: {t}) => Option<{b}>) => __o.tag === \"Some\" ? __f(__o.value) : None)({recv}, {f})"
+            ))
+        }
+        ("getOrElse", [fallback]) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            let fallback = lower_expr(fallback, stmts, cx);
+            Some(format!(
+                "((__o: Option<{t}>, __d: {t}) => __o.tag === \"Some\" ? __o.value : __d)({recv}, {fallback})"
+            ))
+        }
+        ("isSome", []) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            Some(format!("({recv}.tag === \"Some\")"))
+        }
+        ("okOr", [error]) => {
+            // The call's checked type is `Result[T, E]` — peel for E.
+            let err = match cx.commons.expr_types.get(&e.span) {
+                Some(Ty::Result(_, err)) => ts_ty(err),
+                _ => "unknown".to_string(),
+            };
+            let recv = lower_expr(receiver, stmts, cx);
+            let error = lower_expr(error, stmts, cx);
+            Some(format!(
+                "((__o: Option<{t}>, __e: {err}) => __o.tag === \"Some\" ? Ok(__o.value) : Err(__e))({recv}, {error})"
+            ))
+        }
+        _ => None,
+    }
+}
+
+/// v0.22a: lower a built-in `Result[T, E]` kernel method (ADR 0048). The
+/// miss branches return the narrowed receiver — TS's discriminated-union
+/// narrowing makes the `Err` arm assignable to `Result<B, E>` directly.
+#[allow(clippy::too_many_arguments)]
+fn lower_result_kernel(
+    e: &Expr,
+    receiver: &Expr,
+    method: &Ident,
+    args: &[Expr],
+    ok: &Ty,
+    err: &Ty,
+    stmts: &mut Vec<String>,
+    cx: &mut LowerCtx,
+) -> Option<String> {
+    let t = ts_ty(ok);
+    let et = ts_ty(err);
+    match (method.name.as_str(), args) {
+        ("map", [f]) => {
+            // The call's checked type is `Result[B, E]` — peel for B.
+            let b = match cx.commons.expr_types.get(&e.span) {
+                Some(Ty::Result(b, _)) => ts_ty(b),
+                _ => "unknown".to_string(),
+            };
+            let recv = lower_expr(receiver, stmts, cx);
+            let f = lower_expr(f, stmts, cx);
+            Some(format!(
+                "((__r: Result<{t}, {et}>, __f: (x: {t}) => {b}) => __r.tag === \"Ok\" ? Ok(__f(__r.value)) : __r)({recv}, {f})"
+            ))
+        }
+        ("andThen", [f]) => {
+            let b = match cx.commons.expr_types.get(&e.span) {
+                Some(Ty::Result(b, _)) => ts_ty(b),
+                _ => "unknown".to_string(),
+            };
+            let recv = lower_expr(receiver, stmts, cx);
+            let f = lower_expr(f, stmts, cx);
+            Some(format!(
+                "((__r: Result<{t}, {et}>, __f: (x: {t}) => Result<{b}, {et}>) => __r.tag === \"Ok\" ? __f(__r.value) : __r)({recv}, {f})"
+            ))
+        }
+        ("mapErr", [f]) => {
+            // The call's checked type is `Result[T, F]` — peel for F.
+            let fts = match cx.commons.expr_types.get(&e.span) {
+                Some(Ty::Result(_, f)) => ts_ty(f),
+                _ => "unknown".to_string(),
+            };
+            let recv = lower_expr(receiver, stmts, cx);
+            let f = lower_expr(f, stmts, cx);
+            Some(format!(
+                "((__r: Result<{t}, {et}>, __f: (e: {et}) => {fts}) => __r.tag === \"Err\" ? Err(__f(__r.error)) : __r)({recv}, {f})"
+            ))
+        }
+        ("getOrElse", [fallback]) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            let fallback = lower_expr(fallback, stmts, cx);
+            Some(format!(
+                "((__r: Result<{t}, {et}>, __d: {t}) => __r.tag === \"Ok\" ? __r.value : __d)({recv}, {fallback})"
+            ))
+        }
+        ("isOk", []) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            Some(format!("({recv}.tag === \"Ok\")"))
         }
         _ => None,
     }

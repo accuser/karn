@@ -1,0 +1,30 @@
+commons nums {
+  fn distance(a: Int, b: Int) -> Int {
+    (a - b).abs()
+  }
+
+  fn bounded(x: Float, lo: Float, hi: Float) -> Float {
+    x.clamp(lo, hi)
+  }
+
+  fn extremes(a: Int, b: Int) -> Int {
+    a.min(b) + a.max(b)
+  }
+
+  fn safeRatio(a: Float, b: Float) -> Option[Float] {
+    let r = a / b
+    if r.isFinite() { Some(r) } else { None }
+  }
+
+  fn neverNaN(x: Float) -> Bool {
+    x.isNaN() == false
+  }
+
+  fn parseOrZero(s: String) -> Int {
+    Int.parse(s).getOrElse(0)
+  }
+
+  fn parsePrice(s: String) -> Option[Float] {
+    Float.parse(s)
+  }
+}

@@ -1418,18 +1418,23 @@ fn check_expr_references(
             }
             // v0.20b: `List.empty()` / `Map.empty()` — qualified statics on
             // the built-in collection types (no user declaration to resolve
-            // against; the checker owns their typing).
+            // against; the checker owns their typing). v0.22a adds the
+            // numeric parse statics, `Int.parse(…)` / `Float.parse(…)`.
             if let ExprKind::Ident(id) = &receiver.kind
                 && !name_in_scope(&id.name, params, scopes)
-                && (id.name == "List" || id.name == "Map")
+                && matches!(id.name.as_str(), "List" | "Map" | "Int" | "Float")
                 && !types.contains_key(&id.name)
             {
-                if method.name != "empty" {
+                let only = match id.name.as_str() {
+                    "List" | "Map" => "empty",
+                    _ => "parse",
+                };
+                if method.name != only {
                     errors.push(CompileError::new(
                         "karn.resolve.unknown_static_member",
                         method.span,
                         format!(
-                            "the built-in `{}` type has no static method named `{}` — `empty` is the only static",
+                            "the built-in `{}` type has no static method named `{}` — `{only}` is the only static",
                             id.name, method.name
                         ),
                     ));
