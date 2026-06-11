@@ -179,6 +179,26 @@ pub const KARN_MAP_SRC: &str = r#"commons karn.map {
 }
 "#;
 
+/// Inside the reserved `karn.*` prefix; injected when `uses`-imported.
+pub const STRING_UNIT: &str = "karn.string";
+
+/// `karn.string` — Karn-written helpers over the v0.22a string kernel
+/// (`concat`, the `List` `fold`, and the `Option` kernel methods). The
+/// kernel itself is compiler built-in (ADR 0046); only derived helpers
+/// live here. `join` folds to `Option[String]` so empty-string *elements*
+/// are joined faithfully (a bare `""` accumulator could not tell "nothing
+/// yet" from "first element was empty").
+pub const KARN_STRING_SRC: &str = r#"commons karn.string {
+  fn join(parts: List[String], sep: String) -> String {
+    let init: Option[String] = None
+    parts.fold(init, (acc, p) => match acc {
+      Some(s) => Some(s.concat(sep).concat(p))
+      None => Some(p)
+    }).getOrElse("")
+  }
+}
+"#;
+
 /// The reserved `karn` conformance-surface adapter (env-free core). It has no
 /// `binding` clause — the toolchain supplies one per platform (see
 /// [`Platform::karn_binding_source`]).

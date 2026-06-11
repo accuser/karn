@@ -1,0 +1,29 @@
+commons text {
+  fn firstWord(s: String) -> String {
+    s.split(" ").get(0).getOrElse("")
+  }
+
+  fn shout(s: String) -> String {
+    s.trim().toUpper().concat("!")
+  }
+
+  fn redact(s: String, secret: String) -> String {
+    s.replace(secret, "***")
+  }
+
+  fn initials(s: String) -> List[String] {
+    s.chars()
+  }
+
+  fn middle(s: String) -> String {
+    s.slice(1, s.length() - 1)
+  }
+
+  fn findIn(s: String, sub: String) -> Option[Int] {
+    s.indexOf(sub)
+  }
+
+  fn checks(s: String) -> Bool {
+    s.contains("a") && s.startsWith("b") && s.endsWith("c") && s.toLower() == s
+  }
+}

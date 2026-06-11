@@ -65,6 +65,12 @@ the ordinary commons pipeline — tables, `uses` resolution, type-checking,
 and emission to `karn/list.ts` / `karn/map.ts` beside the other modules.
 Unconsumed, nothing is injected and the output is unchanged.
 
+v0.22a adds `karn.string` on the same path (`uses karn.string` →
+`karn/string.ts`): derived helpers **written in Karn over the string
+kernel** ([§5.2](static-semantics.md#52-well-typedness)) — currently
+`join(parts: List[String], sep: String) -> String`. The kernel operations
+themselves are compiler built-ins, not commons functions.
+
 A successful Karn build emits TypeScript that is **type-correct end to end**: it
 compiles under `tsc --strict` with no errors. This is the final gate of the
 compilation model — a Karn program's well-formedness is realised, not merely

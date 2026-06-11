@@ -238,6 +238,25 @@ and **insertion-ordered**, normatively. Per-instantiation helpers
 structurally, re-validates refined types, and reports
 `StructuralMismatch` with an indexed path (`$.orders[3].tags[0][1]`).
 
+### §7.3.8 The stdlib kernels (v0.22a)
+
+The v0.22a kernel methods lower inline, like the collection kernel — no new
+runtime imports beyond the `Some`/`None`/`Ok`/`Err` constructors every
+module already has:
+
+| Construct | Emits |
+|---|---|
+| string ops | the TS string method (`trim`, `split`, `includes`, `startsWith`, …); `s.length()` → `.length`; `toUpper`/`toLower` → `toUpperCase`/`toLowerCase` |
+| `s.replace(a, b)` | `replaceAll(a, b)` — replace-**all**, normatively |
+| `s.chars()` | `[...s]` — code points, normatively |
+| `s.slice(lo, hi)` | `slice(Math.max(0, lo), Math.max(0, hi))` — negatives clamp, no wrap |
+| `s.indexOf(sub)` | a typed IIFE turning `-1` into `None`, else `Some(i)` |
+| `Option`/`Result` combinators | typed IIFEs branching on `.tag`; the miss branch returns the narrowed receiver or `None` |
+| numeric `abs`/`min`/`max` | `Math.*` |
+| `x.clamp(lo, hi)` | `Math.min(Math.max(x, lo), hi)` |
+| `f.isNaN()`/`f.isFinite()` | `Number.isNaN`/`Number.isFinite` |
+| `Int.parse`/`Float.parse` | a typed IIFE over `Number(s)` (full-string), rejecting empty/whitespace input, non-safe-integers (`Int`) and non-finite values (`Float`) |
+
 ## §7.4 The runtime library
 
 Every emitted project ships a single runtime module that the per-context and

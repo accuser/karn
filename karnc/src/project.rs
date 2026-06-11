@@ -424,6 +424,23 @@ fn compile_project_inner(
             Err(errs) => errors.extend(errs),
         }
     }
+    // v0.22a: the first-party string commons — derived helpers over the
+    // built-in string kernel (ADR 0046).
+    if uses_unit(&parsed, firstparty::STRING_UNIT) {
+        match lexer::tokenize(firstparty::KARN_STRING_SRC)
+            .map_err(|e| vec![e])
+            .and_then(|toks| parser::parse_unit(&toks, firstparty::KARN_STRING_SRC))
+        {
+            Ok(unit) => parsed.push(ParsedFile {
+                source_path: PathBuf::from("karn/string.karn"),
+                source: firstparty::KARN_STRING_SRC.to_string(),
+                unit,
+                kind: UnitKind::Commons,
+                synthetic: true,
+            }),
+            Err(errs) => errors.extend(errs),
+        }
+    }
 
     // -- 3. Group by (name, kind) and validate per-directory consistency. --
     // Tests (v0.7) are tracked separately from production units. Their

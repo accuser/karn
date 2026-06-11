@@ -3661,6 +3661,22 @@ impl<'a> Parser<'a> {
                     span: t.span.merge(close.span),
                 })
             }
+            // v0.22a: `Int.parse(…)` / `Float.parse(…)` — a numeric base-type
+            // keyword in static-receiver position. Only recognised when the
+            // next token is `.`, so a bare `Int` in expression position keeps
+            // the ordinary "expected an expression" error. Lowered to an
+            // Ident-shaped receiver; postfix builds the MethodCall and the
+            // resolver/checker own the static dispatch (like `List.empty()`).
+            TokenKind::Int | TokenKind::Float
+                if self.tokens.get(self.pos + 1).map(|t| t.kind) == Some(TokenKind::Dot) =>
+            {
+                self.bump();
+                let name = self.slice(t.span).to_string();
+                Ok(Expr {
+                    kind: ExprKind::Ident(Ident { name, span: t.span }),
+                    span: t.span,
+                })
+            }
             // `Effect.pure(value)` — wrap a synchronous value as `Effect[T]` (v0.5).
             TokenKind::Effect => {
                 let kw = self.bump().unwrap();

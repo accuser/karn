@@ -1,0 +1,46 @@
+commons combinators {
+  fn doubledOr(o: Option[Int], fallback: Int) -> Int {
+    o.map((n) => n * 2).getOrElse(fallback)
+  }
+
+  fn halve(n: Int) -> Option[Int] {
+    if n == 0 { None } else { Some(n / 2) }
+  }
+
+  fn quartered(o: Option[Int]) -> Option[Int] {
+    o.andThen(halve).andThen(halve)
+  }
+
+  fn required(o: Option[String]) -> Result[String, String] {
+    o.okOr("missing")
+  }
+
+  fn present(o: Option[Int]) -> Bool {
+    o.isSome()
+  }
+
+  fn renumber(r: Result[Int, String]) -> Result[Float, String] {
+    r.map((n) => n.toFloat())
+  }
+
+  fn positive(n: Int) -> Result[Int, String] {
+    if n > 0 { Ok(n) } else { Err("negative") }
+  }
+
+  fn chained(r: Result[Int, String]) -> Bool {
+    r.andThen(positive).mapErr((e) => e.concat("!")).isOk()
+  }
+
+  fn viaLambda(r: Result[Int, String]) -> Result[Int, String] {
+    -- A lambda body that itself needs an expected type (a bare `Ok`/`Err`)
+    -- annotates a `let`, exactly as with lambdas passed to generic calls.
+    r.andThen((n) => {
+      let out: Result[Int, String] = if n > 0 { Ok(n) } else { Err("negative") }
+      out
+    })
+  }
+
+  fn orZero(r: Result[Int, String]) -> Int {
+    r.getOrElse(0)
+  }
+}

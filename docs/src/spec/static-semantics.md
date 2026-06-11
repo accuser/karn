@@ -105,14 +105,63 @@ test a program needs — compare with an explicit tolerance, or work in
 the host (`Infinity`/`NaN`); no Karn-level guard applies **in arithmetic**
 (boundaries are guarded: [§7.2](emission.md#72-targets)).
 
-**The numeric kernel** (v0.21). Conversion between the numeric types is
-explicit, via built-in value methods on the bare base types:
-`i.toFloat() -> Float` (total) on `Int`; `f.round()`, `f.floor()`,
+**The numeric kernel** (v0.21, extended v0.22a). Conversion between the
+numeric types is explicit, via built-in value methods on the bare base
+types: `i.toFloat() -> Float` (total) on `Int`; `f.round()`, `f.floor()`,
 `f.ceil()`, `f.truncate()` (each `-> Int`, named and lossy) on `Float` —
-there is deliberately no ambiguous `toInt`. Each takes no arguments
-(`karn.types.method_arity`); an unknown method on a numeric receiver is
-`karn.types.method_not_found`. Statics remain reserved for constructors
-and parsers (`T.of`, `List.empty()`).
+there is deliberately no ambiguous `toInt`. v0.22a (ADR 0048) adds, on
+**both** numeric types, `x.abs()`, `a.min(b)`, `a.max(b)`, and
+`x.clamp(lo, hi)` (arguments take the receiver's type — mixing is the
+no-coercion error), and on `Float` only, `f.isNaN()` and `f.isFinite()`
+(`-> Bool`). Wrong arity is `karn.types.method_arity`; an unknown method
+on a numeric receiver is `karn.types.method_not_found`.
+
+**The numeric parse statics** (v0.22a). `Int.parse(s) -> Option[Int]` and
+`Float.parse(s) -> Option[Float]` — statics, per 0041's rule (ways to
+*obtain* a value). Parsing is **full-string**: leading/trailing garbage is
+`None` (not `parseFloat`'s prefix laxity); the empty or whitespace-only
+string is `None`; a value outside the safe-integer range (`Int`) or
+non-finite (`Float`) is `None`. `parse` is the only static on the numeric
+types (`karn.resolve.unknown_static_member`).
+
+**The string kernel** (v0.22a, ADR 0046). `String` is opaque — no direct
+character access — so its operations are built-in value methods:
+`s.length() -> Int`, `s.split(sep) -> List[String]`, `s.trim()`,
+`s.toUpper()`, `s.toLower()`, `s.concat(t)`, `s.contains(sub)`,
+`s.startsWith(sub)`, `s.endsWith(sub)` (`-> Bool`),
+`s.replace(a, b)`, `s.slice(lo, hi)`, `s.indexOf(sub) -> Option[Int]`,
+and `s.chars() -> List[String]`. **Semantics are UTF-16 code units**,
+normatively, with two pinned exceptions: `replace` replaces **every**
+occurrence (not TS's first-only string form), and `chars()` splits by
+**code points** (so `s.length() != s.chars().length()` when `s` contains
+astral characters). `slice` clamps negative indices to `0` — there is no
+wrap-around. `indexOf` returns `None` for a missing substring, never a
+sentinel `-1`.
+
+**The `Option`/`Result` kernel** (v0.22a, ADR 0048). The combinators are
+built-in value methods on the compiler-known generic receivers — *not*
+free functions, which would collide by bare name on `uses` import
+(`karn.resolve.duplicate_fn`). On `Option[T]`: `o.map(f)`,
+`o.andThen(f)` (the function MUST return an `Option`), `o.getOrElse(x)`,
+`o.isSome()`, `o.okOr(e) -> Result[T, E]`. On `Result[T, E]`: `r.map(f)`,
+`r.andThen(f)` (the function MUST return a `Result` with the receiver's
+error type), `r.mapErr(f)`, `r.getOrElse(x)`, `r.isOk()`. The function
+argument's parameters type contextually from the receiver and its return
+is read from the actual (the v0.20a pass-2 rule) — so a lambda body that
+itself needs an expected type (a bare `Ok`/`Err`/`None`/`[]`) annotates a
+`let`, exactly as with lambdas passed to generic calls.
+
+```karn
+commons checkout {
+  fn parseQty(s: String) -> Int {
+    Int.parse(s.trim()).map((n) => n.clamp(1, 99)).getOrElse(1)
+  }
+
+  fn label(name: Option[String]) -> Result[String, String] {
+    name.map((n) => n.toUpper()).okOr("missing name")
+  }
+}
+```
 
 **Generic instantiation** (v0.20a). A generic function's type arguments are
 inferred from its arguments by argument-directed unification: non-lambda

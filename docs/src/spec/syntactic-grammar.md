@@ -527,6 +527,12 @@ Logical negation `!` and numeric negation `-`, prefixed to an expression.
 
 A receiver, `.`, a method name, and parenthesised arguments. Well-formedness: §5.
 
+v0.22a: the numeric base-type keywords `Int` and `Float` are admitted in
+**static-receiver position** — `Int.parse(s)` / `Float.parse(s)` — but only
+when immediately followed by `.`; a bare `Int` in expression position remains
+a parse error. (`List.empty()` needs no such rule: `List` is lexically an
+ordinary identifier.)
+
 ### §4.6.9 field_access
 
 {{#grammar field_access}}
