@@ -35,9 +35,10 @@ use ariadne::Source;
 pub use error::CompileError;
 pub use firstparty::Platform;
 pub use project::{
-    BuildTarget, CompiledFile, ProjectOutput, ProjectPaths, compile_project,
-    compile_project_with_platform, compile_project_with_split_paths, compile_project_with_target,
-    read_project_paths,
+    AttributedError, BuildTarget, CompiledFile, ProjectFailure, ProjectOutput, ProjectPaths,
+    compile_project, compile_project_full, compile_project_with_platform,
+    compile_project_with_split_paths, compile_project_with_split_paths_full,
+    compile_project_with_target, read_project_paths,
 };
 
 /// Severity classification for [`Diagnostic`]. Mirrors LSP severity levels so
@@ -197,9 +198,9 @@ pub fn print_errors(errors: &[CompileError], source: &str, filename: &str) {
     }
 }
 
-/// Render project-level errors. Each error's span refers to *some* file in
-/// the project, but we don't know which without a span-to-file index. For
-/// now, print errors as plain text since they aren't tied to a single file.
+/// Render project-level errors as plain `[category] message` lines — the
+/// fallback for errors with no file attribution. Rich, source-context
+/// rendering lives in [`print_project_failure`] (v0.24).
 pub fn print_project_errors(root: &Path, errors: &[CompileError]) {
     let _ = root;
     for err in errors {
@@ -210,7 +211,100 @@ pub fn print_project_errors(root: &Path, errors: &[CompileError]) {
     }
 }
 
+/// v0.24 (ADR 0052 rider): render a failed project build with full ariadne
+/// source context per file — the attribution built for the LSP, fixing the
+/// standing gap where project-mode CLI errors were bare lines while
+/// single-file mode had rich rendering. Unattributed (project-level)
+/// errors keep the plain form.
+pub fn print_project_failure(failure: &project::ProjectFailure) {
+    let texts: std::collections::HashMap<&std::path::Path, &str> = failure
+        .snapshots
+        .iter()
+        .map(|(p, t)| (p.as_path(), t.as_str()))
+        .collect();
+    for ae in &failure.errors {
+        match ae
+            .source_path
+            .as_deref()
+            .and_then(|p| texts.get(p).map(|t| (p, *t)))
+        {
+            Some((path, text)) => {
+                let label = path.to_string_lossy().replace('\\', "/");
+                print_errors(std::slice::from_ref(&ae.error), text, &label);
+            }
+            None => {
+                eprintln!("[{}] {}", ae.error.category, ae.error.message);
+                for note in &ae.error.notes {
+                    eprintln!("  note: {note}");
+                }
+            }
+        }
+    }
+}
+
 /// Render project-level errors to a string (for test assertion).
+/// v0.24 (ADR 0052): per-file diagnostics from a whole-project analysis.
+/// `text` is the **analysed snapshot** — positions must convert against it,
+/// not a newer buffer (the analyse→publish window is real).
+pub struct FileDiagnostics {
+    /// Project-root-relative source path.
+    pub source_path: std::path::PathBuf,
+    /// The exact text that was analysed (overlay or disk).
+    pub text: String,
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+/// v0.24: the result of [`diagnose_project`]. Every discovered file appears
+/// in `files` — clean files with an empty list — so a consumer can clear
+/// stale diagnostics. `unattributed` holds project-level diagnostics with
+/// no single owning file (group/cycle/directory validations).
+pub struct ProjectDiagnostics {
+    pub files: Vec<FileDiagnostics>,
+    pub unattributed: Vec<Diagnostic>,
+}
+
+/// v0.24 (ADR 0052): non-bailing, overlay-aware, file-attributed project
+/// diagnostics — the LSP analysis entry point, distinct from
+/// [`compile_project`] (which bails and emits). `overlay` maps
+/// canonicalised absolute paths to buffer text layered over disk reads.
+pub fn diagnose_project(
+    root: &std::path::Path,
+    overlay: &std::collections::HashMap<std::path::PathBuf, String>,
+) -> ProjectDiagnostics {
+    let analysis = project::analyse_project(root, overlay);
+    let mut by_file: std::collections::HashMap<std::path::PathBuf, Vec<Diagnostic>> =
+        std::collections::HashMap::new();
+    let mut unattributed = Vec::new();
+    for ae in analysis.errors {
+        let d = Diagnostic {
+            severity: Severity::for_error(&ae.error),
+            error: ae.error,
+        };
+        match ae.source_path {
+            Some(p) => by_file.entry(p).or_default().push(d),
+            None => unattributed.push(d),
+        }
+    }
+    let files = analysis
+        .snapshots
+        .into_iter()
+        .map(|(source_path, text)| FileDiagnostics {
+            diagnostics: by_file.remove(&source_path).unwrap_or_default(),
+            source_path,
+            text,
+        })
+        .collect();
+    // Anything attributed to a path without a snapshot (defensive — should
+    // not happen) still surfaces rather than vanishing.
+    for (_, ds) in by_file {
+        unattributed.extend(ds);
+    }
+    ProjectDiagnostics {
+        files,
+        unattributed,
+    }
+}
+
 pub fn render_project_errors(errors: &[CompileError]) -> String {
     let mut out = String::new();
     for err in errors {

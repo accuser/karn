@@ -63,3 +63,4 @@ supersedes the old one, the way 0016 supersedes the interim portability tiers.
 | [0049](0049-bare-int-boundary-integrality.md) | Bare-`Int` boundary fields validate integrality (wire-contract tightening) | Accepted (v0.22b) |
 | [0050](0050-kv-list-drain.md) | `Kv.list` is a binding-side drain; cursor-paging deferred (the `given`-gap) | Accepted (v0.23) |
 | [0051](0051-kv-write-options-as-ops.md) | `Kv` write options as distinct camelCase ops (`putTtl`) | Accepted (v0.23) |
+| [0052](0052-lsp-project-diagnostics.md) | LSP project-wide diagnostics: non-bailing, overlay-aware, file-attributed | Accepted (v0.24) |

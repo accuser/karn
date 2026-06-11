@@ -18,6 +18,7 @@ mod completion;
 mod document_symbols;
 mod position;
 mod project;
+mod publish;
 mod symbols;
 
 use std::path::PathBuf;
@@ -51,6 +52,13 @@ struct State {
     config: ProjectConfig,
     /// Open documents keyed by URI.
     docs: std::collections::HashMap<Url, DocumentState>,
+    /// v0.24: URIs that currently carry published project diagnostics — the
+    /// previous round's dirty set, so newly-clean files get a clearing
+    /// (empty) publish.
+    published: std::collections::HashSet<Url>,
+    /// v0.24: debounce generation. Each change bumps it; a scheduled
+    /// analysis runs only if it is still the latest when the delay elapses.
+    analysis_generation: u64,
 }
 
 #[derive(Clone)]
@@ -88,6 +96,13 @@ impl Backend {
     /// Best-effort: a malformed file produces diagnostics rather than a
     /// hard failure.
     async fn recompile_and_publish(&self, uri: &Url) {
+        // v0.24 (ADR 0052): with a project root, diagnostics are
+        // project-wide (every file, contexts included) on a debounce.
+        // Single-file mode (no karn.toml) keeps the per-buffer path below.
+        if self.state.read().await.project_root.is_some() {
+            self.schedule_project_diagnostics().await;
+            return;
+        }
         let text = {
             let state = self.state.read().await;
             state.docs.get(uri).map(|d| d.text.clone())
@@ -105,6 +120,100 @@ impl Backend {
         self.client
             .publish_diagnostics(uri.clone(), lsp_diags, version)
             .await;
+    }
+
+    /// v0.24: debounce a project-wide analysis — each call bumps the
+    /// generation; the spawned task runs only if still the latest after the
+    /// delay, so a typing burst produces one analysis.
+    async fn schedule_project_diagnostics(&self) {
+        let generation = {
+            let mut state = self.state.write().await;
+            state.analysis_generation += 1;
+            state.analysis_generation
+        };
+        let this = self.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            if this.state.read().await.analysis_generation != generation {
+                return;
+            }
+            this.run_project_diagnostics().await;
+        });
+    }
+
+    /// v0.24 (ADR 0052): one project-wide diagnostics round — overlay the
+    /// open buffers over disk, analyse off the async runtime, convert spans
+    /// against the **analysed snapshots**, and publish via the pure
+    /// publish-plan (clears included).
+    async fn run_project_diagnostics(&self) {
+        let (root, src_root, overlay, previously_dirty) = {
+            let state = self.state.read().await;
+            let Some(root) = state.project_root.clone() else {
+                return;
+            };
+            let src_root = root.join(&state.config.src_dir);
+            let mut overlay = std::collections::HashMap::new();
+            for (uri, doc) in &state.docs {
+                if let Ok(p) = uri.to_file_path() {
+                    let canonical = p.canonicalize().unwrap_or(p);
+                    overlay.insert(canonical, doc.text.clone());
+                }
+            }
+            (root, src_root, overlay, state.published.clone())
+        };
+
+        let analysis_root = src_root.clone();
+        let Ok(result) =
+            tokio::task::spawn_blocking(move || karnc::diagnose_project(&analysis_root, &overlay))
+                .await
+        else {
+            return;
+        };
+
+        let mut new_by_uri: std::collections::HashMap<Url, Vec<Diagnostic>> =
+            std::collections::HashMap::new();
+        for file in result.files {
+            let abs = src_root.join(&file.source_path);
+            let abs = abs.canonicalize().unwrap_or(abs);
+            let Ok(uri) = Url::from_file_path(&abs) else {
+                continue;
+            };
+            // Spans convert against the snapshot the analysis saw — never a
+            // newer buffer (Settled, v0.24 proposal).
+            let diags: Vec<Diagnostic> = file
+                .diagnostics
+                .iter()
+                .map(|d| make_diagnostic(d, &file.text, &uri))
+                .collect();
+            new_by_uri.insert(uri, diags);
+        }
+        // Project-level diagnostics with no single owning file surface on
+        // karn.toml (position 0:0) rather than vanishing.
+        if !result.unattributed.is_empty()
+            && let Ok(toml_uri) = Url::from_file_path(root.join("karn.toml"))
+        {
+            let entry = new_by_uri.entry(toml_uri).or_default();
+            for d in &result.unattributed {
+                entry.push(Diagnostic {
+                    range: Default::default(),
+                    severity: Some(match d.severity {
+                        karnc::Severity::Error => DiagnosticSeverity::ERROR,
+                        karnc::Severity::Warning => DiagnosticSeverity::WARNING,
+                    }),
+                    code: Some(tower_lsp::lsp_types::NumberOrString::String(
+                        d.error.category.to_string(),
+                    )),
+                    message: d.error.message.clone(),
+                    ..Default::default()
+                });
+            }
+        }
+
+        let (publishes, dirty) = publish::publish_plan(&previously_dirty, new_by_uri);
+        for (uri, diags) in publishes {
+            self.client.publish_diagnostics(uri, diags, None).await;
+        }
+        self.state.write().await.published = dirty;
     }
 
     /// Project source root resolved against the active `karn.toml`'s

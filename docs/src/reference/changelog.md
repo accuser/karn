@@ -2,7 +2,7 @@
 
 Karn is pre-1.0 and developed in small, spec-first increments (see
 [Versioning & roadmap](../explanation/versioning-and-roadmap.md)). This book is
-written against **v0.23**.
+written against **v0.24**.
 
 This page is a high-level summary of notable increments, not an exhaustive
 per-commit history. While Karn is pre-1.0, increments may change behaviour.
@@ -11,6 +11,7 @@ per-commit history. While Karn is pre-1.0, increments may change behaviour.
 
 | Version | Highlights |
 |---|---|
+| **v0.24** | The first A-tier LSP increment — **project-wide diagnostics** (A-0 slice 1, ADR 0052). `karnc::diagnose_project`: non-bailing (a broken unit no longer hides other units' errors), **overlay-aware** (unsaved buffers diagnosed), **file-attributed** at the collection point (no `Span` change — a span→file map would be unsound). Context files get full resolve/check diagnostics for the first time; the LSP publishes project-wide with clear-on-fix semantics (a unit-tested pure diff) and converts positions against the analysed snapshot. Rider: project-mode CLI errors now render with full `ariadne` source context (previously bare `[category] message` lines). No language change. |
 | **v0.23** | The Cloudflare adapter extended — **`Kv.list` and `putTtl`**. `list(prefix) -> Effect[List[String]]` is a **binding-side drain** (the cursor loops in host code — forced by the recorded `given`-on-free-functions gap: no Karn routine can both recurse and hold a capability); `putTtl` writes with `expirationTtl` (distinct camelCase op over an options record). **Structured values are v0.22-codec composition**, shipped as the first *executed* adapter-op test (fake `env.KV`, drain paging proven, `Json.encode`/`decode[Entry]` round-trip). No new lock machinery; wrangler unchanged. |
 | **v0.22b** | The wider stdlib, second slice — **the typed JSON codec**. `Json.encode(v)` / `Json.decode[T](s) -> Result[T, JsonError]`, compiler-backed onto the boundary codec machinery (no untyped `Json` value); **type application on qualified statics** (`decode[Order]`, `decode[List[Order]]`, the v0.20b forcing case); **`JsonError`** as a compiler-known record (`kind`/`path`/`message`) putting boundary failures in the program's hands; `encode` throws on non-finite `Float` (the 0040 contract). And the **bare-`Int` integrality tightening**: every boundary deserialisation of a bare `Int` now requires `Number.isInteger` — a deliberate wire-contract change, re-blessed in isolation. Completes v0.22. |
 | **v0.22a** | The wider stdlib, first slice — **kernel methods everywhere**. The string kernel (`split`/`trim`/`contains`/`replace`-all/`slice`/`indexOf -> Option`/`chars` code-points/`concat`, UTF-16 code units normatively), `Option`/`Result` combinators as built-in methods (`map`/`andThen`/`getOrElse`/`isSome`/`isOk`/`mapErr`/`okOr` — value methods, not free functions, so nothing collides and **chaining works day one**), numeric helpers (`abs`/`min`/`max`/`clamp`; `isNaN`/`isFinite`), and `Int.parse`/`Float.parse -> Option` statics (full-string, safe-integer/finite). `karn.string` ships Karn-written `join`. Purely additive — no boundary change; the typed JSON codec is v0.22b. |

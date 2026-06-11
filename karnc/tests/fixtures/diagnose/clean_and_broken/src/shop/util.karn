@@ -1,0 +1,5 @@
+commons shop.util
+
+fn double(n: Int) -> Int {
+  n * 2
+}
