@@ -99,12 +99,29 @@ The tree-sitter grammar covers all Karn syntactic forms from v0 through v0.5. Hi
 
 The LSP server runs the existing Karn compiler on the project's source corpus and reports errors and warnings as LSP diagnostics back to the editor.
 
-**Behaviour:**
-- On project load: full compile, all errors surfaced.
-- On file change (in editor): re-compile the affected commons or context.
-  - If the changed file is a fragment of a multi-file unit, re-compile the whole unit.
-  - If the changed file is consumed by other units (commons used by other commons, or context consumed by other contexts), re-compile those too.
-- Debounce: configurable (default 300ms). The LSP waits for the user to pause typing before running diagnostics.
+**Behaviour (REVISED v0.24, ADR 0052 — project-wide):**
+- With a project root (`karn.toml`): every change triggers a **debounced
+  whole-project analysis** via `karnc::diagnose_project` — non-bailing
+  (every file's diagnostics, not the first failure's), **overlay-aware**
+  (open buffers layered over disk, so unsaved edits are diagnosed), and
+  **file-attributed** (collection-point tagging; no `Span` change).
+  Context files get full resolve/check diagnostics — the pre-v0.24 server
+  resolved/checked `Commons` units only.
+- Publish: **all-and-clear** — every file with diagnostics is published;
+  every file that carried diagnostics last round and is now clean gets an
+  **empty publish**. The publish/clear diff is a pure function
+  (`karn-lsp/src/publish.rs`), unit-tested without a transport.
+- **Positions convert against the analysed snapshot** — `diagnose_project`
+  returns the per-file text it analysed; spans never convert against a
+  newer buffer (the analyse→publish window is real; debounce narrows but
+  does not close it).
+- Project-level diagnostics with no single owning file (group/cycle/
+  directory validations) surface on `karn.toml` at position 0:0.
+- Single-file mode (no `karn.toml`): the per-buffer `diagnose` path,
+  unchanged.
+- Debounce: 200ms, generation-counter based (a typing burst produces one
+  analysis). Incremental/salsa-style recompute is deferred — full
+  re-analysis is acceptable at current scale.
 - Reported back via `textDocument/publishDiagnostics`.
 
 **Severity levels:**

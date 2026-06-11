@@ -262,9 +262,19 @@ pub fn compile_project_with_split_paths(
     target: BuildTarget,
     paths: &ProjectPaths,
 ) -> Result<ProjectOutput, Vec<CompileError>> {
+    compile_project_with_split_paths_full(project_root, target, paths)
+        .map_err(ProjectFailure::flatten)
+}
+
+/// v0.24: split-paths build keeping attribution + snapshots on failure.
+pub fn compile_project_with_split_paths_full(
+    project_root: &Path,
+    target: BuildTarget,
+    paths: &ProjectPaths,
+) -> Result<ProjectOutput, ProjectFailure> {
     let src_root = project_root.join(&paths.src);
     let tests_root = project_root.join(&paths.tests);
-    compile_project_inner(&src_root, &tests_root, target, Platform::default())
+    compile_project_full(&src_root, &tests_root, target, Platform::default())
 }
 
 /// Internal: do the work, given a source root (for commons/contexts) and a
@@ -272,19 +282,180 @@ pub fn compile_project_with_split_paths(
 /// behaviour is identical to the v0.4+ single-tree layout. When they differ
 /// — v0.9.1's split-paths mode — sources and tests are discovered separately
 /// and the new `inconsistent_test_path` check fires.
+/// v0.24 (ADR 0052): how the project pipeline is driven. `Build` preserves
+/// the CLI contract exactly (bail at the structural and pre-emit gates);
+/// `Analyse` never bails after discovery, skips all emission, and lets
+/// independent unit groups resolve/check past another group's errors.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Mode {
+    Build,
+    Analyse,
+}
+
+/// v0.24 (ADR 0052): a compile error attributed — where possible — to the
+/// project-relative source file it belongs to, tagged at the collection
+/// point (the phase that produced it knows which file it was processing).
+/// `None` is the project-level bucket: validations spanning files
+/// (group/cycle/directory consistency) with no single owning file.
+pub struct AttributedError {
+    pub source_path: Option<PathBuf>,
+    pub error: CompileError,
+}
+
+/// Collection-point error sink (ADR 0052). Helpers keep their plain
+/// `&mut Vec<CompileError>` signatures; call sites attribute via
+/// `extend_for` with the file in scope at that point.
+struct ErrorSink {
+    entries: Vec<AttributedError>,
+}
+
+impl ErrorSink {
+    fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+    fn push_for(&mut self, file: Option<&Path>, error: CompileError) {
+        self.entries.push(AttributedError {
+            source_path: file.map(Path::to_path_buf),
+            error,
+        });
+    }
+    fn extend_for(&mut self, file: Option<&Path>, errs: impl IntoIterator<Item = CompileError>) {
+        for e in errs {
+            self.push_for(file, e);
+        }
+    }
+    fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+    fn len(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+/// v0.24: the analyse-mode result — every discovered file's analysed text
+/// snapshot (positions must convert against the text that was analysed,
+/// not a newer buffer) plus the attributed diagnostics.
+pub struct ProjectAnalysis {
+    /// `(project-relative source path, analysed text)` for every file read,
+    /// including clean files (the LSP needs them to clear diagnostics).
+    pub snapshots: Vec<(PathBuf, String)>,
+    pub errors: Vec<AttributedError>,
+}
+
+/// v0.24: analyse a project without building — non-bailing, overlay-aware,
+/// file-attributed (ADR 0052). `overlay` maps canonicalised absolute paths
+/// to buffer text layered over disk reads (unsaved editor buffers).
+pub fn analyse_project(root: &Path, overlay: &HashMap<PathBuf, String>) -> ProjectAnalysis {
+    match compile_project_pipeline(
+        root,
+        root,
+        BuildTarget::Bundle,
+        Platform::default(),
+        Mode::Analyse,
+        overlay,
+    ) {
+        PipelineResult::Analysis(a) => a,
+        PipelineResult::Build(_) => unreachable!("analyse mode returned a build result"),
+    }
+}
+
+/// Read a source file, honouring the overlay (keyed by canonicalised
+/// absolute path; falls back to the literal path so a not-yet-created
+/// overlay entry still matches).
+fn read_source(path: &Path, overlay: &HashMap<PathBuf, String>) -> std::io::Result<String> {
+    let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    if let Some(text) = overlay.get(&canonical).or_else(|| overlay.get(path)) {
+        return Ok(text.clone());
+    }
+    fs::read_to_string(path)
+}
+
+/// v0.24: a failed build with its attribution and snapshots intact — what
+/// the CLI renders rich (ariadne source context per file); the plain
+/// `compile_project*` wrappers flatten it to the pre-v0.24 error list.
+pub struct ProjectFailure {
+    pub errors: Vec<AttributedError>,
+    pub snapshots: Vec<(PathBuf, String)>,
+}
+
+impl ProjectFailure {
+    /// The pre-v0.24 contract: collection-ordered, attribution dropped.
+    pub fn flatten(self) -> Vec<CompileError> {
+        self.errors.into_iter().map(|a| a.error).collect()
+    }
+}
+
+pub(crate) enum PipelineResult {
+    Build(Result<ProjectOutput, ProjectFailure>),
+    Analysis(ProjectAnalysis),
+}
+
+/// Terminate the pipeline with the accumulated errors, keeping attribution
+/// and snapshots in both modes.
+fn finish(mode: Mode, errors: ErrorSink, snapshots: Vec<(PathBuf, String)>) -> PipelineResult {
+    match mode {
+        Mode::Build => PipelineResult::Build(Err(ProjectFailure {
+            errors: errors.entries,
+            snapshots,
+        })),
+        Mode::Analyse => PipelineResult::Analysis(ProjectAnalysis {
+            snapshots,
+            errors: errors.entries,
+        }),
+    }
+}
+
 fn compile_project_inner(
     src_root: &Path,
     tests_root: &Path,
     target: BuildTarget,
     platform: Platform,
 ) -> Result<ProjectOutput, Vec<CompileError>> {
-    let mut errors = Vec::new();
+    compile_project_full(src_root, tests_root, target, platform).map_err(ProjectFailure::flatten)
+}
+
+/// v0.24: the build entry point that keeps attribution + snapshots on
+/// failure, so the CLI can render project errors with source context.
+pub fn compile_project_full(
+    src_root: &Path,
+    tests_root: &Path,
+    target: BuildTarget,
+    platform: Platform,
+) -> Result<ProjectOutput, ProjectFailure> {
+    match compile_project_pipeline(
+        src_root,
+        tests_root,
+        target,
+        platform,
+        Mode::Build,
+        &HashMap::new(),
+    ) {
+        PipelineResult::Build(r) => r,
+        PipelineResult::Analysis(_) => unreachable!("build mode returned an analysis"),
+    }
+}
+
+fn compile_project_pipeline(
+    src_root: &Path,
+    tests_root: &Path,
+    target: BuildTarget,
+    platform: Platform,
+    mode: Mode,
+    overlay: &HashMap<PathBuf, String>,
+) -> PipelineResult {
+    let mut errors = ErrorSink::new();
+    let mut snapshots: Vec<(PathBuf, String)> = Vec::new();
     let split_mode = src_root != tests_root;
 
     // -- 1. Discovery. --
     let src_files = match discover_karn_files(src_root) {
         Ok(f) => f,
-        Err(e) => return Err(vec![e]),
+        Err(e) => {
+            errors.push_for(None, e);
+            return finish(mode, errors, snapshots);
+        }
     };
     let tests_files = if split_mode {
         // Tests directory is optional in split mode — a project may have no
@@ -292,7 +463,10 @@ fn compile_project_inner(
         if tests_root.exists() {
             match discover_karn_files(tests_root) {
                 Ok(f) => f,
-                Err(e) => return Err(vec![e]),
+                Err(e) => {
+                    errors.push_for(None, e);
+                    return finish(mode, errors, snapshots);
+                }
             }
         } else {
             Vec::new()
@@ -301,37 +475,71 @@ fn compile_project_inner(
         Vec::new()
     };
     if src_files.is_empty() && tests_files.is_empty() {
-        return Err(vec![CompileError::new(
-            "karn.project.no_sources",
-            Span::default(),
-            format!("no `.karn` source files found under {}", src_root.display()),
-        )]);
+        errors.push_for(
+            None,
+            CompileError::new(
+                "karn.project.no_sources",
+                Span::default(),
+                format!("no `.karn` source files found under {}", src_root.display()),
+            ),
+        );
+        return finish(mode, errors, snapshots);
     }
     if let Err(e) = check_file_directory_conflicts(src_root, &src_files) {
-        errors.extend(e);
+        errors.extend_for(None, e);
     }
     if split_mode && let Err(e) = check_file_directory_conflicts(tests_root, &tests_files) {
-        errors.extend(e);
+        errors.extend_for(None, e);
     }
 
     // -- 2. Parse every file. --
     let mut parsed: Vec<ParsedFile> = Vec::new();
-    for path in &src_files {
-        match parse_file(src_root, path) {
-            Ok(pf) => parsed.push(pf),
-            Err(errs) => errors.extend(errs),
-        }
-    }
-    if split_mode {
-        for path in &tests_files {
-            match parse_file(tests_root, path) {
+    let parse_tree = |root: &Path,
+                      files: &[PathBuf],
+                      parsed: &mut Vec<ParsedFile>,
+                      errors: &mut ErrorSink,
+                      snapshots: &mut Vec<(PathBuf, String)>| {
+        for path in files {
+            let rel = path.strip_prefix(root).unwrap_or(path).to_path_buf();
+            let source = match read_source(path, overlay) {
+                Ok(s) => s,
+                Err(e) => {
+                    errors.push_for(
+                        Some(&rel),
+                        CompileError::new(
+                            "karn.project.read_failed",
+                            Span::default(),
+                            format!("could not read `{}`: {e}", path.display()),
+                        ),
+                    );
+                    continue;
+                }
+            };
+            snapshots.push((rel.clone(), source.clone()));
+            match parse_source(root, path, source) {
                 Ok(pf) => parsed.push(pf),
-                Err(errs) => errors.extend(errs),
+                Err(errs) => errors.extend_for(Some(&rel), errs),
             }
         }
+    };
+    parse_tree(
+        src_root,
+        &src_files,
+        &mut parsed,
+        &mut errors,
+        &mut snapshots,
+    );
+    if split_mode {
+        parse_tree(
+            tests_root,
+            &tests_files,
+            &mut parsed,
+            &mut errors,
+            &mut snapshots,
+        );
     }
     if !errors.is_empty() && parsed.is_empty() {
-        return Err(errors);
+        return finish(mode, errors, snapshots);
     }
 
     // v0.17: if any user unit consumes the first-party `karn` surface, inject it
@@ -356,7 +564,7 @@ fn compile_project_inner(
                 kind: UnitKind::Adapter,
                 synthetic: true,
             }),
-            Err(errs) => errors.extend(errs),
+            Err(errs) => errors.extend_for(None, errs),
         }
     }
     // v0.19: likewise the first-party `karn.cloudflare` platform adapter —
@@ -379,7 +587,7 @@ fn compile_project_inner(
                 kind: UnitKind::Adapter,
                 synthetic: true,
             }),
-            Err(errs) => errors.extend(errs),
+            Err(errs) => errors.extend_for(None, errs),
         }
     }
     // v0.20b: the first-party collection commons. Unlike the adapters above
@@ -406,7 +614,7 @@ fn compile_project_inner(
                 kind: UnitKind::Commons,
                 synthetic: true,
             }),
-            Err(errs) => errors.extend(errs),
+            Err(errs) => errors.extend_for(None, errs),
         }
     }
     if uses_map || uses_unit(&parsed, firstparty::LIST_UNIT) {
@@ -421,7 +629,7 @@ fn compile_project_inner(
                 kind: UnitKind::Commons,
                 synthetic: true,
             }),
-            Err(errs) => errors.extend(errs),
+            Err(errs) => errors.extend_for(None, errs),
         }
     }
     // v0.22a: the first-party string commons — derived helpers over the
@@ -438,7 +646,7 @@ fn compile_project_inner(
                 kind: UnitKind::Commons,
                 synthetic: true,
             }),
-            Err(errs) => errors.extend(errs),
+            Err(errs) => errors.extend_for(None, errs),
         }
     }
 
@@ -464,29 +672,31 @@ fn compile_project_inner(
         }
     }
     if let Err(e) = check_directory_name_consistency(&parsed) {
-        errors.extend(e);
+        errors.extend_for(None, e);
     }
     if let Err(e) = check_directory_kind_consistency(&parsed) {
-        errors.extend(e);
+        errors.extend_for(None, e);
     }
     // A group must agree on kind across all its files (different name but
     // same kind is fine; same name but different kind is an error).
     if let Err(e) = check_group_kind_consistency(&parsed, &groups) {
-        errors.extend(e);
+        errors.extend_for(None, e);
     }
     // Each file's path must match its declared qualified name.
     if let Err(e) = check_path_name_alignment(&parsed) {
-        errors.extend(e);
+        errors.extend_for(None, e);
     }
     // v0.9.1: in split-paths mode, also align test-file paths against the
     // target qualified name. In single-tree mode tests live wherever the
     // user puts them, so the check doesn't apply.
     if split_mode && let Err(e) = check_test_path_alignment(&parsed) {
-        errors.extend(e);
+        errors.extend_for(None, e);
     }
 
     // v0.20a: function types are confined to non-boundary positions.
-    check_function_type_boundaries(&parsed, &mut errors);
+    let mut fn_boundary_errors: Vec<CompileError> = Vec::new();
+    check_function_type_boundaries(&parsed, &mut fn_boundary_errors);
+    errors.extend_for(None, fn_boundary_errors);
 
     // v0.17: the `karn` root namespace is reserved for the toolchain. No user
     // unit of any kind may be named `karn` or `karn.*` (§3.4).
@@ -496,7 +706,7 @@ fn compile_project_inner(
         }
         let qn = pf.unit.name();
         if qn.parts.first().is_some_and(|p| p.name == "karn") {
-            errors.push(
+            errors.push_for(None,
                 CompileError::new(
                     "karn.namespace.reserved",
                     qn.span,
@@ -523,7 +733,7 @@ fn compile_project_inner(
                 .iter()
                 .any(|it| matches!(it, CommonsItem::Provider(p) if p.external));
             if has_external && a.binding.is_none() {
-                errors.push(
+                errors.push_for(None,
                     CompileError::new(
                         "karn.adapter.no_binding",
                         a.span,
@@ -582,7 +792,7 @@ fn compile_project_inner(
                 );
             }
             Err(e) => {
-                errors.push(
+                errors.push_for(None,
                     CompileError::new(
                         "karn.adapter.no_binding",
                         b.module_span,
@@ -609,7 +819,7 @@ fn compile_project_inner(
         let Some(b) = &a.binding else { continue };
         for dep in &b.requires {
             if is_unpinned_range(&dep.range) {
-                errors.push(
+                errors.push_for(None,
                     CompileError::new(
                         "karn.requires.unpinned_dependency",
                         dep.span,
@@ -632,7 +842,9 @@ fn compile_project_inner(
     let mut unit_tables: HashMap<String, UnitTable> = HashMap::new();
     for (name, indices) in &groups {
         let kind = *kinds.get(name).expect("every group has a kind");
-        let table = build_unit_table(name, kind, indices, &parsed, &mut errors);
+        let mut table_errors: Vec<CompileError> = Vec::new();
+        let table = build_unit_table(name, kind, indices, &parsed, &mut table_errors);
+        errors.extend_for(None, table_errors);
         unit_tables.insert(name.clone(), table);
     }
 
@@ -644,7 +856,8 @@ fn compile_project_inner(
             for u in parsed[i].uses() {
                 let target = u.target.joined();
                 if !unit_tables.contains_key(&target) {
-                    errors.push(
+                    errors.push_for(
+                        None,
                         CompileError::new(
                             "karn.uses.unknown_commons",
                             u.span,
@@ -658,7 +871,7 @@ fn compile_project_inner(
                 }
                 let target_kind = *kinds.get(&target).unwrap();
                 if target_kind != UnitKind::Commons {
-                    errors.push(
+                    errors.push_for(None,
                         CompileError::new(
                             "karn.uses.target_is_context",
                             u.span,
@@ -673,11 +886,14 @@ fn compile_project_inner(
                     continue;
                 }
                 if target == *name {
-                    errors.push(CompileError::new(
-                        "karn.uses.self_reference",
-                        u.span,
-                        format!("`{name}` cannot `uses` itself"),
-                    ));
+                    errors.push_for(
+                        None,
+                        CompileError::new(
+                            "karn.uses.self_reference",
+                            u.span,
+                            format!("`{name}` cannot `uses` itself"),
+                        ),
+                    );
                     continue;
                 }
                 if !uses_targets.contains(&target) {
@@ -705,7 +921,7 @@ fn compile_project_inner(
             for c in parsed[i].consumes() {
                 let target = c.target.joined();
                 if kind != UnitKind::Context && kind != UnitKind::Adapter {
-                    errors.push(
+                    errors.push_for(None,
                         CompileError::new(
                             "karn.consumes.in_commons",
                             c.span,
@@ -723,7 +939,7 @@ fn compile_project_inner(
                 // form only — an adapter has no services to RPC-call, so the
                 // whole-unit and `as Alias` forms are meaningless inside one.
                 if kind == UnitKind::Adapter && c.selected.is_none() {
-                    errors.push(
+                    errors.push_for(None,
                         CompileError::new(
                             "karn.adapter.consumes_requires_selection",
                             c.span,
@@ -738,7 +954,8 @@ fn compile_project_inner(
                     continue;
                 }
                 if !unit_tables.contains_key(&target) {
-                    errors.push(
+                    errors.push_for(
+                        None,
                         CompileError::new(
                             "karn.consumes.unknown_context",
                             c.span,
@@ -754,7 +971,7 @@ fn compile_project_inner(
                 // v0.17: `consumes` may target a context or an adapter (the host
                 // boundary). It may not target a commons (use `uses` for that).
                 if target_kind != UnitKind::Context && target_kind != UnitKind::Adapter {
-                    errors.push(
+                    errors.push_for(None,
                         CompileError::new(
                             "karn.consumes.target_is_commons",
                             c.span,
@@ -772,7 +989,7 @@ fn compile_project_inner(
                 // an adapter consuming a *context* would pull service logic into
                 // the host boundary.
                 if kind == UnitKind::Adapter && target_kind == UnitKind::Context {
-                    errors.push(
+                    errors.push_for(None,
                         CompileError::new(
                             "karn.adapter.consumes_context",
                             c.span,
@@ -792,11 +1009,14 @@ fn compile_project_inner(
                     } else {
                         "context"
                     };
-                    errors.push(CompileError::new(
-                        "karn.consumes.self_reference",
-                        c.span,
-                        format!("{kind_word} `{name}` cannot `consumes` itself"),
-                    ));
+                    errors.push_for(
+                        None,
+                        CompileError::new(
+                            "karn.consumes.self_reference",
+                            c.span,
+                            format!("{kind_word} `{name}` cannot `consumes` itself"),
+                        ),
+                    );
                     continue;
                 }
                 // v0.17: `consumes U { Cap, … }` — validate each selected name is
@@ -810,18 +1030,21 @@ fn compile_project_inner(
                         .unwrap_or_default();
                     for cap in names {
                         if !exported.contains(&cap.name) {
-                            errors.push(CompileError::new(
-                                "karn.given.cross_context_unknown_capability",
-                                cap.span,
-                                format!(
-                                    "`{target}` does not export a capability named `{}`",
-                                    cap.name
+                            errors.push_for(
+                                None,
+                                CompileError::new(
+                                    "karn.given.cross_context_unknown_capability",
+                                    cap.span,
+                                    format!(
+                                        "`{target}` does not export a capability named `{}`",
+                                        cap.name
+                                    ),
                                 ),
-                            ));
+                            );
                             continue;
                         }
                         if local_caps.contains(&cap.name) {
-                            errors.push(CompileError::new(
+                            errors.push_for(None, CompileError::new(
                                 "karn.consumes.capability_name_clash",
                                 cap.span,
                                 format!(
@@ -832,7 +1055,7 @@ fn compile_project_inner(
                             continue;
                         }
                         if let Some(prev) = flattened.get(&cap.name) {
-                            errors.push(CompileError::new(
+                            errors.push_for(None, CompileError::new(
                                 "karn.consumes.capability_name_clash",
                                 cap.span,
                                 format!(
@@ -875,7 +1098,7 @@ fn compile_project_inner(
                     continue;
                 }
                 if let Some(prev_span) = alias_spans.get(&alias.name) {
-                    errors.push(
+                    errors.push_for(None,
                         CompileError::new(
                             "karn.consumes.alias_conflict",
                             alias.span,
@@ -920,7 +1143,7 @@ fn compile_project_inner(
                 None
             };
             if let Some(kind) = conflict_kind {
-                errors.push(
+                errors.push_for(None,
                     CompileError::new(
                         "karn.consumes.alias_conflict",
                         alias_span,
@@ -937,7 +1160,9 @@ fn compile_project_inner(
     }
 
     // -- 5c. Detect `consumes` cycles. --
-    detect_consumes_cycles(&unit_consumes, &mut errors);
+    let mut cycle_errors: Vec<CompileError> = Vec::new();
+    detect_consumes_cycles(&unit_consumes, &mut cycle_errors);
+    errors.extend_for(None, cycle_errors);
 
     // -- 6. Name-conflict detection for uses imports (commons-only check). --
     for (name, targets) in &unit_uses {
@@ -951,7 +1176,7 @@ fn compile_project_inner(
                 }
                 if let Some(prev) = imported.get(type_name) {
                     let span = uses_span_of(&parsed, &groups[name], t).unwrap_or_default();
-                    errors.push(
+                    errors.push_for(None,
                         CompileError::new(
                             "karn.uses.name_conflict",
                             span,
@@ -973,7 +1198,7 @@ fn compile_project_inner(
                 }
                 if let Some(prev) = imported.get(fn_name) {
                     let span = uses_span_of(&parsed, &groups[name], t).unwrap_or_default();
-                    errors.push(
+                    errors.push_for(None,
                         CompileError::new(
                             "karn.uses.name_conflict",
                             span,
@@ -1014,7 +1239,8 @@ fn compile_project_inner(
                 let mut within: HashMap<String, Span> = HashMap::new();
                 for n in &clause.names {
                     if let Some(prev) = within.get(&n.name) {
-                        errors.push(
+                        errors.push_for(
+                            None,
                             CompileError::new(
                                 "karn.exports.duplicate_in_clause",
                                 n.span,
@@ -1030,7 +1256,7 @@ fn compile_project_inner(
                     within.insert(n.name.clone(), n.span);
 
                     if !local.types.contains_key(&n.name) {
-                        errors.push(
+                        errors.push_for(None,
                             CompileError::new(
                                 "karn.exports.undeclared_type",
                                 n.span,
@@ -1048,7 +1274,8 @@ fn compile_project_inner(
 
                     if let Some((prev_vis, prev_span)) = seen.get(&n.name) {
                         if *prev_vis == clause_vis {
-                            errors.push(
+                            errors.push_for(
+                                None,
                                 CompileError::new(
                                     "karn.exports.duplicate_export",
                                     n.span,
@@ -1057,7 +1284,7 @@ fn compile_project_inner(
                                 .with_label(*prev_span, "previously exported here"),
                             );
                         } else {
-                            errors.push(
+                            errors.push_for(None,
                                 CompileError::new(
                                     "karn.exports.conflicting_visibility",
                                     n.span,
@@ -1099,7 +1326,8 @@ fn compile_project_inner(
                 }
                 for n in &clause.names {
                     if let Some(prev) = seen.get(&n.name) {
-                        errors.push(
+                        errors.push_for(
+                            None,
                             CompileError::new(
                                 "karn.exports.duplicate_export",
                                 n.span,
@@ -1111,7 +1339,7 @@ fn compile_project_inner(
                     }
                     seen.insert(n.name.clone(), n.span);
                     if !local.capabilities.contains_key(&n.name) {
-                        errors.push(
+                        errors.push_for(None,
                             CompileError::new(
                                 "karn.exports.undeclared_capability",
                                 n.span,
@@ -1127,7 +1355,7 @@ fn compile_project_inner(
                         continue;
                     }
                     if !local.providers.contains_key(&n.name) {
-                        errors.push(
+                        errors.push_for(None,
                             CompileError::new(
                                 "karn.exports.capability_not_provided",
                                 n.span,
@@ -1156,7 +1384,7 @@ fn compile_project_inner(
                 continue;
             }
             let Some(cap) = table.capabilities.get(cap_name) else {
-                errors.push(
+                errors.push_for(None,
                     CompileError::new(
                         "karn.provider.unknown_capability",
                         provider.capability.span,
@@ -1171,21 +1399,24 @@ fn compile_project_inner(
             // 1) Every capability op has a provider op.
             for cap_op in &cap.ops {
                 if !provider.ops.iter().any(|o| o.name.name == cap_op.name.name) {
-                    errors.push(CompileError::new(
-                        "karn.provider.missing_operation",
-                        provider.span,
-                        format!(
-                            "provider `{}` for capability `{}` is missing operation `{}`",
-                            provider.provider_name.name, cap_name, cap_op.name.name
+                    errors.push_for(
+                        None,
+                        CompileError::new(
+                            "karn.provider.missing_operation",
+                            provider.span,
+                            format!(
+                                "provider `{}` for capability `{}` is missing operation `{}`",
+                                provider.provider_name.name, cap_name, cap_op.name.name
+                            ),
                         ),
-                    ));
+                    );
                 }
             }
             // 2) Every provider op corresponds to a capability op with the
             //    same signature (param types and return type).
             for prov_op in &provider.ops {
                 let Some(cap_op) = cap.ops.iter().find(|o| o.name.name == prov_op.name.name) else {
-                    errors.push(CompileError::new(
+                    errors.push_for(None, CompileError::new(
                         "karn.provider.extra_operation",
                         prov_op.span,
                         format!(
@@ -1196,7 +1427,7 @@ fn compile_project_inner(
                     continue;
                 };
                 if cap_op.params.len() != prov_op.params.len() {
-                    errors.push(CompileError::new(
+                    errors.push_for(None, CompileError::new(
                         "karn.provider.signature_mismatch",
                         prov_op.span,
                         format!(
@@ -1213,7 +1444,7 @@ fn compile_project_inner(
                     cap_op.params.iter().zip(prov_op.params.iter()).enumerate()
                 {
                     if !type_refs_match(&cap_p.type_ref, &prov_p.type_ref) {
-                        errors.push(CompileError::new(
+                        errors.push_for(None, CompileError::new(
                             "karn.provider.signature_mismatch",
                             prov_p.span,
                             format!(
@@ -1228,7 +1459,7 @@ fn compile_project_inner(
                     }
                 }
                 if !type_refs_match(&cap_op.return_type, &prov_op.return_type) {
-                    errors.push(CompileError::new(
+                    errors.push_for(None, CompileError::new(
                         "karn.provider.signature_mismatch",
                         prov_op.return_type.span(),
                         format!(
@@ -1244,8 +1475,8 @@ fn compile_project_inner(
         }
     }
 
-    if !errors.is_empty() {
-        return Err(errors);
+    if !errors.is_empty() && mode == Mode::Build {
+        return finish(mode, errors, snapshots);
     }
 
     // -- 7. Build per-unit file index (which file declares which name). --
@@ -1262,6 +1493,12 @@ fn compile_project_inner(
     for (name, indices) in &groups {
         let kind = *kinds.get(name).unwrap();
         let local_table = unit_tables.get(name).unwrap();
+        // v0.24: skip resolve/check only when THIS group's composition
+        // failed. In build mode the sink is empty here (the structural gate
+        // bailed), so the delta equals the old global is_empty check; in
+        // analyse mode one broken unit no longer suppresses every other
+        // unit's semantic diagnostics.
+        let group_error_baseline = errors.len();
 
         // Compose: local + transitive (one level) uses. For commons, mixin
         // preserves type identity; for contexts, mixin produces per-context
@@ -1326,7 +1563,7 @@ fn compile_project_inner(
                     // Name conflict between local/uses and consumed export.
                     let consumes_span =
                         consumes_span_of(&parsed, &groups[name], t).unwrap_or_default();
-                    errors.push(
+                    errors.push_for(None,
                         CompileError::new(
                             "karn.consumes.name_conflict",
                             consumes_span,
@@ -1372,7 +1609,7 @@ fn compile_project_inner(
             }
         }
 
-        if !errors.is_empty() {
+        if errors.len() > group_error_baseline {
             continue;
         }
 
@@ -1500,13 +1737,13 @@ fn compile_project_inner(
                 agents: HashMap::new(),
             };
             if let Err(errs) = resolver::resolve_file(&resolved) {
-                errors.extend(errs);
+                errors.extend_for(Some(&pf.source_path), errs);
                 continue;
             }
             let typed = match checker::check(resolved) {
                 Ok(t) => t,
                 Err(errs) => {
-                    errors.extend(errs);
+                    errors.extend_for(Some(&pf.source_path), errs);
                     continue;
                 }
             };
@@ -1517,7 +1754,7 @@ fn compile_project_inner(
                 let context_check_errs =
                     check_context_constraints(&typed, &consumed_types, &local_names);
                 if !context_check_errs.is_empty() {
-                    errors.extend(context_check_errs);
+                    errors.extend_for(Some(&pf.source_path), context_check_errs);
                     continue;
                 }
             }
@@ -1533,11 +1770,15 @@ fn compile_project_inner(
             {
                 let v0_5_errs = check_v0_5_declarations(&mut typed, table, &cross_context_for_file);
                 if !v0_5_errs.is_empty() {
-                    errors.extend(v0_5_errs);
+                    errors.extend_for(Some(&pf.source_path), v0_5_errs);
                     continue;
                 }
             }
 
+            // Analyse mode stops at checked: emission is build-only.
+            if mode == Mode::Analyse {
+                continue;
+            }
             // Build the emitter context.
             let mut imported_decl_paths: HashMap<String, HashMap<String, PathBuf>> = HashMap::new();
             for t in unit_uses.get(name).into_iter().flatten() {
@@ -1696,6 +1937,7 @@ fn compile_project_inner(
     // its target, validates mocks against the target's capability/consumed-
     // context shapes, type-checks bodies with the target's privileged view,
     // and emits a per-target TypeScript test module under `tests/`.
+    let mut test_errors: Vec<CompileError> = Vec::new();
     let (test_outputs, mut runnable_tests) = process_tests(
         &test_groups,
         &parsed,
@@ -1705,8 +1947,9 @@ fn compile_project_inner(
         &unit_consumes,
         &unit_consumes_aliases,
         &unit_uses,
-        &mut errors,
+        &mut test_errors,
     );
+    errors.extend_for(None, test_errors);
 
     compiled.extend(test_outputs);
 
@@ -1715,6 +1958,7 @@ fn compile_project_inner(
     // cross-context call from a synthetic harness root that consumes every
     // participant, and emits a TypeScript module that stands the participants
     // up as in-process Workers and exercises the flow across the real wire.
+    let mut integration_errors: Vec<CompileError> = Vec::new();
     let (integration_outputs, integration_runnables) = process_integration_tests(
         &integration_groups,
         &parsed,
@@ -1723,8 +1967,9 @@ fn compile_project_inner(
         &unit_consumes,
         &unit_consumes_aliases,
         &unit_uses,
-        &mut errors,
+        &mut integration_errors,
     );
+    errors.extend_for(None, integration_errors);
 
     // v0.19 (decisions 0017/0024): platform-lock enforcement. A deployment
     // unit whose in-process closure reaches a platform-native capability is
@@ -1732,6 +1977,7 @@ fn compile_project_inner(
     // on otherwise-clean programs: the closure walk recurses the provider
     // graph, whose acyclicity the earlier checks establish.
     if errors.is_empty() {
+        let mut lock_errors: Vec<CompileError> = Vec::new();
         check_platform_lock(
             target,
             platform,
@@ -1742,12 +1988,13 @@ fn compile_project_inner(
             &unit_consumes,
             &unit_consumes_aliases,
             &unit_flattened,
-            &mut errors,
+            &mut lock_errors,
         );
+        errors.extend_for(None, lock_errors);
     }
 
-    if !errors.is_empty() {
-        return Err(errors);
+    if mode == Mode::Analyse || !errors.is_empty() {
+        return finish(mode, errors, snapshots);
     }
 
     compiled.extend(integration_outputs);
@@ -1924,7 +2171,7 @@ fn compile_project_inner(
     });
 
     compiled.sort_by(|a, b| a.source_path.cmp(&b.source_path));
-    Ok(ProjectOutput { files: compiled })
+    PipelineResult::Build(Ok(ProjectOutput { files: compiled }))
 }
 
 /// Build a project-level composition root that wires every context's
@@ -2699,17 +2946,10 @@ impl ParsedFile {
     }
 }
 
-fn parse_file(root: &Path, path: &Path) -> Result<ParsedFile, Vec<CompileError>> {
-    let source = match fs::read_to_string(path) {
-        Ok(s) => s,
-        Err(e) => {
-            return Err(vec![CompileError::new(
-                "karn.project.read_failed",
-                Span::default(),
-                format!("could not read `{}`: {e}", path.display()),
-            )]);
-        }
-    };
+/// Parse already-read source text into a [`ParsedFile`]. The read happens
+/// at the call site (v0.24): the pipeline owns the text for snapshots and
+/// per-file error attribution, and the overlay supplies unsaved buffers.
+fn parse_source(root: &Path, path: &Path, source: String) -> Result<ParsedFile, Vec<CompileError>> {
     let tokens = lexer::tokenize(&source).map_err(|e| vec![e])?;
     let unit = parser::parse_unit(&tokens, &source)?;
     let kind = match &unit {
