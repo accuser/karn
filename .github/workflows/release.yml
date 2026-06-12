@@ -7,6 +7,11 @@ name: Release
 #   1. Push a version tag matching the manifests, e.g.
 #        git tag v0.16.0 && git push origin v0.16.0
 #      -> builds binaries and cuts the GitHub Release automatically.
+#      The repo carries a single version across all manifests (see
+#      design/README.md "Versioning & release"): the increment PR runs
+#      scripts/bump-version.sh, and every increment is tagged on merge so
+#      the release the VS Code extension's karnServerVersion pin points at
+#      always exists.
 #   2. Once you've eyeballed that release, manually publish to the registries
 #      from the Actions tab ("Run workflow"), or:
 #        gh workflow run release.yml --ref v0.16.0 \
@@ -41,7 +46,9 @@ permissions:
 jobs:
   # Gate every publish on a green test run AND on the tag matching the version
   # baked into the manifests — so you can't accidentally ship v0.17.0 from a
-  # tree that still says 0.16.0.
+  # tree that still says 0.16.0. "The manifests" is every versioned site in
+  # the repo (single-version posture): the Cargo workspace, both npm packages,
+  # and the extension's karnServerVersion server-download pin.
   verify:
     name: Verify (tests + tag/version match)
     runs-on: ubuntu-latest
@@ -57,14 +64,22 @@ jobs:
       - name: Check tag/version match
         run: |
           ver="$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')"
+          ext="$(node -p "require('./vscode-karn/package.json').version")"
+          pin="$(node -p "require('./vscode-karn/package.json').karnServerVersion")"
+          ts="$(node -p "require('./tree-sitter-karn/package.json').version")"
+          fail=0
+          test "$ext" = "$ver" || { echo "::error::vscode-karn version $ext does not match workspace version $ver"; fail=1; }
+          test "$pin" = "v$ver" || { echo "::error::vscode-karn karnServerVersion $pin does not match workspace version v$ver"; fail=1; }
+          test "$ts" = "$ver" || { echo "::error::tree-sitter-karn version $ts does not match workspace version $ver"; fail=1; }
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             tag="${GITHUB_REF_NAME#v}"   # strip leading v
             base="${tag%%-*}"            # drop any -rc1 / -beta suffix
             echo "ref=tag $GITHUB_REF_NAME  manifest=$ver"
-            test "$base" = "$ver" || { echo "::error::tag $GITHUB_REF_NAME does not match workspace version $ver"; exit 1; }
+            test "$base" = "$ver" || { echo "::error::tag $GITHUB_REF_NAME does not match workspace version $ver"; fail=1; }
           else
             echo "::notice::manual dispatch from $GITHUB_REF_NAME — will publish manifest version $ver"
           fi
+          exit "$fail"
       - name: Run tests
         run: cargo test --workspace --locked
         env:

@@ -14,10 +14,13 @@ durable record of a landed increment is the code and its fixtures, the
    proposal is the approval to build.**
 2. **Implement.** The increment consumes the proposal: the grammar/compiler
    change with fixtures, the spec chapters updated in place, a decision record
-   per language-defining call, the changelog/docs/tooling deltas.
+   per language-defining call, the changelog/docs/tooling deltas, and the
+   version bump (`scripts/bump-version.sh` — see
+   [Versioning & release](../README.md#versioning--release)).
 3. **Delete.** The final implementation PR **removes the proposal file**. An
    empty directory means nothing is in flight. The proposal's history remains
-   in version control (`git log -- design/proposals/`).
+   in version control (`git log -- design/proposals/`). On merge, the
+   increment is tagged `vX.Y.Z`.
 
 ## Writing one
 
