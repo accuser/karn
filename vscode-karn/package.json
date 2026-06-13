@@ -4,6 +4,7 @@
   "description": "Language support for Karn (.karn) source files.",
   "version": "0.28.0",
   "publisher": "karn",
+  "license": "MIT OR Apache-2.0",
   "repository": {
     "url": "https://github.com/accuser/karn"
   },
@@ -92,7 +93,7 @@
     "build": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --minify",
     "check": "tsc -p . --noEmit",
     "watch": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --sourcemap --watch",
-    "package": "npm run build && vsce package"
+    "package": "npm run build && npx @vscode/vsce package"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
@@ -100,7 +101,8 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
-    "esbuild": "^0.25.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.1",
     "typescript": "^5.3.0"
   }
 }
