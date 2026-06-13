@@ -46,7 +46,9 @@ fn compile_fixture(id: &str, source: &str) -> Result<(), Vec<CompileError>> {
         let file = root.join(&rel);
         fs::create_dir_all(file.parent().unwrap()).unwrap();
         fs::write(&file, source).unwrap();
-        let result = karnc::compile_project(&root).map(|_| ());
+        let result = karnc::compile_project(&karnc::CompileOptions::single(root.clone()))
+            .map_err(karnc::ProjectFailure::flatten)
+            .map(|_| ());
         let _ = fs::remove_dir_all(&root);
         result
     } else {

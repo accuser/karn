@@ -37,10 +37,8 @@ use ariadne::Source;
 pub use error::CompileError;
 pub use firstparty::Platform;
 pub use project::{
-    AttributedError, BuildTarget, CompiledFile, ProjectFailure, ProjectOutput, ProjectPaths,
-    compile_project, compile_project_full, compile_project_with_platform,
-    compile_project_with_split_paths, compile_project_with_split_paths_full,
-    compile_project_with_target, read_project_paths,
+    AttributedError, BuildTarget, CompileOptions, CompiledFile, ProjectFailure, ProjectOutput,
+    ProjectPaths, Roots, compile_project, read_project_paths,
 };
 
 /// Severity classification for [`Diagnostic`]. Mirrors LSP severity levels so
