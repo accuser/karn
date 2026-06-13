@@ -5621,6 +5621,20 @@ mod runtime_tests {
         assert_eq!(crate::project::worker_dir_name("a.b.c"), "a-b-c");
     }
 
+    // Refactor track, proposal v0.29.1: characterisation pin for the production
+    // `escape_ts_string`, mirroring `project::seam_tests`. The two copies AGREE
+    // on backslash/quote/newline/tab but DIVERGE on carriage return — this one
+    // escapes `\r`, the project test-emission copy leaves it raw. The v0.29.8
+    // de-duplication must reconcile this difference, not assume it away.
+    #[test]
+    fn escape_ts_string_escapes_cr_unlike_the_project_copy() {
+        assert_eq!(escape_ts_string("a\\b"), "a\\\\b");
+        assert_eq!(escape_ts_string("a\"b"), "a\\\"b");
+        assert_eq!(escape_ts_string("a\nb"), "a\\nb");
+        assert_eq!(escape_ts_string("a\tb"), "a\\tb");
+        assert_eq!(escape_ts_string("a\rb"), "a\\rb"); // CR escaped here; raw in project copy
+    }
+
     #[test]
     fn runtime_import_depth_resolves_correctly() {
         assert_eq!(runtime_import_for(Path::new("compose.ts")), "./runtime.js");
