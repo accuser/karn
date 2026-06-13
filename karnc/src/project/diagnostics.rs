@@ -56,6 +56,11 @@ impl ErrorSink {
     pub(crate) fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
+    /// Consume the sink, yielding the collection-ordered attributed errors —
+    /// the shape both `ProjectFailure` and `ProjectAnalysis` carry.
+    pub(crate) fn into_entries(self) -> Vec<AttributedError> {
+        self.entries
+    }
     pub(crate) fn len(&self) -> usize {
         self.entries.len()
     }
@@ -90,36 +95,5 @@ impl ProjectFailure {
     /// The pre-v0.24 contract: collection-ordered, attribution dropped.
     pub fn flatten(self) -> Vec<CompileError> {
         self.errors.into_iter().map(|a| a.error).collect()
-    }
-}
-
-pub(crate) enum PipelineResult {
-    Build(Result<ProjectOutput, ProjectFailure>),
-    Analysis(ProjectAnalysis),
-}
-
-/// Terminate the pipeline with the accumulated errors, keeping attribution
-/// and snapshots in both modes. `index` is the assembled binding index when
-/// the pipeline reached resolution; early bails pass an empty one. `hints`
-/// holds whatever the checker recorded before the exit — empty on bails
-/// that never reached checking.
-pub(crate) fn finish(
-    mode: Mode,
-    errors: ErrorSink,
-    snapshots: Vec<(PathBuf, String)>,
-    index: ProjectIndex,
-    hints: FileHints,
-) -> PipelineResult {
-    match mode {
-        Mode::Build => PipelineResult::Build(Err(ProjectFailure {
-            errors: errors.entries,
-            snapshots,
-        })),
-        Mode::Analyse => PipelineResult::Analysis(ProjectAnalysis {
-            snapshots,
-            errors: errors.entries,
-            index,
-            hints,
-        }),
     }
 }

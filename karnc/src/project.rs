@@ -217,7 +217,7 @@ impl CompileOptions {
 /// shape.
 pub fn compile_project(options: &CompileOptions) -> Result<ProjectOutput, ProjectFailure> {
     let (src_root, tests_root) = options.roots.resolve();
-    match compile_project_pipeline(
+    match run_checks(
         &src_root,
         &tests_root,
         options.target,
@@ -225,8 +225,48 @@ pub fn compile_project(options: &CompileOptions) -> Result<ProjectOutput, Projec
         Mode::Build,
         &HashMap::new(),
     ) {
-        PipelineResult::Build(r) => r,
-        PipelineResult::Analysis(_) => unreachable!("build mode returned an analysis"),
+        RunChecks::Bailed {
+            errors, snapshots, ..
+        } => Err(ProjectFailure {
+            errors: errors.into_entries(),
+            snapshots,
+        }),
+        RunChecks::Checked {
+            errors, snapshots, ..
+        } if !errors.is_empty() => Err(ProjectFailure {
+            errors: errors.into_entries(),
+            snapshots,
+        }),
+        RunChecks::Checked {
+            compiled,
+            runnable_tests,
+            integration_outputs,
+            integration_runnables,
+            groups,
+            kinds,
+            unit_consumes,
+            unit_consumes_aliases,
+            unit_tables,
+            unit_flattened,
+            adapter_bindings,
+            npm_deps,
+            target,
+            ..
+        } => Ok(build_output(
+            compiled,
+            runnable_tests,
+            integration_outputs,
+            integration_runnables,
+            groups,
+            kinds,
+            unit_consumes,
+            unit_consumes_aliases,
+            unit_tables,
+            unit_flattened,
+            adapter_bindings,
+            npm_deps,
+            target,
+        )),
     }
 }
 
@@ -234,7 +274,7 @@ pub fn compile_project(options: &CompileOptions) -> Result<ProjectOutput, Projec
 /// file-attributed (ADR 0052). `overlay` maps canonicalised absolute paths
 /// to buffer text layered over disk reads (unsaved editor buffers).
 pub fn analyse_project(root: &Path, overlay: &HashMap<PathBuf, String>) -> ProjectAnalysis {
-    match compile_project_pipeline(
+    match run_checks(
         root,
         root,
         BuildTarget::Bundle,
@@ -242,8 +282,39 @@ pub fn analyse_project(root: &Path, overlay: &HashMap<PathBuf, String>) -> Proje
         Mode::Analyse,
         overlay,
     ) {
-        PipelineResult::Analysis(a) => a,
-        PipelineResult::Build(_) => unreachable!("analyse mode returned a build result"),
+        RunChecks::Bailed {
+            errors,
+            snapshots,
+            mut hints,
+        } => ProjectAnalysis {
+            snapshots,
+            errors: errors.into_entries(),
+            index: ProjectIndex::default(),
+            hints: hints.take_files(),
+        },
+        RunChecks::Checked {
+            errors,
+            snapshots,
+            mut refs,
+            mut hints,
+            parsed,
+            unit_uses,
+            unit_consumes,
+            ..
+        } => {
+            let index = assemble_index(
+                &parsed,
+                &unit_uses,
+                &unit_consumes,
+                std::mem::take(&mut refs),
+            );
+            ProjectAnalysis {
+                snapshots,
+                errors: errors.into_entries(),
+                index,
+                hints: hints.take_files(),
+            }
+        }
     }
 }
 
@@ -2051,14 +2122,51 @@ fn check_unit_files(
     }
 }
 
-fn compile_project_pipeline(
+/// The outcome of the shared check pipeline (regions 1+2's shared work),
+/// before either entry point applies its own divergent exit. The two typed
+/// entry points (`compile_project`, `analyse_project`) project this into a
+/// `Result<ProjectOutput, ProjectFailure>` or a `ProjectAnalysis`.
+#[allow(clippy::large_enum_variant)]
+enum RunChecks {
+    /// Discovery/parse failed, or (build mode) the structural gate bailed:
+    /// only diagnostics, no checked program. Index is not assembled here.
+    Bailed {
+        errors: ErrorSink,
+        snapshots: Vec<(PathBuf, String)>,
+        hints: HintSink,
+    },
+    /// All phases ran (per-unit checks + tests + platform-lock done).
+    Checked {
+        errors: ErrorSink,
+        snapshots: Vec<(PathBuf, String)>,
+        refs: RefSink,
+        hints: HintSink,
+        parsed: Vec<ParsedFile>,
+        compiled: Vec<CompiledFile>,
+        runnable_tests: Vec<RunnableTest>,
+        integration_outputs: Vec<CompiledFile>,
+        integration_runnables: Vec<RunnableTest>,
+        groups: HashMap<String, Vec<usize>>,
+        kinds: HashMap<String, UnitKind>,
+        unit_uses: HashMap<String, Vec<String>>,
+        unit_consumes: HashMap<String, Vec<String>>,
+        unit_consumes_aliases: HashMap<String, HashMap<String, String>>,
+        unit_tables: HashMap<String, UnitTable>,
+        unit_flattened: HashMap<String, HashMap<String, String>>,
+        adapter_bindings: HashMap<String, AdapterBinding>,
+        npm_deps: std::collections::BTreeMap<String, String>,
+        target: BuildTarget,
+    },
+}
+
+fn run_checks(
     src_root: &Path,
     tests_root: &Path,
     target: BuildTarget,
     platform: Platform,
     mode: Mode,
     overlay: &HashMap<PathBuf, String>,
-) -> PipelineResult {
+) -> RunChecks {
     let mut errors = ErrorSink::new();
     // v0.25 (ADR 0053): binding edges, recorded at the resolution sites and
     // assembled into the project index at the analyse exit.
@@ -2075,13 +2183,11 @@ fn compile_project_pipeline(
         match phase_discovery(src_root, tests_root, split_mode, &mut errors) {
             Ok(files) => files,
             Err(()) => {
-                return finish(
-                    mode,
+                return RunChecks::Bailed {
                     errors,
                     snapshots,
-                    ProjectIndex::default(),
-                    hints.take_files(),
-                );
+                    hints,
+                };
             }
         };
 
@@ -2098,13 +2204,11 @@ fn compile_project_pipeline(
     ) {
         Ok(out) => out,
         Err(()) => {
-            return finish(
-                mode,
+            return RunChecks::Bailed {
                 errors,
                 snapshots,
-                ProjectIndex::default(),
-                hints.take_files(),
-            );
+                hints,
+            };
         }
     };
 
@@ -2176,13 +2280,11 @@ fn compile_project_pipeline(
     phase_validate_providers(&unit_tables, &mut errors);
 
     if !errors.is_empty() && mode == Mode::Build {
-        return finish(
-            mode,
+        return RunChecks::Bailed {
             errors,
             snapshots,
-            ProjectIndex::default(),
-            hints.take_files(),
-        );
+            hints,
+        };
     }
 
     // -- 7. Build per-unit file index (which file declares which name). --
@@ -2283,7 +2385,7 @@ fn compile_project_pipeline(
     // context shapes, type-checks bodies with the target's privileged view,
     // and emits a per-target TypeScript test module under `tests/`.
     let mut test_errors: Vec<CompileError> = Vec::new();
-    let (test_outputs, mut runnable_tests) = process_tests(
+    let (test_outputs, runnable_tests) = process_tests(
         &test_groups,
         &parsed,
         &kinds,
@@ -2340,16 +2442,49 @@ fn compile_project_pipeline(
         errors.extend_for(None, lock_errors);
     }
 
-    if mode == Mode::Analyse || !errors.is_empty() {
-        let index = assemble_index(
-            &parsed,
-            &unit_uses,
-            &unit_consumes,
-            std::mem::take(&mut refs),
-        );
-        return finish(mode, errors, snapshots, index, hints.take_files());
+    RunChecks::Checked {
+        errors,
+        snapshots,
+        refs,
+        hints,
+        parsed,
+        compiled,
+        runnable_tests,
+        integration_outputs,
+        integration_runnables,
+        groups,
+        kinds,
+        unit_uses,
+        unit_consumes,
+        unit_consumes_aliases,
+        unit_tables,
+        unit_flattened,
+        adapter_bindings,
+        npm_deps,
+        target,
     }
+}
 
+/// Build-success tail (region 3): emit the composition/worker/runtime files
+/// and assemble the final `ProjectOutput`. Reached only on build mode with a
+/// clean error sink. Moved verbatim from the old pipeline; only the locals it
+/// reads are now bound from the `Checked` variant.
+#[allow(clippy::too_many_arguments)]
+fn build_output(
+    mut compiled: Vec<CompiledFile>,
+    mut runnable_tests: Vec<RunnableTest>,
+    integration_outputs: Vec<CompiledFile>,
+    integration_runnables: Vec<RunnableTest>,
+    groups: HashMap<String, Vec<usize>>,
+    kinds: HashMap<String, UnitKind>,
+    unit_consumes: HashMap<String, Vec<String>>,
+    unit_consumes_aliases: HashMap<String, HashMap<String, String>>,
+    unit_tables: HashMap<String, UnitTable>,
+    unit_flattened: HashMap<String, HashMap<String, String>>,
+    adapter_bindings: HashMap<String, AdapterBinding>,
+    npm_deps: std::collections::BTreeMap<String, String>,
+    target: BuildTarget,
+) -> ProjectOutput {
     compiled.extend(integration_outputs);
     runnable_tests.extend(integration_runnables);
 
@@ -2524,7 +2659,7 @@ fn compile_project_pipeline(
     });
 
     compiled.sort_by(|a, b| a.source_path.cmp(&b.source_path));
-    PipelineResult::Build(Ok(ProjectOutput { files: compiled }))
+    ProjectOutput { files: compiled }
 }
 
 /// Build a project-level composition root that wires every context's
