@@ -22,8 +22,7 @@ extension at it with the `karn.executablePath` setting.
 ```sh
 cd vscode-karn
 npm install
-npm run build
-npx vsce package
+npm run package
 code --install-extension karn-vscode-*.vsix
 ```
 
