@@ -7910,3 +7910,355 @@ mod platform_lock_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod seam_tests {
+    //! Characterisation pins for the pure helpers that the v0.29.2+ structural
+    //! splits relocate (refactor track, proposal v0.29.1). These assert *current*
+    //! behaviour so the moves are verifiable, not aspirational. Where a helper
+    //! encodes a latent quirk, the test pins it as-is and says so — see
+    //! `escape_ts_string_leaves_cr_raw`, which captures a divergence from the
+    //! production emitter that constrains the v0.29.8 de-duplication.
+    use super::*;
+    use crate::ast::{BaseType, Ident, TypeRef};
+    use std::collections::{HashMap, HashSet};
+    use std::path::{Path, PathBuf};
+
+    fn strs(xs: &[&str]) -> Vec<String> {
+        xs.iter().map(|x| (*x).to_string()).collect()
+    }
+
+    // -- is_unpinned_range ----------------------------------------------------
+    #[test]
+    fn is_unpinned_range_true_for_wildcards_and_digitless() {
+        assert!(is_unpinned_range(""));
+        assert!(is_unpinned_range("*"));
+        assert!(is_unpinned_range("x"));
+        assert!(is_unpinned_range("X"));
+        assert!(is_unpinned_range("latest"));
+        assert!(is_unpinned_range("LATEST"));
+        assert!(is_unpinned_range("  *  ")); // trimmed before the checks
+        assert!(is_unpinned_range("workspace:*")); // no ascii digit
+        assert!(is_unpinned_range("beta"));
+    }
+
+    #[test]
+    fn is_unpinned_range_false_when_a_digit_is_present() {
+        assert!(!is_unpinned_range("1.0.0"));
+        assert!(!is_unpinned_range("^1.2"));
+        assert!(!is_unpinned_range("~0.1"));
+        assert!(!is_unpinned_range(">=2"));
+        assert!(!is_unpinned_range("18"));
+    }
+
+    // -- normalize_rel --------------------------------------------------------
+    #[test]
+    fn normalize_rel_resolves_dot_and_parent() {
+        assert_eq!(
+            normalize_rel(Path::new("./tokens.binding.ts")),
+            PathBuf::from("tokens.binding.ts")
+        );
+        assert_eq!(normalize_rel(Path::new("a/./b")), PathBuf::from("a/b"));
+        assert_eq!(normalize_rel(Path::new("a/../b")), PathBuf::from("b"));
+        assert_eq!(normalize_rel(Path::new("a/b/../../c")), PathBuf::from("c"));
+        assert_eq!(normalize_rel(Path::new("a/b")), PathBuf::from("a/b"));
+    }
+
+    #[test]
+    fn normalize_rel_drops_root_and_pops_through_empty() {
+        // RootDir / Prefix components are dropped.
+        assert_eq!(normalize_rel(Path::new("/a/b")), PathBuf::from("a/b"));
+        // A leading `..` pops an empty stack (a no-op), so it vanishes.
+        assert_eq!(normalize_rel(Path::new("../a")), PathBuf::from("a"));
+    }
+
+    // -- commons_dir_for / ts_output_path -------------------------------------
+    #[test]
+    fn commons_dir_for_splits_dotted_name_into_dirs() {
+        assert_eq!(commons_dir_for("a.b.c"), PathBuf::from("a/b/c"));
+        assert_eq!(commons_dir_for("foo"), PathBuf::from("foo"));
+    }
+
+    #[test]
+    fn ts_output_path_sets_ts_extension() {
+        assert_eq!(
+            ts_output_path(Path::new("foo.karn")),
+            PathBuf::from("foo.ts")
+        );
+        assert_eq!(
+            ts_output_path(Path::new("a/b.karn")),
+            PathBuf::from("a/b.ts")
+        );
+        assert_eq!(ts_output_path(Path::new("foo")), PathBuf::from("foo.ts"));
+    }
+
+    // -- worker path helpers --------------------------------------------------
+    #[test]
+    fn worker_paths_dasherise_and_root_under_workers() {
+        assert_eq!(worker_dir_name("commerce.payment"), "commerce-payment");
+        assert_eq!(worker_dir_name("plain"), "plain");
+        assert_eq!(
+            worker_handlers_source_path("commerce.payment"),
+            PathBuf::from("workers/commerce-payment/handlers.karn")
+        );
+        assert_eq!(
+            worker_handlers_output_path("commerce.payment"),
+            PathBuf::from("workers/commerce-payment/handlers.ts")
+        );
+    }
+
+    // -- unit_path_matches ----------------------------------------------------
+    #[test]
+    fn unit_path_matches_single_file_layout() {
+        assert!(unit_path_matches(Path::new("a/b/c.karn"), "a.b.c"));
+        assert!(unit_path_matches(Path::new("foo.karn"), "foo"));
+    }
+
+    #[test]
+    fn unit_path_matches_multi_file_layout() {
+        // `a/b/c/<any>.karn` declaring `a.b.c` (the directory is the unit).
+        assert!(unit_path_matches(Path::new("a/b/c/handlers.karn"), "a.b.c"));
+        assert!(unit_path_matches(Path::new("a/b/c/anything.karn"), "a.b.c"));
+    }
+
+    #[test]
+    fn unit_path_matches_rejects_misalignment() {
+        assert!(!unit_path_matches(Path::new("a/b.karn"), "a.b.c"));
+        assert!(!unit_path_matches(Path::new("x/y/z.karn"), "a.b.c"));
+    }
+
+    // -- canonicalise_cycle (the dedup key for consumes cycles) ---------------
+    #[test]
+    fn canonicalise_cycle_is_stable_across_rotations() {
+        // Input always ends with the duplicated start node (the dfs_consumes
+        // shape); every rotation of one cycle yields the same canonical key.
+        assert_eq!(
+            canonicalise_cycle(&strs(&["a", "b", "c", "a"])),
+            strs(&["a", "b", "c"])
+        );
+        assert_eq!(
+            canonicalise_cycle(&strs(&["b", "c", "a", "b"])),
+            strs(&["a", "b", "c"])
+        );
+        assert_eq!(
+            canonicalise_cycle(&strs(&["c", "a", "b", "c"])),
+            strs(&["a", "b", "c"])
+        );
+    }
+
+    #[test]
+    fn canonicalise_cycle_edge_cases() {
+        assert_eq!(canonicalise_cycle(&[]), Vec::<String>::new());
+        assert_eq!(canonicalise_cycle(&strs(&["a", "a"])), strs(&["a"])); // self-loop
+        assert_eq!(
+            canonicalise_cycle(&strs(&["b", "a", "b"])),
+            strs(&["a", "b"])
+        );
+    }
+
+    // -- detect_consumes_cycles over synthetic adjacency maps -----------------
+    fn graph(edges: &[(&str, &[&str])]) -> HashMap<String, Vec<String>> {
+        edges
+            .iter()
+            .map(|(k, vs)| ((*k).to_string(), strs(vs)))
+            .collect()
+    }
+
+    #[test]
+    fn detect_consumes_cycles_silent_on_acyclic() {
+        let g = graph(&[("a", &["b"]), ("b", &["c"]), ("c", &[])]);
+        let mut errors = Vec::new();
+        detect_consumes_cycles(&g, &mut errors);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn detect_consumes_cycles_reports_each_cycle_once() {
+        let mut e2 = Vec::new();
+        detect_consumes_cycles(&graph(&[("a", &["b"]), ("b", &["a"])]), &mut e2);
+        assert_eq!(e2.len(), 1);
+
+        let mut e3 = Vec::new();
+        detect_consumes_cycles(
+            &graph(&[("a", &["b"]), ("b", &["c"]), ("c", &["a"])]),
+            &mut e3,
+        );
+        assert_eq!(e3.len(), 1);
+
+        let mut eself = Vec::new();
+        detect_consumes_cycles(&graph(&[("a", &["a"])]), &mut eself);
+        assert_eq!(eself.len(), 1);
+    }
+
+    #[test]
+    fn detect_consumes_cycles_reports_disjoint_cycles_separately() {
+        let mut errors = Vec::new();
+        detect_consumes_cycles(
+            &graph(&[("a", &["b"]), ("b", &["a"]), ("c", &["d"]), ("d", &["c"])]),
+            &mut errors,
+        );
+        assert_eq!(errors.len(), 2);
+    }
+
+    // -- escape_ts_string (the project test-emission copy) --------------------
+    #[test]
+    fn escape_ts_string_escapes_backslash_quote_newline_tab() {
+        assert_eq!(escape_ts_string("a\\b"), "a\\\\b");
+        assert_eq!(escape_ts_string("a\"b"), "a\\\"b");
+        assert_eq!(escape_ts_string("a\nb"), "a\\nb");
+        assert_eq!(escape_ts_string("a\tb"), "a\\tb");
+        assert_eq!(escape_ts_string("plain"), "plain");
+        assert_eq!(escape_ts_string("emoji 🎉"), "emoji 🎉"); // non-ascii passes through
+    }
+
+    #[test]
+    fn escape_ts_string_leaves_cr_raw() {
+        // CHARACTERISES A LATENT DIVERGENCE (not an endorsement): this project
+        // test-emission copy leaves a carriage return RAW, whereas the
+        // production emitter (`crate::emitter::escape_ts_string`) escapes it to
+        // `\r` — pinned on that side by `emitter::escape_tests`. The v0.29.8
+        // de-duplication must preserve this harness's output for `\r`, so it
+        // cannot silently adopt the emitter's version.
+        assert_eq!(escape_ts_string("a\rb"), "a\rb");
+    }
+
+    // -- sanitise_suite / sanitise_case_name ----------------------------------
+    #[test]
+    fn sanitise_suite_lowercases_collapses_and_trims() {
+        assert_eq!(sanitise_suite("My Suite"), "my_suite");
+        assert_eq!(sanitise_suite("Foo__Bar"), "foo_bar");
+        assert_eq!(sanitise_suite("  Hello  "), "hello");
+        assert_eq!(sanitise_suite("a1B2"), "a1b2");
+        assert_eq!(sanitise_suite("!!!"), "suite"); // empty after trim -> fallback
+        assert_eq!(sanitise_suite(""), "suite");
+    }
+
+    #[test]
+    fn sanitise_case_name_prefixes_and_advances_index() {
+        let mut idx = 0;
+        assert_eq!(
+            sanitise_case_name("hello world", &mut idx),
+            "test_hello_world"
+        );
+        assert_eq!(idx, 1); // index advances on every call
+        assert_eq!(sanitise_case_name("a-b.c", &mut idx), "test_a_b_c");
+        assert_eq!(idx, 2);
+    }
+
+    #[test]
+    fn sanitise_case_name_appends_index_only_for_empty_name() {
+        let mut idx = 5;
+        assert_eq!(sanitise_case_name("", &mut idx), "test_5"); // empty -> index suffix
+        assert_eq!(idx, 6);
+        // A name of only non-alphanumeric chars is NOT "test_", so no suffix.
+        let mut idx2 = 9;
+        assert_eq!(sanitise_case_name(" ", &mut idx2), "test__");
+        assert_eq!(idx2, 10);
+    }
+
+    // -- the duplicate type-ref renderers -------------------------------------
+    fn named(n: &str) -> TypeRef {
+        TypeRef::Named(Ident {
+            name: n.to_string(),
+            span: Span::default(),
+        })
+    }
+    fn base(b: BaseType) -> TypeRef {
+        TypeRef::Base(b, Span::default())
+    }
+
+    #[test]
+    fn ts_type_ref_emit_bases_and_generics() {
+        assert_eq!(ts_type_ref_emit(&base(BaseType::Int)), "number");
+        assert_eq!(ts_type_ref_emit(&base(BaseType::Float)), "number");
+        assert_eq!(ts_type_ref_emit(&base(BaseType::String)), "string");
+        assert_eq!(ts_type_ref_emit(&base(BaseType::Bool)), "boolean");
+        assert_eq!(ts_type_ref_emit(&named("Order")), "Order");
+        assert_eq!(
+            ts_type_ref_emit(&TypeRef::List(Box::new(named("Order")), Span::default())),
+            "readonly Order[]"
+        );
+        assert_eq!(
+            ts_type_ref_emit(&TypeRef::Option(
+                Box::new(base(BaseType::Int)),
+                Span::default()
+            )),
+            "Option<number>"
+        );
+        assert_eq!(
+            ts_type_ref_emit(&TypeRef::Effect(
+                Box::new(TypeRef::Unit(Span::default())),
+                Span::default()
+            )),
+            "Promise<void>"
+        );
+        assert_eq!(
+            ts_type_ref_emit(&TypeRef::Map(
+                Box::new(base(BaseType::String)),
+                Box::new(named("V")),
+                Span::default()
+            )),
+            "ReadonlyMap<string, V>"
+        );
+        assert_eq!(
+            ts_type_ref_emit(&TypeRef::Result(
+                Box::new(named("T")),
+                Box::new(named("E")),
+                Span::default()
+            )),
+            "Result<T, E>"
+        );
+        assert_eq!(
+            ts_type_ref_emit(&TypeRef::HttpResult(Box::new(named("T")), Span::default())),
+            "HttpResult<T>"
+        );
+        assert_eq!(
+            ts_type_ref_emit(&TypeRef::ValidationError(Span::default())),
+            "ValidationError"
+        );
+        assert_eq!(
+            ts_type_ref_emit(&TypeRef::JsonError(Span::default())),
+            "JsonError"
+        );
+    }
+
+    #[test]
+    fn ts_type_ref_emit_fn_uses_positional_param_names() {
+        let f = TypeRef::Fn(
+            vec![base(BaseType::Int), named("Order")],
+            Box::new(TypeRef::Unit(Span::default())),
+            Span::default(),
+        );
+        assert_eq!(ts_type_ref_emit(&f), "(a0: number, a1: Order) => void");
+    }
+
+    #[test]
+    fn ts_type_ref_emit_qualified_prefixes_only_scoped_names() {
+        let mut scope: HashSet<String> = HashSet::new();
+        scope.insert("Order".to_string());
+        // A named type in the privileged scope is qualified with the namespace.
+        assert_eq!(
+            ts_type_ref_emit_qualified(&named("Order"), &scope, "Ns"),
+            "Ns.Order"
+        );
+        // A named type outside the scope is left bare.
+        assert_eq!(
+            ts_type_ref_emit_qualified(&named("Other"), &scope, "Ns"),
+            "Other"
+        );
+        // Qualification recurses through generic arguments.
+        assert_eq!(
+            ts_type_ref_emit_qualified(
+                &TypeRef::List(Box::new(named("Order")), Span::default()),
+                &scope,
+                "Ns"
+            ),
+            "readonly Ns.Order[]"
+        );
+        // Base types are unaffected by qualification.
+        assert_eq!(
+            ts_type_ref_emit_qualified(&base(BaseType::Int), &scope, "Ns"),
+            "number"
+        );
+    }
+}
