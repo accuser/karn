@@ -47,11 +47,7 @@ fn run_test(input: PathBuf, output: Option<PathBuf>, no_run: bool) -> ExitCode {
     let split_mode = karn_toml.exists() || src_dir.is_dir();
     let out = if split_mode {
         let paths = karnc::read_project_paths(&input);
-        match karnc::compile_project_with_split_paths_full(
-            &input,
-            karnc::BuildTarget::Bundle,
-            &paths,
-        ) {
+        match karnc::compile_project(&karnc::CompileOptions::split(input.clone(), paths)) {
             Ok(out) => out,
             Err(failure) => {
                 karnc::print_project_failure(&failure);
@@ -59,12 +55,7 @@ fn run_test(input: PathBuf, output: Option<PathBuf>, no_run: bool) -> ExitCode {
             }
         }
     } else {
-        match karnc::compile_project_full(
-            &input,
-            &input,
-            karnc::BuildTarget::Bundle,
-            karnc::Platform::default(),
-        ) {
+        match karnc::compile_project(&karnc::CompileOptions::single(input.clone())) {
             Ok(out) => out,
             Err(failure) => {
                 karnc::print_project_failure(&failure);
@@ -103,17 +94,13 @@ fn run_test(input: PathBuf, output: Option<PathBuf>, no_run: bool) -> ExitCode {
     if has_integration {
         let workers_out = if split_mode {
             let paths = karnc::read_project_paths(&input);
-            karnc::compile_project_with_split_paths_full(
-                &input,
-                karnc::BuildTarget::Workers,
-                &paths,
+            karnc::compile_project(
+                &karnc::CompileOptions::split(input.clone(), paths)
+                    .target(karnc::BuildTarget::Workers),
             )
         } else {
-            karnc::compile_project_full(
-                &input,
-                &input,
-                karnc::BuildTarget::Workers,
-                karnc::Platform::default(),
+            karnc::compile_project(
+                &karnc::CompileOptions::single(input.clone()).target(karnc::BuildTarget::Workers),
             )
         };
         let workers_out = match workers_out {
@@ -333,7 +320,11 @@ fn run_compile(
 ) -> ExitCode {
     if input.is_dir() {
         // Multi-file project compile.
-        match karnc::compile_project_full(&input, &input, target, platform) {
+        match karnc::compile_project(
+            &karnc::CompileOptions::single(input.clone())
+                .target(target)
+                .platform(platform),
+        ) {
             Ok(out) => {
                 for file in &out.files {
                     let target = output.join(&file.output_path);
@@ -382,12 +373,7 @@ fn run_compile(
 
 fn run_check(input: PathBuf) -> ExitCode {
     if input.is_dir() {
-        match karnc::compile_project_full(
-            &input,
-            &input,
-            karnc::BuildTarget::Bundle,
-            karnc::Platform::default(),
-        ) {
+        match karnc::compile_project(&karnc::CompileOptions::single(input.clone())) {
             Ok(_) => ExitCode::SUCCESS,
             Err(failure) => {
                 karnc::print_project_failure(&failure);

@@ -153,11 +153,12 @@ fn float_boundary_codec_behaviour() {
     // Compile the workers Float-boundary fixture in-process.
     let fixture: PathBuf = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/positive/207_workers_float_boundary/src");
-    let out = karnc::compile_project_with_platform(
-        &fixture,
-        karnc::BuildTarget::Workers,
-        karnc::Platform::Cloudflare,
+    let out = karnc::compile_project(
+        &karnc::CompileOptions::single(fixture)
+            .target(karnc::BuildTarget::Workers)
+            .platform(karnc::Platform::Cloudflare),
     )
+    .map_err(karnc::ProjectFailure::flatten)
     .expect("the Float-boundary fixture must compile");
 
     let tmp = std::env::temp_dir().join(format!("karn-float-codec-{}", std::process::id()));

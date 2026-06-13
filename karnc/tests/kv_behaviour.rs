@@ -206,11 +206,12 @@ fn kv_adapter_behaviour() {
     // Compile the bundle Kv fixture in-process.
     let fixture: PathBuf = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/positive/214_kv_list_bundle/src");
-    let out = karnc::compile_project_with_platform(
-        &fixture,
-        karnc::BuildTarget::Bundle,
-        karnc::Platform::Cloudflare,
+    let out = karnc::compile_project(
+        &karnc::CompileOptions::single(fixture)
+            .target(karnc::BuildTarget::Bundle)
+            .platform(karnc::Platform::Cloudflare),
     )
+    .map_err(karnc::ProjectFailure::flatten)
     .expect("the Kv bundle fixture must compile");
 
     let tmp = std::env::temp_dir().join(format!("karn-kv-behaviour-{}", std::process::id()));

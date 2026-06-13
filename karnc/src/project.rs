@@ -134,58 +134,100 @@ impl UnitKind {
     }
 }
 
-/// Compile a Karn project rooted at `root`, defaulting to the bundle build
-/// target. Use [`compile_project_with_target`] to select a target.
-pub fn compile_project(root: &Path) -> Result<ProjectOutput, Vec<CompileError>> {
-    compile_project_with_target(root, BuildTarget::Bundle)
+/// Where a project's source and test units live.
+pub enum Roots {
+    /// Sources and tests share one root (`src == tests`).
+    Single(PathBuf),
+    /// v0.9.1 split layout: source-unit identity rooted at
+    /// `<project_root>/<paths.src>` and test-unit identity at
+    /// `<project_root>/<paths.tests>`.
+    Split {
+        project_root: PathBuf,
+        paths: ProjectPaths,
+    },
 }
 
-/// Compile a Karn project rooted at `root` with an explicit build target.
-///
-/// In `BuildTarget::Bundle` (default) the output is the existing v0.6+
-/// single-bundle layout. In `BuildTarget::Workers` (v0.8) each context
-/// becomes a Cloudflare Worker under `out/workers/<context-with-dashes>/`.
-pub fn compile_project_with_target(
-    root: &Path,
-    target: BuildTarget,
-) -> Result<ProjectOutput, Vec<CompileError>> {
-    compile_project_inner(root, root, target, Platform::default())
+impl Roots {
+    /// Resolve to `(src_root, tests_root)`.
+    fn resolve(&self) -> (PathBuf, PathBuf) {
+        match self {
+            Roots::Single(root) => (root.clone(), root.clone()),
+            Roots::Split {
+                project_root,
+                paths,
+            } => (
+                project_root.join(&paths.src),
+                project_root.join(&paths.tests),
+            ),
+        }
+    }
 }
 
-/// v0.17: compile with an explicit deploy [`Platform`] (selects the `karn`
-/// surface binding). The MVP ships `cloudflare` only.
-pub fn compile_project_with_platform(
-    root: &Path,
-    target: BuildTarget,
-    platform: Platform,
-) -> Result<ProjectOutput, Vec<CompileError>> {
-    compile_project_inner(root, root, target, platform)
+/// Options for [`compile`]. Construct with [`CompileOptions::single`] or
+/// [`CompileOptions::split`], then chain `.target(…)` / `.platform(…)` to
+/// override the bundle/default-platform defaults.
+pub struct CompileOptions {
+    pub target: BuildTarget,
+    pub platform: Platform,
+    pub roots: Roots,
 }
 
-/// v0.9.1: compile a Karn project where source and test units live in
-/// separate subdirectories under `project_root`, configured via the supplied
-/// [`ProjectPaths`]. Source-unit identity is rooted at `<project_root>/<src>`
-/// and test-unit identity at `<project_root>/<tests>`; both kinds of paths
-/// are validated through the same logic. Use this from `karnc test` so its
-/// rooting matches `karnc compile`'s.
-pub fn compile_project_with_split_paths(
-    project_root: &Path,
-    target: BuildTarget,
-    paths: &ProjectPaths,
-) -> Result<ProjectOutput, Vec<CompileError>> {
-    compile_project_with_split_paths_full(project_root, target, paths)
-        .map_err(ProjectFailure::flatten)
+impl CompileOptions {
+    /// Single-root project (`src == tests`), bundle target, default platform.
+    pub fn single(root: impl Into<PathBuf>) -> Self {
+        Self {
+            target: BuildTarget::Bundle,
+            platform: Platform::default(),
+            roots: Roots::Single(root.into()),
+        }
+    }
+
+    /// v0.9.1 split layout (source and test units in separate subdirectories
+    /// under `project_root`), bundle target, default platform. Use this from
+    /// `karnc test` so its rooting matches `karnc compile`'s.
+    pub fn split(project_root: impl Into<PathBuf>, paths: ProjectPaths) -> Self {
+        Self {
+            target: BuildTarget::Bundle,
+            platform: Platform::default(),
+            roots: Roots::Split {
+                project_root: project_root.into(),
+                paths,
+            },
+        }
+    }
+
+    /// Select the build target. `Bundle` (default) is the v0.6+ single-bundle
+    /// layout; `Workers` (v0.8) emits per-context Cloudflare Workers.
+    pub fn target(mut self, target: BuildTarget) -> Self {
+        self.target = target;
+        self
+    }
+
+    /// v0.17: select the deploy [`Platform`] (selects the `karn` surface
+    /// binding). The MVP ships `cloudflare` only.
+    pub fn platform(mut self, platform: Platform) -> Self {
+        self.platform = platform;
+        self
+    }
 }
 
-/// v0.24: split-paths build keeping attribution + snapshots on failure.
-pub fn compile_project_with_split_paths_full(
-    project_root: &Path,
-    target: BuildTarget,
-    paths: &ProjectPaths,
-) -> Result<ProjectOutput, ProjectFailure> {
-    let src_root = project_root.join(&paths.src);
-    let tests_root = project_root.join(&paths.tests);
-    compile_project_full(&src_root, &tests_root, target, Platform::default())
+/// Compile a Karn project, keeping error attribution + snapshots on failure
+/// (so the CLI can render project errors with source context, ADR 0052). Use
+/// `.map_err(ProjectFailure::flatten)` for the flattened `Vec<CompileError>`
+/// shape.
+pub fn compile_project(options: &CompileOptions) -> Result<ProjectOutput, ProjectFailure> {
+    let (src_root, tests_root) = options.roots.resolve();
+    match compile_project_pipeline(
+        &src_root,
+        &tests_root,
+        options.target,
+        options.platform,
+        Mode::Build,
+        &HashMap::new(),
+    ) {
+        PipelineResult::Build(r) => r,
+        PipelineResult::Analysis(_) => unreachable!("build mode returned an analysis"),
+    }
 }
 
 /// v0.24: analyse a project without building — non-bailing, overlay-aware,
@@ -202,36 +244,6 @@ pub fn analyse_project(root: &Path, overlay: &HashMap<PathBuf, String>) -> Proje
     ) {
         PipelineResult::Analysis(a) => a,
         PipelineResult::Build(_) => unreachable!("analyse mode returned a build result"),
-    }
-}
-
-fn compile_project_inner(
-    src_root: &Path,
-    tests_root: &Path,
-    target: BuildTarget,
-    platform: Platform,
-) -> Result<ProjectOutput, Vec<CompileError>> {
-    compile_project_full(src_root, tests_root, target, platform).map_err(ProjectFailure::flatten)
-}
-
-/// v0.24: the build entry point that keeps attribution + snapshots on
-/// failure, so the CLI can render project errors with source context.
-pub fn compile_project_full(
-    src_root: &Path,
-    tests_root: &Path,
-    target: BuildTarget,
-    platform: Platform,
-) -> Result<ProjectOutput, ProjectFailure> {
-    match compile_project_pipeline(
-        src_root,
-        tests_root,
-        target,
-        platform,
-        Mode::Build,
-        &HashMap::new(),
-    ) {
-        PipelineResult::Build(r) => r,
-        PipelineResult::Analysis(_) => unreachable!("build mode returned an analysis"),
     }
 }
 

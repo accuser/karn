@@ -105,12 +105,15 @@ fn compile_context(body: &str, idx: usize) -> Result<(), String> {
     fs::create_dir_all(file.parent().unwrap()).unwrap();
     fs::write(&file, body).unwrap();
 
-    let result = karnc::compile_project(&root).map(|_| ()).map_err(|errs| {
-        errs.iter()
-            .map(|e| format!("{}: {}", e.category, e.message))
-            .collect::<Vec<_>>()
-            .join("; ")
-    });
+    let result = karnc::compile_project(&karnc::CompileOptions::single(root.clone()))
+        .map_err(karnc::ProjectFailure::flatten)
+        .map(|_| ())
+        .map_err(|errs| {
+            errs.iter()
+                .map(|e| format!("{}: {}", e.category, e.message))
+                .collect::<Vec<_>>()
+                .join("; ")
+        });
     let _ = fs::remove_dir_all(&root);
     result
 }

@@ -121,10 +121,19 @@ fn compile_fixture(
     let karn_toml = fixture_root.join("karn.toml");
     if karn_toml.exists() {
         let paths = karnc::read_project_paths(fixture_root);
-        karnc::compile_project_with_split_paths(fixture_root, target, &paths)
+        karnc::compile_project(
+            &karnc::CompileOptions::split(fixture_root.to_path_buf(), paths).target(target),
+        )
+        .map_err(karnc::ProjectFailure::flatten)
     } else {
         let src_dir = fixture_root.join("src");
-        karnc::compile_project_with_platform(&src_dir, target, fixture_platform(fixture_root))
+        let platform = fixture_platform(fixture_root);
+        karnc::compile_project(
+            &karnc::CompileOptions::single(src_dir)
+                .target(target)
+                .platform(platform),
+        )
+        .map_err(karnc::ProjectFailure::flatten)
     }
 }
 
