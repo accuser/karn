@@ -5551,24 +5551,58 @@ fn ts_base(b: BaseType) -> &'static str {
 }
 
 pub(crate) fn ts_type_ref(r: &TypeRef) -> String {
+    ts_type_ref_with(r, None)
+}
+
+/// Like `ts_type_ref`, but qualifies named types that live in `scope` with the
+/// namespace `ns` (`Order` → `Ns.Order`). Used by the test-emission harness for
+/// mock method signatures that sit outside the destructuring that brings a
+/// namespace's value-side names into local scope, so the types must be
+/// referenced fully qualified. Qualification recurses through generic
+/// arguments; base/unit types are unaffected.
+pub(crate) fn ts_type_ref_qualified(r: &TypeRef, scope: &HashSet<String>, ns: &str) -> String {
+    ts_type_ref_with(r, Some((scope, ns)))
+}
+
+/// Shared renderer behind `ts_type_ref` (`qualify = None`) and
+/// `ts_type_ref_qualified` (`qualify = Some((scope, ns))`). With `None` it is
+/// output-identical to the historic `ts_type_ref`; the only divergence is the
+/// `Named` arm, which qualifies in-scope names when `qualify` is set.
+fn ts_type_ref_with(r: &TypeRef, qualify: Option<(&HashSet<String>, &str)>) -> String {
     match r {
         TypeRef::Base(b, _) => ts_base(*b).to_string(),
-        TypeRef::Named(id) => id.name.clone(),
-        TypeRef::Result(t, e, _) => format!("Result<{}, {}>", ts_type_ref(t), ts_type_ref(e)),
-        TypeRef::Option(t, _) => format!("Option<{}>", ts_type_ref(t)),
+        TypeRef::Named(id) => {
+            if let Some((scope, ns)) = qualify
+                && scope.contains(&id.name)
+            {
+                format!("{ns}.{}", id.name)
+            } else {
+                id.name.clone()
+            }
+        }
+        TypeRef::Result(t, e, _) => format!(
+            "Result<{}, {}>",
+            ts_type_ref_with(t, qualify),
+            ts_type_ref_with(e, qualify)
+        ),
+        TypeRef::Option(t, _) => format!("Option<{}>", ts_type_ref_with(t, qualify)),
         TypeRef::Effect(t, _) => {
-            let inner = ts_type_ref(t);
+            let inner = ts_type_ref_with(t, qualify);
             if inner == "()" || inner == "void" {
                 "Promise<void>".to_string()
             } else {
                 format!("Promise<{inner}>")
             }
         }
-        TypeRef::HttpResult(t, _) => format!("HttpResult<{}>", ts_type_ref(t)),
+        TypeRef::HttpResult(t, _) => format!("HttpResult<{}>", ts_type_ref_with(t, qualify)),
         // v0.20b: collections lower to immutable TS shapes.
-        TypeRef::List(t, _) => format!("readonly {}[]", ts_type_ref(t)),
+        TypeRef::List(t, _) => format!("readonly {}[]", ts_type_ref_with(t, qualify)),
         TypeRef::Map(k, v, _) => {
-            format!("ReadonlyMap<{}, {}>", ts_type_ref(k), ts_type_ref(v))
+            format!(
+                "ReadonlyMap<{}, {}>",
+                ts_type_ref_with(k, qualify),
+                ts_type_ref_with(v, qualify)
+            )
         }
         TypeRef::ValidationError(_) => "ValidationError".to_string(),
         TypeRef::JsonError(_) => "JsonError".to_string(),
@@ -5580,9 +5614,9 @@ pub(crate) fn ts_type_ref(r: &TypeRef) -> String {
             let params: Vec<String> = params
                 .iter()
                 .enumerate()
-                .map(|(i, p)| format!("a{i}: {}", ts_type_ref(p)))
+                .map(|(i, p)| format!("a{i}: {}", ts_type_ref_with(p, qualify)))
                 .collect();
-            let ret = match ts_type_ref(ret).as_str() {
+            let ret = match ts_type_ref_with(ret, qualify).as_str() {
                 "()" => "void".to_string(),
                 other => other.to_string(),
             };
@@ -5643,7 +5677,7 @@ fn ts_binop(op: BinOp) -> &'static str {
     }
 }
 
-fn escape_ts_string(s: &str) -> String {
+pub(crate) fn escape_ts_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         match c {
@@ -5706,13 +5740,10 @@ mod runtime_tests {
         assert_eq!(crate::project::worker_dir_name("a.b.c"), "a-b-c");
     }
 
-    // Refactor track, proposal v0.29.1: characterisation pin for the production
-    // `escape_ts_string`, mirroring `project::tests_emit`'s tests. The two copies AGREE
-    // on backslash/quote/newline/tab but DIVERGE on carriage return — this one
-    // escapes `\r`, the project test-emission copy leaves it raw. The v0.29.8
-    // de-duplication must reconcile this difference, not assume it away.
+    // Refactor track: characterisation pin for the canonical `escape_ts_string`.
+    // It escapes backslash/quote/newline/tab and carriage return (`\r` → `\r`).
     #[test]
-    fn escape_ts_string_escapes_cr_unlike_the_project_copy() {
+    fn escape_ts_string_escapes_cr() {
         assert_eq!(escape_ts_string("a\\b"), "a\\\\b");
         assert_eq!(escape_ts_string("a\"b"), "a\\\"b");
         assert_eq!(escape_ts_string("a\nb"), "a\\nb");

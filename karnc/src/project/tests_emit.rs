@@ -754,7 +754,7 @@ fn emit_integration_module(
     out.push_str("  const results = [];\n");
     for (idx, case) in decl.cases.iter().enumerate() {
         let runner_name = &case_runners[idx];
-        let escaped = escape_ts_string(&case.name);
+        let escaped = emitter::escape_ts_string(&case.name);
         out.push_str(&format!(
             "  results.push({{ name: \"{escaped}\", ...(await {runner_name}()) }});\n"
         ));
@@ -1550,7 +1550,7 @@ fn emit_test_module(
         };
         for case in &test_decl.cases {
             let runner_name = &case_runners[case_index];
-            let escaped = escape_ts_string(&case.name);
+            let escaped = emitter::escape_ts_string(&case.name);
             out.push_str(&format!(
                 "  results.push({{ name: \"{escaped}\", ...(await {runner_name}()) }});\n"
             ));
@@ -1662,12 +1662,13 @@ fn emit_mock_class(
                 format!(
                     "{}: {}",
                     p.name.name,
-                    ts_type_ref_emit_qualified(&p.type_ref, &scope_type_names, &scope_ns)
+                    emitter::ts_type_ref_qualified(&p.type_ref, &scope_type_names, &scope_ns)
                 )
             })
             .collect::<Vec<_>>()
             .join(", ");
-        let return_ty = ts_type_ref_emit_qualified(&op.return_type, &scope_type_names, &scope_ns);
+        let return_ty =
+            emitter::ts_type_ref_qualified(&op.return_type, &scope_type_names, &scope_ns);
         out.push_str(&format!(
             "  async {}({params}): {return_ty} {{\n",
             op.name.name
@@ -2106,163 +2107,11 @@ fn sanitise_case_name(name: &str, index: &mut usize) -> String {
     s
 }
 
-fn escape_ts_string(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for ch in s.chars() {
-        match ch {
-            '\\' => out.push_str("\\\\"),
-            '"' => out.push_str("\\\""),
-            '\n' => out.push_str("\\n"),
-            '\t' => out.push_str("\\t"),
-            c => out.push(c),
-        }
-    }
-    out
-}
-
-#[allow(dead_code)]
-fn ts_type_ref_emit(r: &TypeRef) -> String {
-    // For mocks we lean on the same TS rendering used by the production
-    // emitter; for now, render via a simple display that matches what's
-    // emitted by the production path for capability/service signatures.
-    match r {
-        // v0.20a: TS function-type rendering (positional param names).
-        TypeRef::Fn(params, ret, _) => {
-            let params: Vec<String> = params
-                .iter()
-                .enumerate()
-                .map(|(i, p)| format!("a{i}: {}", ts_type_ref_emit(p)))
-                .collect();
-            format!("({}) => {}", params.join(", "), ts_type_ref_emit(ret))
-        }
-        TypeRef::Base(b, _) => match b {
-            BaseType::Int => "number".to_string(),
-            BaseType::String => "string".to_string(),
-            BaseType::Bool => "boolean".to_string(),
-            BaseType::Float => "number".to_string(),
-        },
-        TypeRef::Named(id) => id.name.clone(),
-        TypeRef::Result(t, e, _) => {
-            format!("Result<{}, {}>", ts_type_ref_emit(t), ts_type_ref_emit(e))
-        }
-        TypeRef::Option(t, _) => format!("Option<{}>", ts_type_ref_emit(t)),
-        TypeRef::Effect(t, _) => format!("Promise<{}>", ts_type_ref_emit(t)),
-        TypeRef::HttpResult(t, _) => format!("HttpResult<{}>", ts_type_ref_emit(t)),
-        TypeRef::List(t, _) => format!("readonly {}[]", ts_type_ref_emit(t)),
-        TypeRef::Map(k, v, _) => {
-            format!(
-                "ReadonlyMap<{}, {}>",
-                ts_type_ref_emit(k),
-                ts_type_ref_emit(v)
-            )
-        }
-        TypeRef::ValidationError(_) => "ValidationError".to_string(),
-        TypeRef::JsonError(_) => "JsonError".to_string(),
-        TypeRef::Unit(_) => "void".to_string(),
-    }
-}
-
-/// Like `ts_type_ref_emit`, but qualifies named types that live in the
-/// privileged scope of a mocked entity with the owning context's namespace.
-/// Mock method signatures sit outside the destructuring statement that brings
-/// the namespace's value-side names into local scope, so the types need to
-/// be referenced fully qualified.
-fn ts_type_ref_emit_qualified(
-    r: &TypeRef,
-    scope_type_names: &HashSet<String>,
-    scope_ns: &str,
-) -> String {
-    match r {
-        TypeRef::Base(b, _) => match b {
-            BaseType::Int => "number".to_string(),
-            BaseType::String => "string".to_string(),
-            BaseType::Bool => "boolean".to_string(),
-            BaseType::Float => "number".to_string(),
-        },
-        // v0.20a: TS function-type rendering (positional param names).
-        TypeRef::Fn(params, ret, _) => {
-            let params: Vec<String> = params
-                .iter()
-                .enumerate()
-                .map(|(i, p)| {
-                    format!(
-                        "a{i}: {}",
-                        ts_type_ref_emit_qualified(p, scope_type_names, scope_ns)
-                    )
-                })
-                .collect();
-            format!(
-                "({}) => {}",
-                params.join(", "),
-                ts_type_ref_emit_qualified(ret, scope_type_names, scope_ns)
-            )
-        }
-        TypeRef::Named(id) => {
-            if scope_type_names.contains(&id.name) {
-                format!("{scope_ns}.{}", id.name)
-            } else {
-                id.name.clone()
-            }
-        }
-        TypeRef::Result(t, e, _) => format!(
-            "Result<{}, {}>",
-            ts_type_ref_emit_qualified(t, scope_type_names, scope_ns),
-            ts_type_ref_emit_qualified(e, scope_type_names, scope_ns)
-        ),
-        TypeRef::Option(t, _) => format!(
-            "Option<{}>",
-            ts_type_ref_emit_qualified(t, scope_type_names, scope_ns)
-        ),
-        TypeRef::Effect(t, _) => format!(
-            "Promise<{}>",
-            ts_type_ref_emit_qualified(t, scope_type_names, scope_ns)
-        ),
-        TypeRef::HttpResult(t, _) => format!(
-            "HttpResult<{}>",
-            ts_type_ref_emit_qualified(t, scope_type_names, scope_ns)
-        ),
-        TypeRef::List(t, _) => format!(
-            "readonly {}[]",
-            ts_type_ref_emit_qualified(t, scope_type_names, scope_ns)
-        ),
-        TypeRef::Map(k, v, _) => format!(
-            "ReadonlyMap<{}, {}>",
-            ts_type_ref_emit_qualified(k, scope_type_names, scope_ns),
-            ts_type_ref_emit_qualified(v, scope_type_names, scope_ns)
-        ),
-        TypeRef::ValidationError(_) => "ValidationError".to_string(),
-        TypeRef::JsonError(_) => "JsonError".to_string(),
-        TypeRef::Unit(_) => "void".to_string(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ast::{BaseType, Ident, TypeRef};
     use std::collections::HashSet;
-
-    // -- escape_ts_string (the project test-emission copy) --------------------
-    #[test]
-    fn escape_ts_string_escapes_backslash_quote_newline_tab() {
-        assert_eq!(escape_ts_string("a\\b"), "a\\\\b");
-        assert_eq!(escape_ts_string("a\"b"), "a\\\"b");
-        assert_eq!(escape_ts_string("a\nb"), "a\\nb");
-        assert_eq!(escape_ts_string("a\tb"), "a\\tb");
-        assert_eq!(escape_ts_string("plain"), "plain");
-        assert_eq!(escape_ts_string("emoji 🎉"), "emoji 🎉"); // non-ascii passes through
-    }
-
-    #[test]
-    fn escape_ts_string_leaves_cr_raw() {
-        // CHARACTERISES A LATENT DIVERGENCE (not an endorsement): this project
-        // test-emission copy leaves a carriage return RAW, whereas the
-        // production emitter (`crate::emitter::escape_ts_string`) escapes it to
-        // `\r` — pinned on that side by `emitter::escape_tests`. The v0.29.8
-        // de-duplication must preserve this harness's output for `\r`, so it
-        // cannot silently adopt the emitter's version.
-        assert_eq!(escape_ts_string("a\rb"), "a\rb");
-    }
 
     // -- sanitise_suite / sanitise_case_name ----------------------------------
     #[test]
@@ -2298,7 +2147,7 @@ mod tests {
         assert_eq!(idx2, 10);
     }
 
-    // -- the duplicate type-ref renderers -------------------------------------
+    // -- the unified emitter type-ref renderers -------------------------------
     fn named(n: &str) -> TypeRef {
         TypeRef::Named(Ident {
             name: n.to_string(),
@@ -2310,32 +2159,32 @@ mod tests {
     }
 
     #[test]
-    fn ts_type_ref_emit_bases_and_generics() {
-        assert_eq!(ts_type_ref_emit(&base(BaseType::Int)), "number");
-        assert_eq!(ts_type_ref_emit(&base(BaseType::Float)), "number");
-        assert_eq!(ts_type_ref_emit(&base(BaseType::String)), "string");
-        assert_eq!(ts_type_ref_emit(&base(BaseType::Bool)), "boolean");
-        assert_eq!(ts_type_ref_emit(&named("Order")), "Order");
+    fn ts_type_ref_bases_and_generics() {
+        assert_eq!(emitter::ts_type_ref(&base(BaseType::Int)), "number");
+        assert_eq!(emitter::ts_type_ref(&base(BaseType::Float)), "number");
+        assert_eq!(emitter::ts_type_ref(&base(BaseType::String)), "string");
+        assert_eq!(emitter::ts_type_ref(&base(BaseType::Bool)), "boolean");
+        assert_eq!(emitter::ts_type_ref(&named("Order")), "Order");
         assert_eq!(
-            ts_type_ref_emit(&TypeRef::List(Box::new(named("Order")), Span::default())),
+            emitter::ts_type_ref(&TypeRef::List(Box::new(named("Order")), Span::default())),
             "readonly Order[]"
         );
         assert_eq!(
-            ts_type_ref_emit(&TypeRef::Option(
+            emitter::ts_type_ref(&TypeRef::Option(
                 Box::new(base(BaseType::Int)),
                 Span::default()
             )),
             "Option<number>"
         );
         assert_eq!(
-            ts_type_ref_emit(&TypeRef::Effect(
+            emitter::ts_type_ref(&TypeRef::Effect(
                 Box::new(TypeRef::Unit(Span::default())),
                 Span::default()
             )),
             "Promise<void>"
         );
         assert_eq!(
-            ts_type_ref_emit(&TypeRef::Map(
+            emitter::ts_type_ref(&TypeRef::Map(
                 Box::new(base(BaseType::String)),
                 Box::new(named("V")),
                 Span::default()
@@ -2343,7 +2192,7 @@ mod tests {
             "ReadonlyMap<string, V>"
         );
         assert_eq!(
-            ts_type_ref_emit(&TypeRef::Result(
+            emitter::ts_type_ref(&TypeRef::Result(
                 Box::new(named("T")),
                 Box::new(named("E")),
                 Span::default()
@@ -2351,46 +2200,46 @@ mod tests {
             "Result<T, E>"
         );
         assert_eq!(
-            ts_type_ref_emit(&TypeRef::HttpResult(Box::new(named("T")), Span::default())),
+            emitter::ts_type_ref(&TypeRef::HttpResult(Box::new(named("T")), Span::default())),
             "HttpResult<T>"
         );
         assert_eq!(
-            ts_type_ref_emit(&TypeRef::ValidationError(Span::default())),
+            emitter::ts_type_ref(&TypeRef::ValidationError(Span::default())),
             "ValidationError"
         );
         assert_eq!(
-            ts_type_ref_emit(&TypeRef::JsonError(Span::default())),
+            emitter::ts_type_ref(&TypeRef::JsonError(Span::default())),
             "JsonError"
         );
     }
 
     #[test]
-    fn ts_type_ref_emit_fn_uses_positional_param_names() {
+    fn ts_type_ref_fn_uses_positional_param_names() {
         let f = TypeRef::Fn(
             vec![base(BaseType::Int), named("Order")],
             Box::new(TypeRef::Unit(Span::default())),
             Span::default(),
         );
-        assert_eq!(ts_type_ref_emit(&f), "(a0: number, a1: Order) => void");
+        assert_eq!(emitter::ts_type_ref(&f), "(a0: number, a1: Order) => void");
     }
 
     #[test]
-    fn ts_type_ref_emit_qualified_prefixes_only_scoped_names() {
+    fn ts_type_ref_qualified_prefixes_only_scoped_names() {
         let mut scope: HashSet<String> = HashSet::new();
         scope.insert("Order".to_string());
         // A named type in the privileged scope is qualified with the namespace.
         assert_eq!(
-            ts_type_ref_emit_qualified(&named("Order"), &scope, "Ns"),
+            emitter::ts_type_ref_qualified(&named("Order"), &scope, "Ns"),
             "Ns.Order"
         );
         // A named type outside the scope is left bare.
         assert_eq!(
-            ts_type_ref_emit_qualified(&named("Other"), &scope, "Ns"),
+            emitter::ts_type_ref_qualified(&named("Other"), &scope, "Ns"),
             "Other"
         );
         // Qualification recurses through generic arguments.
         assert_eq!(
-            ts_type_ref_emit_qualified(
+            emitter::ts_type_ref_qualified(
                 &TypeRef::List(Box::new(named("Order")), Span::default()),
                 &scope,
                 "Ns"
@@ -2399,7 +2248,7 @@ mod tests {
         );
         // Base types are unaffected by qualification.
         assert_eq!(
-            ts_type_ref_emit_qualified(&base(BaseType::Int), &scope, "Ns"),
+            emitter::ts_type_ref_qualified(&base(BaseType::Int), &scope, "Ns"),
             "number"
         );
     }
