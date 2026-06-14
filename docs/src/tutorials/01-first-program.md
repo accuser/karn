@@ -135,5 +135,5 @@ service.
 ---
 
 *Want the bigger picture behind `commons`, branding, and compiling to
-TypeScript? See [How a Karn program is shaped](../explanation/how-a-karn-program-is-shaped.md)
-and [Why compile to TypeScript](../explanation/why-compile-to-typescript.md).*
+TypeScript? See [How a Karn program is shaped](../guides/program-structure/how-a-program-is-shaped.md)
+and [Why compile to TypeScript](../guides/projects-build-and-deployment/why-compile-to-typescript.md).*

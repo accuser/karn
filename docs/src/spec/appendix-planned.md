@@ -19,4 +19,4 @@ Three directions are designed but not yet shipped:
 These are sketches of intent, not specifications: this appendix deliberately
 states no syntax or behaviour for them. For the design rationale and the current
 thinking on what is deferred, see
-[Versioning & roadmap](../explanation/versioning-and-roadmap.md#what-is-deferred-to-v1).
+[Versioning & roadmap](../about/versioning-and-roadmap.md#what-is-deferred-to-v1).

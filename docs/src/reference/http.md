@@ -93,4 +93,4 @@ service api {
 `on http` services compile to a runnable Cloudflare Worker on the `--target
 workers` target (`index.ts` router, `handlers.ts`, `compose.ts`,
 `wrangler.toml`). See [emission](emission.md) and
-[Target Cloudflare Workers](../how-to/projects/cloudflare-workers.md).
+[Target Cloudflare Workers](../guides/projects-build-and-deployment/cloudflare-workers.md).

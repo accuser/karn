@@ -44,7 +44,7 @@ Age.of(value)   -- Result[Age, ValidationError]
 
 `.of` **always** returns a `Result`. Use it for values not known at compile time
 (input, variables). See
-[Define a refined type and validate untrusted input](../how-to/refined-types/define-and-validate.md).
+[Define a refined type and validate untrusted input](../guides/type-system/define-and-validate.md).
 
 ## `.unsafe` — unchecked construction
 
@@ -66,12 +66,12 @@ in these positions:
 - a refined-typed call argument.
 
 A literal that violates the predicate is a compile error
-([`karn.refine.literal_violates`](../how-to/troubleshooting/refine-literal-violates.md)).
+([`karn.refine.literal_violates`](../troubleshooting/refine-literal-violates.md)).
 **Opaque types are excluded** from admission. Admitted literals are compile-time
 literals only — integers, strings, booleans, and `()` — not arithmetic
 expressions or identifiers.
 
-See [The refined-literal admission model](../explanation/refined-literal-admission.md)
+See [The refined-literal admission model](../guides/type-system/refined-literal-admission.md)
 for the rationale.
 
 ## Narrowing with `is`
@@ -103,9 +103,9 @@ fn classify(n: Int) -> Int {
 - The value must be an **identifier** to be narrowed (a `let` binding or a
   parameter); `f(x) is Quantity` is a valid check but narrows nothing.
 - The refined type's base must match the value's
-  ([`karn.types.is_base_mismatch`](../how-to/troubleshooting/is-base-mismatch.md)).
+  ([`karn.types.is_base_mismatch`](../troubleshooting/is-base-mismatch.md)).
 - This is the flow-sensitive counterpart to `.of`: `.of(v)` returns a `Result`
   for the untrusted case; `is` narrows in a guard. Refinements are **not**
   preserved through arithmetic (`a + b` of two refined `Int`s is a plain `Int`).
 
-See [Narrow and bind with `is`](../how-to/pattern-matching/narrow-with-is.md).
+See [Narrow and bind with `is`](../guides/type-system/narrow-with-is.md).

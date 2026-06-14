@@ -133,7 +133,7 @@ commons shop {
 }
 ```
 
-**See also.** [How a Karn program is shaped](../explanation/how-a-karn-program-is-shaped.md) · [Lay out a project](../how-to/projects/layout.md).
+**See also.** [How a Karn program is shaped](../guides/program-structure/how-a-program-is-shaped.md) · [Lay out a project](../guides/projects-build-and-deployment/layout.md).
 
 ### item_fragment {#rule-_item_fragment}
 
@@ -177,7 +177,7 @@ service sweeper {
 **Static semantics.**
 {{#grammar-semantics context_decl}}
 
-**See also.** [How a Karn program is shaped](../explanation/how-a-karn-program-is-shaped.md).
+**See also.** [How a Karn program is shaped](../guides/program-structure/how-a-program-is-shaped.md).
 
 ### adapter_decl {#rule-adapter_decl}
 
@@ -204,7 +204,7 @@ adapter tokens {
 **Static semantics.**
 {{#grammar-semantics adapter_decl}}
 
-**See also.** [Adapters](adapters.md) · [Wrap a library as an adapter](../how-to/adapters/wrap-a-library.md).
+**See also.** [Adapters](adapters.md) · [Wrap a library as an adapter](../guides/effects-and-capabilities/wrap-a-library.md).
 
 ### test_decl {#rule-test_decl}
 
@@ -216,7 +216,7 @@ mocks.
 **Static semantics.**
 {{#grammar-semantics test_decl}}
 
-**See also.** [Testing](testing.md) · [Write tests and mock collaborators](../how-to/testing/write-tests.md).
+**See also.** [Testing](testing.md) · [Write tests and mock collaborators](../guides/testing/write-tests.md).
 
 ### integration_decl {#rule-integration_decl}
 
@@ -228,7 +228,7 @@ flow across their boundaries.
 **Static semantics.**
 {{#grammar-semantics integration_decl}}
 
-**See also.** [Test a flow across Workers](../how-to/testing/integration.md).
+**See also.** [Test a flow across Workers](../guides/testing/integration.md).
 
 ### wires_decl {#rule-wires_decl}
 
@@ -286,7 +286,7 @@ Imports a `commons` so its public names are in scope.
 **Static semantics.**
 {{#grammar-semantics uses_decl}}
 
-**See also.** [Define sum, record, and opaque types](../how-to/types/define-types.md).
+**See also.** [Define sum, record, and opaque types](../guides/type-system/define-types.md).
 
 ### consumes_decl {#rule-consumes_decl}
 
@@ -299,7 +299,7 @@ capabilities flattened to bare names (`{ Cap, … }`).
 **Static semantics.**
 {{#grammar-semantics consumes_decl}}
 
-**See also.** [Consume another context's services](../how-to/types/consumes.md).
+**See also.** [Consume another context's services](../guides/program-structure/consume-services.md).
 
 ### binding_decl {#rule-binding_decl}
 
@@ -331,7 +331,7 @@ transparently, and which capabilities are exported.
 **Static semantics.**
 {{#grammar-semantics exports_decl}}
 
-**See also.** [Share a capability across contexts](../how-to/capabilities/share-across-contexts.md).
+**See also.** [Share a capability across contexts](../guides/effects-and-capabilities/share-across-contexts.md).
 
 ## Types & refinements
 
@@ -354,7 +354,7 @@ type Status =
 **Static semantics.**
 {{#grammar-semantics type_decl}}
 
-**See also.** [Type system](types.md) · [Define sum, record, and opaque types](../how-to/types/define-types.md) · [The type-system philosophy](../explanation/type-system-philosophy.md).
+**See also.** [Type system](types.md) · [Define sum, record, and opaque types](../guides/type-system/define-types.md) · [The type-system philosophy](../guides/type-system/philosophy.md).
 
 ### type_body {#rule-_type_body}
 
@@ -369,7 +369,7 @@ The right-hand side of a `type` declaration: one of the five type forms.
 A type whose representation is hidden outside its defining module; constructed
 and inspected only through its API.
 
-**See also.** [Define sum, record, and opaque types](../how-to/types/define-types.md).
+**See also.** [Define sum, record, and opaque types](../guides/type-system/define-types.md).
 
 ### refined_type {#rule-refined_type}
 
@@ -386,7 +386,7 @@ type Quantity = Int where InRange(1, 100)
 **Static semantics.**
 {{#grammar-semantics refined_type}}
 
-**See also.** [Refined-type API](refined-types.md) · [Define and validate untrusted input](../how-to/refined-types/define-and-validate.md).
+**See also.** [Refined-type API](refined-types.md) · [Define and validate untrusted input](../guides/type-system/define-and-validate.md).
 
 ### record_type {#rule-record_type}
 
@@ -447,7 +447,7 @@ satisfy them.
 **Static semantics.**
 {{#grammar-semantics refinement}}
 
-**See also.** [The refined-literal admission model](../explanation/refined-literal-admission.md).
+**See also.** [The refined-literal admission model](../guides/type-system/refined-literal-admission.md).
 
 ### refinement_pred {#rule-_refinement_pred}
 
@@ -514,7 +514,7 @@ or `HttpResult[T]`.
 **Static semantics.**
 {{#grammar-semantics generic_type_ref}}
 
-**See also.** [Work with `Result` and optional values](../how-to/types/result-and-optionals.md).
+**See also.** [Work with `Result` and optional values](../guides/type-system/result-and-optionals.md).
 
 ### function_type_ref {#rule-function_type_ref}
 
@@ -637,7 +637,7 @@ capabilities it depends on.
 **Static semantics.**
 {{#grammar-semantics provider_decl}}
 
-**See also.** [Compose a provider from other capabilities](../how-to/capabilities/compose-a-provider.md).
+**See also.** [Compose a provider from other capabilities](../guides/effects-and-capabilities/compose-a-provider.md).
 
 ### provider_op {#rule-provider_op}
 
@@ -710,7 +710,7 @@ contexts.
 **Static semantics.**
 {{#grammar-semantics http_handler}}
 
-**See also.** [HTTP](http.md) · [Handle an HTTP request](../how-to/http/handle-request.md).
+**See also.** [HTTP](http.md) · [Handle an HTTP request](../guides/entry-points/http.md).
 
 ### http_method {#rule-http_method}
 
@@ -730,7 +730,7 @@ The HTTP methods a route may handle.
 **Static semantics.**
 {{#grammar-semantics cron_handler}}
 
-**See also.** [Cron](cron.md) · [Run a task on a schedule](../how-to/cron/handle-cron-trigger.md).
+**See also.** [Cron](cron.md) · [Run a task on a schedule](../guides/entry-points/cron.md).
 
 ### queue_handler {#rule-queue_handler}
 
@@ -741,7 +741,7 @@ The HTTP methods a route may handle.
 **Static semantics.**
 {{#grammar-semantics queue_handler}}
 
-**See also.** [Queue](queue.md) · [Process a queued message](../how-to/queue/handle-queue-message.md).
+**See also.** [Queue](queue.md) · [Process a queued message](../guides/entry-points/queue.md).
 
 ## Agents
 
@@ -782,7 +782,7 @@ agent Counter {
 **Static semantics.**
 {{#grammar-semantics agent_decl}}
 
-**See also.** [Agents](agents.md) · [Build a stateful agent](../how-to/agents/stateful-agent.md) · [The agent model](../explanation/the-agent-model.md).
+**See also.** [Agents](agents.md) · [Build a stateful agent](../guides/agents-and-state/stateful-agent.md) · [The agent model](../guides/agents-and-state/the-agent-model.md).
 
 ### key_decl {#rule-key_decl}
 
@@ -800,7 +800,7 @@ field with no default must have an implicit zero value.
 **Static semantics.**
 {{#grammar-semantics state_decl}}
 
-**See also.** [Model an agent as a state machine](../how-to/agents/state-machine.md).
+**See also.** [Model an agent as a state machine](../guides/agents-and-state/state-machine.md).
 
 ## Expressions
 
@@ -847,7 +847,7 @@ match s {
 **Static semantics.**
 {{#grammar-semantics match_expr}}
 
-**See also.** [Pattern-match with `match`](../how-to/pattern-matching/match.md).
+**See also.** [Pattern-match with `match`](../guides/type-system/match.md).
 
 ### is_expr {#rule-is_expr}
 
@@ -859,7 +859,7 @@ branch.
 **Static semantics.**
 {{#grammar-semantics is_expr}}
 
-**See also.** [Narrow and bind with `is`](../how-to/pattern-matching/narrow-with-is.md).
+**See also.** [Narrow and bind with `is`](../guides/type-system/narrow-with-is.md).
 
 ### binary_expr {#rule-binary_expr}
 
@@ -939,7 +939,7 @@ The `?` operator: unwraps a `Result`, propagating the error on failure.
 **Static semantics.**
 {{#grammar-semantics question_expr}}
 
-**See also.** [Work with `Result` and optional values](../how-to/types/result-and-optionals.md).
+**See also.** [Work with `Result` and optional values](../guides/type-system/result-and-optionals.md).
 
 ### ok_expr {#rule-ok_expr}
 
@@ -993,7 +993,7 @@ in test bodies.
 **Static semantics.**
 {{#grammar-semantics mock_expr}}
 
-**See also.** [Write tests and mock collaborators](../how-to/testing/write-tests.md).
+**See also.** [Write tests and mock collaborators](../guides/testing/write-tests.md).
 
 ### mock_arg {#rule-mock_arg}
 
@@ -1066,7 +1066,7 @@ One arm of a `match`: a pattern, `=>`, and a result expression.
 **Static semantics.**
 {{#grammar-semantics match_arm}}
 
-**See also.** [Pattern-match with `match`](../how-to/pattern-matching/match.md).
+**See also.** [Pattern-match with `match`](../guides/type-system/match.md).
 
 ### pattern {#rule-_pattern}
 
@@ -1188,7 +1188,7 @@ test "a fresh counter starts at zero" {
 **Static semantics.**
 {{#grammar-semantics test_case}}
 
-**See also.** [Testing](testing.md) · [Write tests and mock collaborators](../how-to/testing/write-tests.md).
+**See also.** [Testing](testing.md) · [Write tests and mock collaborators](../guides/testing/write-tests.md).
 
 ### mocks_decl {#rule-mocks_decl}
 
@@ -1200,4 +1200,4 @@ test "a fresh counter starts at zero" {
 **Static semantics.**
 {{#grammar-semantics mocks_decl}}
 
-**See also.** [Write tests and mock collaborators](../how-to/testing/write-tests.md).
+**See also.** [Write tests and mock collaborators](../guides/testing/write-tests.md).

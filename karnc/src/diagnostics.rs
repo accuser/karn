@@ -1326,7 +1326,7 @@ pub fn render_markdown() -> String {
     out.push_str(
         "Every diagnostic code the compiler can emit, with a one-line summary of \
          the cause, grouped by category. For step-by-step cause-and-fix guidance \
-         on the most common ones, see the [troubleshooting guides](../how-to/troubleshooting/index.md).\n\n",
+         on the most common ones, see the [troubleshooting guides](../troubleshooting/index.md).\n\n",
     );
     out.push_str(&format!(
         "There are **{}** codes in total.\n",

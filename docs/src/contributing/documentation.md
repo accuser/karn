@@ -1,9 +1,12 @@
 # Working on the docs
 
 This book lives in `docs/` and is built with [mdBook](https://rust-lang.github.io/mdBook/).
-It is organised by [Diátaxis](../introduction/how-these-docs-are-organised.md):
-tutorials, how-to guides, reference, and explanation, for language users, plus
-the contributor and tooling sections.
+It is organised **by concern** (see
+[How these docs are organised](../introduction/how-these-docs-are-organised.md)):
+a guided tutorial spine, then one **Guides** section per concern that co-locates
+that topic's explanation and how-to pages, with the **Reference** and
+**Specification** kept whole as lookup catalogues. [Diátaxis](https://diataxis.fr/)
+still governs each page — one mode per page — it just sits inside a concern now.
 
 ## Build the book locally
 
@@ -99,7 +102,7 @@ its captured transcript:
 3. On the page, show the source in a `karn,fail` fence and the transcript in a
    `text` fence, each holding a single mdBook `#include` line pointing at
    `docs/diagnostics/<id>.karn` and `docs/diagnostics/<id>.txt` (the path is
-   relative to the page). See [the agent model](../explanation/the-agent-model.md)
+   relative to the page). See [the agent model](../guides/agents-and-state/the-agent-model.md)
    for a live example to copy.
 
 The `.txt` transcripts are **generated — never hand-edit them**;
@@ -123,7 +126,7 @@ persuasive shape in the book. Two panels:
 Weave it into the prose where the page already *asserts* the bug, so the
 demonstration replaces the assertion rather than bolting on. Keep it to
 explanation pages; reference stays dry. See
-[the type-system philosophy](../explanation/type-system-philosophy.md) for the
+[the type-system philosophy](../guides/type-system/philosophy.md) for the
 device in use.
 
 ## The guardrails
@@ -262,7 +265,8 @@ behaviour.
 Treat docs as part of an increment's definition of done (see
 [Testing & fixtures](testing.md)): update the affected reference (regenerating
 the generated pages), update the affected [specification](../spec/index.md)
-chapters (per *Keeping the spec current* above), add a changelog entry, bump the
-version references (the introduction banner, `tooling/index.md`, and
-`explanation/versioning-and-roadmap.md`) when the increment changes it, and check
-that any touched tutorial or how-to still compiles under the doc-example gate.
+chapters (per *Keeping the spec current* above), and add a changelog entry. The
+book's current-version banners are single-sourced — `scripts/bump-version.sh`
+rewrites them and `karnc/tests/doc_version.rs` fails CI on drift, so there is no
+manual version-bump step. Finally, check that any touched tutorial or guide
+still compiles under the doc-example gate.

@@ -181,8 +181,8 @@ shortener:
 
 > Capabilities and `given`-based dependency injection are a topic in their own
 > right; here we only need enough to mock one. See the
-> [capabilities how-to guides](../how-to/capabilities/index.md) for the full
-> treatment, and [Test a flow across Workers](../how-to/testing/integration.md)
+> [capabilities how-to guides](../guides/effects-and-capabilities/index.md) for the full
+> treatment, and [Test a flow across Workers](../guides/testing/integration.md)
 > for testing across contexts.
 
 ## What you have done — and where to go
@@ -195,15 +195,15 @@ stateful agent, to a tested URL shortener.
 
 From here:
 
-- **Have a specific task?** The [how-to guides](../how-to/index.md) are recipes
+- **Have a specific task?** The [how-to guides](../guides/index.md) are recipes
   for individual jobs.
 - **Need exact behaviour?** The [reference](../reference/index.md) is the
   consultable source of truth.
-- **Want the reasoning?** The [explanation](../explanation/index.md) section
+- **Want the reasoning?** The [explanation](../guides/index.md) section
   covers the *why* behind Karn's design.
 
 ---
 
 *For the reasoning behind `Mock[T]` and test isolation, see
-[The testing philosophy](../explanation/testing-philosophy.md). For exact rules,
+[The testing philosophy](../guides/testing/philosophy.md). For exact rules,
 see the [testing reference](../reference/testing.md).*

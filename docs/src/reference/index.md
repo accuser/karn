@@ -2,7 +2,7 @@
 
 Consultable, complete, and dry. These pages describe exact behaviour; for
 learning, start with the [tutorials](../tutorials/01-first-program.md), and for
-tasks see the [how-to guides](../how-to/index.md).
+tasks see the [how-to guides](../guides/index.md).
 
 ## Language
 

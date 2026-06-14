@@ -3,7 +3,7 @@
 The Visual Studio Code extension for Karn. It provides syntax highlighting plus
 the full language-server experience by launching [`karnc-lsp`](karn-lsp.md). For
 step-by-step setup, see the how-to
-[Set up editor support](../how-to/tooling/editor-support.md); this page is the
+[Set up editor support](../guides/editor-and-tooling/editor-support.md); this page is the
 reference.
 
 ## Features

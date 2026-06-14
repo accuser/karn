@@ -31,7 +31,7 @@ fn current_version_banners_agree_with_the_release() {
         ("introduction.md", format!("currently v{mm}")),
         ("tooling/index.md", format!("currently v{mm}")),
         (
-            "explanation/versioning-and-roadmap.md",
+            "about/versioning-and-roadmap.md",
             format!("written against v{mm}"),
         ),
         ("spec/scope.md", format!("current version, v{mm}")),

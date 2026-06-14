@@ -223,6 +223,6 @@ or `.unsafe` bypasses the predicate and is disallowed).
 
 ## See also
 
-- [Wrap a library as an adapter](../how-to/adapters/wrap-a-library.md)
+- [Wrap a library as an adapter](../guides/effects-and-capabilities/wrap-a-library.md)
 - [Capabilities & providers](capabilities.md)
-- [Adapter & binding errors](../how-to/troubleshooting/adapter-errors.md)
+- [Adapter & binding errors](../troubleshooting/adapter-errors.md)

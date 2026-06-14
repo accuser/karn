@@ -1,7 +1,7 @@
 # Version compatibility & changelog
 
 Karn is pre-1.0 and developed in small, spec-first increments (see
-[Versioning & roadmap](../explanation/versioning-and-roadmap.md)). This book is
+[Versioning & roadmap](../about/versioning-and-roadmap.md)). This book is
 written against **v0.31**.
 
 This page is a high-level summary of notable increments, not an exhaustive
@@ -66,7 +66,7 @@ agents, capabilities, and testing.
 ## Deferred to v1
 
 Events, sagas, and storage kinds are designed but not yet shipped — see
-[Versioning & roadmap](../explanation/versioning-and-roadmap.md#what-is-deferred-to-v1).
+[Versioning & roadmap](../about/versioning-and-roadmap.md#what-is-deferred-to-v1).
 
 > This summary will become a precise per-increment changelog as the docs-delta
 > discipline (docs shipped with each increment) takes hold.
