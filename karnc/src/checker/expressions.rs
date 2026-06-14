@@ -843,7 +843,7 @@ fn body_performs_effects(e: &Expr, ctx: &Ctx) -> bool {
             ..
         } => {
             if let ExprKind::Ident(id) = &receiver.kind
-                && ctx.capabilities.contains_key(&id.name)
+                && ctx.caps.capabilities.contains_key(&id.name)
             {
                 return true;
             }
