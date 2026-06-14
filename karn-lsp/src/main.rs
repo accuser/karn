@@ -320,6 +320,37 @@ impl Backend {
         crate::locals_nav::local_sites_at(locals, text, offset)
     }
 
+    /// v0.31 (ADR 0064): the in-scope local bindings at the cursor, as
+    /// `variable` completions, read from the **cached** analysis — so they
+    /// survive the mid-edit buffer the current keystroke produced (the last
+    /// good round's bindings around the cursor are what's wanted). Positions
+    /// convert against the cached snapshot, like the other cached-round reads.
+    async fn locals_completions(&self, uri: &Url, pos: Position) -> Vec<CompletionItem> {
+        let analysis = self.state.read().await.analysis.clone();
+        let Some(analysis) = analysis else {
+            return Vec::new();
+        };
+        let Some(rel) = Self::uri_to_rel(&analysis, uri) else {
+            return Vec::new();
+        };
+        let (Some(text), Some(locals)) = (analysis.snapshots.get(&rel), analysis.locals.get(&rel))
+        else {
+            return Vec::new();
+        };
+        let Some(offset) = crate::position::position_to_offset(text, pos) else {
+            return Vec::new();
+        };
+        karnc::locals::locals_at(locals, offset)
+            .into_iter()
+            .map(|b| CompletionItem {
+                label: b.name.clone(),
+                kind: Some(CompletionItemKind::VARIABLE),
+                detail: Some(b.ty.clone()),
+                ..Default::default()
+            })
+            .collect()
+    }
+
     /// Convert same-file local spans to LSP `Location`s.
     fn local_locations(
         &self,
@@ -713,14 +744,25 @@ impl LanguageServer for Backend {
             .to_string();
         let src_root = self.project_src_root().await;
         let candidates = completion::complete(&line_prefix, &text, src_root.as_deref());
-        if candidates.is_empty() {
+        let mut items: Vec<CompletionItem> =
+            candidates.into_iter().map(to_completion_item).collect();
+        // v0.31 (ADR 0064): offer in-scope locals at keyword position (alongside
+        // keywords) and at expression position (where nothing else fires).
+        let append_locals = if items.is_empty() {
+            completion::is_expression_position(&line_prefix)
+        } else {
+            completion::is_keyword_position(&line_prefix)
+        };
+        if append_locals {
+            items.extend(self.locals_completions(&uri, pos).await);
+        }
+        if items.is_empty() {
             // Slice 3: a lowercase `receiver.` is a value receiver — type it by
             // re-analysing the rewritten buffer and offer its members.
             let offset = cursor_byte_offset(&text, pos);
             let value_items = self.value_member_completions(&uri, &text, offset).await;
             return Ok((!value_items.is_empty()).then_some(CompletionResponse::Array(value_items)));
         }
-        let items: Vec<CompletionItem> = candidates.into_iter().map(to_completion_item).collect();
         Ok(Some(CompletionResponse::Array(items)))
     }
 
