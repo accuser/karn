@@ -268,12 +268,14 @@ pub fn check_handler_body(
         effectful,
         agent_state_ty,
         commit_seen: false,
-        capabilities,
-        declared_capabilities,
-        given_remaining,
-        given_used: HashSet::new(),
-        given_entries: given_entries.clone(),
-        given_anchor,
+        caps: CapabilityCtx {
+            capabilities,
+            declared_capabilities,
+            given_remaining,
+            given_used: HashSet::new(),
+            given_entries: given_entries.clone(),
+            given_anchor,
+        },
         in_test_body: false,
         test_services: HashSet::new(),
         type_vars: HashSet::new(),
@@ -307,7 +309,7 @@ pub fn check_handler_body(
         if !report_unused {
             break;
         }
-        if ctx.given_used.contains(c) || !reported.insert(c) {
+        if ctx.caps.given_used.contains(c) || !reported.insert(c) {
             continue;
         }
         ctx.errors.push(
@@ -359,6 +361,36 @@ impl ConstLit {
 }
 
 /// Mutable per-function context.
+/// Capability bookkeeping for the checker — the `given`-clause lifecycle and
+/// capability dispatch, grouped out of [`Ctx`] (v0.29.10). Empty (`Default`)
+/// for pure functions / non-context code.
+#[derive(Default)]
+pub struct CapabilityCtx {
+    /// Capabilities in scope for the current handler, as a name → CapabilityInfo
+    /// map. Empty for pure functions and non-context code.
+    pub capabilities: HashMap<String, CapabilityInfo>,
+    /// All capabilities declared in the surrounding context (for diagnostic
+    /// purposes — used to detect `<Cap>.op(...)` calls where the capability is
+    /// declared in the context but not listed in `given`).
+    pub declared_capabilities: HashMap<String, CapabilityInfo>,
+    /// Names of capabilities the user listed in `given`, but haven't yet
+    /// observed used. After checking the body, anything left here is
+    /// unused — a warning.
+    pub given_remaining: HashSet<String>,
+    /// Names of capabilities actually used in the body so far.
+    pub given_used: HashSet<String>,
+    /// v0.26 (ADR 0054): the `given` clause's entries in declaration order —
+    /// (deps key, source span) — so the `given` quick-fixes can author
+    /// list-aware edits at the diagnosis site. Empty where no `given` clause
+    /// applies (fns, mock ops, state initialisers).
+    pub given_entries: Vec<(String, Span)>,
+    /// v0.26: where the add-capability fix synthesises an *absent* `given`
+    /// clause — the handler's return type (the clause follows it). `None`
+    /// where the clause lives elsewhere (a provider's `provides … given`
+    /// line); the fix is then offered only when entries already exist.
+    pub given_anchor: Option<Span>,
+}
+
 pub struct Ctx<'a> {
     pub input: &'a ResolvedCommons,
     pub expr_types: &'a mut HashMap<Span, Ty>,
@@ -386,29 +418,9 @@ pub struct Ctx<'a> {
     /// True if a `commit` has been seen on the current control-flow path.
     /// Used to detect "two reachable commits".
     pub commit_seen: bool,
-    /// Capabilities in scope for the current handler, as a name → CapabilityInfo
-    /// map. Empty for pure functions and non-context code.
-    pub capabilities: HashMap<String, CapabilityInfo>,
-    /// All capabilities declared in the surrounding context (for diagnostic
-    /// purposes — used to detect `<Cap>.op(...)` calls where the capability is
-    /// declared in the context but not listed in `given`).
-    pub declared_capabilities: HashMap<String, CapabilityInfo>,
-    /// Names of capabilities the user listed in `given`, but haven't yet
-    /// observed used. After checking the body, anything left here is
-    /// unused — a warning.
-    pub given_remaining: HashSet<String>,
-    /// Names of capabilities actually used in the body so far.
-    pub given_used: HashSet<String>,
-    /// v0.26 (ADR 0054): the `given` clause's entries in declaration order —
-    /// (deps key, source span) — so the `given` quick-fixes can author
-    /// list-aware edits at the diagnosis site. Empty where no `given` clause
-    /// applies (fns, mock ops, state initialisers).
-    pub given_entries: Vec<(String, Span)>,
-    /// v0.26: where the add-capability fix synthesises an *absent* `given`
-    /// clause — the handler's return type (the clause follows it). `None`
-    /// where the clause lives elsewhere (a provider's `provides … given`
-    /// line); the fix is then offered only when entries already exist.
-    pub given_anchor: Option<Span>,
+    /// Capability bookkeeping — the `given`-clause lifecycle + dispatch,
+    /// grouped (v0.29.10). Empty for pure functions / non-context code.
+    pub caps: CapabilityCtx,
     /// True when the body being checked is a test case body. Permits
     /// `assert` statements (v0.7).
     pub in_test_body: bool,

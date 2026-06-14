@@ -68,12 +68,7 @@ pub(crate) fn check_fn(
         effectful,
         agent_state_ty: None,
         commit_seen: false,
-        capabilities: HashMap::new(),
-        declared_capabilities: HashMap::new(),
-        given_remaining: HashSet::new(),
-        given_used: HashSet::new(),
-        given_entries: Vec::new(),
-        given_anchor: None,
+        caps: CapabilityCtx::default(),
         in_test_body: false,
         test_services: HashSet::new(),
         type_vars: vars.clone(),
@@ -130,12 +125,7 @@ pub fn check_state_initialiser(
             effectful: false,
             agent_state_ty: None,
             commit_seen: false,
-            capabilities: HashMap::new(),
-            declared_capabilities: HashMap::new(),
-            given_remaining: HashSet::new(),
-            given_used: HashSet::new(),
-            given_entries: Vec::new(),
-            given_anchor: None,
+            caps: CapabilityCtx::default(),
             in_test_body: false,
             test_services: HashSet::new(),
             type_vars: HashSet::new(),
@@ -640,8 +630,8 @@ pub(crate) fn check_static_call(
     // Capability dispatch (v0.5): if `type_name` names a capability declared
     // in the context, dispatch via the capability table. If the capability is
     // declared but not in `given`, error specifically.
-    if ctx.declared_capabilities.contains_key(&type_name.name)
-        && !ctx.capabilities.contains_key(&type_name.name)
+    if ctx.caps.declared_capabilities.contains_key(&type_name.name)
+        && !ctx.caps.capabilities.contains_key(&type_name.name)
     {
         record_capability_ref(type_name.span, &type_name.name, ctx);
         let mut err = CompileError::new(
@@ -657,9 +647,11 @@ pub(crate) fn check_static_call(
             type_name.name
         ));
         // v0.26 (ADR 0054): the one-click counterpart of the note.
-        if let Some((span, insert)) =
-            given_insertion_edit(&ctx.given_entries, ctx.given_anchor, &type_name.name)
-        {
+        if let Some((span, insert)) = given_insertion_edit(
+            &ctx.caps.given_entries,
+            ctx.caps.given_anchor,
+            &type_name.name,
+        ) {
             err = err.with_suggestion(
                 format!("add `{}` to the `given` clause", type_name.name),
                 vec![(span, insert)],
@@ -672,7 +664,7 @@ pub(crate) fn check_static_call(
         }
         return None;
     }
-    if let Some(cap) = ctx.capabilities.get(&type_name.name).cloned() {
+    if let Some(cap) = ctx.caps.capabilities.get(&type_name.name).cloned() {
         record_capability_ref(type_name.span, &type_name.name, ctx);
         if !ctx.effectful {
             ctx.errors.push(
@@ -686,7 +678,7 @@ pub(crate) fn check_static_call(
                 ),
             );
         }
-        ctx.given_used.insert(type_name.name.clone());
+        ctx.caps.given_used.insert(type_name.name.clone());
         let Some(op) = cap.ops.iter().find(|o| o.name == method.name) else {
             ctx.errors.push(CompileError::new(
                 "karn.capability.unknown_operation",
@@ -1033,8 +1025,8 @@ pub(crate) fn check_method_call(
     // but undeclared in `given` — the static-call path emits the error).
     if let ExprKind::Ident(id) = &receiver.kind
         && ctx.lookup(id.name.as_str()).is_none()
-        && (ctx.capabilities.contains_key(&id.name)
-            || ctx.declared_capabilities.contains_key(&id.name))
+        && (ctx.caps.capabilities.contains_key(&id.name)
+            || ctx.caps.declared_capabilities.contains_key(&id.name))
     {
         return check_static_call(id, method, args, span, ctx);
     }
@@ -1259,7 +1251,8 @@ fn cross_context_prefix(receiver: &Expr, ctx: &Ctx) -> Option<String> {
     if ctx.lookup(head).is_some() {
         return None;
     }
-    if ctx.capabilities.contains_key(head) || ctx.declared_capabilities.contains_key(head) {
+    if ctx.caps.capabilities.contains_key(head) || ctx.caps.declared_capabilities.contains_key(head)
+    {
         return None;
     }
     // If the head is a known local type, only an alias whose name happens to
@@ -1309,7 +1302,7 @@ fn check_cross_context_capability_call(
     }
     // The capability must be declared in this handler/provider's `given`.
     // The local deps key is the capability's simple name.
-    if !ctx.given_remaining.contains(cap) {
+    if !ctx.caps.given_remaining.contains(cap) {
         let mut err = CompileError::new(
             "karn.given.undeclared_capability",
             receiver.span,
@@ -1321,8 +1314,8 @@ fn check_cross_context_capability_call(
         // v0.26 (ADR 0054): the one-click counterpart of the note — the
         // clause entry is the qualified form the user writes (`B.Cap`).
         if let Some((span, insert)) = given_insertion_edit(
-            &ctx.given_entries,
-            ctx.given_anchor,
+            &ctx.caps.given_entries,
+            ctx.caps.given_anchor,
             &format!("{consumed}.{cap}"),
         ) {
             err = err.with_suggestion(
@@ -1337,7 +1330,7 @@ fn check_cross_context_capability_call(
         }
         return None;
     }
-    ctx.given_used.insert(cap.to_string());
+    ctx.caps.given_used.insert(cap.to_string());
 
     let info = &ctx.input.cross_context;
     let op = info
