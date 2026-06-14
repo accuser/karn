@@ -695,6 +695,18 @@ pub(crate) fn check_lambda(
         }
     }
 
+    // v0.31: lambda parameters are in scope over the lambda body.
+    for (p, ty) in lambda.params.iter().zip(&param_tys) {
+        if p.name.name != "_" {
+            ctx.locals.record(
+                p.name.name.clone(),
+                p.name.span,
+                ty.display(),
+                lambda.body.span,
+            );
+        }
+    }
+
     ctx.scopes.push(scope);
 
     // v0.20a generics: an expected return that still carries a *flexible*

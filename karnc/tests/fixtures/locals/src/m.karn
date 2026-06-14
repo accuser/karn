@@ -1,0 +1,16 @@
+commons probe.locals
+
+fn nested(n: Int) -> Int {
+  if n > 0 {
+    let inner = n + 1
+    inner
+  } else {
+    n
+  }
+}
+
+fn shadow(n: Int) -> Int {
+  let x = n
+  let x = x + 1
+  x
+}

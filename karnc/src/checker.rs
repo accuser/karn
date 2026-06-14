@@ -22,6 +22,7 @@ use crate::builtin_names::types::*;
 use crate::error::{Applicability, CompileError};
 use crate::hints::HintSink;
 use crate::index::{RefSink, SymbolKind};
+use crate::locals::LocalsSink;
 use crate::resolver::{MethodTable, ResolvedCommons};
 use crate::span::Span;
 
@@ -168,7 +169,12 @@ pub struct TypedCommons {
 // ==== Entry points ====
 
 pub fn check(input: ResolvedCommons) -> Result<TypedCommons, Vec<CompileError>> {
-    check_record(input, &mut RefSink::new(), &mut HintSink::new())
+    check_record(
+        input,
+        &mut RefSink::new(),
+        &mut HintSink::new(),
+        &mut LocalsSink::new(),
+    )
 }
 
 /// [`check`], recording binding edges into `refs` at the checker's
@@ -177,6 +183,7 @@ pub fn check_record(
     input: ResolvedCommons,
     refs: &mut RefSink,
     hints: &mut HintSink,
+    locals: &mut LocalsSink,
 ) -> Result<TypedCommons, Vec<CompileError>> {
     let mut errors = Vec::new();
     let mut expr_types: HashMap<Span, Ty> = HashMap::new();
@@ -192,7 +199,7 @@ pub fn check_record(
     for item in &input.commons.items {
         if let CommonsItem::Fn(f) = item {
             refs.set_owner(f.name.display());
-            check_fn(f, &input, &mut expr_types, &mut errors, refs, hints);
+            check_fn(f, &input, &mut expr_types, &mut errors, refs, hints, locals);
             refs.clear_owner();
         }
     }
@@ -226,6 +233,7 @@ pub fn check_handler_body(
     errors: &mut Vec<CompileError>,
     refs: &mut RefSink,
     hints: &mut HintSink,
+    locals: &mut LocalsSink,
     capabilities: HashMap<String, CapabilityInfo>,
     declared_capabilities: HashMap<String, CapabilityInfo>,
     agent_state_ty: Option<Ty>,
@@ -244,6 +252,10 @@ pub fn check_handler_body(
     for p in params {
         if let Some(t) = resolve_type_ref(&p.type_ref, &input.types) {
             record_type_refs(&p.type_ref, &input.types, &no_vars, refs);
+            // v0.31: a handler/op parameter is in scope over the whole body.
+            if p.name.name != "_" {
+                locals.record(p.name.name.clone(), p.name.span, t.display(), body.span);
+            }
             param_scope.insert(p.name.name.clone(), t);
         }
     }
@@ -262,6 +274,7 @@ pub fn check_handler_body(
         errors,
         refs,
         hints,
+        locals,
         scopes: vec![param_scope],
         return_ty: return_ty.clone(),
         return_ty_span,
@@ -405,6 +418,10 @@ pub struct Ctx<'a> {
     /// annotation-absent binding sites (`let` / `let <-` / lambda params)
     /// as the binding's final type is computed.
     pub hints: &'a mut HintSink,
+    /// v0.31 (ADR 0064): local bindings recorded with their scope ranges at
+    /// every binding site (`let`/`let <-`, params, match patterns), for the
+    /// LSP's scope-at-offset query.
+    pub locals: &'a mut LocalsSink,
     /// Stack of in-scope name → type frames.
     pub scopes: Vec<HashMap<String, Ty>>,
     pub return_ty: Ty,
@@ -825,6 +842,16 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                         ctx.hints
                             .record(l.name.span, format!(": {}", final_ty.display()));
                     }
+                    // v0.31: in scope from after this statement to block end.
+                    ctx.locals.record(
+                        l.name.name.clone(),
+                        l.name.span,
+                        final_ty.display(),
+                        Span {
+                            start: l.span.end,
+                            end: block.span.end,
+                        },
+                    );
                     ctx.bind(l.name.name.clone(), final_ty);
                 }
             }
@@ -911,6 +938,15 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                         ctx.hints
                             .record(l.name.span, format!(": {}", final_ty.display()));
                     }
+                    ctx.locals.record(
+                        l.name.name.clone(),
+                        l.name.span,
+                        final_ty.display(),
+                        Span {
+                            start: l.span.end,
+                            end: block.span.end,
+                        },
+                    );
                     ctx.bind(l.name.name.clone(), final_ty);
                 }
             }

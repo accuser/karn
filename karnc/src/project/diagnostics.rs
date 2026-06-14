@@ -86,6 +86,10 @@ pub struct ProjectAnalysis {
     /// completion's receiver typing. Empty for files with errors (the
     /// clean-file ceiling) and for synthetic files.
     pub expr_types: FileExprTypes,
+    /// v0.31 (ADR 0064): per-file local bindings with their scope ranges —
+    /// `let`/`let <-`, fn/handler/lambda params — for the scope-at-offset
+    /// query backing locals completion + navigation. Synthetic files muted.
+    pub locals: FileLocals,
 }
 
 /// v0.24: a failed build with its attribution and snapshots intact — what

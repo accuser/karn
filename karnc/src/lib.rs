@@ -28,6 +28,7 @@ pub mod index;
 pub mod kernel_methods;
 pub mod keywords;
 pub mod lexer;
+pub mod locals;
 pub mod parser;
 pub mod project;
 pub mod resolver;
@@ -275,6 +276,9 @@ pub struct ProjectDiagnostics {
     /// captured on the Ok path, for `.`-member completion's receiver typing.
     /// Empty for files with errors (the clean-file ceiling).
     pub expr_types: expr_types::FileExprTypes,
+    /// v0.31 (ADR 0064): per-file local bindings with scope ranges, for the
+    /// scope-at-offset query backing locals completion + navigation.
+    pub locals: locals::FileLocals,
 }
 
 /// v0.24 (ADR 0052): non-bailing, overlay-aware, file-attributed project
@@ -319,6 +323,7 @@ pub fn diagnose_project(
         index: analysis.index,
         hints: analysis.hints,
         expr_types: analysis.expr_types,
+        locals: analysis.locals,
     }
 }
 
