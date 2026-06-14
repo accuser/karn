@@ -198,4 +198,4 @@ will start modelling the shortener's data in earnest.
 ---
 
 *Curious why a context maps to a Worker, or how the boundary validation fits the
-design? See [How a Karn program is shaped](../explanation/how-a-karn-program-is-shaped.md).*
+design? See [How a Karn program is shaped](../guides/program-structure/how-a-program-is-shaped.md).*

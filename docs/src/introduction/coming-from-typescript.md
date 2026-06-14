@@ -9,7 +9,7 @@ for you.
 It is an orientation, not a tutorial — for the hands-on build, start with
 [Tutorial 1](../tutorials/01-first-program.md); for the deeper *whether and when
 to choose Karn*, see
-[Karn compared to TypeScript](../explanation/karn-compared-to-typescript.md).
+[Karn compared to TypeScript](../about/karn-compared-to-typescript.md).
 
 ## The translation table
 
@@ -17,15 +17,15 @@ to choose Karn*, see
 |---|---|---|
 | hand-roll a branded type — `type OrderId = string & { readonly __brand: "OrderId" }` | declare an **opaque type** — `type OrderId = opaque String` | the brand is the language's job; see [opaque types](../reference/types.md) |
 | validate at the edge with `zod` or manual `if` checks | give the type a **refinement** and construct with **`.of`** (which returns a `Result`) | validation happens once, at the boundary — [refined types](../reference/refined-types.md) |
-| cast with `as` to assert validity | use **`.unsafe`** (the explicit escape hatch), or write a literal and let **admission** check it at compile time | the cast is named and searchable — [admission](../explanation/refined-literal-admission.md) |
+| cast with `as` to assert validity | use **`.unsafe`** (the explicit escape hatch), or write a literal and let **admission** check it at compile time | the cast is named and searchable — [admission](../guides/type-system/refined-literal-admission.md) |
 | return `Result`/`Either` by convention (`neverthrow`, `fp-ts`) | get **`Result[T, E]`** in the language | the caller must handle `Err` to reach `T` |
-| `throw` exceptions | return **errors as values**; propagate with **`?`** | no hidden control flow — [type-system philosophy](../explanation/type-system-philosophy.md) |
+| `throw` exceptions | return **errors as values**; propagate with **`?`** | no hidden control flow — [type-system philosophy](../guides/type-system/philosophy.md) |
 | guard `null` / `undefined` | use **`Option[T]`** (`Some` / `None`) | absence is in the type, where the compiler can see it |
 | a discriminated union + `switch` with no `default` | a **sum type** read with an exhaustive **`match`** | the compiler checks every variant is handled |
 | an `interface` of fields | a **record** | [type system](../reference/types.md) |
 | wire dependencies by hand or with decorators | declare a **capability**, ask for it with **`given`**, and supply a **provider** | dependencies are explicit and checked — [capabilities](../reference/capabilities.md) |
 | write a Worker `fetch` handler and a router | write an **`on http`** service and let Karn emit the Worker | [HTTP](../reference/http.md) |
-| hand-write a Durable Object class | declare an **agent** — a key, zeroable `state`, and `commit` | [the agent model](../explanation/the-agent-model.md) |
+| hand-write a Durable Object class | declare an **agent** — a key, zeroable `state`, and `commit` | [the agent model](../guides/agents-and-state/the-agent-model.md) |
 
 ## The shift in feel
 
@@ -40,12 +40,12 @@ you to the shape you intended.
 
 The cost side of that trade — a new toolchain, a smaller ecosystem — is discussed
 honestly in
-[Karn compared to TypeScript](../explanation/karn-compared-to-typescript.md).
+[Karn compared to TypeScript](../about/karn-compared-to-typescript.md).
 
 ## Where to next
 
 - Build something: [Tutorial 1](../tutorials/01-first-program.md) is a five-minute
   warm-up; tutorials 2–6 then build one real service end to end.
 - Keep the [glossary](../reference/glossary.md) open for any unfamiliar term.
-- Skim [the type-system philosophy](../explanation/type-system-philosophy.md) for
+- Skim [the type-system philosophy](../guides/type-system/philosophy.md) for
   the reasoning behind the table.

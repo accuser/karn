@@ -39,12 +39,12 @@ Compiling either with `karnc` produces TypeScript you can read, run, and deploy.
   (types carrying a predicate), *[opaque types](../reference/glossary.md#term-opaque-type)*,
   and *errors-as-values* ([`Result`](../reference/glossary.md#term-result-option),
   `Ok`/`Some`/`None`) so that whole classes of bug cannot be
-  expressed. See [The type-system philosophy](../explanation/type-system-philosophy.md).
+  expressed. See [The type-system philosophy](../guides/type-system/philosophy.md).
 - **Architecture in the language.** Contexts, services, and stateful *agents*
-  are first-class. See [How a Karn program is shaped](../explanation/how-a-karn-program-is-shaped.md).
+  are first-class. See [How a Karn program is shaped](../guides/program-structure/how-a-program-is-shaped.md).
 - **Compiles to TypeScript.** You get JavaScript-ecosystem interop and a
   natural fit for Cloudflare Workers, with a static type system in front of it.
-  See [Why compile to TypeScript](../explanation/why-compile-to-typescript.md).
+  See [Why compile to TypeScript](../guides/projects-build-and-deployment/why-compile-to-typescript.md).
 - **Testing is built in.** `test` blocks, `assert`, dependency `mocks`, and
   [`Mock[T]`](../reference/glossary.md#term-mock) value fabrication ship with the
   language.
@@ -54,7 +54,7 @@ Compiling either with `karnc` produces TypeScript you can read, run, and deploy.
 Karn is pre-1.0. Some designed features — events, sagas, and storage kinds —
 are **deferred, not missing**, and land in later increments on the road to v1.
 This book documents only what compiles today and marks planned features as
-planned. See [Versioning & roadmap](../explanation/versioning-and-roadmap.md).
+planned. See [Versioning & roadmap](../about/versioning-and-roadmap.md).
 
 ## Why "Karn"?
 

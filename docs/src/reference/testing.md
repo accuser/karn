@@ -16,7 +16,7 @@ test counters {
 Case descriptions within a block must be unique
 (`karn.test.duplicate_case_name`); the target must exist
 (`karn.test.unknown_target`). Test files live under the project's `tests/` tree —
-see [Lay out a project](../how-to/projects/layout.md).
+see [Lay out a project](../guides/projects-build-and-deployment/layout.md).
 
 ## `assert`
 
@@ -65,7 +65,7 @@ a target may be mocked once (`karn.mock.duplicate_target`) and must be in scope
 literal (`karn.mock.pin_not_literal`), must satisfy the refinement
 (`karn.mock.literal_violates`), and is only accepted where the kind supports it
 (`karn.mock.pin_unsupported`). See
-[`karn.mock.*` errors](../how-to/troubleshooting/mock-errors.md).
+[`karn.mock.*` errors](../troubleshooting/mock-errors.md).
 
 ## `test integration` — multi-Worker integration tests
 
@@ -106,7 +106,7 @@ provider is instantiated locally in the consumer Worker (v0.15 model A1).
 **Agents** (Durable Objects) work too: a participant's agents are backed by
 in-memory Durable Object instances — same key, same instance **within a case**;
 state starts empty and is **fresh per case**. See
-[Test a flow across Workers](../how-to/testing/integration.md).
+[Test a flow across Workers](../guides/testing/integration.md).
 
 `karnc test` runs integration tests in plain Node alongside unit tests — it
 compiles the participants in workers mode under `out/workers/`, stands them up

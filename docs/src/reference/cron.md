@@ -56,4 +56,4 @@ service sweeper {
 `event.scheduledTime` to handlers that declare the parameter), and every
 schedule is aggregated into the `[triggers]` table of the generated
 `wrangler.toml`. See [emission](emission.md) and
-[Target Cloudflare Workers](../how-to/projects/cloudflare-workers.md).
+[Target Cloudflare Workers](../guides/projects-build-and-deployment/cloudflare-workers.md).

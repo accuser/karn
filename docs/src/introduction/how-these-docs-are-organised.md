@@ -1,29 +1,52 @@
 # How these docs are organised
 
-This book follows **[Diátaxis](https://diataxis.fr/)** — a framework that splits
-technical documentation into four kinds, because a reader *learning* a language
-needs something very different from a reader *looking up* an exact rule. Each
-kind has its own voice and its own page. They are deliberately **not mixed**: a
-tutorial will not stop to argue design rationale, and a reference page will not
-walk you through a task.
+This book is organised **by concern**. Each part of Karn — the type system,
+program structure, effects & capabilities, agents, entry points, testing,
+projects, tooling — has one home that co-locates everything you need to learn it
+and act on it. You shouldn't have to hop across the book to understand and use a
+single topic.
 
-Knowing which of the four you are in tells you what to expect — and where to go
-when a page is not what you need.
+Within a concern, the book still follows **[Diátaxis](https://diataxis.fr/)** —
+the discipline of keeping the *kinds* of documentation apart, one per page, so a
+page that teaches never argues rationale and a page you look something up in
+never walks you through a task. Concern-first grouping makes that discipline
+*more* load-bearing, not less: the modes now sit side by side, so each must stay
+in its lane.
 
-## The four kinds
+## The shape of the book
+
+1. **Getting started** and **Learn Karn** — the on-ramp: what Karn is, how to
+   install it, and a single guaranteed end-to-end tutorial spine
+   ([Compile your first program](../tutorials/01-first-program.md) onward).
+2. **[Guides](../guides/index.md)** — the main body, **one section per
+   concern**, each co-locating its explanation and how-to pages with a short
+   landing page that links out to the reference and spec.
+3. **[Reference](../reference/index.md)** and
+   **[Specification](../spec/index.md)** — the *lookup* surfaces, kept whole and
+   uniform: dry, complete catalogues you scan to confirm an exact rule. They are
+   not split by concern, because you read them by jumping to a known entry.
+4. **About Karn**, **Troubleshooting**, **Contributing**, and **Tooling** round
+   out the background, the diagnostic catalogue, and the two further audiences
+   (compiler contributors, and tool users who may not write Karn).
+
+The split is between **journey** and **lookup**. Tutorials, how-to guides, and
+explanation are read *on a journey* — while learning, doing, or trying to
+understand a concern — so they group by concern. Reference and the normative spec
+are read *to look something up* — so they stay whole.
+
+## The four kinds, one per page
 
 | Kind | When you are… | It answers | What it looks like |
 |---|---|---|---|
-| **[Tutorials](../tutorials/01-first-program.md)** | learning | “Teach me.” | A guided lesson. The author drives; it is guaranteed to work end to end. |
-| **[How-to guides](../how-to/index.md)** | doing a task | “How do I X?” | Steps to a goal you already have. Assumes you know the basics. |
-| **[Reference](../reference/index.md)** | looking something up | “What is the exact behaviour of X?” | Dry, complete, accurate. Structured like the language itself. |
-| **[Explanation](../explanation/index.md)** | trying to understand | “Why is it like this?” | Discussion, rationale, and trade-offs. |
+| **[Tutorial](../tutorials/01-first-program.md)** | learning | "Teach me." | A guided lesson. The author drives; guaranteed to work end to end. |
+| **How-to** (in a [guide](../guides/index.md)) | doing a task | "How do I X?" | Steps to a goal you already have. Assumes the basics. |
+| **Explanation** (in a [guide](../guides/index.md)) | trying to understand | "Why is it like this?" | Discussion, rationale, and trade-offs. |
+| **[Reference](../reference/index.md)** | looking something up | "What is the exact behaviour of X?" | Dry, complete, accurate. Structured like the language. |
 
-Two axes underlie the table. **Tutorials** and **how-to guides** are for
-*action* (doing); **reference** and **explanation** are for *cognition*
-(thinking). **Tutorials** and **explanation** serve *acquiring* skill and
-understanding; **how-to guides** and **reference** serve *applying* what you
-already have.
+Two axes underlie the kinds. **Tutorials** and **how-to** are for *action*
+(doing); **reference** and **explanation** are for *cognition* (thinking).
+**Tutorials** and **explanation** serve *acquiring* skill and understanding;
+**how-to** and **reference** serve *applying* what you already have.
 
 ```mermaid
 quadrantChart
@@ -39,16 +62,11 @@ quadrantChart
 *Which quadrant you are in — acquisition vs application, action vs cognition —
 tells you what to expect.*
 
-Text equivalent: along the *action* row sit **Tutorials** (acquisition: "teach
-me") and **How-to guides** (application: "how do I X?"); along the *cognition* row
-sit **Explanation** (acquisition: "why is it so?") and **Reference** (application:
-"what exactly is X?").
-
 ```text
                  ACQUISITION                 APPLICATION
             (learning / studying)       (working / applying)
           ┌───────────────────────┬───────────────────────┐
-   ACTION │       Tutorials       │     How-to guides      │
+   ACTION │       Tutorials       │       How-to           │
  (doing)  │   "teach me"          │   "how do I X?"        │
           ├───────────────────────┼───────────────────────┤
 COGNITION │     Explanation       │      Reference         │
@@ -56,37 +74,17 @@ COGNITION │     Explanation       │      Reference         │
           └───────────────────────┴───────────────────────┘
 ```
 
-## How to use them together
-
-The kinds link *outward* to one another rather than repeating content, so each
-page can stay short:
-
-- A **how-to guide** points to the **reference** for exact rules and to an
-  **explanation** for the reasoning — it does not reproduce either.
-- A **tutorial** gets you to a working result; when you want to know *why* a
-  step works, it sends you to **explanation**.
-
-So: follow a **tutorial** when you are new, grab a **how-to** when you have a
-job to do, consult the **reference** to confirm exact behaviour, and read an
-**explanation** when you want the reasoning behind a decision.
-
-## A note on the audience layout
-
-The four kinds above all serve **language users** — people writing Karn. The
-book has two further top-level sections for other audiences:
-
-- **[Contributing to the compiler](../contributing/index.md)** — for people
-  working on `karnc` itself.
-- **[Tooling](../tooling/index.md)** — for `karn-fmt`, `karn-lsp`,
-  `tree-sitter-karn`, and the VS Code extension.
-
-Each audience gets its own coherent set of the four Diátaxis kinds, so the
-modes stay unmixed within a clear audience.
+The kinds link *outward* to one another rather than repeating content: a how-to
+points to the reference for exact rules and to an explanation for the reasoning;
+a tutorial sends you to a guide when you want to know *why* a step works. So:
+follow the **tutorial spine** when you are new, open a **guide** for a concern
+you are working in, consult the **reference**/**spec** to confirm exact
+behaviour, and read a guide's **explanation** for the reasoning behind a design.
 
 ## A note on status
 
 Karn is pre-1.0 and changes in small increments. The book documents **what
 compiles today**; anything still on the roadmap is marked as planned rather than
 described as if it exists. See
-[Versioning & roadmap](../explanation/versioning-and-roadmap.md) for how the
-book tracks the language.
+[Versioning & roadmap](../about/versioning-and-roadmap.md) for how the book
+tracks the language.

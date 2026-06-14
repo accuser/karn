@@ -10,7 +10,7 @@
 | `<` `<=` `>` `>=` | binary | `Int` | `Bool` | comparison |
 | `&&` `\|\|` | binary | `Bool` | `Bool` | logical |
 | `!` | unary | `Bool` | `Bool` | logical not |
-| `is` | binary | sum value + pattern | `Bool` | variant test, may bind ([guide](../how-to/pattern-matching/narrow-with-is.md)) |
+| `is` | binary | sum value + pattern | `Bool` | variant test, may bind ([guide](../guides/type-system/narrow-with-is.md)) |
 | `?` | postfix | `Result` | unwraps `Ok` | propagates `Err`; only in a `Result`-returning fn |
 | `<-` | bind | `Effect[T]` | `T` | sequences an effect in a `let` |
 

@@ -62,4 +62,4 @@ service outbox {
 message, acking on `Ok` / retrying on `Err`), and every queue becomes a
 `[[queues.consumers]]` binding in the generated `wrangler.toml`. See
 [emission](emission.md) and
-[Target Cloudflare Workers](../how-to/projects/cloudflare-workers.md).
+[Target Cloudflare Workers](../guides/projects-build-and-deployment/cloudflare-workers.md).

@@ -4,7 +4,7 @@
      Source: karnc/src/diagnostics.rs (`render_markdown`).
      Regenerate with: KARN_BLESS=1 cargo test -p karnc --test diagnostics_registry -->
 
-Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../how-to/troubleshooting/index.md).
+Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../troubleshooting/index.md).
 
 There are **253** codes in total.
 

@@ -49,7 +49,7 @@ cargo install --path karn-lsp
 
 This provides the `karnc-lsp` binary. Most users consume it through the VS Code
 extension rather than invoking it directly — see
-[Set up editor support](../how-to/tooling/editor-support.md).
+[Set up editor support](../guides/editor-and-tooling/editor-support.md).
 
 ## Next steps
 

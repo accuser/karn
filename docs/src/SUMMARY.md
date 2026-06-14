@@ -9,7 +9,7 @@
 - [Install](introduction/install.md)
 - [How these docs are organised](introduction/how-these-docs-are-organised.md)
 
-# Tutorials
+# Learn Karn
 
 - [1. Compile your first program](tutorials/01-first-program.md)
 - [2. Build a small HTTP service](tutorials/02-http-service.md)
@@ -18,54 +18,44 @@
 - [5. Add a stateful agent](tutorials/05-stateful-agent.md)
 - [6. Test it](tutorials/06-testing.md)
 
-# How-to guides
+# Guides
 
-- [How-to guides](how-to/index.md)
-  - [Refined types](how-to/refined-types/index.md)
-    - [Define and validate untrusted input](how-to/refined-types/define-and-validate.md)
-    - [Use a literal where a refined type is expected](how-to/refined-types/literal-admission.md)
-  - [Pattern matching](how-to/pattern-matching/index.md)
-    - [Pattern-match with `match`](how-to/pattern-matching/match.md)
-    - [Narrow and bind with `is`](how-to/pattern-matching/narrow-with-is.md)
-  - [Types & values](how-to/types/index.md)
-    - [Work with `Result` and optional values](how-to/types/result-and-optionals.md)
-    - [Define sum, record, and opaque types](how-to/types/define-types.md)
-    - [Consume another context's services](how-to/types/consumes.md)
-  - [Agents](how-to/agents/index.md)
-    - [Build a stateful agent](how-to/agents/stateful-agent.md)
-    - [Model an agent as a state machine](how-to/agents/state-machine.md)
-  - [Capabilities](how-to/capabilities/index.md)
-    - [Compose a provider from other capabilities](how-to/capabilities/compose-a-provider.md)
-    - [Share a capability across contexts](how-to/capabilities/share-across-contexts.md)
-  - [Adapters](how-to/adapters/index.md)
-    - [Wrap a library as an adapter](how-to/adapters/wrap-a-library.md)
-  - [HTTP](how-to/http/index.md)
-    - [Handle an HTTP request](how-to/http/handle-request.md)
-  - [Cron](how-to/cron/index.md)
-    - [Run a task on a schedule](how-to/cron/handle-cron-trigger.md)
-  - [Queue](how-to/queue/index.md)
-    - [Process a queued message](how-to/queue/handle-queue-message.md)
-  - [Testing](how-to/testing/index.md)
-    - [Write tests and mock collaborators](how-to/testing/write-tests.md)
-    - [Test a flow across Workers](how-to/testing/integration.md)
-  - [Projects](how-to/projects/index.md)
-    - [Lay out a project](how-to/projects/layout.md)
-    - [Target Cloudflare Workers](how-to/projects/cloudflare-workers.md)
-  - [Editor & tooling](how-to/tooling/index.md)
-    - [Format your code with `karn-fmt`](how-to/tooling/format.md)
-    - [Set up editor support](how-to/tooling/editor-support.md)
-  - [Troubleshooting](how-to/troubleshooting/index.md)
-    - [`karn.refine.literal_violates`](how-to/troubleshooting/refine-literal-violates.md)
-    - [`karn.agents.non_zeroable_state_field`](how-to/troubleshooting/agents-non-zeroable-state-field.md)
-    - [`karn.agents.bad_state_initialiser`](how-to/troubleshooting/agents-bad-state-initialiser.md)
-    - [`karn.provider.dependency_cycle`](how-to/troubleshooting/provider-dependency-cycle.md)
-    - [`karn.exports.*` cross-context capability errors](how-to/troubleshooting/exports-capability-errors.md)
-    - [`karn.adapter.*` / binding errors](how-to/troubleshooting/adapter-errors.md)
-    - [`karn.types.is_base_mismatch`](how-to/troubleshooting/is-base-mismatch.md)
-    - [`karn.mock.*` errors](how-to/troubleshooting/mock-errors.md)
-    - [`karn.cron.*` errors](how-to/troubleshooting/cron-errors.md)
-    - [`karn.queue.*` errors](how-to/troubleshooting/queue-errors.md)
-    - [`karn.integration.*` errors](how-to/troubleshooting/integration-errors.md)
+- [Guides](guides/index.md)
+  - [The type system](guides/type-system/index.md)
+    - [The type-system philosophy](guides/type-system/philosophy.md)
+    - [The refined-literal admission model](guides/type-system/refined-literal-admission.md)
+    - [Define and validate untrusted input](guides/type-system/define-and-validate.md)
+    - [Use a literal where a refined type is expected](guides/type-system/use-a-literal.md)
+    - [Define sum, record, and opaque types](guides/type-system/define-types.md)
+    - [Work with `Result` and optional values](guides/type-system/result-and-optionals.md)
+    - [Pattern-match with `match`](guides/type-system/match.md)
+    - [Narrow and bind with `is`](guides/type-system/narrow-with-is.md)
+  - [Program structure](guides/program-structure/index.md)
+    - [How a Karn program is shaped](guides/program-structure/how-a-program-is-shaped.md)
+    - [Consume another context's services](guides/program-structure/consume-services.md)
+  - [Effects & capabilities](guides/effects-and-capabilities/index.md)
+    - [Compose a provider from other capabilities](guides/effects-and-capabilities/compose-a-provider.md)
+    - [Share a capability across contexts](guides/effects-and-capabilities/share-across-contexts.md)
+    - [Wrap a library as an adapter](guides/effects-and-capabilities/wrap-a-library.md)
+  - [Agents & state](guides/agents-and-state/index.md)
+    - [The agent model](guides/agents-and-state/the-agent-model.md)
+    - [Build a stateful agent](guides/agents-and-state/stateful-agent.md)
+    - [Model an agent as a state machine](guides/agents-and-state/state-machine.md)
+  - [Entry points](guides/entry-points/index.md)
+    - [Handle an HTTP request](guides/entry-points/http.md)
+    - [Run a task on a schedule (cron)](guides/entry-points/cron.md)
+    - [Process a queued message](guides/entry-points/queue.md)
+  - [Testing](guides/testing/index.md)
+    - [The testing philosophy](guides/testing/philosophy.md)
+    - [Write tests and mock collaborators](guides/testing/write-tests.md)
+    - [Test a flow across Workers](guides/testing/integration.md)
+  - [Projects, build & deployment](guides/projects-build-and-deployment/index.md)
+    - [Why compile to TypeScript](guides/projects-build-and-deployment/why-compile-to-typescript.md)
+    - [Lay out a project](guides/projects-build-and-deployment/layout.md)
+    - [Target Cloudflare Workers](guides/projects-build-and-deployment/cloudflare-workers.md)
+  - [Editor & tooling](guides/editor-and-tooling/index.md)
+    - [Format your code with `karn-fmt`](guides/editor-and-tooling/format.md)
+    - [Set up editor support](guides/editor-and-tooling/editor-support.md)
 
 # Reference
 
@@ -90,19 +80,6 @@
   - [Emission](reference/emission.md)
   - [Version compatibility & changelog](reference/changelog.md)
 
-# Explanation
-
-- [Explanation](explanation/index.md)
-  - [Why Karn exists](explanation/why-karn-exists.md)
-  - [Why compile to TypeScript](explanation/why-compile-to-typescript.md)
-  - [The type-system philosophy](explanation/type-system-philosophy.md)
-  - [The refined-literal admission model](explanation/refined-literal-admission.md)
-  - [The agent model](explanation/the-agent-model.md)
-  - [The testing philosophy](explanation/testing-philosophy.md)
-  - [How a Karn program is shaped](explanation/how-a-karn-program-is-shaped.md)
-  - [Versioning & roadmap](explanation/versioning-and-roadmap.md)
-  - [Karn compared to TypeScript](explanation/karn-compared-to-typescript.md)
-
 # Specification
 
 - [The Karn Language Specification](spec/index.md)
@@ -120,6 +97,27 @@
   - [§11 Complete grammar](spec/grammar-appendix.md)
   - [Appendix A — Planned features](spec/appendix-planned.md)
   - [Appendix B — Version history](spec/appendix-version-history.md)
+
+# About Karn
+
+- [Why Karn exists](about/why-karn-exists.md)
+- [Karn compared to TypeScript](about/karn-compared-to-typescript.md)
+- [Versioning & roadmap](about/versioning-and-roadmap.md)
+
+# Troubleshooting
+
+- [Troubleshooting](troubleshooting/index.md)
+  - [`karn.refine.literal_violates`](troubleshooting/refine-literal-violates.md)
+  - [`karn.agents.non_zeroable_state_field`](troubleshooting/agents-non-zeroable-state-field.md)
+  - [`karn.agents.bad_state_initialiser`](troubleshooting/agents-bad-state-initialiser.md)
+  - [`karn.provider.dependency_cycle`](troubleshooting/provider-dependency-cycle.md)
+  - [`karn.exports.*` cross-context capability errors](troubleshooting/exports-capability-errors.md)
+  - [`karn.adapter.*` / binding errors](troubleshooting/adapter-errors.md)
+  - [`karn.types.is_base_mismatch`](troubleshooting/is-base-mismatch.md)
+  - [`karn.mock.*` errors](troubleshooting/mock-errors.md)
+  - [`karn.cron.*` errors](troubleshooting/cron-errors.md)
+  - [`karn.queue.*` errors](troubleshooting/queue-errors.md)
+  - [`karn.integration.*` errors](troubleshooting/integration-errors.md)
 
 ---
 

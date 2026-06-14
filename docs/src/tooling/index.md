@@ -1,7 +1,7 @@
 # Tooling
 
 Documentation for the tools around the Karn compiler. If you just want editor
-support, the how-to [Set up editor support](../how-to/tooling/editor-support.md)
+support, the how-to [Set up editor support](../guides/editor-and-tooling/editor-support.md)
 is the quickest path; the pages here are the reference for each tool.
 
 | Tool | Binary / package | Purpose |

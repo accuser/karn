@@ -154,7 +154,7 @@ provides CodeGen = FixedCodeGen {
 
 A **capability** is a dependency a handler asks for with `given`; a **provider**
 supplies it. They are a topic in their own right — see
-[Compose a provider](../how-to/capabilities/compose-a-provider.md) — but the shape
+[Compose a provider](../guides/effects-and-capabilities/compose-a-provider.md) — but the shape
 above is all we need: mint a raw string, then validate it into a `ShortCode`.
 
 ## The whole file
@@ -305,6 +305,6 @@ We have asserted that all this works — now let us prove it.
 ---
 
 *For what an agent really is and why state must be zeroable, see
-[The agent model](../explanation/the-agent-model.md). For exact rules, see the
+[The agent model](../guides/agents-and-state/the-agent-model.md). For exact rules, see the
 [agents reference](../reference/agents.md). For capabilities and providers, see
-the [how-to guides](../how-to/capabilities/index.md).*
+the [how-to guides](../guides/effects-and-capabilities/index.md).*

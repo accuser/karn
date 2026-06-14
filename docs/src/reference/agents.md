@@ -65,7 +65,7 @@ state {
 A field that has neither an initialiser nor an implicit zero — an opaque type, a
 non-`Option` sum, or a refined type that excludes its zero (`Int where
 Positive`) — is rejected with
-[`karn.agents.non_zeroable_state_field`](../how-to/troubleshooting/agents-non-zeroable-state-field.md).
+[`karn.agents.non_zeroable_state_field`](../troubleshooting/agents-non-zeroable-state-field.md).
 Add an initialiser (or, to model "not set yet", use `Option[T]`).
 
 ## State machines
@@ -122,4 +122,4 @@ let n <- c.increment()
 A fresh key's state falls back to the compiled zero value on first access. On the
 `bundle` target an agent uses an in-process state registry; on `workers` it
 compiles to a Cloudflare Durable Object keyed by the agent key. See
-[emission](emission.md) and [The agent model](../explanation/the-agent-model.md).
+[emission](emission.md) and [The agent model](../guides/agents-and-state/the-agent-model.md).

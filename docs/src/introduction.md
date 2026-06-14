@@ -3,7 +3,7 @@
 > ⚠️ **Karn is pre-1.0 (currently v0.31) and under active development.**
 > The language changes in small, spec-first increments. This book documents
 > **what compiles today**; planned features are marked as planned rather than
-> described as if they exist. See [Versioning & roadmap](explanation/versioning-and-roadmap.md).
+> described as if they exist. See [Versioning & roadmap](about/versioning-and-roadmap.md).
 
 Welcome to the official guide and reference for **Karn** — a statically typed,
 architecture-first language that compiles to typed TypeScript for Cloudflare
@@ -15,9 +15,9 @@ need. If you are not sure where to start:
 
 - **New to Karn?** Begin with [What is Karn?](introduction/what-is-karn.md),
   then work through the [Tutorials](tutorials/01-first-program.md) in order.
-- **Have a specific task?** Jump to the [How-to guides](how-to/index.md).
+- **Have a specific task?** Jump to the [How-to guides](guides/index.md).
 - **Need exact behaviour?** Consult the [Reference](reference/index.md).
-- **Want to understand the *why*?** Read the [Explanation](explanation/index.md).
+- **Want to understand the *why*?** Read the [Explanation](guides/index.md).
 
 Or choose a path by background:
 
@@ -26,8 +26,8 @@ Or choose a path by background:
 - **New to typed or functional ideas?** Start at
   [Tutorial 1](tutorials/01-first-program.md), keeping the
   [glossary](reference/glossary.md) to hand.
-- **Evaluating Karn?** Read [Why Karn exists](explanation/why-karn-exists.md),
-  then [Karn compared to TypeScript](explanation/karn-compared-to-typescript.md).
+- **Evaluating Karn?** Read [Why Karn exists](about/why-karn-exists.md),
+  then [Karn compared to TypeScript](about/karn-compared-to-typescript.md).
 
 > [!NOTE]
 > Meet an unfamiliar term? The [glossary](reference/glossary.md) defines Karn's

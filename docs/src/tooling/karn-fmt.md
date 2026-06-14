@@ -3,7 +3,7 @@
 Karn's formatter. There is one implementation, in `karnc::fmt`; the `karn-fmt`
 crate is a thin re-export of it so other tools (the CLI, the LSP) can share it.
 You invoke it as `karnc fmt` — see the how-to
-[Format your code with `karn-fmt`](../how-to/tooling/format.md) for usage.
+[Format your code with `karn-fmt`](../guides/editor-and-tooling/format.md) for usage.
 
 ## What it does
 
