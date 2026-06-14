@@ -1803,3 +1803,537 @@ impl<'a> Parser<'a> {
         Ok(QualifiedName { parts, span })
     }
 }
+
+impl<'a> Parser<'a> {
+    // -- v0.5 declarations --
+
+    fn parse_capability_decl(&mut self) -> Result<CapabilityDecl, CompileError> {
+        let kw = self.expect(TokenKind::Capability, "to start a capability declaration")?;
+        let name = self.expect_ident("after `capability`")?;
+        self.expect(TokenKind::LBrace, "to open the capability body")?;
+        let mut ops = Vec::new();
+        loop {
+            let (leading, item_doc) = self.collect_item_lead();
+            match self.peek_kind() {
+                Some(TokenKind::RBrace) => {
+                    if let Some((_, doc_span)) = item_doc {
+                        self.warnings.push(CompileError::new(
+                            "karn.parse.orphan_doc_block",
+                            doc_span,
+                            "documentation block has no following operation to attach to",
+                        ));
+                    }
+                    break;
+                }
+                Some(TokenKind::Fn) => {
+                    let next_span = self.peek().unwrap().span;
+                    let doc = self.finalize_doc(item_doc, next_span);
+                    let mut op = self.parse_capability_op()?;
+                    op.documentation = doc;
+                    op.trivia.leading = leading;
+                    op.trivia.trailing = self.take_trailing_trivia();
+                    ops.push(op);
+                }
+                Some(_) => {
+                    let t = self.peek().unwrap();
+                    return Err(CompileError::new(
+                        "karn.parse.expected_capability_op",
+                        t.span,
+                        format!(
+                            "expected `fn` to declare a capability operation, found {}",
+                            t.kind.describe()
+                        ),
+                    ));
+                }
+                None => {
+                    return Err(CompileError::new(
+                        "karn.parse.unexpected_eof",
+                        self.eof_span(),
+                        "expected `}` to close the capability body, found end of file",
+                    ));
+                }
+            }
+        }
+        let close = self.expect(TokenKind::RBrace, "to close the capability body")?;
+        if ops.is_empty() {
+            return Err(CompileError::new(
+                "karn.parse.empty_capability",
+                kw.span.merge(close.span),
+                "a capability must declare at least one operation",
+            ));
+        }
+        Ok(CapabilityDecl {
+            name,
+            ops,
+            documentation: None,
+            span: kw.span.merge(close.span),
+            trivia: Trivia::default(),
+        })
+    }
+
+    fn parse_capability_op(&mut self) -> Result<CapabilityOp, CompileError> {
+        let kw = self.expect(TokenKind::Fn, "to start a capability operation")?;
+        let name = self.expect_ident("as the capability operation name")?;
+        self.expect(TokenKind::LParen, "after the operation name")?;
+        let mut params = Vec::new();
+        if self.peek_kind() != Some(TokenKind::RParen) {
+            params.push(self.parse_param()?);
+            while self.eat(TokenKind::Comma).is_some() {
+                params.push(self.parse_param()?);
+            }
+        }
+        self.expect(TokenKind::RParen, "to close the operation parameter list")?;
+        self.expect(TokenKind::Arrow, "before the operation return type")?;
+        let return_type = self.parse_type_ref("as the operation return type")?;
+        let end_span = return_type.span();
+        Ok(CapabilityOp {
+            name,
+            params,
+            return_type,
+            documentation: None,
+            span: kw.span.merge(end_span),
+            trivia: Trivia::default(),
+        })
+    }
+
+    /// Parse one capability reference in a `given` clause (v0.15 §3.2). A bare
+    /// name (`Cap`) is a local capability; a dotted name (`B.Cap` /
+    /// `platform.time.Clock`) refers to a capability provided by a consumed
+    /// context — every segment but the last forms the context prefix.
+    fn parse_cap_ref(&mut self) -> Result<CapRef, CompileError> {
+        let role = "as a capability name in the `given` clause";
+        let mut parts = vec![self.expect_ident(role)?];
+        while self.peek_kind() == Some(TokenKind::Dot) {
+            self.bump();
+            parts.push(self.expect_ident(role)?);
+        }
+        let name = parts.pop().unwrap();
+        let context = if parts.is_empty() {
+            None
+        } else {
+            let qspan = parts
+                .first()
+                .unwrap()
+                .span
+                .merge(parts.last().unwrap().span);
+            Some(QualifiedName { parts, span: qspan })
+        };
+        let span = context
+            .as_ref()
+            .map(|q| q.span.merge(name.span))
+            .unwrap_or(name.span);
+        Ok(CapRef {
+            context,
+            name,
+            span,
+        })
+    }
+
+    fn parse_provider_decl(&mut self) -> Result<ProviderDecl, CompileError> {
+        let kw = self.expect(TokenKind::Provides, "to start a provider declaration")?;
+        let capability = self.expect_ident("after `provides`")?;
+        self.expect(TokenKind::Eq, "after the capability name")?;
+        let provider_name = self.expect_ident("as the provider name")?;
+        // v0.12: optional `given C1, C2` — capabilities the provider depends on.
+        // v0.15: a dependency may be a cross-context capability (`given B.Cap`).
+        let mut given = Vec::new();
+        if self.peek_kind() == Some(TokenKind::Given) {
+            self.bump();
+            given.push(self.parse_cap_ref()?);
+            while self.eat(TokenKind::Comma).is_some() {
+                given.push(self.parse_cap_ref()?);
+            }
+        }
+        // v0.17: a provider with **no** brace block is an *external* provider —
+        // its implementation is supplied by an adapter's binding. The absence of
+        // the brace block (not an empty one) is the signal. Whether this form is
+        // legal here (adapter) or not (context) is decided by the checker, so the
+        // parser accepts both shapes structurally.
+        if self.peek_kind() != Some(TokenKind::LBrace) {
+            let end = given.last().map(|g| g.span).unwrap_or(provider_name.span);
+            return Ok(ProviderDecl {
+                capability,
+                provider_name,
+                given,
+                ops: Vec::new(),
+                external: true,
+                documentation: None,
+                span: kw.span.merge(end),
+                trivia: Trivia::default(),
+            });
+        }
+        self.expect(TokenKind::LBrace, "to open the provider body")?;
+        let mut ops = Vec::new();
+        loop {
+            let leading = self.take_leading_trivia();
+            match self.peek_kind() {
+                Some(TokenKind::RBrace) => break,
+                Some(TokenKind::Fn) => {
+                    let mut op = self.parse_provider_op()?;
+                    op.trivia.leading = leading;
+                    op.trivia.trailing = self.take_trailing_trivia();
+                    ops.push(op);
+                }
+                Some(_) => {
+                    let t = self.peek().unwrap();
+                    return Err(CompileError::new(
+                        "karn.parse.expected_provider_op",
+                        t.span,
+                        format!(
+                            "expected `fn` to declare a provider operation, found {}",
+                            t.kind.describe()
+                        ),
+                    ));
+                }
+                None => {
+                    return Err(CompileError::new(
+                        "karn.parse.unexpected_eof",
+                        self.eof_span(),
+                        "expected `}` to close the provider body, found end of file",
+                    ));
+                }
+            }
+        }
+        let close = self.expect(TokenKind::RBrace, "to close the provider body")?;
+        Ok(ProviderDecl {
+            capability,
+            provider_name,
+            given,
+            ops,
+            external: false,
+            documentation: None,
+            span: kw.span.merge(close.span),
+            trivia: Trivia::default(),
+        })
+    }
+
+    fn parse_provider_op(&mut self) -> Result<ProviderOp, CompileError> {
+        let kw = self.expect(TokenKind::Fn, "to start a provider operation")?;
+        let name = self.expect_ident("as the provider operation name")?;
+        self.expect(TokenKind::LParen, "after the operation name")?;
+        let mut params = Vec::new();
+        if self.peek_kind() != Some(TokenKind::RParen) {
+            params.push(self.parse_param()?);
+            while self.eat(TokenKind::Comma).is_some() {
+                params.push(self.parse_param()?);
+            }
+        }
+        self.expect(TokenKind::RParen, "to close the operation parameter list")?;
+        self.expect(TokenKind::Arrow, "before the operation return type")?;
+        let return_type = self.parse_type_ref("as the operation return type")?;
+        let body = self.parse_block("to open the provider operation body")?;
+        let span = kw.span.merge(body.span);
+        Ok(ProviderOp {
+            name,
+            params,
+            return_type,
+            body,
+            span,
+            trivia: Trivia::default(),
+        })
+    }
+
+    fn parse_service_decl(&mut self) -> Result<ServiceDecl, CompileError> {
+        let kw = self.expect(TokenKind::Service, "to start a service declaration")?;
+        let name = self.expect_ident("after `service`")?;
+        self.expect(TokenKind::LBrace, "to open the service body")?;
+        let mut handlers = Vec::new();
+        loop {
+            let (leading, item_doc) = self.collect_item_lead();
+            match self.peek_kind() {
+                Some(TokenKind::RBrace) => {
+                    if let Some((_, doc_span)) = item_doc {
+                        self.warnings.push(CompileError::new(
+                            "karn.parse.orphan_doc_block",
+                            doc_span,
+                            "documentation block has no following handler to attach to",
+                        ));
+                    }
+                    break;
+                }
+                Some(TokenKind::On) => {
+                    let next_span = self.peek().unwrap().span;
+                    let doc = self.finalize_doc(item_doc, next_span);
+                    let mut h = self.parse_handler(false)?;
+                    h.documentation = doc;
+                    h.trivia.leading = leading;
+                    h.trivia.trailing = self.take_trailing_trivia();
+                    handlers.push(h);
+                }
+                Some(_) => {
+                    let t = self.peek().unwrap();
+                    return Err(CompileError::new(
+                        "karn.parse.expected_handler",
+                        t.span,
+                        format!(
+                            "expected `on` to start a handler, found {}",
+                            t.kind.describe()
+                        ),
+                    ));
+                }
+                None => {
+                    return Err(CompileError::new(
+                        "karn.parse.unexpected_eof",
+                        self.eof_span(),
+                        "expected `}` to close the service body, found end of file",
+                    ));
+                }
+            }
+        }
+        let close = self.expect(TokenKind::RBrace, "to close the service body")?;
+        if handlers.is_empty() {
+            return Err(CompileError::new(
+                "karn.parse.empty_service",
+                kw.span.merge(close.span),
+                "a service must declare at least one handler",
+            ));
+        }
+        Ok(ServiceDecl {
+            name,
+            handlers,
+            documentation: None,
+            span: kw.span.merge(close.span),
+            trivia: Trivia::default(),
+        })
+    }
+
+    fn parse_agent_decl(&mut self) -> Result<AgentDecl, CompileError> {
+        let kw = self.expect(TokenKind::Agent, "to start an agent declaration")?;
+        let name = self.expect_ident("after `agent`")?;
+        self.expect(TokenKind::LBrace, "to open the agent body")?;
+        // key id: Type
+        // The `key` keyword is recognised as an identifier with the literal
+        // name "key" — we don't have a dedicated keyword so it can be a
+        // method name elsewhere. v0.5 reserves it only inside an agent body.
+        let key_ident =
+            self.expect_ident("expected `key id: Type` at the start of the agent body")?;
+        if key_ident.name != "key" {
+            return Err(CompileError::new(
+                "karn.parse.expected_agent_key",
+                key_ident.span,
+                format!(
+                    "expected `key id: Type` at the start of the agent body, found `{}`",
+                    key_ident.name
+                ),
+            ));
+        }
+        let key_name = self.expect_ident("as the agent key field name")?;
+        self.expect(TokenKind::Colon, "after the agent key field name")?;
+        let key_type = self.parse_type_ref("as the agent key type")?;
+        // state { ... }
+        let state_kw = self.expect(
+            TokenKind::State,
+            "expected `state { ... }` after the agent key",
+        )?;
+        self.expect(TokenKind::LBrace, "to open the agent state block")?;
+        let mut state_fields = Vec::new();
+        while self.peek_kind() != Some(TokenKind::RBrace) {
+            state_fields.push(self.parse_record_field()?);
+            if self.eat(TokenKind::Comma).is_none() {
+                break;
+            }
+        }
+        let state_close = self.expect(TokenKind::RBrace, "to close the agent state block")?;
+        let state_span = state_kw.span.merge(state_close.span);
+        // handlers
+        let mut handlers = Vec::new();
+        loop {
+            let (leading, item_doc) = self.collect_item_lead();
+            match self.peek_kind() {
+                Some(TokenKind::RBrace) => {
+                    if let Some((_, doc_span)) = item_doc {
+                        self.warnings.push(CompileError::new(
+                            "karn.parse.orphan_doc_block",
+                            doc_span,
+                            "documentation block has no following handler to attach to",
+                        ));
+                    }
+                    break;
+                }
+                Some(TokenKind::On) => {
+                    let next_span = self.peek().unwrap().span;
+                    let doc = self.finalize_doc(item_doc, next_span);
+                    let mut h = self.parse_handler(true)?;
+                    h.documentation = doc;
+                    h.trivia.leading = leading;
+                    h.trivia.trailing = self.take_trailing_trivia();
+                    handlers.push(h);
+                }
+                Some(_) => {
+                    let t = self.peek().unwrap();
+                    return Err(CompileError::new(
+                        "karn.parse.expected_handler",
+                        t.span,
+                        format!(
+                            "expected `on` to start a handler, found {}",
+                            t.kind.describe()
+                        ),
+                    ));
+                }
+                None => {
+                    return Err(CompileError::new(
+                        "karn.parse.unexpected_eof",
+                        self.eof_span(),
+                        "expected `}` to close the agent body, found end of file",
+                    ));
+                }
+            }
+        }
+        let close = self.expect(TokenKind::RBrace, "to close the agent body")?;
+        if handlers.is_empty() {
+            return Err(CompileError::new(
+                "karn.parse.empty_agent",
+                kw.span.merge(close.span),
+                "an agent must declare at least one handler",
+            ));
+        }
+        Ok(AgentDecl {
+            name,
+            key_name,
+            key_type,
+            state_fields,
+            state_span,
+            handlers,
+            documentation: None,
+            span: kw.span.merge(close.span),
+            trivia: Trivia::default(),
+        })
+    }
+
+    /// Parse a handler block.
+    ///
+    /// Service handlers are `on call(args) -> T given C1, C2 { body }`.
+    /// Agent handlers are `on call methodName(args) -> T given C1, C2 { body }`,
+    /// where the method name is the agent operation invoked on an instance.
+    fn parse_handler(&mut self, is_agent: bool) -> Result<Handler, CompileError> {
+        let kw = self.expect(TokenKind::On, "to start a handler")?;
+        // v0.9: the handler kind is either `call` (an identifier) or `http`
+        // (a reserved keyword followed by method + path).
+        let kind = if self.peek_kind() == Some(TokenKind::Http) {
+            let http_tok = self.bump().unwrap();
+            if is_agent {
+                return Err(CompileError::new(
+                    "karn.parse.http_in_agent",
+                    http_tok.span,
+                    "`on http` handlers are only valid inside `service` declarations, not `agent`",
+                )
+                .with_note(
+                    "agents persist state and respond to `on call`; HTTP routes belong on services",
+                ));
+            }
+            let method_ident = self.expect_ident(
+                "expected an HTTP method (GET, POST, PUT, PATCH, DELETE) after `on http`",
+            )?;
+            let Some(method) = HttpMethod::from_ident(&method_ident.name) else {
+                return Err(CompileError::new(
+                    "karn.parse.unknown_http_method",
+                    method_ident.span,
+                    format!(
+                        "unknown HTTP method `{}` — expected one of GET, POST, PUT, PATCH, DELETE",
+                        method_ident.name
+                    ),
+                ));
+            };
+            let path_tok = self.expect(
+                TokenKind::StrLit,
+                "expected a path pattern string literal after the HTTP method",
+            )?;
+            let path = parse_string_literal(self.slice(path_tok.span), path_tok.span)?;
+            HandlerKind::Http { method, path }
+        } else if self.peek_kind() == Some(TokenKind::Cron) {
+            let cron_tok = self.bump().unwrap();
+            if is_agent {
+                return Err(CompileError::new(
+                    "karn.parse.cron_in_agent",
+                    cron_tok.span,
+                    "`on cron` handlers are only valid inside `service` declarations, not `agent`",
+                )
+                .with_note(
+                    "agents persist state and respond to `on call`; scheduled tasks belong on services",
+                ));
+            }
+            let expr_tok = self.expect(
+                TokenKind::StrLit,
+                "expected a cron expression string literal after `on cron`",
+            )?;
+            let expr = parse_string_literal(self.slice(expr_tok.span), expr_tok.span)?;
+            HandlerKind::Cron { expr }
+        } else if self.peek_kind() == Some(TokenKind::Queue) {
+            let queue_tok = self.bump().unwrap();
+            if is_agent {
+                return Err(CompileError::new(
+                    "karn.parse.queue_in_agent",
+                    queue_tok.span,
+                    "`on queue` handlers are only valid inside `service` declarations, not `agent`",
+                )
+                .with_note(
+                    "agents persist state and respond to `on call`; queue consumers belong on services",
+                ));
+            }
+            let name_tok = self.expect(
+                TokenKind::StrLit,
+                "expected a queue name string literal after `on queue`",
+            )?;
+            let name = parse_string_literal(self.slice(name_tok.span), name_tok.span)?;
+            HandlerKind::Queue { name }
+        } else {
+            let kind_ident = self.expect_ident("expected handler kind (e.g. `call`) after `on`")?;
+            match kind_ident.name.as_str() {
+                "call" => HandlerKind::Call,
+                other => {
+                    return Err(CompileError::new(
+                        "karn.parse.unknown_handler_kind",
+                        kind_ident.span,
+                        format!(
+                            "unknown handler kind `{other}` — supported kinds are `call`, `http`, `cron`, and `queue`"
+                        ),
+                    )
+                    .with_note(
+                        "use `on call(...)`, `on http METHOD \"/path\" (...)`, `on cron \"expr\" (...)`, or `on queue \"name\" (message: T)`",
+                    ));
+                }
+            }
+        };
+        // Agent handlers have a method name before the parameter list:
+        //   on call addItem(item: CartItem) -> ...
+        // Service handlers have just the parameter list:
+        //   on call(amount: Money) -> ...
+        let method_name = if is_agent && self.peek_kind() == Some(TokenKind::Ident) {
+            Some(self.expect_ident("as the agent handler operation name")?)
+        } else {
+            None
+        };
+        self.expect(TokenKind::LParen, "before the handler parameter list")?;
+        let mut params = Vec::new();
+        if self.peek_kind() != Some(TokenKind::RParen) {
+            params.push(self.parse_param()?);
+            while self.eat(TokenKind::Comma).is_some() {
+                params.push(self.parse_param()?);
+            }
+        }
+        self.expect(TokenKind::RParen, "to close the handler parameter list")?;
+        self.expect(TokenKind::Arrow, "before the handler return type")?;
+        let return_type = self.parse_type_ref("as the handler return type")?;
+        let mut given = Vec::new();
+        if self.peek_kind() == Some(TokenKind::Given) {
+            self.bump();
+            given.push(self.parse_cap_ref()?);
+            while self.eat(TokenKind::Comma).is_some() {
+                given.push(self.parse_cap_ref()?);
+            }
+        }
+        let body = self.parse_block("to open the handler body")?;
+        let span = kw.span.merge(body.span);
+        Ok(Handler {
+            kind,
+            method_name,
+            params,
+            return_type,
+            given,
+            body,
+            documentation: None,
+            span,
+            trivia: Trivia::default(),
+        })
+    }
+}
