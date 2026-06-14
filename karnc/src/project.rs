@@ -34,6 +34,7 @@ use crate::firstparty::{self, Platform};
 use crate::hints::{FileHints, HintSink};
 use crate::index::{IndexBuilder, ProjectIndex, RefSink, SiteRef, SymbolKind};
 use crate::lexer;
+use crate::locals::{FileLocals, LocalsSink};
 use crate::parser;
 use crate::resolver::{self, MethodTable as ResolverMethodTable, ResolvedCommons};
 use crate::span::Span;
@@ -287,12 +288,14 @@ pub fn analyse_project(root: &Path, overlay: &HashMap<PathBuf, String>) -> Proje
             errors,
             snapshots,
             mut hints,
+            mut locals,
             mut exprs,
         } => ProjectAnalysis {
             snapshots,
             errors: errors.into_entries(),
             index: ProjectIndex::default(),
             hints: hints.take_files(),
+            locals: locals.take_files(),
             expr_types: exprs.take_files(),
         },
         RunChecks::Checked {
@@ -300,6 +303,7 @@ pub fn analyse_project(root: &Path, overlay: &HashMap<PathBuf, String>) -> Proje
             snapshots,
             mut refs,
             mut hints,
+            mut locals,
             mut exprs,
             parsed,
             unit_uses,
@@ -317,6 +321,7 @@ pub fn analyse_project(root: &Path, overlay: &HashMap<PathBuf, String>) -> Proje
                 errors: errors.into_entries(),
                 index,
                 hints: hints.take_files(),
+                locals: locals.take_files(),
                 expr_types: exprs.take_files(),
             }
         }
@@ -1936,6 +1941,7 @@ fn check_unit_files(
     errors: &mut ErrorSink,
     refs: &mut RefSink,
     hints: &mut HintSink,
+    locals: &mut LocalsSink,
     exprs: &mut ExprTypeSink,
     compiled: &mut Vec<CompiledFile>,
 ) {
@@ -2065,11 +2071,14 @@ fn check_unit_files(
             &pf.source_path,
             pf.synthetic || matches!(pf.kind, UnitKind::Test | UnitKind::Integration),
         );
+        // v0.31: locals serve completion/navigation in test files too — only
+        // synthetic (toolchain-injected) files are muted.
+        locals.enter_file(&pf.source_path, pf.synthetic);
         if let Err(errs) = resolver::resolve_file_record(&resolved, refs) {
             errors.extend_for(Some(&pf.source_path), errs);
             continue;
         }
-        let typed = match checker::check_record(resolved, refs, hints) {
+        let typed = match checker::check_record(resolved, refs, hints, locals) {
             Ok(t) => t,
             Err(errs) => {
                 errors.extend_for(Some(&pf.source_path), errs);
@@ -2096,8 +2105,14 @@ fn check_unit_files(
         if (kind == UnitKind::Context || kind == UnitKind::Adapter)
             && let Some(table) = unit_table_owned.as_ref()
         {
-            let decl_errs =
-                check_context_declarations(&mut typed, table, &cross_context_for_file, refs, hints);
+            let decl_errs = check_context_declarations(
+                &mut typed,
+                table,
+                &cross_context_for_file,
+                refs,
+                hints,
+                locals,
+            );
             if !decl_errs.is_empty() {
                 errors.extend_for(Some(&pf.source_path), decl_errs);
                 continue;
@@ -2144,6 +2159,7 @@ enum RunChecks {
         errors: ErrorSink,
         snapshots: Vec<(PathBuf, String)>,
         hints: HintSink,
+        locals: LocalsSink,
         exprs: ExprTypeSink,
     },
     /// All phases ran (per-unit checks + tests + platform-lock done).
@@ -2152,6 +2168,7 @@ enum RunChecks {
         snapshots: Vec<(PathBuf, String)>,
         refs: RefSink,
         hints: HintSink,
+        locals: LocalsSink,
         exprs: ExprTypeSink,
         parsed: Vec<ParsedFile>,
         compiled: Vec<CompiledFile>,
@@ -2187,6 +2204,7 @@ fn run_checks(
     // binding sites. A sink (not part of the checker's Ok payload) so hints
     // survive the per-file error-`continue`s.
     let mut hints = HintSink::new();
+    let mut locals = LocalsSink::new();
     // v0.30.2 (ADR 0063): per-file expression types, captured on the Ok path so
     // `.`-member completion can type a receiver. Carried like `hints`.
     let mut exprs = ExprTypeSink::new();
@@ -2202,6 +2220,7 @@ fn run_checks(
                     errors,
                     snapshots,
                     hints,
+                    locals,
                     exprs,
                 };
             }
@@ -2224,6 +2243,7 @@ fn run_checks(
                 errors,
                 snapshots,
                 hints,
+                locals,
                 exprs,
             };
         }
@@ -2301,6 +2321,7 @@ fn run_checks(
             errors,
             snapshots,
             hints,
+            locals,
             exprs,
         };
     }
@@ -2394,6 +2415,7 @@ fn run_checks(
             &mut errors,
             &mut refs,
             &mut hints,
+            &mut locals,
             &mut exprs,
             &mut compiled,
         );
@@ -2466,6 +2488,7 @@ fn run_checks(
         snapshots,
         refs,
         hints,
+        locals,
         exprs,
         parsed,
         compiled,

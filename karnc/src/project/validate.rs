@@ -450,6 +450,7 @@ pub(crate) fn check_context_declarations(
     cross_context: &resolver::CrossContextInfo,
     refs: &mut RefSink,
     hints: &mut HintSink,
+    locals: &mut LocalsSink,
 ) -> Vec<CompileError> {
     let mut errors = Vec::new();
     let no_vars: HashSet<String> = HashSet::new();
@@ -542,6 +543,7 @@ pub(crate) fn check_context_declarations(
         &capability_info_map,
         refs,
         hints,
+        locals,
         &mut errors,
     );
     check_service_decls(
@@ -552,6 +554,7 @@ pub(crate) fn check_context_declarations(
         &capability_info_map,
         refs,
         hints,
+        locals,
         &mut errors,
     );
     check_agent_decls(
@@ -562,6 +565,7 @@ pub(crate) fn check_context_declarations(
         &no_vars,
         refs,
         hints,
+        locals,
         &mut errors,
     );
 
@@ -602,6 +606,7 @@ fn check_provider_decls(
     capability_info_map: &HashMap<String, CapabilityInfo>,
     refs: &mut RefSink,
     hints: &mut HintSink,
+    locals: &mut LocalsSink,
     errors: &mut Vec<CompileError>,
 ) {
     for provider in table.providers.values() {
@@ -635,6 +640,7 @@ fn check_provider_decls(
                 errors,
                 refs,
                 hints,
+                locals,
                 provider_caps.clone(),
                 capability_info_map.clone(),
                 None,
@@ -673,6 +679,7 @@ fn check_service_decls(
     capability_info_map: &HashMap<String, CapabilityInfo>,
     refs: &mut RefSink,
     hints: &mut HintSink,
+    locals: &mut LocalsSink,
     errors: &mut Vec<CompileError>,
 ) {
     // v0.9: validate HTTP handler shape and check for duplicate routes
@@ -795,6 +802,7 @@ fn check_service_decls(
                 errors,
                 refs,
                 hints,
+                locals,
                 handler_caps,
                 capability_info_map.clone(),
                 None,
@@ -820,6 +828,7 @@ fn check_agent_decls(
     no_vars: &HashSet<String>,
     refs: &mut RefSink,
     hints: &mut HintSink,
+    locals: &mut LocalsSink,
     errors: &mut Vec<CompileError>,
 ) {
     for agent in table.agents.values() {
@@ -874,6 +883,7 @@ fn check_agent_decls(
                     errors,
                     refs,
                     hints,
+                    locals,
                 );
             } else if checker::zero_value_ts(
                 &field.type_ref,
@@ -1000,6 +1010,7 @@ fn check_agent_decls(
                 errors,
                 refs,
                 hints,
+                locals,
                 handler_caps,
                 capability_info_map.clone(),
                 Some(state_ty.clone()),

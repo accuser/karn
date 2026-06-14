@@ -5,6 +5,7 @@
 
 use super::*;
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_fn(
     f: &FnDecl,
     input: &ResolvedCommons,
@@ -12,6 +13,7 @@ pub(crate) fn check_fn(
     errors: &mut Vec<CompileError>,
     refs: &mut RefSink,
     hints: &mut HintSink,
+    locals: &mut LocalsSink,
 ) {
     // v0.20a: the fn's type parameters are *rigid* type variables while
     // checking its own body. A type param shadowing a declared type is
@@ -52,6 +54,10 @@ pub(crate) fn check_fn(
     for p in &f.params {
         if let Some(ty) = resolve_type_ref_in(&p.type_ref, &input.types, &vars) {
             record_type_refs(&p.type_ref, &input.types, &vars, refs);
+            // v0.31: a fn parameter is in scope over the whole body.
+            if p.name.name != "_" {
+                locals.record(p.name.name.clone(), p.name.span, ty.display(), f.body.span);
+            }
             param_scope.insert(p.name.name.clone(), ty);
         }
     }
@@ -62,6 +68,7 @@ pub(crate) fn check_fn(
         errors,
         refs,
         hints,
+        locals,
         scopes: vec![param_scope],
         return_ty: return_ty.clone(),
         return_ty_span: f.return_type.span(),
@@ -99,6 +106,7 @@ pub(crate) fn check_fn(
 /// admit (v0.9.4) and sum variants resolve. The init's expression types are
 /// recorded into `expr_types` for emission; a single
 /// `karn.agents.bad_state_initialiser` is pushed on any failure.
+#[allow(clippy::too_many_arguments)]
 pub fn check_state_initialiser(
     init: &Expr,
     field_type: &TypeRef,
@@ -107,6 +115,7 @@ pub fn check_state_initialiser(
     errors: &mut Vec<CompileError>,
     refs: &mut RefSink,
     hints: &mut HintSink,
+    locals: &mut LocalsSink,
 ) {
     let Some(field_ty) = resolve_type_ref(field_type, &input.types) else {
         return; // an unresolved field type is reported elsewhere
@@ -119,6 +128,7 @@ pub fn check_state_initialiser(
             errors: &mut local_errors,
             refs,
             hints,
+            locals,
             scopes: vec![HashMap::new()],
             return_ty: field_ty.clone(),
             return_ty_span: init.span,

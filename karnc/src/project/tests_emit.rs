@@ -609,12 +609,14 @@ fn check_integration_case_body(
     let mut expr_types: HashMap<Span, checker::Ty> = HashMap::new();
     // Test bodies record no hints (out of v0.27 scope) — a throwaway sink.
     let mut no_hints = HintSink::new();
+    let mut no_locals = LocalsSink::new();
     let mut ctx = checker::Ctx {
         input: &resolved,
         expr_types: &mut expr_types,
         errors,
         refs,
         hints: &mut no_hints,
+        locals: &mut no_locals,
         scopes: vec![HashMap::new()],
         return_ty: return_ty.clone(),
         return_ty_span: case.span,
@@ -1176,6 +1178,7 @@ fn check_op_body_with_privileged_view(
         refs,
         // Mock op bodies live in test files — out of v0.27 hint scope.
         &mut HintSink::new(),
+        &mut LocalsSink::new(),
         HashMap::new(),
         HashMap::new(),
         None,
@@ -1265,12 +1268,14 @@ fn check_test_case_body(
     let effectful = matches!(return_ty, checker::Ty::Effect(_));
     // Test bodies record no hints (out of v0.27 scope) — a throwaway sink.
     let mut no_hints = HintSink::new();
+    let mut no_locals = LocalsSink::new();
     let mut ctx = checker::Ctx {
         input: &resolved,
         expr_types: &mut expr_types,
         errors,
         refs,
         hints: &mut no_hints,
+        locals: &mut no_locals,
         scopes: vec![HashMap::new()],
         return_ty: return_ty.clone(),
         return_ty_span,
@@ -1737,6 +1742,7 @@ fn emit_mock_op_body(
             &mut errs,
             &mut RefSink::new(),
             &mut HintSink::new(),
+            &mut LocalsSink::new(),
             HashMap::new(),
             HashMap::new(),
             None,
