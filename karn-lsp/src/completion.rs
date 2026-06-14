@@ -249,8 +249,28 @@ fn in_type_arg_list(head: &str) -> bool {
 /// only leading whitespace plus an optional partial identifier (no operators,
 /// colons, or brackets). Fires on an empty line too. Disjoint from
 /// [`is_type_position`], whose triggers (`:`/`->`/`[`) make this false.
-fn is_keyword_position(line: &str) -> bool {
+pub fn is_keyword_position(line: &str) -> bool {
     line.trim().chars().all(|c| c.is_alphanumeric() || c == '_')
+}
+
+/// The cursor sits where a **value** expression is expected — after `=`/`(`/`,`,
+/// a `=>` lambda arrow, or a binary operator — so in-scope locals are offered
+/// (v0.31, ADR 0064). Conservative: covers the common positions, excludes the
+/// type arrow `->`. (The handler also offers locals at keyword position.)
+pub fn is_expression_position(line: &str) -> bool {
+    let head = line
+        .trim_end_matches(|c: char| c.is_alphanumeric() || c == '_')
+        .trim_end();
+    if head.ends_with("->") {
+        return false; // a return/param type, not a value
+    }
+    if head.ends_with("=>") {
+        return true; // a lambda body
+    }
+    matches!(
+        head.chars().last(),
+        Some('=' | '(' | ',' | '[' | '+' | '-' | '*' | '/' | '<' | '>' | '&' | '|')
+    )
 }
 
 /// `UpperIdent.<partial>` at the cursor → `Some("UpperIdent")` — a name
@@ -933,6 +953,22 @@ mod tests {
         let items = value_member_candidates(&string, "context a.b\n", None);
         assert!(find(&items, "split", CompletionKind::Member).is_some());
         assert!(find(&items, "trim", CompletionKind::Member).is_some());
+    }
+
+    #[test]
+    fn expression_position_offers_locals() {
+        // Value-expecting positions (locals offered).
+        assert!(is_expression_position("  let y = "));
+        assert!(is_expression_position("  let y = a + lo")); // after a binary op
+        assert!(is_expression_position("  f("));
+        assert!(is_expression_position("  g(a, "));
+        assert!(is_expression_position("  xs.fold(0, (acc, x) => ac")); // lambda body
+        // `let y = foo` is still a value position (you're typing the value).
+        assert!(is_expression_position("  let y = foo"));
+        // Not value positions.
+        assert!(!is_expression_position("  let y: ")); // type annotation
+        assert!(!is_expression_position("  on call() -> ")); // return type
+        assert!(!is_expression_position("  tot")); // bare line start (keyword position covers it)
     }
 
     #[test]

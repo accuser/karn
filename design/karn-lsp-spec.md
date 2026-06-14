@@ -405,6 +405,7 @@ The recognised contexts and their candidate sources:
 | **keyword position** (a bare word at a decl/statement start) (v0.30) | reserved keywords (with registry docs) + declaration snippets | `KEYWORD` / `SNIPPET` |
 | **name-receiver member** (`UpperIdent.`) (v0.30.1) | sum-type variants; refined/opaque `of`/`unsafe`; capability ops; built-in type statics (`Int.parse`/`Json.decode`) | `ENUM_MEMBER` / `METHOD` |
 | **value-receiver member** (`lowercase.`) (v0.30.2) | the receiver type's kernel methods (`xs.fold`/`s.split`/`o.map`) + record fields | `METHOD` / `FIELD` |
+| **locals** (keyword / expression position) (v0.31.2) | in-scope `let`/param bindings (with inferred type) | `VARIABLE` |
 
 **Built-ins/surface come from static registries, not the index (ADR 0061).** Because first-party symbols aren't indexed (§3.14's finding), the built-in types (`Int`/`Bool`/`Float`/`String`/`Option`/`Result`/`Effect`/`List`/`Map`), keyword docs, the `karn`-surface transparent types, and the built-in type statics (`Int.parse`/`Float.parse`/`Json.encode`/`decode`) are sourced from `karnc::{keywords, builtin_names, firstparty}` (and a small static statics table) — the index (here, the project parse) supplies only *project* symbols. Keyword candidates are the lowercase-initial reserved words (declaration/statement keywords); uppercase type/value names belong to type/expression position. Snippets carry LSP `${n:…}` tab stops (`InsertTextFormat::SNIPPET`).
 
@@ -414,7 +415,9 @@ The recognised contexts and their candidate sources:
 
 **Conservative detection.** Type-position triggers exclude a list-literal `[` (its bracket isn't preceded by a type constructor); the one accepted false positive is a record *construction* value (`Order { id: ` — lexically identical to a record field-type declaration), where offering type names is mild noise. Name-receiver detection requires a *single* uppercase-initial segment, excluding the decimal `1.` and the `.`-qualified `a.B.`. Out-of-context prefixes (e.g. `let x = `) yield `[]`.
 
-**Deferred to slice 4 (ADR 0063).** **Locals/params in scope** need a scope-at-offset query the index doesn't have (it tracks only top-level symbols) — independent of slice 3's receiver-typing machinery. Lifting the value-receiver clean-file ceiling (error-tolerant/scoped typing) and the `karn.*` combinator/UFCS members are later work, as are signature help, auto-import/add-`consumes` resolve, and postfix expansion.
+**Locals (v0.31.2, ADR 0064).** In-scope local bindings are offered at **keyword position** (appended to the keywords + snippets) and at **expression position** — after `=`/`(`/`,`, a `=>` lambda arrow, or a binary operator (the type arrow `->` excluded) — as `variable` items with their inferred type. They come from the **cached** analysis's `FileLocals` (the last good round's bindings around the cursor), so they survive the mid-edit buffer; positions convert against the cached snapshot. Locals are appended to a specific context's results only at keyword position — never to type/member completion.
+
+**Later work.** Lifting the value-receiver clean-file ceiling (error-tolerant/scoped typing), the `karn.*` combinator/UFCS members, match-arm/`is`-narrowing local bindings, and a `parameter`-vs-`variable` token split; signature help, auto-import/add-`consumes` resolve, and postfix expansion.
 
 ---
 
