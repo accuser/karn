@@ -304,7 +304,7 @@ fn member_receiver(line: &str) -> Option<String> {
 /// Built-in type statics (`Int.parse`/`Float.parse`/`Json.encode`/`decode`) —
 /// real language statics (v0.22, ADRs 0048/0049) that are not user-declared, so
 /// they come from this small table rather than the project parse.
-const BUILTIN_STATICS: &[(&str, &[(&str, &str)])] = &[
+pub(crate) const BUILTIN_STATICS: &[(&str, &[(&str, &str)])] = &[
     ("Int", &[("parse", "parse(s: String) -> Option[Int]")]),
     ("Float", &[("parse", "parse(s: String) -> Option[Float]")]),
     (
@@ -506,7 +506,11 @@ fn keyword_and_snippet_candidates() -> Vec<Completion> {
 /// Parse every project unit, plus the embedded first-party adapters (the
 /// `karn` surface and the `karn.cloudflare` platform adapter), and call `f`
 /// for each. Recovery parsing tolerates the in-progress edit at the cursor.
-fn for_each_unit(doc_text: &str, src_root: Option<&Path>, mut f: impl FnMut(&SourceUnit)) {
+pub(crate) fn for_each_unit(
+    doc_text: &str,
+    src_root: Option<&Path>,
+    mut f: impl FnMut(&SourceUnit),
+) {
     let mut sources: Vec<String> = vec![
         KARN_ADAPTER_SRC.to_string(),
         CLOUDFLARE_ADAPTER_SRC.to_string(),

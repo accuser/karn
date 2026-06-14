@@ -25,6 +25,7 @@ mod locals_nav;
 mod position;
 mod project;
 mod publish;
+mod signature_help;
 mod symbols;
 
 use std::path::PathBuf;
@@ -721,6 +722,48 @@ impl LanguageServer for Backend {
         }))
     }
 
+    /// v0.32 (ADR 0065): signature help for the call under the cursor.
+    async fn signature_help(
+        &self,
+        params: SignatureHelpParams,
+    ) -> JsonRpcResult<Option<SignatureHelp>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let pos = params.text_document_position_params.position;
+        let text = {
+            let s = self.state.read().await;
+            s.docs.get(&uri).map(|d| d.text.clone())
+        };
+        let Some(text) = text else { return Ok(None) };
+        let offset = cursor_byte_offset(&text, pos);
+        let Some(ctx) = crate::signature_help::call_context(&text, offset) else {
+            return Ok(None);
+        };
+        let src_root = self.project_src_root().await;
+        let Some(label) =
+            crate::signature_help::resolve_label(&ctx.callee, &text, src_root.as_deref())
+        else {
+            return Ok(None);
+        };
+        let parameters: Vec<ParameterInformation> = crate::signature_help::param_ranges(&label)
+            .into_iter()
+            .map(|(s, e)| ParameterInformation {
+                label: ParameterLabel::LabelOffsets([s as u32, e as u32]),
+                documentation: None,
+            })
+            .collect();
+        let active = ctx.active_param as u32;
+        Ok(Some(SignatureHelp {
+            signatures: vec![SignatureInformation {
+                label,
+                documentation: None,
+                parameters: Some(parameters),
+                active_parameter: Some(active),
+            }],
+            active_signature: Some(0),
+            active_parameter: Some(active),
+        }))
+    }
+
     async fn completion(
         &self,
         params: CompletionParams,
@@ -1244,6 +1287,12 @@ fn server_capabilities() -> ServerCapabilities {
         // keyword, the `{` of a selected-capability list, and `,`.
         completion_provider: Some(CompletionOptions {
             trigger_characters: Some(vec![" ".to_string(), "{".to_string(), ",".to_string()]),
+            ..Default::default()
+        }),
+        // v0.32 (ADR 0065): signature help while typing a call's arguments.
+        signature_help_provider: Some(SignatureHelpOptions {
+            trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
+            retrigger_characters: Some(vec![",".to_string()]),
             ..Default::default()
         }),
         document_formatting_provider: Some(OneOf::Left(true)),
