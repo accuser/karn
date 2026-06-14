@@ -274,7 +274,7 @@ pub(crate) fn walk_karn_files(root: &Path) -> Vec<PathBuf> {
     out
 }
 
-fn type_ref_str(t: &TypeRef) -> String {
+pub(crate) fn type_ref_str(t: &TypeRef) -> String {
     match t {
         // v0.20a: function types render in Karn surface syntax.
         TypeRef::Fn(params, ret, _) => {

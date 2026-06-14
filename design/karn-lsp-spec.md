@@ -417,7 +417,22 @@ The recognised contexts and their candidate sources:
 
 **Locals (v0.31.2, ADR 0064).** In-scope local bindings are offered at **keyword position** (appended to the keywords + snippets) and at **expression position** — after `=`/`(`/`,`, a `=>` lambda arrow, or a binary operator (the type arrow `->` excluded) — as `variable` items with their inferred type. They come from the **cached** analysis's `FileLocals` (the last good round's bindings around the cursor), so they survive the mid-edit buffer; positions convert against the cached snapshot. Locals are appended to a specific context's results only at keyword position — never to type/member completion.
 
-**Later work.** Lifting the value-receiver clean-file ceiling (error-tolerant/scoped typing), the `karn.*` combinator/UFCS members, match-arm/`is`-narrowing local bindings, and a `parameter`-vs-`variable` token split; signature help, auto-import/add-`consumes` resolve, and postfix expansion.
+**Later work.** Lifting the value-receiver clean-file ceiling (error-tolerant/scoped typing), the `karn.*` combinator/UFCS members, match-arm/`is`-narrowing local bindings, and a `parameter`-vs-`variable` token split; auto-import/add-`consumes` resolve, and postfix expansion.
+
+### 3.16 Signature help (v0.32)
+
+`textDocument/signatureHelp` shows the callee's signature with the **active parameter** highlighted while the cursor is inside a call's argument list. **Context detection is lexical** (it must work mid-edit): scan back to the **innermost unclosed `(`** before the cursor (bracket-balanced — a depth-0 `[` or `{` means the cursor is in type args / a list / a block, not a call), take the **callee** identifier (`name` or `Recv.member`) immediately before it, and the **active parameter** from a top-level, bracket-aware comma count (so `f(g(x|))` targets `g`, and commas inside nested `()`/`[]` don't count). **Signatures are semantic**, resolved the same name-vs-value way as completion (§3.15):
+
+| Callee | Source | Slice |
+|---|---|---|
+| free fn `bar(` | the `FnDecl` from the recovery parse | v0.32 |
+| capability op `Clock.now(` | the `CapabilityOp` from the parse | v0.32 |
+| refined/opaque `Email.of(` / `.unsafe(` | synthesised from the type's base | v0.32 |
+| built-in static `Int.parse(`/`Json.decode(` | the `BUILTIN_STATICS` registry string | v0.32 |
+| `Ok`/`Err`/`Some` constructor | built-in | v0.32 |
+| value-receiver method `xs.fold(` | the receiver typed (§3.15's machinery) → the kernel-method registry signature | later (clean-file ceiling) |
+
+Signatures render through the **same `type_ref_str` renderer as hover** (§3.3) — one format, never divergent; the kernel/static **registry signature strings are reused verbatim**. The response is a single `SignatureInformation` (Karn has no overloads); `ParameterInformation` offsets parse the parenthesised parameter list (top-level-comma-aware). Trigger characters: `(` and `,`. Generic type-argument display in a signature waits on the checker recording instantiations queryably.
 
 ---
 
