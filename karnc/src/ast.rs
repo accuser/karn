@@ -1032,6 +1032,10 @@ pub enum ExprKind {
         lexeme: String,
     },
     StrLit(String),
+    /// An interpolated string `"… \(expr) …"` (v0.43, ADR 0075). Chunks and
+    /// holes alternate. A plain `"…"` with no holes stays [`ExprKind::StrLit`],
+    /// so existing code and the emitter/formatter fast-path are untouched.
+    InterpStr(Vec<InterpPart>),
     BoolLit(bool),
     Ident(Ident),
     Call {
@@ -1134,6 +1138,18 @@ pub enum ExprKind {
     /// `[a, b, c]` — list literal (v0.20b). An empty `[]` requires an
     /// expected type (`karn.types.uninferable_element_type`).
     ListLit(Vec<Expr>),
+}
+
+/// One part of an interpolated string (v0.43, ADR 0075). An
+/// [`ExprKind::InterpStr`] holds an alternating run of these.
+#[derive(Debug, Clone)]
+pub enum InterpPart {
+    /// Literal text between holes, with escapes already resolved.
+    Chunk(String),
+    /// An interpolated expression `\(expr)`. Type-checked by the hole rule
+    /// (base scalars only; see the checker) and lowered into a template-
+    /// literal `${…}` slot.
+    Hole(Box<Expr>),
 }
 
 /// One field-initialiser inside a record construction expression:

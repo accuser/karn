@@ -1047,6 +1047,21 @@ fn maybe_auto_lift(ty: Option<Ty>, expected: Option<&Ty>) -> Option<Ty> {
     ty
 }
 
+/// Whether a value of type `ty` may fill an interpolation hole (v0.43, ADR
+/// 0075): a base scalar, or a refinement of one (which widens to its base for
+/// display). Opaque types are excluded — their base is hidden, so a value must
+/// be `.raw`-ed out first.
+fn interpolable(ty: &Ty) -> bool {
+    matches!(
+        ty,
+        Ty::Base(_)
+            | Ty::Named {
+                kind: NamedKind::Refined(_),
+                ..
+            }
+    )
+}
+
 pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> {
     let ty = match &expr.kind {
         // v0.9.4: a literal in a refined-expected position takes the refined
@@ -1064,6 +1079,37 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
         }
         ExprKind::StrLit(_) => {
             admit_refined_literal(expr, expected, ctx).or(Some(Ty::Base(BaseType::String)))
+        }
+        // An interpolated string (v0.43, ADR 0075). Each hole must type to a
+        // base scalar (String/Int/Float/Bool) or a *refinement* of one — those
+        // have a well-defined display form (Int/Float via the ADR 0074
+        // `toString` contract, Bool as `true`/`false`; a refined value widens
+        // to its base, e.g. `Subject` displays as its `String`). Records,
+        // sums, opaque types (whose base is deliberately hidden — `.raw` it
+        // first), and other types are rejected, foreclosing JS's
+        // `[object Object]` footgun. The result is always a `String`.
+        ExprKind::InterpStr(parts) => {
+            for part in parts {
+                let InterpPart::Hole(hole) = part else {
+                    continue;
+                };
+                match type_of(hole, None, ctx) {
+                    Some(ty) if interpolable(&ty) => {}
+                    Some(other) => ctx.errors.push(
+                        CompileError::new(
+                            "karn.types.interpolation_non_scalar",
+                            hole.span,
+                            format!("type `{}` has no string form here", other.display()),
+                        )
+                        .with_note(
+                            "interpolation holes accept the base scalar types (String, Int, Float, Bool) or a refinement of one; map other values to a String first",
+                        ),
+                    ),
+                    // The hole already produced its own error — don't pile on.
+                    None => {}
+                }
+            }
+            Some(Ty::Base(BaseType::String))
         }
         ExprKind::BoolLit(_) => Some(Ty::Base(BaseType::Bool)),
         // v0.20b: a list literal. Elements check against the expected

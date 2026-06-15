@@ -765,6 +765,24 @@ fn check_expr_references(
     errors: &mut Sinks,
 ) {
     match &expr.kind {
+        // v0.43: resolve names referenced inside each interpolation hole.
+        ExprKind::InterpStr(parts) => {
+            for part in parts {
+                if let InterpPart::Hole(hole) = part {
+                    check_expr_references(
+                        hole,
+                        params,
+                        in_method,
+                        scopes,
+                        types,
+                        type_params,
+                        fns,
+                        methods,
+                        errors,
+                    );
+                }
+            }
+        }
         ExprKind::IntLit(_)
         | ExprKind::FloatLit { .. }
         | ExprKind::StrLit(_)

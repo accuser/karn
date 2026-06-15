@@ -200,6 +200,12 @@ fn walk_expr(e: &Expr, out: &mut Vec<(Span, bool)>) {
         ExprKind::FieldAccess { receiver, .. } => walk_expr(receiver, out),
         ExprKind::Is { value, .. } => walk_expr(value, out),
         ExprKind::Mock { args, .. } => args.iter().for_each(|a| walk_expr(a, out)),
+        // v0.43: walk each interpolation hole's expression.
+        ExprKind::InterpStr(parts) => parts.iter().for_each(|part| {
+            if let InterpPart::Hole(hole) = part {
+                walk_expr(hole, out);
+            }
+        }),
         // Leaves carry no foldable children.
         ExprKind::IntLit(_)
         | ExprKind::FloatLit { .. }

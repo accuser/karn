@@ -677,6 +677,50 @@ mod tests {
     }
 
     #[test]
+    fn interpolated_string_parses_into_parts() {
+        // v0.43: `"Hi, \(name)!"` splits into chunk / hole / chunk.
+        let c = parse_str("commons x\n\nfn f(name: String) -> String {\n  \"Hi, \\(name)!\"\n}\n")
+            .unwrap();
+        let CommonsItem::Fn(f) = &c.items[0] else {
+            panic!("expected fn")
+        };
+        let ExprKind::InterpStr(parts) = &f.body.tail.kind else {
+            panic!("expected InterpStr, got {:?}", f.body.tail.kind)
+        };
+        assert_eq!(parts.len(), 3);
+        assert!(matches!(&parts[0], InterpPart::Chunk(s) if s == "Hi, "));
+        assert!(
+            matches!(&parts[1], InterpPart::Hole(h) if matches!(&h.kind, ExprKind::Ident(id) if id.name == "name"))
+        );
+        assert!(matches!(&parts[2], InterpPart::Chunk(s) if s == "!"));
+    }
+
+    #[test]
+    fn interpolated_hole_parses_a_full_expression() {
+        // A hole holds an arbitrary expression, not just an identifier.
+        let c =
+            parse_str("commons x\n\nfn f(a: Int, b: Int) -> String {\n  \"sum = \\(a + b)\"\n}\n")
+                .unwrap();
+        let CommonsItem::Fn(f) = &c.items[0] else {
+            panic!("expected fn")
+        };
+        let ExprKind::InterpStr(parts) = &f.body.tail.kind else {
+            panic!("expected InterpStr")
+        };
+        assert!(matches!(&parts[1], InterpPart::Hole(h) if matches!(&h.kind, ExprKind::BinOp(..))));
+    }
+
+    #[test]
+    fn empty_interpolation_hole_is_rejected() {
+        let errs = parse_str("commons x\n\nfn f() -> String {\n  \"\\()\"\n}\n").unwrap_err();
+        assert!(
+            errs.iter()
+                .any(|e| e.category == "karn.parse.empty_interpolation"),
+            "expected empty_interpolation; got {errs:?}"
+        );
+    }
+
+    #[test]
     fn fragment_form_parses() {
         let c = parse_str("commons x.y\n\ntype T = Int where NonNegative\n").unwrap();
         assert_eq!(c.form, CommonsForm::Fragment);

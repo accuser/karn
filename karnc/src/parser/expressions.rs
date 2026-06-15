@@ -395,6 +395,18 @@ impl<'a> Parser<'a> {
                     span: t.span,
                 })
             }
+            // An interpolated string `"… \(expr) …"` (v0.43). The lexer has
+            // already delimited the token and balanced its holes; here we
+            // split the chunks from the holes and parse each hole as a full
+            // expression (against the original source, so spans stay absolute).
+            TokenKind::InterpStr => {
+                self.bump();
+                let parts = self.parse_interp_parts(t.span)?;
+                Ok(Expr {
+                    kind: ExprKind::InterpStr(parts),
+                    span: t.span,
+                })
+            }
             TokenKind::True => {
                 self.bump();
                 Ok(Expr {
@@ -986,5 +998,58 @@ impl<'a> Parser<'a> {
             ExprKind::Err(Box::new(value))
         };
         Ok(Expr { kind, span })
+    }
+
+    /// Split an `InterpStr` token (covering the whole `"…"`) into its
+    /// alternating chunks and holes, parsing each hole as a full expression.
+    /// (v0.43.)
+    fn parse_interp_parts(&mut self, span: Span) -> Result<Vec<InterpPart>, CompileError> {
+        let segments = crate::lexer::split_interp(self.source, span)?;
+        let mut parts = Vec::with_capacity(segments.len());
+        for segment in segments {
+            match segment {
+                crate::lexer::InterpSegment::Chunk(text) => parts.push(InterpPart::Chunk(text)),
+                crate::lexer::InterpSegment::Hole(hole) => {
+                    parts.push(InterpPart::Hole(Box::new(self.parse_hole_expr(hole)?)));
+                }
+            }
+        }
+        Ok(parts)
+    }
+
+    /// Parse the body of one interpolation hole (`\(expr)`) — the bytes spanned
+    /// by `hole` — as a single expression. The hole source is re-lexed and its
+    /// token spans are rebased to absolute positions in the full source, so
+    /// diagnostics and the (later) LSP point at the real location. (v0.43.)
+    fn parse_hole_expr(&mut self, hole: Span) -> Result<Expr, CompileError> {
+        let src = &self.source[hole.range()];
+        if src.trim().is_empty() {
+            return Err(CompileError::new(
+                "karn.parse.empty_interpolation",
+                hole,
+                "empty interpolation hole",
+            )
+            .with_note("`\\(…)` must contain an expression"));
+        }
+        let mut tokens = crate::lexer::tokenize(src)?;
+        for token in &mut tokens {
+            token.span = Span::new(token.span.start + hole.start, token.span.end + hole.start);
+        }
+        let (content, trivia) = split_trivia(&tokens, self.source);
+        let mut warnings = Vec::new();
+        let mut sub = Parser::new(&content, self.source, trivia, &mut warnings);
+        let expr = sub.parse_expr()?;
+        if let Some(extra) = sub.peek() {
+            return Err(CompileError::new(
+                "karn.parse.extra_tokens",
+                extra.span,
+                format!(
+                    "unexpected {} after the interpolation expression",
+                    extra.kind.describe()
+                ),
+            )
+            .with_note("an interpolation hole `\\(…)` holds a single expression"));
+        }
+        Ok(expr)
     }
 }

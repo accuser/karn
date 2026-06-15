@@ -420,6 +420,11 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "An unexpected character in the source.",
     ),
     dg(
+        "karn.lex.unterminated_interpolation",
+        "An interpolation hole `\\(…)` is not closed on its line.",
+        &["string_literal"],
+    ),
+    dg(
         "karn.lex.unterminated_string",
         "A string literal is not terminated.",
         &["string_literal"],
@@ -507,6 +512,10 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "karn.parse.empty_capability",
         "A `capability` body is empty.",
         &["capability_decl"],
+    ),
+    d(
+        "karn.parse.empty_interpolation",
+        "An interpolation hole `\\(…)` contains no expression.",
     ),
     dg(
         "karn.parse.empty_match",
@@ -1019,6 +1028,10 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "karn.types.if_non_bool_cond",
         "An `if` condition is not a `Bool`.",
         &["if_expr"],
+    ),
+    d(
+        "karn.types.interpolation_non_scalar",
+        "An interpolation hole holds a value with no string form.",
     ),
     dg(
         "karn.types.invalid_regex",

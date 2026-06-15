@@ -142,6 +142,18 @@ astral characters). `slice` clamps negative indices to `0` — there is no
 wrap-around. `indexOf` returns `None` for a missing substring, never a
 sentinel `-1`.
 
+**String interpolation** (v0.43, ADR 0075). An interpolated string
+`"… \(e) …"` has type `String`. Each hole expression `e` must have type
+`String`, `Int`, `Float`, `Bool`, or a **refinement** of one of those (which
+widens to its base for display) — these are the types with a well-defined
+string form (`Int`/`Float` via the ADR 0074 `toString` contract, `Bool` as
+`true`/`false`). Any other hole type — `record`, `sum`, `Option`, `Result`,
+`List`, an opaque type (whose base is hidden — `.raw` it first), … — is a
+static error (`karn.types.interpolation_non_scalar`): map the value to a
+`String` first. The conversion is implicit only here, in a display context; it
+does **not** generalise to arithmetic or comparison (ADR 0046 is unchanged —
+`+` stays numeric, `concat` stays a method).
+
 **The `Option`/`Result` kernel** (v0.22a, ADR 0048). The combinators are
 built-in value methods on the compiler-known generic receivers — *not*
 free functions, which would collide by bare name on `uses` import
