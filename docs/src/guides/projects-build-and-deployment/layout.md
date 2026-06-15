@@ -37,7 +37,10 @@ See the [`karn.toml` reference](../../reference/manifest.md) for every key.
 A unit's path must match its qualified name. A file declaring `context counters`
 must be `src/counters.karn`; one declaring `context commerce.orders` must be
 `src/commerce/orders.karn`. A test file mirrors the name of the unit it tests
-under `tests/`, so `test counters` lives in `tests/counters.karn`.
+under `tests/`, so `test counters` lives in `tests/counters.karn` — or, with the
+optional self-identifying suffix, `tests/counters.test.karn`. Both forms are
+accepted (the `.test.karn` suffix is what single-tree layouts use, and is handy
+for grepping); use whichever you prefer.
 
 > Mismatches are reported as `karn.project.inconsistent_commons_name` (source) or
 > `karn.project.inconsistent_test_path` (tests).
