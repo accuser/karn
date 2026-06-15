@@ -22,9 +22,13 @@ Add a **`HintKind { Type, Parameter }`** to the sink and widen its entry to a
 - **`Parameter`** → anchor `span.start`, `InlayHintKind::PARAMETER`,
   `padding_right` (renders `count: 5`).
 
-**This increment lands parameter-name hints (slice 1).** Generic-instantiation
-hints follow in slice 2, reusing the discriminator (a `Type`-kind hint at the
-call-name span with a `[A, B]` label — no new sink method).
+**Slice 1** landed parameter-name hints; **slice 2** adds generic-instantiation
+hints, reusing the discriminator — a `Type`-kind hint at the call-name span with
+a `[A, B]` label (no new sink method): at the end of `check_generic_call`, when
+the user omitted the type arguments, the inferred `subst` is rendered in
+type-param declaration order and recorded at the function-name span, reading
+`identity[Int](5)`. Skipped when explicit type args were written (redundant) or
+any var stayed unresolved.
 
 - **Where recorded:** at the checker's argument loops — free-fn, generic, method,
   and cross-context op/service calls — via a shared `record_param_hint` helper.

@@ -537,6 +537,21 @@ fn check_generic_call(
     if !ok {
         return None;
     }
+    // v0.39 (ADR 0072): when the user omitted the type arguments, show the
+    // inferred ones as a `Type`-kind hint after the function name —
+    // `identity` ⟨`[Int]`⟩ `(5)`. Declaration order; skipped if any var stayed
+    // unresolved (defensive — the arg loop above already grounds them).
+    if type_args.is_empty() && !fn_decl.type_params.is_empty() {
+        let rendered: Option<Vec<String>> = fn_decl
+            .type_params
+            .iter()
+            .map(|tp| subst.get(&tp.name.name).map(|t| t.display()))
+            .collect();
+        if let Some(parts) = rendered {
+            ctx.hints
+                .record(name.span, format!("[{}]", parts.join(", ")));
+        }
+    }
     let ret = substitute(&ret_pattern, &subst);
     // v0.20b: the return is ground *up to the caller's rigid type
     // parameters* — a generic fn calling another generic fn (karn.list's
