@@ -160,6 +160,19 @@ pub fn worker_handlers_output_path(context: &str) -> PathBuf {
 /// - **Single-file**: `a/b/c.karn` declaring `a.b.c`.
 /// - **Multi-file**: `a/b/c/<any>.karn` declaring `a.b.c`.
 ///
+/// #47: in split-paths mode a test file may use the self-identifying
+/// `<target-path>.test.karn` form as well as the bare `<target-path>.karn`
+/// (single-tree mode already uses the suffixed form). Normalise the former to
+/// the latter so the two conventions are unified for path-alignment matching.
+pub(crate) fn strip_test_infix(rel_path: &Path) -> PathBuf {
+    if let Some(name) = rel_path.file_name().and_then(|n| n.to_str())
+        && let Some(base) = name.strip_suffix(".test.karn")
+    {
+        return rel_path.with_file_name(format!("{base}.karn"));
+    }
+    rel_path.to_path_buf()
+}
+
 /// v0.9.1: shared between source-unit and test-unit path validation. The
 /// caller decides which root to strip from the file path before calling.
 pub(crate) fn unit_path_matches(rel_path: &Path, qualified_name: &str) -> bool {
@@ -292,5 +305,38 @@ mod tests {
     fn unit_path_matches_rejects_misalignment() {
         assert!(!unit_path_matches(Path::new("a/b.karn"), "a.b.c"));
         assert!(!unit_path_matches(Path::new("x/y/z.karn"), "a.b.c"));
+    }
+
+    #[test]
+    fn strip_test_infix_normalises_the_dot_test_suffix() {
+        // `<path>.test.karn` → `<path>.karn`; the bare form is untouched.
+        assert_eq!(
+            strip_test_infix(Path::new("a/b/c.test.karn")),
+            PathBuf::from("a/b/c.karn")
+        );
+        assert_eq!(
+            strip_test_infix(Path::new("demo.test.karn")),
+            PathBuf::from("demo.karn")
+        );
+        assert_eq!(
+            strip_test_infix(Path::new("a/b/c.karn")),
+            PathBuf::from("a/b/c.karn")
+        );
+    }
+
+    #[test]
+    fn test_path_alignment_accepts_either_form_after_normalisation() {
+        // #47: both the bare and `.test.karn` forms align for the same target.
+        for p in ["a/b.karn", "a/b.test.karn", "a/b/x.karn", "a/b/x.test.karn"] {
+            assert!(
+                unit_path_matches(&strip_test_infix(Path::new(p)), "a.b"),
+                "{p} should align with `a.b`"
+            );
+        }
+        // A genuinely misaligned `.test.karn` is still rejected.
+        assert!(!unit_path_matches(
+            &strip_test_infix(Path::new("a/z.test.karn")),
+            "a.b"
+        ));
     }
 }

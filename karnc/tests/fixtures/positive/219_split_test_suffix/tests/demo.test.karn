@@ -1,0 +1,5 @@
+test demo {
+  test "doubles" {
+    assert double(2) == 4
+  }
+}

@@ -126,20 +126,21 @@ pub(crate) fn check_test_path_alignment(parsed: &[ParsedFile]) -> Result<(), Vec
         let target_name = test_decl.target.joined();
         let target_parts: Vec<&str> = target_name.split('.').collect();
         let rel = &pf.source_path;
-        if !unit_path_matches(rel, &target_name) {
+        // #47: accept the self-identifying `<target>.test.karn` form too — a
+        // test file at `<path>.test.karn` aligns exactly as `<path>.karn` does.
+        if !unit_path_matches(&strip_test_infix(rel), &target_name) {
+            let p = target_parts.join("/");
             errors.push(
                 CompileError::new(
                     "karn.project.inconsistent_test_path",
                     pf.unit.span(),
                     format!(
-                        "test file `{}` targets `{target_name}`, but its path doesn't match — expected either `{}.karn` (single-file) or `{}/...karn` (multi-file)",
+                        "test file `{}` targets `{target_name}`, but its path doesn't match — expected `{p}.karn` / `{p}.test.karn` (single-file) or `{p}/...karn` (multi-file)",
                         rel.display(),
-                        target_parts.join("/"),
-                        target_parts.join("/"),
                     ),
                 )
                 .with_note(
-                    "in split-paths mode (configured via `karn.toml`'s `[paths]`), each test file's path under the `tests` directory must match its target's qualified name",
+                    "in split-paths mode (configured via `karn.toml`'s `[paths]`), each test file's path under the `tests` directory must match its target's qualified name; a `.test.karn` suffix is allowed",
                 ),
             );
         }
