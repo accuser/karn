@@ -3,24 +3,39 @@
 The working home for **active** increment proposals — and only active ones. A
 proposal is a **transient input** to an increment, not a durable artefact: the
 durable record of a landed increment is the code and its fixtures, the
-[normative spec](../../docs/src/spec/index.md) updated in place, and the
-[decision records](../decisions/README.md).
+[normative spec](../../docs/src/spec/index.md) updated in place, the
+[decision records](../decisions/README.md), and the **reader-facing book**
+(`docs/src/` — guides, reference, tutorials, changelog, roadmap) left current
+and reliable. The spec is normative; the book is what a newcomer or evaluator
+actually reads, and it is part of the increment, not a follow-up.
 
 ## Lifecycle
 
-1. **Propose.** A draft lands here as `vX.Y-<slug>.md` via its own PR. It is
-   the sign-off artefact: the design forks marked `[DECISION]` with
-   recommendations, the risks, and a sketch of the spec delta. **Merging the
-   proposal is the approval to build.**
+1. **Propose.** A draft lands here as `vX.Y-<slug>.md` via its own PR — or, for a
+   **docs-only increment** (one that touches no grammar, compiler, emitter, or
+   tooling — e.g. the concern-first book reorganisation), a plain `<slug>.md`
+   with no version prefix. It is the sign-off artefact: the design forks marked
+   `[DECISION]` with
+   recommendations, the risks, a sketch of the spec delta, and a **docs delta**
+   — which book pages the increment adds or changes (see [Documentation is part
+   of done](#documentation-is-part-of-done)). A proposal with no docs delta must
+   say *why* the book is untouched; silence is treated as an oversight, not a
+   no-op. **Merging the proposal is the approval to build.**
 2. **Implement.** The increment consumes the proposal: the grammar/compiler
    change with fixtures, the spec chapters updated in place, a decision record
-   per language-defining call, the changelog/docs/tooling deltas, and the
-   version bump (`scripts/bump-version.sh` — see
-   [Versioning & release](../README.md#versioning--release)).
+   per language-defining call, the **book and changelog deltas** that keep
+   `docs/src/` current and reliable, the tooling deltas, and — for a
+   language/tooling increment — the version bump (`scripts/bump-version.sh` —
+   see [Versioning & release](../README.md#versioning--release)). The book delta
+   is a completion criterion, not optional polish. A docs-only increment carries
+   **no version bump**: there is no language or tooling artefact to version, and
+   the book's own currency banner is advanced to whatever version it now
+   describes, not to a new one of its own.
 3. **Delete.** The final implementation PR **removes the proposal file**. An
    empty directory means nothing is in flight. The proposal's history remains
-   in version control (`git log -- design/proposals/`). On merge, the
-   increment is tagged `vX.Y.Z`.
+   in version control (`git log -- design/proposals/`). On merge, a
+   language/tooling increment is tagged `vX.Y.Z`; a docs-only increment is **not
+   tagged** — it ships with its PR and bumps nothing.
 
 ## Writing one
 
@@ -30,3 +45,37 @@ spec sections will say. Do **not** duplicate normative content (full grammar
 productions, worked emission output): the normative prose is written once, in
 the spec, during implementation. Duplicated content is how the retired
 instalment documents drifted.
+
+## Documentation is part of done
+
+The spec proves the language is *defined*; the book is what makes it *usable and
+trusted*. An increment that ships a feature but leaves the book stale has not
+landed cleanly — to a newcomer or evaluator a self-contradicting book reads as
+"not seriously maintained", which is the most expensive impression a pre-1.0
+language can give. So every increment leaves `docs/src/` **current and reliable**.
+Concretely, the implementing PR must, *where the increment touches them*:
+
+- **Document new or changed surface in the book, not only the spec.** A new
+  language/tooling feature gets its reference page **and** its guide entry — and,
+  for a genuinely new *concept*, the "Understand" on-ramp, not just a "Do"
+  recipe. The spec is for lookup; the guides are the learning path.
+- **Keep currency claims true.** Advance the "written against vX.Y" banner and
+  `spec/appendix-version-history.md`; add the `reference/changelog.md` entry. The
+  version the book *claims* to describe and the version it *does* describe must
+  match.
+- **Keep the roadmap honest in both directions.** Shipped behaviour must never be
+  listed as "next/planned", and aspirational design must never be written in the
+  present tense the book reserves for "what compiles today". Prefer naming
+  *intent* over version-pinned milestones that rot on the next release.
+- **Leave no dead links or stale framing.** Moving/renaming pages updates every
+  inbound link (including the repo `README.md`) and any prose describing the docs'
+  shape. The link-check / doc-example / spelling gates catch broken *references*;
+  they do **not** catch a sample corrupted inside a code fence or a claim that
+  silently went out of date — those are the author's responsibility.
+- **Keep examples consistent and compiling.** Snippets demonstrating the same
+  thing use the same form; prefer `{{#include}}` from a compiled worked example
+  over hand-written fences so CI keeps them honest and they cannot rot.
+
+If the increment genuinely touches none of these (e.g. a pure internal refactor),
+say so in the proposal's docs delta — an explicit "no book impact, because …"
+rather than an absent section.
