@@ -24,6 +24,7 @@ import {
 } from "./server";
 import { newContext, newProject } from "./scaffold";
 import { registerTasks } from "./tasks";
+import { provideCodeLenses } from "./codelens";
 
 let client: LanguageClient | undefined;
 let output: vscode.OutputChannel;
@@ -111,6 +112,10 @@ async function startServer(
         if (!enabled) return [];
         return next(document, viewPort, token);
       },
+      // The reference-count CodeLens carries `editor.action.showReferences`,
+      // whose arguments must be real VS Code instances; the server sends them
+      // as plain LSP JSON, so re-hydrate them client-side.
+      provideCodeLenses,
     },
   };
 
