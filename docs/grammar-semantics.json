@@ -882,6 +882,10 @@
       "summary": "An invalid escape sequence in a string literal."
     },
     {
+      "code": "karn.lex.unterminated_interpolation",
+      "summary": "An interpolation hole `\\(…)` is not closed on its line."
+    },
+    {
       "code": "karn.lex.unterminated_string",
       "summary": "A string literal is not terminated."
     }

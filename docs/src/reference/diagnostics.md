@@ -6,7 +6,7 @@
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../troubleshooting/index.md).
 
-There are **253** codes in total.
+There are **256** codes in total.
 
 ## Agents
 
@@ -134,6 +134,7 @@ There are **253** codes in total.
 | `karn.lex.integer_overflow` | An integer literal is out of range. | [`number_literal`](grammar.md#rule-number_literal) |
 | `karn.lex.unclosed_doc_block` | A documentation block is not closed. |  |
 | `karn.lex.unexpected_character` | An unexpected character in the source. |  |
+| `karn.lex.unterminated_interpolation` | An interpolation hole `\(…)` is not closed on its line. | [`string_literal`](grammar.md#rule-string_literal) |
 | `karn.lex.unterminated_string` | A string literal is not terminated. | [`string_literal`](grammar.md#rule-string_literal) |
 
 ## Mock and mocks
@@ -187,6 +188,7 @@ There are **253** codes in total.
 | `karn.parse.cron_in_agent` | An `on cron` handler was declared in an agent. | [`cron_handler`](grammar.md#rule-cron_handler) |
 | `karn.parse.empty_agent` | An `agent` body is empty. | [`agent_decl`](grammar.md#rule-agent_decl) |
 | `karn.parse.empty_capability` | A `capability` body is empty. | [`capability_decl`](grammar.md#rule-capability_decl) |
+| `karn.parse.empty_interpolation` | An interpolation hole `\(…)` contains no expression. |  |
 | `karn.parse.empty_match` | A `match` has no arms. | [`match_expr`](grammar.md#rule-match_expr) |
 | `karn.parse.empty_mock_body` | A `mocks` body is empty. | [`mocks_decl`](grammar.md#rule-mocks_decl) |
 | `karn.parse.empty_service` | A `service` body is empty. | [`service_decl`](grammar.md#rule-service_decl) |
@@ -340,6 +342,7 @@ There are **253** codes in total.
 | `karn.types.function_at_boundary` | A function type appeared in a serialisable or boundary position (a record field, sum payload, service/agent handler signature, capability operation signature, agent state field, or agent key); functions cannot serialise or cross a boundary. | [`function_type_ref`](grammar.md#rule-function_type_ref) |
 | `karn.types.if_branch_mismatch` | The branches of an `if` have different types. | [`if_expr`](grammar.md#rule-if_expr) |
 | `karn.types.if_non_bool_cond` | An `if` condition is not a `Bool`. | [`if_expr`](grammar.md#rule-if_expr) |
+| `karn.types.interpolation_non_scalar` | An interpolation hole holds a value with no string form. |  |
 | `karn.types.invalid_regex` | A `Matches` predicate contains an invalid regular expression. | [`refinement`](grammar.md#rule-refinement) |
 | `karn.types.inverted_range` | An `InRange` predicate has its bounds inverted. | [`refinement`](grammar.md#rule-refinement) |
 | `karn.types.is_base_mismatch` | An `is` refinement check is applied to a value of the wrong base type. | [`is_expr`](grammar.md#rule-is_expr) |

@@ -1332,6 +1332,22 @@ fn expr_with_prec(e: &Expr, parent_prec: u8) -> String {
         // v0.21: the stored lexeme verbatim — formatting must not normalise.
         ExprKind::FloatLit { lexeme, .. } => lexeme.clone(),
         ExprKind::StrLit(s) => format!("\"{}\"", escape_string(s)),
+        // v0.43: re-emit the interpolated string — chunks re-escaped, each
+        // hole as `\(expr)`. Re-escaping a chunk's literal `\` to `\\` keeps a
+        // source `\\(` (an escaped `\(`) round-tripping as text, not a hole.
+        ExprKind::InterpStr(parts) => {
+            let mut out = String::from("\"");
+            for part in parts {
+                match part {
+                    InterpPart::Chunk(text) => out.push_str(&escape_string(text)),
+                    InterpPart::Hole(hole) => {
+                        out.push_str(&format!("\\({})", expr_with_prec(hole, 0)));
+                    }
+                }
+            }
+            out.push('"');
+            out
+        }
         ExprKind::BoolLit(b) => b.to_string(),
         ExprKind::UnitLit => "()".to_string(),
         ExprKind::Ident(id) => id.name.clone(),

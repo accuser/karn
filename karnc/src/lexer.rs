@@ -180,6 +180,11 @@ pub enum TokenKind {
     // backslash followed by one of the four allowed escapes.
     #[regex(r#""([^"\\\n]|\\[nt"\\])*""#)]
     StrLit,
+    // An interpolated string `"… \(expr) …"` (v0.43). Hand-scanned in
+    // `tokenize` (logos cannot balance the holes' parens), never produced by
+    // the logos lexer — like [`TokenKind::DocBlock`]/[`TokenKind::Comment`].
+    // The span covers the whole `"…"`; the parser splits chunks from holes.
+    InterpStr,
 
     // Multi-char operators
     #[token("->")]
@@ -316,6 +321,7 @@ impl TokenKind {
             IntLit => "integer literal",
             FloatLit => "float literal",
             StrLit => "string literal",
+            InterpStr => "interpolated string",
             Arrow => "`->`",
             EqEq => "`==`",
             BangEq => "`!=`",
@@ -418,6 +424,20 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, CompileError> {
             pos += 1;
             continue;
         }
+        // An interpolated string `"… \(expr) …"` (v0.43): only strings that
+        // actually contain a `\(` hole are hand-scanned here; plain strings
+        // fall through to the logos `StrLit` path unchanged. `\(` is an
+        // invalid escape in the logos grammar, so this never re-routes a
+        // currently-valid literal.
+        if bytes[pos] == b'"' && has_interp_hole(bytes, pos) {
+            let end = scan_str(bytes, source, pos)?;
+            tokens.push(Token {
+                kind: TokenKind::InterpStr,
+                span: Span::new(pos, end),
+            });
+            pos = end;
+            continue;
+        }
         // Otherwise dispatch a single logos token starting at `pos`.
         let mut lex = TokenKind::lexer(&source[pos..]);
         let Some(result) = lex.next() else {
@@ -495,6 +515,171 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, CompileError> {
         }
     }
     Ok(tokens)
+}
+
+/// Cheap routing pre-scan (v0.43): does the string opening at `start` contain a
+/// `\(` interpolation hole before it closes (or the line ends)? Decides whether
+/// `tokenize` hand-scans the string as an `InterpStr` or defers to logos for a
+/// plain `StrLit`. Deliberately tolerant — a malformed string with a hole is
+/// routed here so the hole-aware scanner produces the precise error.
+fn has_interp_hole(bytes: &[u8], start: usize) -> bool {
+    let mut i = start + 1;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\n' | b'"' => return false,
+            b'\\' => {
+                if bytes.get(i + 1) == Some(&b'(') {
+                    return true;
+                }
+                i += 2;
+            }
+            _ => i += 1,
+        }
+    }
+    false
+}
+
+/// Scan a double-quoted string starting at `start` (the opening `"`), returning
+/// the byte offset just past the closing `"`. Recognises the four simple
+/// escapes plus `\(…)` interpolation holes, whose parens are balanced (and
+/// whose nested strings are skipped) by [`scan_hole`]. (v0.43.)
+fn scan_str(bytes: &[u8], source: &str, start: usize) -> Result<usize, CompileError> {
+    debug_assert_eq!(bytes[start], b'"');
+    let mut i = start + 1;
+    loop {
+        if i >= bytes.len() || bytes[i] == b'\n' {
+            return Err(CompileError::new(
+                "karn.lex.unterminated_string",
+                Span::new(start, i.min(bytes.len())),
+                "unterminated string literal",
+            )
+            .with_note(
+                "string literals must close with `\"` on the same line; \
+                 supported escapes are `\\n`, `\\t`, `\\\"`, `\\\\`, and `\\(…)` interpolation",
+            ));
+        }
+        match bytes[i] {
+            b'"' => return Ok(i + 1),
+            b'\\' => match bytes.get(i + 1) {
+                Some(b'n' | b't' | b'"' | b'\\') => i += 2,
+                Some(b'(') => i = scan_hole(bytes, source, i + 2)?,
+                other => {
+                    let shown = other.map(|b| (*b as char).to_string()).unwrap_or_default();
+                    return Err(CompileError::new(
+                        "karn.lex.bad_escape",
+                        Span::new(i, (i + 2).min(bytes.len())),
+                        format!("invalid escape sequence `\\{shown}` in string literal"),
+                    )
+                    .with_note("supported escapes: \\n \\t \\\" \\\\ \\(…)"));
+                }
+            },
+            // Any other byte advances one position. UTF-8 continuation bytes
+            // are all >= 0x80, so they never collide with the ASCII specials.
+            _ => i += 1,
+        }
+    }
+}
+
+/// Scan an interpolation hole body. `start` points just past the `\(`; returns
+/// the offset just past the matching `)`. Tracks paren depth and skips nested
+/// strings (whose own parens must not close the hole), recursing through
+/// [`scan_str`] so nested interpolation nests correctly. (v0.43.)
+fn scan_hole(bytes: &[u8], source: &str, start: usize) -> Result<usize, CompileError> {
+    let mut i = start;
+    let mut depth = 1usize;
+    loop {
+        if i >= bytes.len() || bytes[i] == b'\n' {
+            return Err(CompileError::new(
+                "karn.lex.unterminated_interpolation",
+                Span::new(start.saturating_sub(2), i.min(bytes.len())),
+                "unterminated interpolation hole",
+            )
+            .with_note(
+                "an interpolation hole `\\(…)` must close with a matching `)` on the same line",
+            ));
+        }
+        match bytes[i] {
+            b'(' => {
+                depth += 1;
+                i += 1;
+            }
+            b')' => {
+                depth -= 1;
+                i += 1;
+                if depth == 0 {
+                    return Ok(i);
+                }
+            }
+            b'"' => i = scan_str(bytes, source, i)?,
+            _ => i += 1,
+        }
+    }
+}
+
+/// One segment of a split interpolated string (v0.43): literal text (escapes
+/// resolved) or the absolute source span of a hole's expression (the bytes
+/// between `\(` and its matching `)`). The parser turns the latter into a real
+/// `Expr`; the lexer owns only the scanning.
+pub(crate) enum InterpSegment {
+    Chunk(String),
+    Hole(Span),
+}
+
+/// Split an `InterpStr` token (its `span` covers the whole `"…"`) into chunks
+/// and hole spans. Escapes in the chunks are resolved here (mirroring
+/// [`parse_string_literal`]); holes are returned as spans for the parser to
+/// re-lex and parse as expressions. (v0.43.)
+pub(crate) fn split_interp(source: &str, span: Span) -> Result<Vec<InterpSegment>, CompileError> {
+    let bytes = source.as_bytes();
+    let inner_end = span.end - 1; // the closing `"`
+    let mut segments = Vec::new();
+    let mut chunk = String::new();
+    let mut i = span.start + 1; // past the opening `"`
+    while i < inner_end {
+        match bytes[i] {
+            b'\\' => match bytes[i + 1] {
+                b'n' => {
+                    chunk.push('\n');
+                    i += 2;
+                }
+                b't' => {
+                    chunk.push('\t');
+                    i += 2;
+                }
+                b'"' => {
+                    chunk.push('"');
+                    i += 2;
+                }
+                b'\\' => {
+                    chunk.push('\\');
+                    i += 2;
+                }
+                b'(' => {
+                    if !chunk.is_empty() {
+                        segments.push(InterpSegment::Chunk(std::mem::take(&mut chunk)));
+                    }
+                    let hole_start = i + 2;
+                    let after = scan_hole(bytes, source, hole_start)?;
+                    // `after` is one past the matching `)`; the hole body is
+                    // everything up to that `)`.
+                    segments.push(InterpSegment::Hole(Span::new(hole_start, after - 1)));
+                    i = after;
+                }
+                // The lexer already validated every escape, so nothing else
+                // can appear here.
+                other => unreachable!("unvalidated escape `\\{}` in InterpStr", other as char),
+            },
+            _ => {
+                let ch = source[i..].chars().next().unwrap();
+                chunk.push(ch);
+                i += ch.len_utf8();
+            }
+        }
+    }
+    if !chunk.is_empty() {
+        segments.push(InterpSegment::Chunk(chunk));
+    }
+    Ok(segments)
 }
 
 /// If a `---` doc-block marker line starts at or shortly after `pos` (which
@@ -807,5 +992,54 @@ mod tests {
     fn fat_arrow_and_underscore() {
         use TokenKind::*;
         assert_eq!(kinds("_ =>"), vec![Underscore, FatArrow]);
+    }
+
+    // -- v0.43 string interpolation --
+
+    #[test]
+    fn interp_string_is_one_token() {
+        use TokenKind::*;
+        assert_eq!(kinds(r#""Hello, \(name)!""#), vec![InterpStr]);
+        // A plain string (no hole) stays a `StrLit`, via the logos path.
+        assert_eq!(kinds(r#""Hello, world""#), vec![StrLit]);
+    }
+
+    #[test]
+    fn interp_balances_nested_parens_and_strings() {
+        use TokenKind::*;
+        // The `)` inside `f(x)` must not close the hole early.
+        assert_eq!(kinds(r#""= \(f(x))""#), vec![InterpStr]);
+        // A `)` inside a nested string inside the hole is also ignored.
+        assert_eq!(kinds(r#""= \(label(")"))""#), vec![InterpStr]);
+        // A nested interpolated string inside a hole.
+        assert_eq!(kinds(r#""out \("in \(x)")""#), vec![InterpStr]);
+    }
+
+    #[test]
+    fn escaped_open_paren_is_not_a_hole() {
+        use TokenKind::*;
+        // `\\(` is a literal backslash followed by `(` — no hole, so the
+        // string lexes as a plain `StrLit` on the logos path.
+        assert_eq!(kinds(r#""a \\(b) c""#), vec![StrLit]);
+    }
+
+    #[test]
+    fn unterminated_hole_is_an_error() {
+        // The hole runs to end of line without its closing `)`.
+        let err = tokenize("\"value \\(x + 1\n\"").unwrap_err();
+        assert_eq!(err.category, "karn.lex.unterminated_interpolation");
+    }
+
+    #[test]
+    fn unterminated_interp_string_is_an_error() {
+        // A hole closes but the string never does (newline before the `"`).
+        let err = tokenize("\"value \\(x) more\n").unwrap_err();
+        assert_eq!(err.category, "karn.lex.unterminated_string");
+    }
+
+    #[test]
+    fn bad_escape_in_interp_string_is_an_error() {
+        let err = tokenize(r#""a \q \(x)""#).unwrap_err();
+        assert_eq!(err.category, "karn.lex.bad_escape");
     }
 }

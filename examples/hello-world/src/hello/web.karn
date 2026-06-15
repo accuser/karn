@@ -13,7 +13,7 @@ service api {
   on http GET "/hello/:name" (name: String) -> Effect[HttpResult[String]] given Logger {
     match Subject.of(name) {
       Ok(subject) => {
-        let _ <- Logger.info("greeting ".concat(subject))
+        let _ <- Logger.info("greeting \(subject)")
         Ok(greeting(subject))
       }
       Err(_) => BadRequest("a name must be non-empty and at most 40 characters")

@@ -676,6 +676,14 @@ fn walk_exprs(e: &Expr, f: &mut impl FnMut(&Expr)) {
         | ExprKind::Ident(_)
         | ExprKind::None
         | ExprKind::UnitLit => {}
+        // v0.43: visit each interpolation hole's expression.
+        ExprKind::InterpStr(parts) => {
+            for part in parts {
+                if let InterpPart::Hole(hole) = part {
+                    walk_exprs(hole, f);
+                }
+            }
+        }
         ExprKind::Lambda(l) => walk_exprs(&l.body, f),
         ExprKind::EffectPure(i)
         | ExprKind::Assert(i)
@@ -1317,6 +1325,14 @@ fn collect_refs_in_expr(
         | ExprKind::BoolLit(_)
         | ExprKind::None
         | ExprKind::UnitLit => {}
+        // v0.43: a hole's expression may reference imported names.
+        ExprKind::InterpStr(parts) => {
+            for part in parts {
+                if let InterpPart::Hole(hole) = part {
+                    collect_refs_in_expr(hole, local_to_file, commons, ctx, out);
+                }
+            }
+        }
         // v0.20a: a lambda — its annotated param types may reference
         // imported types; the body walks like any expression.
         ExprKind::Lambda(lambda) => {

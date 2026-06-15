@@ -302,6 +302,45 @@ fn lower_const_literal_raw(e: &Expr) -> Option<String> {
     }
 }
 
+/// Lower an interpolated string (v0.43, ADR 0075) to a TS template literal.
+/// Chunks become escaped literal text; each hole becomes `${String(<expr>)}`.
+/// `String(…)` is identity for a `String` hole and the display form for
+/// `Int`/`Float`/`Bool` — and the checker guarantees only base scalars reach
+/// here, so no `[object Object]` can be emitted.
+fn lower_interp_str(parts: &[InterpPart], stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
+    let mut out = String::from("`");
+    for part in parts {
+        match part {
+            InterpPart::Chunk(text) => out.push_str(&escape_ts_template(text)),
+            InterpPart::Hole(hole) => {
+                let lowered = lower_expr(hole, stmts, cx);
+                out.push_str(&format!("${{String({lowered})}}"));
+            }
+        }
+    }
+    out.push('`');
+    out
+}
+
+/// Escape a literal chunk for a TS template-literal context: backslash,
+/// backtick, and `$` (to neutralise `${`), plus the control-char escapes
+/// [`escape_ts_string`] applies. (v0.43.)
+fn escape_ts_template(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '`' => out.push_str("\\`"),
+            '$' => out.push_str("\\$"),
+            '\n' => out.push_str("\\n"),
+            '\t' => out.push_str("\\t"),
+            '\r' => out.push_str("\\r"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 pub(crate) fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -> String {
     // v0.9.4: a literal the checker admitted as a refined type (expected-type-
     // directed construction) is emitted through the unchecked `unsafe`
@@ -320,6 +359,9 @@ pub(crate) fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -
         // v0.21: the stored lexeme verbatim — `1e10` must not normalise.
         ExprKind::FloatLit { lexeme, .. } => lexeme.clone(),
         ExprKind::StrLit(s) => format!("\"{}\"", escape_ts_string(s)),
+        // v0.43 (ADR 0075): an interpolated string lowers to a TS template
+        // literal — chunks as escaped literal text, holes as `${String(…)}`.
+        ExprKind::InterpStr(parts) => lower_interp_str(parts, stmts, cx),
         ExprKind::BoolLit(b) => b.to_string(),
         // v0.20b: a list literal lowers to a TS array literal; `readonly` is
         // a type-level property and the checker owns the element typing.

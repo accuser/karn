@@ -206,6 +206,14 @@ fn walk_expr_for_constraints(
                 walk_expr_for_constraints(el, typed, consumed, local, errors);
             }
         }
+        // v0.43: a hole's expression is checked like any other.
+        ExprKind::InterpStr(parts) => {
+            for part in parts {
+                if let InterpPart::Hole(hole) = part {
+                    walk_expr_for_constraints(hole, typed, consumed, local, errors);
+                }
+            }
+        }
         ExprKind::RecordConstruction { type_name, fields } => {
             if let Some(ct) = consumed.get(&type_name.name) {
                 errors.push(

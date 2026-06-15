@@ -60,6 +60,17 @@ under maximal munch: `2.5.round()` lexes as `2.5` `.` `round`, and
 A double-quoted string. The escape sequences `\n`, `\t`, `\"`, and `\\` are
 recognised; an unescaped newline does not appear within the token.
 
+A string may also contain **interpolation holes** of the form `\(expr)`
+(v0.43): the text `\(` opens a hole whose body runs to its matching `)`
+(parentheses balance, and a nested `"…"` inside a hole is skipped so its
+parens do not close the hole), and the body is an ordinary
+[expression](syntactic-grammar.md). `\\(` is the escape for a literal `\(`,
+so existing literals are unaffected (a bare `\(` was previously an invalid
+escape). A string containing one or more holes is an *interpolated string*; one
+with none is the plain string literal above. The hole rule and emission are
+specified in [§5.2 well-typedness](static-semantics.md#52-well-typedness) and
+[§7 emission](emission.md).
+
 ### §3.2.3 boolean_literal
 
 {{#grammar boolean_literal}}

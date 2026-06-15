@@ -845,6 +845,10 @@ fn body_performs_effects(e: &Expr, ctx: &Ctx) -> bool {
     }
     match &e.kind {
         ExprKind::Lambda(_) => false,
+        // v0.43: an interpolated string is effectful iff one of its holes is.
+        ExprKind::InterpStr(parts) => parts
+            .iter()
+            .any(|part| matches!(part, InterpPart::Hole(hole) if body_performs_effects(hole, ctx))),
         ExprKind::Block(b) => block_performs(b, ctx),
         ExprKind::EffectPure(_) => true,
         // A capability operation call (`Cap.op(…)`) or `Effect.pure` shape.

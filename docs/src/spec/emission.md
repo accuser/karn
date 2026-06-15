@@ -98,6 +98,7 @@ includes a `Number.isInteger` check; a refined `Float`'s `.of` includes
 | `match` | a `switch` on `.tag`, payload fields bound as `const` |
 | admitted literal | `T.unsafe(literal)` ([§6.4](type-system.md#64-admission--construction)) |
 | float literal | the source **lexeme** verbatim (`1e10` does not normalise) |
+| interpolated string | a **template literal**: chunks as escaped text (backslash, backtick, and `$` escaped), each `\(e)` hole as `${String(<e>)}` (ADR 0075) |
 | `Int / Int` | `Math.trunc(a / b)` — truncating, unchanged |
 | `Float / Float` | `a / b` — true division (v0.21, operand-typed) |
 | numeric kernel | `i.toFloat()` → the receiver (erased identity); `f.round()`/`floor`/`ceil`/`truncate` → `Math.round(f)` / `Math.floor(f)` / `Math.ceil(f)` / `Math.trunc(f)`; `x.toString()` → `String(x)` (host number→string, ADR 0074) |

@@ -12,5 +12,5 @@ type Subject = String where NonEmpty and MaxLength(40)
 The canonical greeting for a subject.
 ---
 fn greeting(subject: Subject) -> String {
-  "Hello, ".concat(subject).concat("!")
+  "Hello, \(subject)!"
 }
