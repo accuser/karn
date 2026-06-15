@@ -1,0 +1,13 @@
+commons generics.demo
+
+fn identity[A](x: A) -> A {
+  x
+}
+
+fn implicit() -> Int {
+  identity(5)
+}
+
+fn explicit() -> Int {
+  identity[Int](5)
+}

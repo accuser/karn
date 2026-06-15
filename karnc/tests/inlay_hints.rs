@@ -109,6 +109,24 @@ fn parameter_name_hints_show_at_args_and_suppress_matching_identifiers() {
 }
 
 #[test]
+fn generic_instantiation_hints_show_inferred_args_only_when_omitted() {
+    let result = karnc::diagnose_project(&fixture_root("generics"), &HashMap::new());
+    // Generic-instantiation hints are `Type`-kind, anchored on the fn name.
+    let (hints, text) = hints_for(&result, "demo.karn");
+
+    // `identity(5)` → the inferred `[Int]` shown after the name.
+    assert_eq!(
+        label_at(&hints, &text, "identity(5)", "identity"),
+        Some("[Int]")
+    );
+    // `identity[Int](5)` → the user wrote the args, so no hint.
+    assert_eq!(
+        label_at(&hints, &text, "identity[Int](5)", "identity"),
+        None
+    );
+}
+
+#[test]
 fn let_bindings_and_lambda_params_get_inferred_type_hints() {
     let result = karnc::diagnose_project(&fixture_root("clean"), &HashMap::new());
     let (hints, text) = hints_for(&result, "shop/util.karn");
