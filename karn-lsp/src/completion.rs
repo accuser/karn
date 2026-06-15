@@ -765,6 +765,23 @@ mod tests {
     }
 
     #[test]
+    fn member_completion_reaches_inside_an_interpolation_hole() {
+        // v0.43: a `Type.`/`Cap.` receiver inside a `\(…)` hole completes just
+        // as it does in bare expression position — context detection is purely
+        // lexical, so the surrounding string and `\(` do not interfere.
+        let doc = "context a.b\n  capability Timer { fn now() -> Effect[Int] }\n";
+        let in_hole = complete("    \"the time is \\(Timer.", doc, None);
+        assert!(
+            find(&in_hole, "now", CompletionKind::Member).is_some(),
+            "capability op not offered inside a hole: {:?}",
+            in_hole.iter().map(|c| &c.label).collect::<Vec<_>>()
+        );
+        // A built-in static receiver works inside a hole too.
+        let statics = complete("  \"n=\\(Int.", "context a.b\n", None);
+        assert!(find(&statics, "parse", CompletionKind::Member).is_some());
+    }
+
+    #[test]
     fn consumes_with_as_is_not_a_target_completion() {
         // `consumes X as ` is aliasing, not target-name completion.
         assert!(!is_consumes_target("consumes platform.time as "));
