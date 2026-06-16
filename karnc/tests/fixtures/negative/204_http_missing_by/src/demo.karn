@@ -1,0 +1,9 @@
+context demo
+
+type View = { ok: Bool }
+
+service api from http {
+  on GET("/health") () -> Effect[HttpResult[View]] {
+    Ok(View { ok: true })
+  }
+}

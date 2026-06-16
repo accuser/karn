@@ -220,6 +220,14 @@ impl<'a> Parser<'a> {
                     );
                     self.handle_item_err(err)?;
                 }
+                Some(TokenKind::Actor) => {
+                    let err = CompileError::new(
+                        "karn.actor.outside_context",
+                        self.peek().unwrap().span,
+                        "`actor` declarations are only allowed inside a context, not a commons",
+                    );
+                    self.handle_item_err(err)?;
+                }
                 Some(_) => {
                     let t = self.peek().unwrap();
                     let err = CompileError::new(
@@ -382,6 +390,14 @@ impl<'a> Parser<'a> {
                         "karn.agent.outside_context",
                         self.peek().unwrap().span,
                         "`agent` declarations are only allowed inside a context, not a commons",
+                    );
+                    self.handle_item_err(err)?;
+                }
+                Some(TokenKind::Actor) => {
+                    let err = CompileError::new(
+                        "karn.actor.outside_context",
+                        self.peek().unwrap().span,
+                        "`actor` declarations are only allowed inside a context, not a commons",
                     );
                     self.handle_item_err(err)?;
                 }
@@ -1463,6 +1479,21 @@ impl<'a> Parser<'a> {
                         Err(e) => self.handle_item_err(e)?,
                     }
                 }
+                Some(TokenKind::Actor) => {
+                    let next_span = self.peek().unwrap().span;
+                    let doc = self.finalize_doc(item_doc, next_span);
+                    match self.parse_actor_decl() {
+                        Ok(mut a) => {
+                            a.documentation = doc;
+                            a.trivia.leading = leading;
+                            a.trivia.trailing = self.take_trailing_trivia();
+                            last_span = a.span;
+                            items.push(CommonsItem::Actor(a));
+                            seen_item = true;
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
+                }
                 None => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
@@ -1481,7 +1512,7 @@ impl<'a> Parser<'a> {
                         "karn.parse.expected_item",
                         t.span,
                         format!(
-                            "expected a `type`, `fn`, `uses`, `consumes`, `exports`, `capability`, `provides`, `service`, or `agent` declaration, found {}",
+                            "expected a `type`, `fn`, `uses`, `consumes`, `exports`, `capability`, `provides`, `service`, `agent`, or `actor` declaration, found {}",
                             t.kind.describe()
                         ),
                     );
@@ -1686,6 +1717,20 @@ impl<'a> Parser<'a> {
                             a.trivia.trailing = self.take_trailing_trivia();
                             last_span = a.span;
                             items.push(CommonsItem::Agent(a));
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
+                }
+                Some(TokenKind::Actor) => {
+                    let next_span = self.peek().unwrap().span;
+                    let doc = self.finalize_doc(item_doc, next_span);
+                    match self.parse_actor_decl() {
+                        Ok(mut a) => {
+                            a.documentation = doc;
+                            a.trivia.leading = leading;
+                            a.trivia.trailing = self.take_trailing_trivia();
+                            last_span = a.span;
+                            items.push(CommonsItem::Actor(a));
                         }
                         Err(e) => self.handle_item_err(e)?,
                     }

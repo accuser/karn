@@ -6,7 +6,7 @@
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../troubleshooting/index.md).
 
-There are **257** codes in total.
+There are **265** codes in total.
 
 ## Agents
 
@@ -158,6 +158,14 @@ There are **257** codes in total.
 
 | Code | Summary | Construct |
 |---|---|---|
+| `karn.actor.identity_not_sealed` | An actor identity type is not a context-ownable (sealed) value type. |  |
+| `karn.actor.missing_by_on_http` | An HTTP handler lacks the required `by` actor clause. |  |
+| `karn.actor.outside_context` | An `actor` was declared outside a context (e.g. in a commons). |  |
+| `karn.actor.refinement_unsupported` | The actor refinement form (`actor A = B where …`) is not yet supported. |  |
+| `karn.actor.scheme_not_admissible` | An actor's scheme is not admissible on this handler's protocol. |  |
+| `karn.actor.scheme_unsupported` | An actor's authentication scheme is reserved but not yet supported. |  |
+| `karn.actor.unknown_actor` | A handler's `by` clause names an actor that is not declared. |  |
+| `karn.actor.unknown_scheme` | An actor declares an authentication scheme that is not compiler-known. |  |
 | `karn.adapter.consumes_context` | An `adapter` consumed a context; adapter dependencies are adapter-to-adapter. | [`consumes_decl`](grammar.md#rule-consumes_decl) |
 | `karn.adapter.consumes_requires_selection` | An `adapter` used a whole-unit or aliased `consumes`; adapters must select capabilities with `consumes U { Cap, … }`. | [`consumes_decl`](grammar.md#rule-consumes_decl) |
 | `karn.adapter.disallowed_item` | An `adapter` declared a `service`, `agent`, or other item it may not contain. | [`adapter_decl`](grammar.md#rule-adapter_decl) |

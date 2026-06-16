@@ -13,6 +13,7 @@
 //! and any single-file commons that does not declare `uses` against another
 //! commons.
 
+pub mod actors;
 pub mod ast;
 pub mod builtin_names;
 pub mod checker;

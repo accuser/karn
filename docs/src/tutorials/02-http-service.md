@@ -24,7 +24,7 @@ code:
 context shortener
 
 service api from http {
-  on GET("/links/:code") (code: String) -> Effect[HttpResult[String]] {
+  on GET("/links/:code") by v: Visitor (code: String) -> Effect[HttpResult[String]] {
     NotFound
   }
 }
@@ -36,7 +36,7 @@ A few new things:
   **[context](../reference/glossary.md#term-context)** rather than a `commons`. Contexts
   are the unit Karn deploys — each becomes one Worker.
 - `service api from http { … }` groups request handlers.
-- `on GET("/links/:code") (code: String)` is a handler: it answers
+- `on GET("/links/:code") by v: Visitor (code: String)` is a handler: it answers
   `GET /links/<something>`, binds the `:code` path segment to the `code`
   parameter, and returns `Effect[HttpResult[String]]`.
 - We have no storage yet — that arrives in [Tutorial 5](05-stateful-agent.md) —
@@ -107,11 +107,11 @@ type CreateLinkRequest = {
 }
 
 service api from http {
-  on GET("/links/:code") (code: String) -> Effect[HttpResult[String]] {
+  on GET("/links/:code") by v: Visitor (code: String) -> Effect[HttpResult[String]] {
     NotFound
   }
 
-  on POST("/links") (body: CreateLinkRequest) -> Effect[HttpResult[String]] {
+  on POST("/links") by v: Visitor (body: CreateLinkRequest) -> Effect[HttpResult[String]] {
     Created(body.target)
   }
 }

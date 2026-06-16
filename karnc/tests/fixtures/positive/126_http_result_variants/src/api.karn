@@ -1,39 +1,39 @@
 context api
 
 service routes from http {
-  on GET("/created") () -> Effect[HttpResult[String]] {
+  on GET("/created") by v: Visitor () -> Effect[HttpResult[String]] {
     Created("created")
   }
 
-  on GET("/nocontent") () -> Effect[HttpResult[String]] {
+  on GET("/nocontent") by v: Visitor () -> Effect[HttpResult[String]] {
     NoContent
   }
 
-  on GET("/badrequest") () -> Effect[HttpResult[String]] {
+  on GET("/badrequest") by v: Visitor () -> Effect[HttpResult[String]] {
     BadRequest("bad request")
   }
 
-  on GET("/unauthorized") () -> Effect[HttpResult[String]] {
+  on GET("/unauthorized") by v: Visitor () -> Effect[HttpResult[String]] {
     Unauthorized
   }
 
-  on GET("/forbidden") () -> Effect[HttpResult[String]] {
+  on GET("/forbidden") by v: Visitor () -> Effect[HttpResult[String]] {
     Forbidden
   }
 
-  on GET("/notfound") () -> Effect[HttpResult[String]] {
+  on GET("/notfound") by v: Visitor () -> Effect[HttpResult[String]] {
     NotFound
   }
 
-  on GET("/conflict") () -> Effect[HttpResult[String]] {
+  on GET("/conflict") by v: Visitor () -> Effect[HttpResult[String]] {
     Conflict("conflict")
   }
 
-  on GET("/unprocessable") () -> Effect[HttpResult[String]] {
+  on GET("/unprocessable") by v: Visitor () -> Effect[HttpResult[String]] {
     UnprocessableEntity("invalid")
   }
 
-  on GET("/servererror") () -> Effect[HttpResult[String]] {
+  on GET("/servererror") by v: Visitor () -> Effect[HttpResult[String]] {
     ServerError("oops")
   }
 }
