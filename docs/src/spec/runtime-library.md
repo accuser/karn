@@ -132,3 +132,14 @@ Two parts of the surface have **no** runtime export, by design:
 > and the aggregating `tests/main.ts`, not exported from the runtime library; an
 > `assert` lowers to an inline check that throws on failure
 > ([§7.3.5](emission.md#735-tests)). This note is informative.
+
+## §7.4.7 Prelude actors (v0.45)
+
+The compiler provides four **prelude actors** — boundary contracts available
+without a declaration: `Visitor` (`auth = None`; identity `()`), and the
+`Internal` actors `Scheduler`, `Producer`, and `Caller` that back the
+per-protocol defaults (cron, queue, and `on call` respectively). `Caller` yields
+the calling-context identity; the other prelude actors carry no identity payload
+(`()`) in this increment. Prelude actors have **no runtime export** — like
+brands, an actor is a compile-time contract; the zero-crypto schemes mint no
+runtime verification code (see [§7.3](emission.md)).
