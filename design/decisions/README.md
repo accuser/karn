@@ -10,6 +10,11 @@ records here as part of the increment itself.
 A record is **immutable once accepted** — a reversal is a new record that
 supersedes the old one, the way 0016 supersedes the interim portability tiers.
 
+The table below is **complete by construction**: a CI drift guard (`karnc`'s
+`decisions_index` test, run by the `drift` job) fails if an ADR file has no row
+or a row links to no file. Summaries and statuses are curated by hand; the
+*presence* of every record is enforced.
+
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-literal-admission-set.md) | Compile-time literal admission is a narrow, closed set | Accepted (v0.9.4) |
@@ -70,3 +75,21 @@ supersedes the old one, the way 0016 supersedes the interim portability tiers.
 | [0056](0056-lsp-inlay-hints.md) | Inlay hints: a curated set harvested via a checker sink (`let`/`let <-`/lambda params; peeled payload; survives errors at reached sites) | Accepted (v0.27) |
 | [0057](0057-lsp-semantic-tokens.md) | Semantic tokens read the index over a frozen legend; first-party references via a tokens-only `foreign_refs` side table; `refined` only with a refinement present | Accepted (v0.28) |
 | [0058](0058-extension-mirrors-legend.md) | The VS Code extension declares + themes the legend's custom tokens; the names are a cross-component contract enforced by a `karn-lsp` test parsing `package.json` (excluded from the published tarball) | Accepted (v0.29) |
+| [0059](0059-refactor-track-posture.md) | The refactor track: behaviour-preserving, patch-versioned, trunk-based, golden-verified | Accepted (v0.29.1) |
+| [0060](0060-named-concern-modules.md) | Split sprawling files into named single-concern modules (flat re-export is fine) | Accepted (v0.29) |
+| [0061](0061-completion-sliced-positional-first.md) | Completion is sliced; positional first, lexical contexts, static built-ins | Accepted (v0.30) |
+| [0062](0062-completion-member-name-vs-value-receiver.md) | `.`-member completion splits by receiver: name now, typed value later | Accepted (v0.30.1) |
+| [0063](0063-completion-value-receiver-typing.md) | Value-receiver `.`-member completion: retained `expr_types`, enumerable kernels | Accepted (v0.30.2) |
+| [0064](0064-locals-in-scope.md) | Locals in scope: scope ranges from the checker, resolved per-file | Accepted (v0.31) |
+| [0065](0065-signature-help.md) | Signature help: lexical call context, name-vs-value callees, shared renderer | Accepted (v0.32) |
+| [0066](0066-codelens-reference-counts.md) | CodeLens reference counts from the index | Accepted (v0.33) |
+| [0067](0067-call-hierarchy.md) | Call hierarchy from a preserved-owner call graph | Accepted (v0.34) |
+| [0068](0068-implementation-navigation.md) | Implementation navigation from a provides-clause impl graph | Accepted (v0.35) |
+| [0069](0069-member-index-kinds.md) | Member index kinds via compound names | Accepted (v0.36) |
+| [0070](0070-folding-selection-ranges.md) | Folding & selection ranges from one recovered-AST visitor | Accepted (v0.37) |
+| [0071](0071-extension-polish.md) | B-2 extension polish: scaffolds, commands, walkthrough, problem-matcher | Accepted (v0.38) |
+| [0072](0072-richer-inlay-hints.md) | Richer inlay hints: parameter names + generic instantiations | Accepted (v0.39) |
+| [0073](0073-inrange-swap-quickfix.md) | InRange-swap quick-fix via per-bound spans | Accepted (v0.40) |
+| [0074](0074-numeric-tostring.md) | `toString` on the numeric kernel | Accepted (v0.42) |
+| [0075](0075-string-interpolation.md) | String interpolation (`\(expr)` holes) | Accepted (v0.43) |
+| [0076](0076-feature-track-posture.md) | Far-reaching features run as a feature track: persistent design doc, settle-first, front-loaded ADRs, per-slice proposals | Accepted (posture) |
