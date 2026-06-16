@@ -1792,6 +1792,13 @@ fn lower_field_access(
     // zero-crypto schemes the sealed identity carries no payload, so it lowers
     // to the unit value (`undefined`). Authenticated identities (Bearer/
     // Signature) and the calling-context value arrive with their later slices.
+    //
+    // CORRECTNESS NOTE (for the authenticated-scheme slices): this blanket
+    // lowering to `undefined` is only sound while every minted identity is unit.
+    // A non-unit identity (a declared `identity = T`, or Caller's `CallerId`)
+    // typed as `T` but lowered to `undefined` is a type/runtime mismatch — when
+    // real identities are minted, this must lower to the seam-bound value, not
+    // `undefined`.
     if field.name == "identity"
         && matches!(cx.commons.expr_types.get(&receiver.span), Some(Ty::Actor(_)))
     {
