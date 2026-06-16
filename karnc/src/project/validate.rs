@@ -835,23 +835,40 @@ fn check_actor_contracts(
         for handler in &service.handlers {
             match &handler.by_clause {
                 Some(by) => {
-                    // Resolve the actor: a local declaration or a prelude actor.
-                    let local = table.actors.get(&by.actor.name);
-                    if local.is_some() {
-                        refs.record(by.actor.span, SymbolKind::Actor, &by.actor.name);
+                    // The actor binder introduces a new binding; it must not
+                    // collide with a handler parameter of the same name (which it
+                    // would otherwise silently shadow in the body scope).
+                    if handler.params.iter().any(|p| p.name.name == by.binder.name) {
+                        errors.push(
+                            CompileError::new(
+                                "karn.actor.binder_shadows_param",
+                                by.binder.span,
+                                format!(
+                                    "the actor binder `{}` collides with a handler parameter of the same name",
+                                    by.binder.name,
+                                ),
+                            )
+                            .with_note("rename the `by` binder or the parameter"),
+                        );
                     }
-                    let contract = local
-                        .and_then(|a| {
-                            a.auth
-                                .as_ref()
-                                .and_then(|au| Scheme::from_name(&au.name))
-                                .filter(|s| s.admitted())
-                                .map(|scheme| actors::Contract {
-                                    scheme,
-                                    identity: actors::Identity::Unit,
-                                })
-                        })
-                        .or_else(|| actors::prelude_actor(&by.actor.name));
+                    // Resolve the actor: a local declaration *or* a prelude actor.
+                    // A local declaration that exists but is malformed (its scheme
+                    // already errored at the decl) does NOT fall through to a
+                    // prelude actor of the same name — only an unresolved name is.
+                    let local = table.actors.get(&by.actor.name);
+                    let contract = if let Some(a) = local {
+                        refs.record(by.actor.span, SymbolKind::Actor, &by.actor.name);
+                        a.auth
+                            .as_ref()
+                            .and_then(|au| Scheme::from_name(&au.name))
+                            .filter(|s| s.admitted())
+                            .map(|scheme| actors::Contract {
+                                scheme,
+                                identity: actors::Identity::Unit,
+                            })
+                    } else {
+                        actors::prelude_actor(&by.actor.name)
+                    };
                     let Some(contract) = contract else {
                         // A malformed local actor errored at its decl; only an
                         // unresolved name is reported here.
@@ -1082,6 +1099,12 @@ fn handler_actor_binding(
     resolved: &ResolvedCommons,
 ) -> Option<(String, checker::Ty)> {
     let by = handler.by_clause.as_ref()?;
+    // A binder that collides with a parameter is diagnosed
+    // (`karn.actor.binder_shadows_param`); suppress the binding so the body
+    // scope keeps the real parameter rather than the clobbering actor binding.
+    if handler.params.iter().any(|p| p.name.name == by.binder.name) {
+        return None;
+    }
     let identity = actor_identity_ty(&by.actor.name, table, resolved);
     Some((by.binder.name.clone(), identity))
 }

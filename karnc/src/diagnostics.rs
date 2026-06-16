@@ -33,6 +33,10 @@ pub struct DiagnosticInfo {
 /// Every diagnostic code the compiler emits, sorted by code.
 pub const REGISTRY: &[DiagnosticInfo] = &[
     d(
+        "karn.actor.binder_shadows_param",
+        "A `by` actor binder collides with a handler parameter of the same name.",
+    ),
+    d(
         "karn.actor.identity_not_sealed",
         "An actor identity type is not a context-ownable (sealed) value type.",
     ),

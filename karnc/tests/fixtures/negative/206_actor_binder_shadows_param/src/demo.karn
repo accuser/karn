@@ -1,0 +1,7 @@
+context demo
+
+service api from http {
+  on POST("/echo") by body: Visitor (body: String) -> Effect[HttpResult[String]] {
+    Ok("ok")
+  }
+}

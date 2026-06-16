@@ -6,7 +6,7 @@
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../troubleshooting/index.md).
 
-There are **265** codes in total.
+There are **266** codes in total.
 
 ## Agents
 
@@ -158,6 +158,7 @@ There are **265** codes in total.
 
 | Code | Summary | Construct |
 |---|---|---|
+| `karn.actor.binder_shadows_param` | A `by` actor binder collides with a handler parameter of the same name. |  |
 | `karn.actor.identity_not_sealed` | An actor identity type is not a context-ownable (sealed) value type. |  |
 | `karn.actor.missing_by_on_http` | An HTTP handler lacks the required `by` actor clause. |  |
 | `karn.actor.outside_context` | An `actor` was declared outside a context (e.g. in a commons). |  |
