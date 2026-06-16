@@ -376,6 +376,28 @@ codes).
 
 {{#grammar-semantics http_handler}}
 
+## §5.7a Actors & the `by` clause (v0.45)
+
+An `actor` MUST be declared inside a context (`karn.actor.outside_context`). Its
+`auth` scheme MUST be compiler-known (`karn.actor.unknown_scheme`) and admitted —
+this increment admits `None` and `Internal`, so `Bearer`/`Signature` are rejected
+(`karn.actor.scheme_unsupported`). The reserved refinement form
+`actor A = B where p` is rejected (`karn.actor.refinement_unsupported`). A
+declared `identity = T` MUST be a context-ownable value type, so the verified
+identity is sealed — minted only inside the owning context
+(`karn.actor.identity_not_sealed`).
+
+A handler consumes an actor on its `by <binder>: <Actor>` clause. The named actor
+MUST resolve to a declared actor or a prelude actor (`Visitor`, `Scheduler`,
+`Producer`, `Caller`) (`karn.actor.unknown_actor`), and its scheme MUST be
+admissible on the handler's protocol — HTTP admits `None`, the internal protocols
+(call/cron/queue) admit `Internal` (`karn.actor.scheme_not_admissible`). A handler
+that omits `by` inherits its protocol's default actor; an **HTTP handler has no
+safe default and MUST declare `by`** (`karn.actor.missing_by_on_http`). The
+verified identity binds to `<binder>` and is read as `<binder>.identity`; it is a
+sealed value, minted at the boundary before the body runs and never re-checked
+downstream.
+
 ## §5.8 Boundaries & cross-context
 
 `consumes` MUST appear only in a context or an adapter (`karn.consumes.in_commons`),

@@ -179,11 +179,11 @@ fn describe(error: LinkError) -> String {
 }
 
 service api from http {
-  on POST("/links") (body: CreateLinkRequest) -> Effect[HttpResult[CreatedView]] {
+  on POST("/links") by v: Visitor (body: CreateLinkRequest) -> Effect[HttpResult[CreatedView]] {
     Created(CreatedView { code: "abc123", target: body.target })
   }
 
-  on GET("/links/:code") (code: String) -> Effect[HttpResult[ResolveView]] {
+  on GET("/links/:code") by v: Visitor (code: String) -> Effect[HttpResult[ResolveView]] {
     NotFound
   }
 }

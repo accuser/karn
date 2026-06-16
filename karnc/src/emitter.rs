@@ -843,7 +843,12 @@ fn ty_to_type_ref(t: &Ty) -> Option<TypeRef> {
         Ty::Unit => TypeRef::Unit(sp),
         Ty::ValidationError => TypeRef::ValidationError(sp),
         Ty::JsonError => TypeRef::JsonError(sp),
-        Ty::Effect(_) | Ty::HttpResult(_) | Ty::QueueResult | Ty::Fn { .. } | Ty::Var(_) => {
+        Ty::Effect(_)
+        | Ty::HttpResult(_)
+        | Ty::QueueResult
+        | Ty::Fn { .. }
+        | Ty::Var(_)
+        | Ty::Actor(_) => {
             return None;
         }
     })
@@ -1223,6 +1228,11 @@ fn collect_external_references(commons: &TypedCommons, ctx: &EmitProjectCtx) -> 
                     }
                     collect_refs_in_typeref(&h.return_type, &local_to_file, ctx, &mut refs);
                     collect_refs_in_block(&h.body, &local_to_file, commons, ctx, &mut refs);
+                }
+            }
+            CommonsItem::Actor(a) => {
+                if let Some(id) = &a.identity {
+                    collect_refs_in_typeref(id, &local_to_file, ctx, &mut refs);
                 }
             }
         }
@@ -2186,6 +2196,8 @@ fn ts_ty(t: &Ty) -> String {
             format!("({}) => {}", params.join(", "), ts_ty(ret))
         }
         Ty::Var(n) => n.clone(),
+        // The identity type the actor binding yields (`name.identity`).
+        Ty::Actor(id) => ts_ty(id),
     }
 }
 

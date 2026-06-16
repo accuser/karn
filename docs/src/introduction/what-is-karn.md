@@ -24,7 +24,7 @@ A small HTTP service is not much larger:
 context greet
 
 service api from http {
-  on GET("/ping") () -> Effect[HttpResult[String]] {
+  on GET("/ping") by v: Visitor () -> Effect[HttpResult[String]] {
     Ok("pong")
   }
 }

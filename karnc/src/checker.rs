@@ -71,6 +71,10 @@ pub enum Ty {
     JsonError,
     /// `()` — the unit type (v0.5).
     Unit,
+    /// v0.45: a verified actor binding (`by name: Actor`). The inner type is
+    /// the actor's identity, read as `name.identity`. A boundary-minted, sealed
+    /// value — only ever `.identity`-accessed, never constructed or passed.
+    Actor(Box<Ty>),
     /// `A -> B` — a function type (v0.20a). Effectful iff `ret` is
     /// `Effect[_]` (the structural rule); no separate flag, so there is a
     /// single source of truth.
@@ -119,6 +123,7 @@ impl Ty {
             Ty::ValidationError => "ValidationError".to_string(),
             Ty::JsonError => "JsonError".to_string(),
             Ty::Unit => "()".to_string(),
+            Ty::Actor(id) => format!("actor[{}]", id.display()),
             Ty::Fn { params, ret } => {
                 let params = match params.len() {
                     0 => "()".to_string(),
@@ -244,6 +249,10 @@ pub fn check_handler_body(
     given: &[CapRef],
     given_anchor: Option<Span>,
     report_unused: bool,
+    // v0.45: the `by <binder>: <Actor>` binding — the binder name and the
+    // identity type it yields, bound in scope as `Ty::Actor(identity)` so
+    // `binder.identity` type-checks. `None` for handlers without a `by` clause.
+    actor_binding: Option<(String, Ty)>,
 ) {
     let Some(return_ty) = resolve_type_ref(return_type, &input.types) else {
         return;
@@ -261,6 +270,12 @@ pub fn check_handler_body(
             }
             param_scope.insert(p.name.name.clone(), t);
         }
+    }
+    if let Some((binder, identity)) = actor_binding {
+        if binder != "_" {
+            locals.record(binder.clone(), body.span, "actor".to_string(), body.span);
+        }
+        param_scope.insert(binder, Ty::Actor(Box::new(identity)));
     }
     if let Some(self_scope) = agent_self_scope {
         param_scope.extend(self_scope);
@@ -1482,7 +1497,12 @@ fn rebrand_return_type(t: &Ty, caller_types: &HashMap<String, TypeDecl>) -> Ty {
             Box::new(rebrand_return_type(k, caller_types)),
             Box::new(rebrand_return_type(v, caller_types)),
         ),
-        Ty::Base(_) | Ty::QueueResult | Ty::ValidationError | Ty::JsonError | Ty::Unit => t.clone(),
+        Ty::Base(_)
+        | Ty::QueueResult
+        | Ty::ValidationError
+        | Ty::JsonError
+        | Ty::Unit
+        | Ty::Actor(_) => t.clone(),
         // v0.20a: function types are confined to non-boundary positions
         // (`karn.types.function_at_boundary`), so a cross-context return can
         // never carry one; Vars never escape call checking.

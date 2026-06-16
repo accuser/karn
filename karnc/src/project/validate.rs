@@ -663,6 +663,7 @@ fn check_provider_decls(
                 &provider.given,
                 None,
                 false,
+                None,
             );
         }
     }
@@ -744,6 +745,192 @@ fn protocol_label(p: &ServiceProtocol) -> &'static str {
     }
 }
 
+/// v0.45: actor-contract well-formedness and the handler `by`-clause checks.
+///
+/// Two passes: (1) each `actor` declaration is well-formed — the refinement
+/// form is reserved-and-rejected, the scheme is admitted, and a declared
+/// identity is a context-ownable (sealed) type; (2) each service handler either
+/// names an admissible actor on `by` or inherits the protocol default — and
+/// HTTP requires an explicit `by`.
+fn check_actor_contracts(
+    table: &UnitTable,
+    resolved: &ResolvedCommons,
+    refs: &mut RefSink,
+    errors: &mut Vec<CompileError>,
+) {
+    use crate::actors::{self, Scheme};
+
+    // Pass 1 — actor declaration well-formedness.
+    for actor in table.actors.values() {
+        refs.set_owner(&actor.name.name);
+        if let Some(r) = &actor.refinement {
+            errors.push(
+                CompileError::new(
+                    "karn.actor.refinement_unsupported",
+                    r.span,
+                    format!(
+                        "actor refinement (`actor {} = {} where …`) is not yet supported",
+                        actor.name.name, r.base.name,
+                    ),
+                )
+                .with_note(
+                    "refinement-based authorisation invariants land in a later actors slice; \
+                     for now declare a base actor with `actor Name { auth = … }`",
+                ),
+            );
+            continue;
+        }
+        let Some(auth) = &actor.auth else {
+            continue;
+        };
+        match Scheme::from_name(&auth.name) {
+            None => errors.push(
+                CompileError::new(
+                    "karn.actor.unknown_scheme",
+                    auth.span,
+                    format!("unknown authentication scheme `{}`", auth.name),
+                )
+                .with_note(
+                    "the schemes are `None`, `Internal`, `Bearer`, `Signature`; \
+                     this slice admits `None` and `Internal`",
+                ),
+            ),
+            Some(s) if !s.admitted() => errors.push(
+                CompileError::new(
+                    "karn.actor.scheme_unsupported",
+                    auth.span,
+                    format!(
+                        "the `{}` authentication scheme is reserved but not yet supported",
+                        s.as_str(),
+                    ),
+                )
+                .with_note(
+                    "Foundations admits the zero-crypto schemes `None` and `Internal`; \
+                     `Bearer` and `Signature` arrive in later actors slices",
+                ),
+            ),
+            Some(_) => {}
+        }
+        // A declared identity must be a context-ownable (sealed) type — a type
+        // this context declares, so it can only be minted inside the context.
+        if let Some(id) = &actor.identity {
+            let ownable =
+                matches!(id, TypeRef::Named(n) if resolved.local_type_names.contains(&n.name));
+            if !ownable {
+                errors.push(
+                    CompileError::new(
+                        "karn.actor.identity_not_sealed",
+                        id.span(),
+                        "an actor identity must be a context-ownable value type",
+                    )
+                    .with_note(
+                        "declare the identity as a type in this context so it is sealed — \
+                         minted only inside the context and unforgeable downstream",
+                    ),
+                );
+            }
+        }
+    }
+
+    // Pass 2 — handler `by`-clause contracts.
+    for service in table.services.values() {
+        refs.set_owner(&service.name.name);
+        for handler in &service.handlers {
+            match &handler.by_clause {
+                Some(by) => {
+                    // The actor binder introduces a new binding; it must not
+                    // collide with a handler parameter of the same name (which it
+                    // would otherwise silently shadow in the body scope).
+                    if handler.params.iter().any(|p| p.name.name == by.binder.name) {
+                        errors.push(
+                            CompileError::new(
+                                "karn.actor.binder_shadows_param",
+                                by.binder.span,
+                                format!(
+                                    "the actor binder `{}` collides with a handler parameter of the same name",
+                                    by.binder.name,
+                                ),
+                            )
+                            .with_note("rename the `by` binder or the parameter"),
+                        );
+                    }
+                    // Resolve the actor: a local declaration *or* a prelude actor.
+                    // A local declaration that exists but is malformed (its scheme
+                    // already errored at the decl) does NOT fall through to a
+                    // prelude actor of the same name — only an unresolved name is.
+                    let local = table.actors.get(&by.actor.name);
+                    let contract = if let Some(a) = local {
+                        refs.record(by.actor.span, SymbolKind::Actor, &by.actor.name);
+                        a.auth
+                            .as_ref()
+                            .and_then(|au| Scheme::from_name(&au.name))
+                            .filter(|s| s.admitted())
+                            .map(|scheme| actors::Contract {
+                                scheme,
+                                identity: actors::Identity::Unit,
+                            })
+                    } else {
+                        actors::prelude_actor(&by.actor.name)
+                    };
+                    let Some(contract) = contract else {
+                        // A malformed local actor errored at its decl; only an
+                        // unresolved name is reported here.
+                        if local.is_none() {
+                            errors.push(
+                                CompileError::new(
+                                    "karn.actor.unknown_actor",
+                                    by.actor.span,
+                                    format!("unknown actor `{}`", by.actor.name),
+                                )
+                                .with_note(
+                                    "name a declared `actor` or a prelude actor \
+                                     (`Visitor`, `Scheduler`, `Producer`, `Caller`)",
+                                ),
+                            );
+                        }
+                        continue;
+                    };
+                    if !actors::scheme_admissible(&service.protocol, contract.scheme) {
+                        errors.push(
+                            CompileError::new(
+                                "karn.actor.scheme_not_admissible",
+                                by.span,
+                                format!(
+                                    "a `{}` actor is not admissible on a `{}` handler",
+                                    contract.scheme.as_str(),
+                                    protocol_label(&service.protocol),
+                                ),
+                            )
+                            .with_note(match service.protocol {
+                                ServiceProtocol::Http => {
+                                    "public HTTP routes take an anonymous actor — write `by v: Visitor`"
+                                }
+                                _ => "internal protocols (call/cron/queue) take an `Internal` actor",
+                            }),
+                        );
+                    }
+                }
+                None => {
+                    // No `by`: HTTP has no safe default; everything else inherits.
+                    if actors::default_actor(&service.protocol).is_none() {
+                        errors.push(
+                            CompileError::new(
+                                "karn.actor.missing_by_on_http",
+                                handler.span,
+                                "an HTTP handler must declare its actor with a `by` clause",
+                            )
+                            .with_note(
+                                "HTTP has no safe default actor — a public route writes \
+                                 `by v: Visitor`; an authenticated route names its actor",
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn check_service_decls(
     typed: &mut checker::TypedCommons,
@@ -759,6 +946,9 @@ fn check_service_decls(
     // v0.44: a service is one protocol adapter — every handler's form must
     // match the service's `from <protocol>` header.
     check_service_protocols(table, errors);
+
+    // v0.45: actor-contract well-formedness and the handler `by`-clause checks.
+    check_actor_contracts(table, resolved, refs, errors);
 
     // v0.9: validate HTTP handler shape and check for duplicate routes
     // across all services in this context.
@@ -873,6 +1063,8 @@ fn check_service_decls(
                     ),
                 ));
             }
+            // v0.45: the `by`-bound actor identity, in scope for the body.
+            let actor_binding = handler_actor_binding(handler, &service.protocol, table, resolved);
             checker::check_handler_body(
                 &handler.body,
                 &handler.return_type,
@@ -891,8 +1083,52 @@ fn check_service_decls(
                 &handler.given,
                 Some(handler.return_type.span()),
                 true,
+                actor_binding,
             );
         }
+    }
+}
+
+/// v0.45: the actor binding a service handler exposes to its body, if it has a
+/// `by <binder>: <Actor>` clause. Returns `(binder, identity_ty)`. Default-actor
+/// handlers (no `by`) carry no named binding. The identity type is the actor's
+/// declared `identity = T` (a context-ownable type), or the scheme default:
+/// `()` for trivial actors, the calling-context id (`String`) for the prelude
+/// `Caller` (Q7).
+fn handler_actor_binding(
+    handler: &Handler,
+    _protocol: &ServiceProtocol,
+    table: &UnitTable,
+    resolved: &ResolvedCommons,
+) -> Option<(String, checker::Ty)> {
+    let by = handler.by_clause.as_ref()?;
+    // A binder that collides with a parameter is diagnosed
+    // (`karn.actor.binder_shadows_param`); suppress the binding so the body
+    // scope keeps the real parameter rather than the clobbering actor binding.
+    if handler.params.iter().any(|p| p.name.name == by.binder.name) {
+        return None;
+    }
+    let identity = actor_identity_ty(&by.actor.name, table, resolved);
+    Some((by.binder.name.clone(), identity))
+}
+
+/// The identity `Ty` a named actor yields (a local declaration or a prelude
+/// actor).
+fn actor_identity_ty(
+    actor_name: &str,
+    table: &UnitTable,
+    resolved: &ResolvedCommons,
+) -> checker::Ty {
+    use crate::actors::{Identity, prelude_actor};
+    if let Some(local) = table.actors.get(actor_name) {
+        return match &local.identity {
+            Some(id) => checker::resolve_type_ref(id, &resolved.types).unwrap_or(checker::Ty::Unit),
+            None => checker::Ty::Unit,
+        };
+    }
+    match prelude_actor(actor_name).map(|c| c.identity) {
+        Some(Identity::CallerId) => checker::Ty::Base(crate::ast::BaseType::String),
+        _ => checker::Ty::Unit,
     }
 }
 
@@ -1099,6 +1335,7 @@ fn check_agent_decls(
                 &handler.given,
                 Some(handler.return_type.span()),
                 true,
+                None,
             );
         }
     }
@@ -1487,6 +1724,11 @@ pub(crate) fn check_function_type_boundary_items(
                             reject_fn_types(&p.type_ref, "an agent handler signature", errors);
                         }
                         reject_fn_types(&h.return_type, "an agent handler signature", errors);
+                    }
+                }
+                CommonsItem::Actor(a) => {
+                    if let Some(id) = &a.identity {
+                        reject_fn_types(id, "an actor identity type", errors);
                     }
                 }
                 CommonsItem::Fn(_) | CommonsItem::Provider(_) => {}

@@ -83,7 +83,7 @@ context greeter
 consumes karn { Clock, Logger }
 
 service api from http {
-  on GET("/now") () -> Effect[HttpResult[Int]] given Clock, Logger {
+  on GET("/now") by v: Visitor () -> Effect[HttpResult[Int]] given Clock, Logger {
     let t <- Clock.now()
     let _ <- Logger.info("checked the clock")
     Ok(t)

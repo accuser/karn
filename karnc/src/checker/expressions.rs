@@ -1649,6 +1649,22 @@ pub(crate) fn check_field_access(receiver: &Expr, field: &Ident, ctx: &mut Ctx) 
         return Some(named_ty(decl));
     }
     let recv_ty = type_of(receiver, None, ctx)?;
+    // v0.45: a verified actor binding exposes exactly `.identity` — the sealed,
+    // boundary-minted identity value. No other member is valid.
+    if let Ty::Actor(identity) = &recv_ty {
+        if field.name == "identity" {
+            return Some((**identity).clone());
+        }
+        ctx.errors.push(CompileError::new(
+            "karn.types.unknown_field",
+            field.span,
+            format!(
+                "a verified actor exposes only `.identity`, not `.{}`",
+                field.name
+            ),
+        ));
+        return None;
+    }
     // `.raw` on an opaque value: only available within the defining commons.
     // Returns the base type. The emitter compiles this to a `value as base`
     // type assertion (see emitter::lower_expr for FieldAccess).

@@ -694,6 +694,7 @@ impl<'a> Formatter<'a> {
             CommonsItem::Provider(p) => self.format_provider(p),
             CommonsItem::Service(s) => self.format_service(s),
             CommonsItem::Agent(a) => self.format_agent(a),
+            CommonsItem::Actor(a) => self.format_actor(a),
         }
     }
 
@@ -1089,6 +1090,34 @@ impl<'a> Formatter<'a> {
         }
     }
 
+    fn format_actor(&mut self, a: &ActorDecl) {
+        self.emit_leading_comments(&a.trivia.leading);
+        if let Some(doc) = &a.documentation {
+            self.emit_doc(doc);
+        }
+        if let Some(r) = &a.refinement {
+            // Reserved refinement form: `actor Name = Base where <predicate>`.
+            self.push(&format!(
+                "actor {} = {} where {}",
+                a.name.name,
+                r.base.name,
+                expr_to_string(&r.predicate)
+            ));
+        } else {
+            // Normal form: `actor Name { auth = Scheme(, identity = Type)? }`.
+            let auth = a.auth.as_ref().map(|i| i.name.as_str()).unwrap_or("None");
+            self.push(&format!("actor {} {{ auth = {auth}", a.name.name));
+            if let Some(id) = &a.identity {
+                self.push(&format!(", identity = {}", type_ref_to_string(id)));
+            }
+            self.push(" }");
+        }
+        self.emit_trailing_comment(a.trivia.trailing.as_deref());
+        if a.trivia.trailing.is_none() {
+            self.newline();
+        }
+    }
+
     fn format_handler(&mut self, h: &Handler) {
         self.emit_leading_comments(&h.trivia.leading);
         if let Some(doc) = &h.documentation {
@@ -1118,6 +1147,15 @@ impl<'a> Formatter<'a> {
             HandlerKind::Message => {
                 self.push("on message");
             }
+        }
+        // v0.45: the `by <binder>: <Actor>` clause sits between the config and
+        // the parameters. The Http/Cron config prefixes already emit a trailing
+        // space; Call/Message do not, so add one before the clause.
+        if let Some(by) = &h.by_clause {
+            if matches!(h.kind, HandlerKind::Call | HandlerKind::Message) {
+                self.push(" ");
+            }
+            self.push(&format!("by {}: {} ", by.binder.name, by.actor.name));
         }
         self.format_params(&h.params, false);
         self.push(" -> ");

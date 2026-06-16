@@ -59,6 +59,11 @@ pub(crate) fn assemble_index(
                         &p.provider_name.name,
                         symbol_modifiers(&unit, None),
                     ),
+                    CommonsItem::Actor(a) => (
+                        SymbolKind::Actor,
+                        &a.name.name,
+                        symbol_modifiers(&unit, None),
+                    ),
                 };
                 builder.add_first_party_def(&unit, kind, name, modifiers);
             }
@@ -163,6 +168,15 @@ pub(crate) fn assemble_index(
                         symbol_modifiers(&unit, None),
                     );
                 }
+                CommonsItem::Actor(a) => {
+                    builder.add_def(
+                        &unit,
+                        SymbolKind::Actor,
+                        &a.name.name,
+                        site(&a.name),
+                        symbol_modifiers(&unit, None),
+                    );
+                }
             }
         }
     }
@@ -204,6 +218,8 @@ pub struct UnitTable {
     pub services: HashMap<String, ServiceDecl>,
     /// Per-context agents (v0.5). Empty for commons.
     pub agents: HashMap<String, AgentDecl>,
+    /// v0.45: actors — boundary contracts consumed by handler `by` clauses.
+    pub actors: HashMap<String, ActorDecl>,
     /// v0.15: capability names this context offers to consumers via
     /// `exports capability { … }`. Empty for commons.
     pub exported_capabilities: std::collections::HashSet<String>,
@@ -389,6 +405,28 @@ pub(crate) fn build_unit_table(
                         table.agents.insert(a.name.name.clone(), a.clone());
                     }
                 }
+                CommonsItem::Actor(a) => {
+                    if kind == UnitKind::Adapter {
+                        errors.push(CompileError::new(
+                            "karn.adapter.disallowed_item",
+                            a.span,
+                            "an `adapter` may not declare an `actor` — adapters contain only capabilities, boundary types, external providers, and helpers",
+                        ));
+                        continue;
+                    }
+                    if let Some(prev) = table.actors.get(&a.name.name) {
+                        errors.push(
+                            CompileError::new(
+                                "karn.resolve.duplicate_actor",
+                                a.name.span,
+                                format!("actor `{}` is already declared", a.name.name),
+                            )
+                            .with_label(prev.name.span, "previously declared here"),
+                        );
+                    } else {
+                        table.actors.insert(a.name.name.clone(), a.clone());
+                    }
+                }
                 _ => {}
             }
         }
@@ -515,7 +553,8 @@ pub(crate) fn build_file_decl_index(indices: &[usize], parsed: &[ParsedFile]) ->
                 CommonsItem::Capability(_)
                 | CommonsItem::Provider(_)
                 | CommonsItem::Service(_)
-                | CommonsItem::Agent(_) => {}
+                | CommonsItem::Agent(_)
+                | CommonsItem::Actor(_) => {}
             }
         }
     }

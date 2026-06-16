@@ -220,6 +220,14 @@ impl<'a> Parser<'a> {
                     );
                     self.handle_item_err(err)?;
                 }
+                Some(TokenKind::Actor) => {
+                    let err = CompileError::new(
+                        "karn.actor.outside_context",
+                        self.peek().unwrap().span,
+                        "`actor` declarations are only allowed inside a context, not a commons",
+                    );
+                    self.handle_item_err(err)?;
+                }
                 Some(_) => {
                     let t = self.peek().unwrap();
                     let err = CompileError::new(
@@ -382,6 +390,14 @@ impl<'a> Parser<'a> {
                         "karn.agent.outside_context",
                         self.peek().unwrap().span,
                         "`agent` declarations are only allowed inside a context, not a commons",
+                    );
+                    self.handle_item_err(err)?;
+                }
+                Some(TokenKind::Actor) => {
+                    let err = CompileError::new(
+                        "karn.actor.outside_context",
+                        self.peek().unwrap().span,
+                        "`actor` declarations are only allowed inside a context, not a commons",
                     );
                     self.handle_item_err(err)?;
                 }
@@ -1199,13 +1215,26 @@ impl<'a> Parser<'a> {
                         Err(e) => self.handle_item_err(e)?,
                     }
                 }
+                Some(TokenKind::Actor) => {
+                    let next_span = self.peek().unwrap().span;
+                    let doc = self.finalize_doc(item_doc, next_span);
+                    match self.parse_actor_decl() {
+                        Ok(mut a) => {
+                            a.documentation = doc;
+                            a.trivia.leading = leading;
+                            a.trivia.trailing = self.take_trailing_trivia();
+                            items.push(CommonsItem::Actor(a));
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
+                }
                 Some(_) => {
                     let t = self.peek().unwrap();
                     let err = CompileError::new(
                         "karn.parse.expected_item",
                         t.span,
                         format!(
-                            "expected a `type`, `fn`, `uses`, `consumes`, `exports`, `capability`, `provides`, `service`, or `agent` declaration, found {}",
+                            "expected a `type`, `fn`, `uses`, `consumes`, `exports`, `capability`, `provides`, `service`, `agent`, or `actor` declaration, found {}",
                             t.kind.describe()
                         ),
                     );
@@ -1450,6 +1479,21 @@ impl<'a> Parser<'a> {
                         Err(e) => self.handle_item_err(e)?,
                     }
                 }
+                Some(TokenKind::Actor) => {
+                    let next_span = self.peek().unwrap().span;
+                    let doc = self.finalize_doc(item_doc, next_span);
+                    match self.parse_actor_decl() {
+                        Ok(mut a) => {
+                            a.documentation = doc;
+                            a.trivia.leading = leading;
+                            a.trivia.trailing = self.take_trailing_trivia();
+                            last_span = a.span;
+                            items.push(CommonsItem::Actor(a));
+                            seen_item = true;
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
+                }
                 None => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
@@ -1468,7 +1512,7 @@ impl<'a> Parser<'a> {
                         "karn.parse.expected_item",
                         t.span,
                         format!(
-                            "expected a `type`, `fn`, `uses`, `consumes`, `exports`, `capability`, `provides`, `service`, or `agent` declaration, found {}",
+                            "expected a `type`, `fn`, `uses`, `consumes`, `exports`, `capability`, `provides`, `service`, `agent`, or `actor` declaration, found {}",
                             t.kind.describe()
                         ),
                     );
@@ -1673,6 +1717,20 @@ impl<'a> Parser<'a> {
                             a.trivia.trailing = self.take_trailing_trivia();
                             last_span = a.span;
                             items.push(CommonsItem::Agent(a));
+                        }
+                        Err(e) => self.handle_item_err(e)?,
+                    }
+                }
+                Some(TokenKind::Actor) => {
+                    let next_span = self.peek().unwrap().span;
+                    let doc = self.finalize_doc(item_doc, next_span);
+                    match self.parse_actor_decl() {
+                        Ok(mut a) => {
+                            a.documentation = doc;
+                            a.trivia.leading = leading;
+                            a.trivia.trailing = self.take_trailing_trivia();
+                            last_span = a.span;
+                            items.push(CommonsItem::Actor(a));
                         }
                         Err(e) => self.handle_item_err(e)?,
                     }
@@ -2033,6 +2091,96 @@ impl<'a> Parser<'a> {
         })
     }
 
+    /// v0.45: an actor declaration — a nominal boundary contract.
+    ///
+    /// Normal form: `actor Name { auth = Scheme }` or
+    /// `actor Name { auth = Scheme, identity = Type }`.
+    ///
+    /// Reserved refinement form (parsed, rejected in the checker):
+    /// `actor Admin = User where <predicate>`.
+    fn parse_actor_decl(&mut self) -> Result<ActorDecl, CompileError> {
+        let kw = self.expect(TokenKind::Actor, "to start an actor declaration")?;
+        let name = self.expect_ident("after `actor`")?;
+
+        // Refinement form: `actor Name = Base where <predicate>` (Q3). Parsed so
+        // the grammar is fixed now; the checker emits
+        // `karn.actor.refinement_unsupported`.
+        if self.peek_kind() == Some(TokenKind::Eq) {
+            self.bump();
+            let base = self.expect_ident("as the base actor after `=`")?;
+            self.expect(TokenKind::Where, "before the actor refinement predicate")?;
+            let predicate = self.parse_expr()?;
+            let span = kw.span.merge(predicate.span);
+            return Ok(ActorDecl {
+                name,
+                auth: None,
+                identity: None,
+                refinement: Some(ActorRefinement {
+                    base,
+                    predicate,
+                    span,
+                }),
+                documentation: None,
+                span,
+                trivia: Trivia::default(),
+            });
+        }
+
+        // Normal form: `actor Name { auth = Scheme (, identity = Type)? }`.
+        self.expect(TokenKind::LBrace, "to open the actor body")?;
+        let auth_kw = self.expect_ident("expected `auth` to start the actor body")?;
+        if auth_kw.name != "auth" {
+            return Err(CompileError::new(
+                "karn.parse.expected_token",
+                auth_kw.span,
+                format!(
+                    "expected `auth` in the actor body, found `{}`",
+                    auth_kw.name
+                ),
+            )
+            .with_note("an actor body begins with `auth = <Scheme>`"));
+        }
+        self.expect(TokenKind::Eq, "after `auth`")?;
+        // The scheme name is an identifier, except `None` (which is also the
+        // `Option` keyword) — accept that token here as the scheme name.
+        let auth = if self.peek_kind() == Some(TokenKind::None) {
+            let t = self.expect(TokenKind::None, "as the authentication scheme")?;
+            Ident {
+                name: "None".to_string(),
+                span: t.span,
+            }
+        } else {
+            self.expect_ident("as the authentication scheme after `auth =`")?
+        };
+
+        let mut identity = None;
+        if self.eat(TokenKind::Comma).is_some() {
+            let id_kw = self.expect_ident("expected `identity` after `,`")?;
+            if id_kw.name != "identity" {
+                return Err(CompileError::new(
+                    "karn.parse.expected_token",
+                    id_kw.span,
+                    format!("expected `identity`, found `{}`", id_kw.name),
+                )
+                .with_note("the only actor field after `auth` is `identity = <Type>`"));
+            }
+            self.expect(TokenKind::Eq, "after `identity`")?;
+            identity = Some(self.parse_type_ref("as the actor identity type")?);
+        }
+
+        let close = self.expect(TokenKind::RBrace, "to close the actor body")?;
+        let span = kw.span.merge(close.span);
+        Ok(ActorDecl {
+            name,
+            auth: Some(auth),
+            identity,
+            refinement: None,
+            documentation: None,
+            span,
+            trivia: Trivia::default(),
+        })
+    }
+
     fn parse_service_decl(&mut self) -> Result<ServiceDecl, CompileError> {
         let kw = self.expect(TokenKind::Service, "to start a service declaration")?;
         let name = self.expect_ident("after `service`")?;
@@ -2323,6 +2471,24 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
+        // v0.45: the optional `by <binder>: <Actor>` clause sits after the
+        // protocol config and before the parameters. It names the actor
+        // contract the handler consumes; the verified identity binds to
+        // `binder` and is read in the body as `binder.identity`.
+        let by_clause = if self.peek_kind() == Some(TokenKind::By) {
+            let by_kw = self.expect(TokenKind::By, "to start the handler actor clause")?;
+            let binder = self.expect_ident("as the actor binding name after `by`")?;
+            self.expect(TokenKind::Colon, "after the actor binding name")?;
+            let actor = self.expect_ident("as the actor contract name after `:`")?;
+            let span = by_kw.span.merge(actor.span);
+            Some(ByClause {
+                binder,
+                actor,
+                span,
+            })
+        } else {
+            None
+        };
         self.expect(TokenKind::LParen, "before the handler parameter list")?;
         let mut params = Vec::new();
         if self.peek_kind() != Some(TokenKind::RParen) {
@@ -2347,6 +2513,7 @@ impl<'a> Parser<'a> {
         Ok(Handler {
             kind,
             method_name,
+            by_clause,
             params,
             return_type,
             given,

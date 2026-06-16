@@ -395,6 +395,9 @@ pub enum CommonsItem {
     Service(ServiceDecl),
     /// `agent Name { key id: T; state { ... }; on call ... }` (v0.5).
     Agent(AgentDecl),
+    /// `actor Name { auth = Scheme, identity = T }` (v0.45). A nominal boundary
+    /// contract consumed by a handler's `by` clause; not a runnable entity.
+    Actor(ActorDecl),
 }
 
 impl CommonsItem {
@@ -406,6 +409,7 @@ impl CommonsItem {
             CommonsItem::Provider(p) => &p.provider_name,
             CommonsItem::Service(s) => &s.name,
             CommonsItem::Agent(a) => &a.name,
+            CommonsItem::Actor(a) => &a.name,
         }
     }
 }
@@ -515,6 +519,55 @@ pub struct AgentDecl {
     pub trivia: Trivia,
 }
 
+/// An actor declaration (v0.45 §3.7). An actor is a nominal *contract type*
+/// describing an external party at a boundary — not a runnable entity. A
+/// handler consumes an actor on its `by` clause; the boundary verifies the
+/// declared `auth` scheme and mints a sealed identity (`name.identity`).
+#[derive(Debug, Clone)]
+pub struct ActorDecl {
+    pub name: Ident,
+    /// The authentication scheme from `auth = <Scheme>`, stored as the raw
+    /// identifier. The checker classifies it: `None`/`Internal` are admitted;
+    /// `Bearer`/`Signature` are reserved-and-rejected
+    /// (`karn.actor.scheme_unsupported`); anything else is
+    /// `karn.actor.unknown_scheme`. `None` for the refinement form.
+    pub auth: Option<Ident>,
+    /// The optional identity type from `, identity = <T>`. Absent ⇒ the
+    /// scheme default (`()` for `None`; a sealed `CallerId` for the `Internal`
+    /// `on call` channel, `()` for other `Internal` channels).
+    pub identity: Option<TypeRef>,
+    /// The reserved-and-rejected refinement form `actor Admin = Base where p`
+    /// (Q3). Parsed so the grammar is fixed now; the checker emits
+    /// `karn.actor.refinement_unsupported`.
+    pub refinement: Option<ActorRefinement>,
+    pub documentation: Option<String>,
+    pub span: Span,
+    pub trivia: Trivia,
+}
+
+/// The reserved refinement form `actor Admin = User where <predicate>` (Q3).
+/// Parsed in Foundations so the grammar is fixed; admission is a later slice.
+#[derive(Debug, Clone)]
+pub struct ActorRefinement {
+    /// The base actor being refined.
+    pub base: Ident,
+    /// The `where` predicate. Parsed but not yet checked.
+    pub predicate: Expr,
+    pub span: Span,
+}
+
+/// The `by <binder>: <Actor>` clause on a handler (v0.45). Names the actor
+/// contract the handler consumes; the verified identity binds to `binder` and
+/// is accessed in the body as `binder.identity`. Sits after the protocol
+/// config and before the parameters.
+#[derive(Debug, Clone)]
+pub struct ByClause {
+    pub binder: Ident,
+    /// The actor contract referenced — a local actor decl or a prelude actor.
+    pub actor: Ident,
+    pub span: Span,
+}
+
 /// A handler block — `on call(args) -> T given C1, C2 { body }`.
 /// Used by both services and agents.
 #[derive(Debug, Clone)]
@@ -524,6 +577,9 @@ pub struct Handler {
     /// `on call addItem(...)`). For service handlers, this is None (just
     /// `on call(...)`).
     pub method_name: Option<Ident>,
+    /// The `by <binder>: <Actor>` clause (v0.45), if present. Service handlers
+    /// only; an absent clause inherits the protocol's default actor.
+    pub by_clause: Option<ByClause>,
     pub params: Vec<Param>,
     pub return_type: TypeRef,
     pub given: Vec<CapRef>,

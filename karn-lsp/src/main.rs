@@ -1670,6 +1670,7 @@ fn lsp_symbol_kind(kind: karnc::index::SymbolKind) -> SymbolKind {
         karnc::index::SymbolKind::Method => SymbolKind::METHOD,
         karnc::index::SymbolKind::CapabilityOp => SymbolKind::METHOD,
         karnc::index::SymbolKind::Field => SymbolKind::FIELD,
+        karnc::index::SymbolKind::Actor => SymbolKind::INTERFACE,
     }
 }
 

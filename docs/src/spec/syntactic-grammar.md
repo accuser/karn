@@ -456,6 +456,36 @@ clause, and a block body. Valid only in a `from cron` service. Well-formedness: 
 queue("name")` header. Parameters, `->` `Effect[QueueResult]`, an optional
 `given` clause, and a block body. Well-formedness: §5.
 
+### §4.4.8 by_clause (v0.45)
+
+{{#grammar by_clause}}
+
+`by <binder>: <Actor>` — the actor a handler consumes, positioned after the
+protocol config and before the parameters
+(`on schedule("…") by s: Scheduler () -> …`). The verified actor binds to
+`<binder>`; its identity is `<binder>.identity`. Omitting `by` inherits the
+protocol's default actor; on a `from http` handler `by` is required.
+Well-formedness: §5.
+
+An `actor` is a nominal *boundary contract* — a closed, compiler-known
+authentication scheme plus an optional sealed identity — consumed by a handler's
+`by` clause (§4.4.8). Actors are context-only.
+
+### §4.4.9 actor_decl (v0.45)
+
+{{#grammar actor_decl}}
+
+`actor <Name> { auth = <Scheme> }`, optionally `, identity = <Type>`. The
+reserved refinement form `actor <Name> = <Base> where <predicate>` parses but is
+rejected in this increment. Well-formedness: §5.
+
+### §4.4.10 scheme
+
+{{#grammar scheme}}
+
+The closed authentication-scheme set. This increment admits `None` and
+`Internal`; `Bearer` and `Signature` are reserved. Well-formedness: §5.
+
 ## §4.5 Agents
 
 An `agent` is a keyed, stateful entity whose state evolves through handlers that

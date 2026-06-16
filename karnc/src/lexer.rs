@@ -147,6 +147,12 @@ pub enum TokenKind {
     Service,
     #[token("state")]
     State,
+    // v0.45 keywords: `actor` heads a boundary-contract declaration; `by`
+    // heads a handler's actor clause.
+    #[token("actor")]
+    Actor,
+    #[token("by")]
+    By,
     /// `...` — used in record-spread expressions (v0.5).
     #[token("...")]
     DotDotDot,
@@ -321,6 +327,8 @@ impl TokenKind {
             Provides => "`provides`",
             Service => "`service`",
             State => "`state`",
+            Actor => "`actor`",
+            By => "`by`",
             DotDotDot => "`...`",
             LArrow => "`<-`",
             DocBlock => "documentation block",

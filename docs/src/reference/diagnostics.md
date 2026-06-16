@@ -6,7 +6,7 @@
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../troubleshooting/index.md).
 
-There are **256** codes in total.
+There are **266** codes in total.
 
 ## Agents
 
@@ -158,6 +158,15 @@ There are **256** codes in total.
 
 | Code | Summary | Construct |
 |---|---|---|
+| `karn.actor.binder_shadows_param` | A `by` actor binder collides with a handler parameter of the same name. |  |
+| `karn.actor.identity_not_sealed` | An actor identity type is not a context-ownable (sealed) value type. |  |
+| `karn.actor.missing_by_on_http` | An HTTP handler lacks the required `by` actor clause. |  |
+| `karn.actor.outside_context` | An `actor` was declared outside a context (e.g. in a commons). |  |
+| `karn.actor.refinement_unsupported` | The actor refinement form (`actor A = B where …`) is not yet supported. |  |
+| `karn.actor.scheme_not_admissible` | An actor's scheme is not admissible on this handler's protocol. |  |
+| `karn.actor.scheme_unsupported` | An actor's authentication scheme is reserved but not yet supported. |  |
+| `karn.actor.unknown_actor` | A handler's `by` clause names an actor that is not declared. |  |
+| `karn.actor.unknown_scheme` | An actor declares an authentication scheme that is not compiler-known. |  |
 | `karn.adapter.consumes_context` | An `adapter` consumed a context; adapter dependencies are adapter-to-adapter. | [`consumes_decl`](grammar.md#rule-consumes_decl) |
 | `karn.adapter.consumes_requires_selection` | An `adapter` used a whole-unit or aliased `consumes`; adapters must select capabilities with `consumes U { Cap, … }`. | [`consumes_decl`](grammar.md#rule-consumes_decl) |
 | `karn.adapter.disallowed_item` | An `adapter` declared a `service`, `agent`, or other item it may not contain. | [`adapter_decl`](grammar.md#rule-adapter_decl) |
@@ -274,6 +283,7 @@ There are **256** codes in total.
 |---|---|---|
 | `karn.resolve.ambiguous_variant` | A variant name is ambiguous across several sum types. |  |
 | `karn.resolve.arity_mismatch` | A function was called with the wrong number of arguments. | [`call`](grammar.md#rule-call) |
+| `karn.resolve.duplicate_actor` | Two actors share a name. |  |
 | `karn.resolve.duplicate_agent` | Two agents share a name. | [`agent_decl`](grammar.md#rule-agent_decl) |
 | `karn.resolve.duplicate_capability` | Two capabilities share a name. | [`capability_decl`](grammar.md#rule-capability_decl) |
 | `karn.resolve.duplicate_field` | A record declares a field twice. | [`record_type`](grammar.md#rule-record_type) |

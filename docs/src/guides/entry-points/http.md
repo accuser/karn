@@ -12,7 +12,7 @@ its parameters, and returns `Effect[HttpResult[T]]`.
 context notes
 
 service api from http {
-  on GET("/ping") () -> Effect[HttpResult[String]] {
+  on GET("/ping") by v: Visitor () -> Effect[HttpResult[String]] {
     Ok("pong")
   }
 }
@@ -25,7 +25,7 @@ service api from http {
 A `:name` segment in the route becomes a parameter of the same name:
 
 ```karn
-  on GET("/notes/:id") (id: String) -> Effect[HttpResult[String]] {
+  on GET("/notes/:id") by v: Visitor (id: String) -> Effect[HttpResult[String]] {
     NotFound
   }
 ```
@@ -39,7 +39,7 @@ handler runs — an invalid body is rejected with `400` at the boundary:
 type NewNote = { title: String }
 
 service api from http {
-  on POST("/notes") (body: NewNote) -> Effect[HttpResult[NewNote]] {
+  on POST("/notes") by v: Visitor (body: NewNote) -> Effect[HttpResult[NewNote]] {
     Created(body)
   }
 }

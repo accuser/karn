@@ -35,6 +35,9 @@ pub enum SymbolKind {
     Field,
     /// v0.36 (ADR 0069, slice 2): a capability operation, keyed by `"Cap.op"`.
     CapabilityOp,
+    /// v0.45: an actor declaration — a boundary contract consumed by a
+    /// handler's `by` clause.
+    Actor,
 }
 
 impl SymbolKind {
@@ -49,6 +52,7 @@ impl SymbolKind {
             SymbolKind::Method => "method",
             SymbolKind::Field => "field",
             SymbolKind::CapabilityOp => "operation",
+            SymbolKind::Actor => "actor",
         }
     }
 }

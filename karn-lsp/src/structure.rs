@@ -100,6 +100,9 @@ fn walk_item(item: &CommonsItem, out: &mut Vec<(Span, bool)>) {
                 walk_block(&h.body, out);
             }
         }
+        CommonsItem::Actor(a) => {
+            out.push((a.span, true));
+        }
     }
 }
 

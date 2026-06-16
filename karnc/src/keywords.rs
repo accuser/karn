@@ -34,6 +34,10 @@ pub const KEYWORDS: &[KeywordInfo] = &[
         "The error type returned by a refined type's `.of`.",
     ),
     k(
+        "actor",
+        "Declare an actor — a boundary contract a handler consumes via `by`.",
+    ),
+    k(
         "adapter",
         "Declare an adapter — the host boundary (capability contract + binding).",
     ),
@@ -44,6 +48,10 @@ pub const KEYWORDS: &[KeywordInfo] = &[
     k(
         "binding",
         "Name an adapter's TypeScript binding module (`binding \"<module>\"`).",
+    ),
+    k(
+        "by",
+        "Name the actor a handler consumes (`on … by <name>: <Actor>`).",
     ),
     k(
         "capability",

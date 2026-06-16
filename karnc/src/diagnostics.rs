@@ -32,6 +32,42 @@ pub struct DiagnosticInfo {
 
 /// Every diagnostic code the compiler emits, sorted by code.
 pub const REGISTRY: &[DiagnosticInfo] = &[
+    d(
+        "karn.actor.binder_shadows_param",
+        "A `by` actor binder collides with a handler parameter of the same name.",
+    ),
+    d(
+        "karn.actor.identity_not_sealed",
+        "An actor identity type is not a context-ownable (sealed) value type.",
+    ),
+    d(
+        "karn.actor.missing_by_on_http",
+        "An HTTP handler lacks the required `by` actor clause.",
+    ),
+    d(
+        "karn.actor.outside_context",
+        "An `actor` was declared outside a context (e.g. in a commons).",
+    ),
+    d(
+        "karn.actor.refinement_unsupported",
+        "The actor refinement form (`actor A = B where …`) is not yet supported.",
+    ),
+    d(
+        "karn.actor.scheme_not_admissible",
+        "An actor's scheme is not admissible on this handler's protocol.",
+    ),
+    d(
+        "karn.actor.scheme_unsupported",
+        "An actor's authentication scheme is reserved but not yet supported.",
+    ),
+    d(
+        "karn.actor.unknown_actor",
+        "A handler's `by` clause names an actor that is not declared.",
+    ),
+    d(
+        "karn.actor.unknown_scheme",
+        "An actor declares an authentication scheme that is not compiler-known.",
+    ),
     dg(
         "karn.adapter.consumes_context",
         "An `adapter` consumed a context; adapter dependencies are adapter-to-adapter.",
@@ -764,6 +800,7 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "A function was called with the wrong number of arguments.",
         &["call"],
     ),
+    d("karn.resolve.duplicate_actor", "Two actors share a name."),
     dg(
         "karn.resolve.duplicate_agent",
         "Two agents share a name.",

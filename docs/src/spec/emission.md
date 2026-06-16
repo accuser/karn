@@ -136,6 +136,21 @@ validation), `compose.ts` (the wiring), and a `wrangler.toml`. A handler's
 status and body of the `Response`; records crossing the boundary are serialised
 and deserialised through the generated `serialise_*` / `deserialise_*` helpers.
 
+### §7.3.4a Actors & the verification seam (v0.45)
+
+An `actor` declaration emits **no** TypeScript — like a brand, it is a
+compile-time contract. The handler `by` clause ([§5.7a](static-semantics.md#57a-actors--the-by-clause-v045))
+lowers through a per-scheme **verification seam** that mirrors the protocol
+descriptor: a scheme contributes its verification codegen, identity shape, and
+failure mapping behind one interface. The two zero-crypto schemes add **no
+topology**: `None` always admits, and `Internal` reuses the channel-trust
+assertion already implicit in the service-binding and platform-dispatch entry
+points — so a handler with a `by` clause emits byte-identically to one without.
+The bound identity (`<binder>.identity`) is minted at the seam; for the
+zero-crypto schemes it is the sealed unit value. Authenticated schemes
+(`Bearer`/`Signature`) extend the seam with real verification and identity
+payloads in later slices.
+
 ### §7.3.5 Tests
 
 Each test unit emits a per-target test module; an aggregating runner
