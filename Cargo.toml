@@ -27,7 +27,7 @@ homepage = "https://github.com/accuser/karn"
 karnc = { path = "karnc", version = "0.45.0" }
 karn-fmt = { path = "karn-fmt", version = "0.45.0" }
 karn-grammar = { path = "karn-grammar", version = "0.45.0" }
-ariadne = "0.5"
+ariadne = "0.6"
 clap = { version = "4", features = ["derive"] }
 logos = "0.16"
 regex = "1"
