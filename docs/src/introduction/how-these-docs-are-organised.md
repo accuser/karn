@@ -81,6 +81,26 @@ follow the **tutorial spine** when you are new, open a **guide** for a concern
 you are working in, consult the **reference**/**spec** to confirm exact
 behaviour, and read a guide's **explanation** for the reasoning behind a design.
 
+## A note on code samples
+
+Many reference and guide snippets show a declaration on its own — a bare `type`,
+`fn`, or `service` — to keep the focus on the construct being explained. In a
+real source file, every declaration lives under a module header: a `commons`
+(pure, shareable code) or a `context` (a bounded context). The body braces are
+**optional at file scope**, so a single-file program is most often written as a
+header followed by its declarations:
+
+```karn
+commons greetings
+
+type Subject = String where NonEmpty
+fn greeting(s: Subject) -> String { "Hello, \(s)!" }
+```
+
+[Tutorial 1](../tutorials/01-first-program.md) builds one from scratch; where a
+snippet wraps its declarations in `commons name { … }`, that is the same module,
+written with explicit braces.
+
 ## A note on status
 
 Karn is pre-1.0 and changes in small increments. The book documents **what
@@ -88,3 +108,8 @@ compiles today**; anything still on the roadmap is marked as planned rather than
 described as if it exists. See
 [Versioning & roadmap](../about/versioning-and-roadmap.md) for how the book
 tracks the language.
+
+An inline tag such as **(v0.20)** next to a feature means "introduced in that
+version" — a pointer for readers tracking how the language grew, never a
+requirement you need to act on. Everything documented here works in the current
+version; the [changelog](../reference/changelog.md) has the per-version detail.

@@ -33,7 +33,7 @@ type Code = String where Matches("[a-z]+")
 …pin the value where you mock it in a test case:
 
 ```karn
-let c = Mock[Code](../how-to/troubleshooting/"abc")
+let c = Mock[Code]("abc")
 ```
 
 ## Other Mock errors

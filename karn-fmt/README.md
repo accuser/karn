@@ -17,7 +17,7 @@ formatting is fundamentally an AST walk over the compiler's own types.)
 
 Most users format Karn through the CLI (`karnc fmt`) or format-on-save in the
 editor, rather than depending on this crate directly. See
-[Format your code with `karn-fmt`](https://github.com/accuser/karn/blob/main/docs/src/how-to/tooling/format.md).
+[Format your code with `karn-fmt`](https://github.com/accuser/karn/blob/main/docs/src/guides/editor-and-tooling/format.md).
 
 ## Use
 

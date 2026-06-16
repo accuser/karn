@@ -58,7 +58,6 @@ planned. See [Versioning & roadmap](../about/versioning-and-roadmap.md).
 
 ## Why "Karn"?
 
-<!-- Origin note — Matthew, tune this to taste. -->
 *Karn* is Cornish for a rocky outcrop, or cairn: the name is meant to evoke
 something solid and structural that will not shift under you. It nods in
 particular to **Roughtor** on Bodmin Moor, one of Cornwall's great granite karns.

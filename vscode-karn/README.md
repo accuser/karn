@@ -102,7 +102,7 @@ and packages it with [`@vscode/vsce`](https://github.com/microsoft/vscode-vsce)
 or `npm run watch` while developing.
 
 See also
-[Set up editor support](https://github.com/accuser/karn/blob/main/docs/src/how-to/tooling/editor-support.md)
+[Set up editor support](https://github.com/accuser/karn/blob/main/docs/src/guides/editor-and-tooling/editor-support.md)
 for using `karnc-lsp` with other editors.
 
 ## License

@@ -111,5 +111,5 @@ Wrangler prints the deployed URL — your greeting is live at
 
 - [Tutorials](../../docs/src/tutorials/01-first-program.md) — the URL
   shortener series grows these same ideas into a stateful service.
-- [How a Karn program is shaped](../../docs/src/explanation/how-a-karn-program-is-shaped.md)
+- [How a Karn program is shaped](../../docs/src/guides/program-structure/how-a-program-is-shaped.md)
   — why contexts, capabilities, and boundaries look the way they do.

@@ -23,7 +23,7 @@ requires going through validation you do not care about for this test.
 satisfies the refinement; for a sum it picks a variant; for a record it fills
 every field. This is deliberately *different* from real construction: a mock is an
 admission that "the specific value is irrelevant here". When the value *is*
-relevant, you pin it — `Mock[T](../../explanation/50)` — and the pin is checked against the type's
+relevant, you pin it — `Mock[T](50)` — and the pin is checked against the type's
 refinement just as a literal would be.
 
 Some values cannot be fabricated blindly — there is no sensible way to invent a
