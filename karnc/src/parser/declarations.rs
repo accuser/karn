@@ -2138,7 +2138,17 @@ impl<'a> Parser<'a> {
             .with_note("an actor body begins with `auth = <Scheme>`"));
         }
         self.expect(TokenKind::Eq, "after `auth`")?;
-        let auth = self.expect_ident("as the authentication scheme after `auth =`")?;
+        // The scheme name is an identifier, except `None` (which is also the
+        // `Option` keyword) — accept that token here as the scheme name.
+        let auth = if self.peek_kind() == Some(TokenKind::None) {
+            let t = self.expect(TokenKind::None, "as the authentication scheme")?;
+            Ident {
+                name: "None".to_string(),
+                span: t.span,
+            }
+        } else {
+            self.expect_ident("as the authentication scheme after `auth =`")?
+        };
 
         let mut identity = None;
         if self.eat(TokenKind::Comma).is_some() {

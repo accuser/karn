@@ -1187,6 +1187,7 @@ fn check_op_body_with_privileged_view(
         &[],
         None,
         false,
+        None,
     );
     let _ = in_test_body; // Mock op bodies are not test bodies; assert is not valid here.
 }
@@ -1751,6 +1752,7 @@ fn emit_mock_op_body(
             &[],
             None,
             false,
+            None,
         );
     }
     let cross = crate::resolver::CrossContextInfo::default();

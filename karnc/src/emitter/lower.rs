@@ -1787,6 +1787,16 @@ fn lower_field_access(
             return format!("(this.state.id.toString() as {})", k);
         }
     }
+    // v0.45: `<binder>.identity` on a verified actor binding. The binder is not
+    // a runtime value; the identity is minted at the verification seam. For the
+    // zero-crypto schemes the sealed identity carries no payload, so it lowers
+    // to the unit value (`undefined`). Authenticated identities (Bearer/
+    // Signature) and the calling-context value arrive with their later slices.
+    if field.name == "identity"
+        && matches!(cx.commons.expr_types.get(&receiver.span), Some(Ty::Actor(_)))
+    {
+        return "undefined".to_string();
+    }
     let r = lower_expr(receiver, stmts, cx);
     // `.raw` on an opaque value compiles to a TypeScript type
     // assertion back to the base type. The checker has already

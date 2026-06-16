@@ -663,6 +663,7 @@ fn check_provider_decls(
                 &provider.given,
                 None,
                 false,
+                None,
             );
         }
     }
@@ -1042,6 +1043,8 @@ fn check_service_decls(
                     ),
                 ));
             }
+            // v0.45: the `by`-bound actor identity, in scope for the body.
+            let actor_binding = handler_actor_binding(handler, &service.protocol, table, resolved);
             checker::check_handler_body(
                 &handler.body,
                 &handler.return_type,
@@ -1060,8 +1063,48 @@ fn check_service_decls(
                 &handler.given,
                 Some(handler.return_type.span()),
                 true,
+                actor_binding,
             );
         }
+    }
+}
+
+/// v0.45: the actor binding a service handler exposes to its body, if it has a
+/// `by <binder>: <Actor>` clause. Returns `(binder, identity_ty)`. Default-actor
+/// handlers (no `by`) carry no named binding. The identity type is the actor's
+/// declared `identity = T` (a context-ownable type), or the scheme default:
+/// `()` for trivial actors, the calling-context id (`String`) for the prelude
+/// `Caller` (Q7).
+fn handler_actor_binding(
+    handler: &Handler,
+    _protocol: &ServiceProtocol,
+    table: &UnitTable,
+    resolved: &ResolvedCommons,
+) -> Option<(String, checker::Ty)> {
+    let by = handler.by_clause.as_ref()?;
+    let identity = actor_identity_ty(&by.actor.name, table, resolved);
+    Some((by.binder.name.clone(), identity))
+}
+
+/// The identity `Ty` a named actor yields (a local declaration or a prelude
+/// actor).
+fn actor_identity_ty(
+    actor_name: &str,
+    table: &UnitTable,
+    resolved: &ResolvedCommons,
+) -> checker::Ty {
+    use crate::actors::{Identity, prelude_actor};
+    if let Some(local) = table.actors.get(actor_name) {
+        return match &local.identity {
+            Some(id) => {
+                checker::resolve_type_ref(id, &resolved.types).unwrap_or(checker::Ty::Unit)
+            }
+            None => checker::Ty::Unit,
+        };
+    }
+    match prelude_actor(actor_name).map(|c| c.identity) {
+        Some(Identity::CallerId) => checker::Ty::Base(crate::ast::BaseType::String),
+        _ => checker::Ty::Unit,
     }
 }
 
@@ -1268,6 +1311,7 @@ fn check_agent_decls(
                 &handler.given,
                 Some(handler.return_type.span()),
                 true,
+                None,
             );
         }
     }
