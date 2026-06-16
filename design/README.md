@@ -9,6 +9,10 @@ the canonical, reader-facing spec and reference.
 - [`proposals/`](proposals/README.md) — **active increment proposals**: the
   transient sign-off artefact for an increment, deleted by the PR that
   implements it.
+- [`tracks/`](tracks/README.md) — **feature-track design docs** (ADR 0076): the
+  *persistent* design + slice decomposition for a far-reaching, multi-increment
+  language feature. Unlike a proposal, a track doc is not deleted on merge; it is
+  the living map the per-slice proposals are cut from.
 - [`decisions/`](decisions/README.md) — the **decision records**: one ADR per
   language-defining call, harvested from the retired increment instalments and
   added per increment going forward.
