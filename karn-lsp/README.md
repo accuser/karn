@@ -53,7 +53,7 @@ This produces the **`karnc-lsp`** binary. Requires a stable Rust toolchain,
 which bundles and launches it automatically. For other editors, point your LSP
 client at the `karnc-lsp` binary and associate it with the `karn` language /
 `.karn` files. See
-[Set up editor support](https://github.com/accuser/karn/blob/main/docs/src/how-to/tooling/editor-support.md).
+[Set up editor support](https://github.com/accuser/karn/blob/main/docs/src/guides/editor-and-tooling/editor-support.md).
 
 The server discovers a project by walking up to the nearest `karn.toml` (falling
 back to single-file mode if there is none). It logs to `~/.karn-lsp.log` at

@@ -36,7 +36,7 @@ refinement; pass an argument to pin a specific value:
 test quantities {
   test "mocks" {
     let a = Mock[Quantity]       -- a valid Quantity
-    let b = Mock[Quantity](../../how-to/testing/50)   -- pinned to 50
+    let b = Mock[Quantity](50)   -- pinned to 50
     assert a == a
     assert b == b
   }

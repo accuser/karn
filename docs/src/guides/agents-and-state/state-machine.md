@@ -47,8 +47,8 @@ agent Order {
 }
 ```
 
-A fresh `Order` key starts at `Pending` — not `None`. (Before v0.11 you had to
-wrap a sum state in `Option[…]`; now the sum *is* the state.)
+A fresh `Order` key starts at `Pending` — not `None`. The sum *is* the state, so
+there is no separate "uninitialised" case to handle.
 
 ```mermaid
 stateDiagram-v2

@@ -9,15 +9,17 @@ Welcome to the official guide and reference for **Karn** — a statically typed,
 architecture-first language that compiles to typed TypeScript for Cloudflare
 Workers.
 
-This book is organised the way the [Diátaxis](https://diataxis.fr/) framework
-recommends: into four distinct kinds of documentation, each serving a different
-need. If you are not sure where to start:
+This book follows the [Diátaxis](https://diataxis.fr/) framework, grouped
+concern-first: each guide section keeps its explanation, its recipes, and its
+reference together rather than splitting them across the book. If you are not
+sure where to start:
 
 - **New to Karn?** Begin with [What is Karn?](introduction/what-is-karn.md),
   then work through the [Tutorials](tutorials/01-first-program.md) in order.
-- **Have a specific task?** Jump to the [How-to guides](guides/index.md).
+- **Have a specific task?** Jump to the [Guides](guides/index.md).
 - **Need exact behaviour?** Consult the [Reference](reference/index.md).
-- **Want to understand the *why*?** Read the [Explanation](guides/index.md).
+- **Want to understand the *why*?** Each guide section opens with an
+  *Understand* page — e.g. [the type-system philosophy](guides/type-system/philosophy.md).
 
 Or choose a path by background:
 

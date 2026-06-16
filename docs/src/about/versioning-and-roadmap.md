@@ -27,28 +27,24 @@ behaviour.
 
 ## What's next
 
-The forward sequence (re-planned after v0.18): the **Cloudflare adapter comes
-*before* the standard library**, because a minimal `Kv` (get/put/delete) is
-collection-free — it needs only `String`/`Option`/`Effect`, which exist. Each
-increment stays single-purpose: language/stdlib work and adapter work never
-share an increment (decision record 0023 in `design/decisions/`).
+Forward work is planned as a queue of small, single-purpose increments rather
+than a fixed version-by-version schedule — a schedule pinned to version numbers
+on this page is exactly what goes stale the moment an increment ships. The live
+queues are kept under `design/`: the active proposal in `design/proposals/`, and
+the planning backlogs (`karn-tooling-proposal-queue.md`,
+`karn-refactor-proposal-queue.md`). By theme, the current edges are:
 
-- **v0.19 — Cloudflare `Kv` + lock enforcement (shipped).** The
-  `karn.cloudflare` platform adapter (`Kv` get/put/delete);
-  `[[kv_namespaces]]` emission and `env.KV` typing derived from first-party
-  metadata; platform-lock enforcement live (`karn.target.*`, the effective
-  platform computed along the in-process `given` closure).
-- **v0.20 — the functional core.** Two slices: **v0.20a (shipped)** —
-  first-class functions (lambdas, function types, value application) and
-  Open-narrow generic functions; **v0.20b (next)** — built-in `List`/`Map`
-  and the Karn-written combinator stdlib. Retires `Fetch`'s missing-headers
-  compromise on completion.
-- **v0.21 — wider standard library.** JSON/structured values, string/number
-  helpers — language/stdlib only; does not touch the adapters.
-- **v0.22 — extend `cloudflare`.** With collections and stdlib in place:
-  `Kv.list`, structured (JSON) values, and `Queue` (send/sendBatch).
-- **Later:** an `aws` platform adapter; more platforms (Deno); shared/singleton
-  provider instances; the decorate/wrap override; a public binding ABI.
+- **Language surface.** Continuing to round out the service, effect, and
+  standard-library surface — one single-purpose increment at a time.
+  Language/stdlib work and platform-adapter work never share an increment
+  (decision record 0023 in `design/decisions/`).
+- **Editor tooling.** Deepening the `karnc-lsp` experience — completion,
+  navigation, and diagnostics — and the VS Code extension that surfaces it.
+- **Distribution.** Publishing the compiler, grammar, and extension through
+  their registries as the project approaches a public 1.0.
+
+The larger capabilities that are designed but intentionally held back are listed
+next.
 
 ## What is deferred to v1
 

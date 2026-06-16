@@ -94,14 +94,15 @@ This is a Cargo workspace. The published crates are `karnc`, `karn-fmt`,
 
 ## Documentation
 
-The **[Karn Book](docs/)** is the canonical guide and reference. It is organised
-along [Diátaxis](https://diataxis.fr/) lines:
+The **[Karn Book](docs/)** is the canonical guide and reference. It follows
+[Diátaxis](https://diataxis.fr/), grouped concern-first so each topic keeps its
+explanation, recipes, and reference together:
 
 - **[Tutorials](docs/src/tutorials/01-first-program.md)** — learn Karn by building.
-- **[How-to guides](docs/src/how-to/index.md)** — solve a specific task.
+- **[Guides](docs/src/guides/index.md)** — task-focused recipes, each section
+  opening with the *why* before the *how*.
 - **[Reference](docs/src/reference/index.md)** — exact behaviour, including the
   [normative spec](docs/src/spec/) and [CLI reference](docs/src/reference/cli.md).
-- **[Explanation](docs/src/explanation/index.md)** — the *why* behind the design.
 
 Build the book locally with [mdBook](https://rust-lang.github.io/mdBook/):
 `mdbook serve docs`.
