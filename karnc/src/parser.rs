@@ -578,6 +578,8 @@ fn is_reserved_keyword(kind: TokenKind) -> bool {
             | Provides
             | Service
             | State
+            | Actor
+            | By
             | Assert
             | Expect
             | Mocks

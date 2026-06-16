@@ -64,6 +64,11 @@
         "id": "provider",
         "superType": "function",
         "description": "A Karn capability provider."
+      },
+      {
+        "id": "actor",
+        "superType": "type",
+        "description": "A Karn actor (a boundary contract consumed by a handler's `by` clause)."
       }
     ],
     "semanticTokenModifiers": [
@@ -88,6 +93,7 @@
           "service": ["entity.name.type"],
           "agent": ["entity.name.type.class"],
           "provider": ["entity.name.function"],
+          "actor": ["entity.name.type"],
           "type.refined": ["support.type"],
           "type.opaque": ["support.type"],
           "capability.platformNative": ["support.type"],

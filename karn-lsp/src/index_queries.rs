@@ -356,6 +356,9 @@ pub fn semantic_tokens_legend() -> tower_lsp::lsp_types::SemanticTokensLegend {
             // v0.36 (ADR 0069, slice 2): record fields. Appended. Standard LSP
             // type. (Capability ops reuse `method` — they're operation calls.)
             SemanticTokenType::PROPERTY,
+            // v0.45: actor declarations. Appended at index 9 (never reordered).
+            // Custom type — the VS Code extension declares it in package.json.
+            SemanticTokenType::new("actor"),
         ],
         token_modifiers: vec![
             SemanticTokenModifier::DECLARATION,
@@ -380,6 +383,8 @@ fn token_type_index(kind: SymbolKind) -> u32 {
         // v0.36 slice 2: ops reuse `method` (7); fields append `property` at 8.
         SymbolKind::CapabilityOp => 7,
         SymbolKind::Field => 8,
+        // v0.45: actors append `actor` at 9.
+        SymbolKind::Actor => 9,
     }
 }
 
@@ -737,6 +742,7 @@ mod tests {
                 "variable", // v0.31 (ADR 0064): locals — appended, never reordered
                 "method",   // v0.36 (ADR 0069): instance methods — appended
                 "property", // v0.36 (ADR 0069, slice 2): record fields — appended
+                "actor",    // v0.45: actor declarations — appended
             ]
         );
         let modifiers: Vec<&str> = legend.token_modifiers.iter().map(|m| m.as_str()).collect();

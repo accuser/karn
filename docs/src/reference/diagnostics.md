@@ -6,7 +6,7 @@
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../troubleshooting/index.md).
 
-There are **256** codes in total.
+There are **257** codes in total.
 
 ## Agents
 
@@ -274,6 +274,7 @@ There are **256** codes in total.
 |---|---|---|
 | `karn.resolve.ambiguous_variant` | A variant name is ambiguous across several sum types. |  |
 | `karn.resolve.arity_mismatch` | A function was called with the wrong number of arguments. | [`call`](grammar.md#rule-call) |
+| `karn.resolve.duplicate_actor` | Two actors share a name. |  |
 | `karn.resolve.duplicate_agent` | Two agents share a name. | [`agent_decl`](grammar.md#rule-agent_decl) |
 | `karn.resolve.duplicate_capability` | Two capabilities share a name. | [`capability_decl`](grammar.md#rule-capability_decl) |
 | `karn.resolve.duplicate_field` | A record declares a field twice. | [`record_type`](grammar.md#rule-record_type) |

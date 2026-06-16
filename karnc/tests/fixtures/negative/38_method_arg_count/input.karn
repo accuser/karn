@@ -1,8 +1,8 @@
 commons test {
   type Box = { value: Int }
 
-  fn Box.adjust(self, by: Int) -> Box {
-    Box { value: self.value + by }
+  fn Box.adjust(self, delta: Int) -> Box {
+    Box { value: self.value + delta }
   }
 
   fn bad(b: Box) -> Box {

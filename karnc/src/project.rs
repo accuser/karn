@@ -2004,6 +2004,11 @@ fn check_unit_files(
                 CommonsItem::Agent(a) => {
                     emit_items.push(CommonsItem::Agent(a.clone()));
                 }
+                CommonsItem::Actor(a) => {
+                    // Actors emit no standalone TS, but are carried so the
+                    // emitter can read their schemes for the verification seam.
+                    emit_items.push(CommonsItem::Actor(a.clone()));
+                }
             }
         }
         for type_name in &types_in_this_file {

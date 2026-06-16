@@ -144,7 +144,19 @@ fn item_symbol(source: &str, item: &CommonsItem) -> DocumentSymbol {
         CommonsItem::Provider(p) => provider_symbol(source, p),
         CommonsItem::Service(s) => service_symbol(source, s),
         CommonsItem::Agent(a) => agent_symbol(source, a),
+        CommonsItem::Actor(a) => actor_symbol(source, a),
     }
+}
+
+fn actor_symbol(source: &str, a: &ActorDecl) -> DocumentSymbol {
+    make_symbol(
+        a.name.name.clone(),
+        detail_from_doc(&a.documentation),
+        SymbolKind::INTERFACE,
+        span_to_range(source, a.span),
+        span_to_range(source, a.name.span),
+        Vec::new(),
+    )
 }
 
 fn type_symbol(source: &str, t: &TypeDecl) -> DocumentSymbol {
@@ -458,7 +470,7 @@ mod tests {
                    agent Counter {\n\
                    key id: Int\n\
                    state { value: Int }\n\
-                   on call bump(by: Int) -> Int { 0 }\n\
+                   on call bump(amount: Int) -> Int { 0 }\n\
                    }\n\
                    }";
         let syms = outline_of(src);

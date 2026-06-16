@@ -1225,6 +1225,11 @@ fn collect_external_references(commons: &TypedCommons, ctx: &EmitProjectCtx) -> 
                     collect_refs_in_block(&h.body, &local_to_file, commons, ctx, &mut refs);
                 }
             }
+            CommonsItem::Actor(a) => {
+                if let Some(id) = &a.identity {
+                    collect_refs_in_typeref(id, &local_to_file, ctx, &mut refs);
+                }
+            }
         }
     }
     refs

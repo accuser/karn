@@ -197,7 +197,8 @@ pub fn resolve(commons: Commons) -> Result<ResolvedCommons, Vec<CompileError>> {
             CommonsItem::Capability(_)
             | CommonsItem::Provider(_)
             | CommonsItem::Service(_)
-            | CommonsItem::Agent(_) => {}
+            | CommonsItem::Agent(_)
+            | CommonsItem::Actor(_) => {}
             CommonsItem::Type(t) => {
                 if let Some(prev) = types.get(&t.name.name) {
                     errors.push(
@@ -317,7 +318,8 @@ pub fn resolve(commons: Commons) -> Result<ResolvedCommons, Vec<CompileError>> {
             CommonsItem::Capability(_)
             | CommonsItem::Provider(_)
             | CommonsItem::Service(_)
-            | CommonsItem::Agent(_) => {}
+            | CommonsItem::Agent(_)
+            | CommonsItem::Actor(_) => {}
         }
     }
 
@@ -377,7 +379,8 @@ pub fn resolve_file_record(
             CommonsItem::Capability(_)
             | CommonsItem::Provider(_)
             | CommonsItem::Service(_)
-            | CommonsItem::Agent(_) => {}
+            | CommonsItem::Agent(_)
+            | CommonsItem::Actor(_) => {}
         }
         sinks.refs.clear_owner();
     }

@@ -1489,6 +1489,11 @@ pub(crate) fn check_function_type_boundary_items(
                         reject_fn_types(&h.return_type, "an agent handler signature", errors);
                     }
                 }
+                CommonsItem::Actor(a) => {
+                    if let Some(id) = &a.identity {
+                        reject_fn_types(id, "an actor identity type", errors);
+                    }
+                }
                 CommonsItem::Fn(_) | CommonsItem::Provider(_) => {}
             }
         }
