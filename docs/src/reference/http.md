@@ -80,11 +80,11 @@ status and JSON body per the table above.
 context notes
 
 service api from http {
-  on GET("/ping") by v: Visitor () -> Effect[HttpResult[String]] {
+  on GET("/ping") by Visitor () -> Effect[HttpResult[String]] {
     Ok("pong")
   }
 
-  on GET("/notes/:id") by v: Visitor (id: String) -> Effect[HttpResult[String]] {
+  on GET("/notes/:id") by Visitor (id: String) -> Effect[HttpResult[String]] {
     NotFound
   }
 }

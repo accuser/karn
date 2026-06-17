@@ -104,3 +104,4 @@ or a row links to no file. Summaries and statuses are curated by hand; the
 | [0085](0085-bearer-token-jwt-hs256.md) | BearerToken is compiler-generated JWT/HS256; identity is the `sub` claim through a string-constructible identity type; HTTP-only; fail-closed → 401 | Accepted (v0.47) |
 | [0086](0086-firstparty-sources-as-files-vendored.md) | First-party sources authored as files (embedded via `include_str!`), vendored not published while part of the emit ABI | Accepted (v0.48) |
 | [0087](0087-security-ci-posture.md) | Emitted security boundaries carry a standing behavioral bypass-class test; CodeQL SAST + npm audit committed; native secret-scanning push protection | Accepted (v0.49) |
+| [0088](0088-optional-by-binder.md) | The `by` binder is optional (`by <Actor>` for anonymous / verify-and-discard); amends 0082; `_` not admitted as a binder | Accepted (v0.50) |

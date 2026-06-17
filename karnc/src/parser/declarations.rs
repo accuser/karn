@@ -2497,15 +2497,36 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
-        // v0.45: the optional `by <binder>: <Actor>` clause sits after the
-        // protocol config and before the parameters. It names the actor
-        // contract the handler consumes; the verified identity binds to
-        // `binder` and is read in the body as `binder.identity`.
+        // v0.45/v0.50: the optional `by (<binder>:)? <Actor>` clause sits after
+        // the protocol config and before the parameters. `by <name>: <Actor>`
+        // captures the verified identity (read as `name.identity`);
+        // `by <Actor>` declares-and-verifies the contract without capturing it
+        // (anonymous / verify-and-discard). One-token lookahead on `:`
+        // disambiguates.
         let by_clause = if self.peek_kind() == Some(TokenKind::By) {
             let by_kw = self.expect(TokenKind::By, "to start the handler actor clause")?;
-            let binder = self.expect_ident("as the actor binding name after `by`")?;
-            self.expect(TokenKind::Colon, "after the actor binding name")?;
-            let actor = self.expect_ident("as the actor contract name after `:`")?;
+            // `_` is not a valid binder — guide to the binder-less form.
+            if self.peek_kind() == Some(TokenKind::Underscore) {
+                let t = self.peek().unwrap();
+                return Err(CompileError::new(
+                    "karn.parse.expected_token",
+                    t.span,
+                    "`_` is not a valid actor binder".to_string(),
+                )
+                .with_note("omit the binder for an anonymous handler — `by <Actor>`"));
+            }
+            let first = self.expect_ident("as the actor (or its binder) after `by`")?;
+            // A `:` after the first name means it was the binder; otherwise the
+            // first name *is* the actor (binder-less form).
+            let (binder, actor) = if self.peek_kind() == Some(TokenKind::Colon) {
+                self.bump();
+                (
+                    Some(first),
+                    self.expect_ident("as the actor contract name after `:`")?,
+                )
+            } else {
+                (None, first)
+            };
             let span = by_kw.span.merge(actor.span);
             Some(ByClause {
                 binder,

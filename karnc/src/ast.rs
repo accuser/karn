@@ -561,13 +561,17 @@ pub struct ActorRefinement {
     pub span: Span,
 }
 
-/// The `by <binder>: <Actor>` clause on a handler (v0.45). Names the actor
-/// contract the handler consumes; the verified identity binds to `binder` and
-/// is accessed in the body as `binder.identity`. Sits after the protocol
-/// config and before the parameters.
+/// The `by (<binder>:)? <Actor>` clause on a handler (v0.45; binder optional in
+/// v0.50). Names the actor contract the handler consumes; when a `binder` is
+/// given, the verified identity binds to it and is read as `binder.identity`.
+/// Omitting the binder (`by <Actor>`) declares-and-verifies the contract without
+/// capturing the identity — for anonymous or verify-and-discard handlers. Sits
+/// after the protocol config and before the parameters.
 #[derive(Debug, Clone)]
 pub struct ByClause {
-    pub binder: Ident,
+    /// The identity binder, if the handler consumes the identity. `None` for the
+    /// binder-less `by <Actor>` form.
+    pub binder: Option<Ident>,
     /// The actor contract referenced — a local actor decl or a prelude actor.
     pub actor: Ident,
     pub span: Span,
