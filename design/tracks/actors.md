@@ -1,13 +1,13 @@
 # Feature track — Actors: boundary contracts (`actor` + the `by` handler clause)
 
-- **Phase:** **Building — Foundations (v0.45) + BearerToken (v0.47) + the optional
-  binder (v0.50) + Signature (v0.51) + multi-actor sum dispatch (v0.52) +
-  authorisation invariants (v0.53) + cross-context `Caller` value (v0.54)
-  landed — the planned Q1–Q7 scope is complete.** The
-  foundational ADRs are accepted: Q1 → [0080](../decisions/0080-actor-schemes-closed-nominal.md),
-  Q2 → [0081](../decisions/0081-verified-identity-context-sealed.md),
-  Q5 → [0082](../decisions/0082-by-clause-verify-then-body-defaults.md). The
-  remaining per-question decisions below stay *proposed* until their slices land.
+- **Phase:** **✅ COMPLETE — the planned Q1–Q7 scope shipped.** Foundations (v0.45),
+  BearerToken (v0.47), the optional binder (v0.50), Signature (v0.51), multi-actor
+  sum dispatch (v0.52), authorisation invariants (v0.53), and the cross-context
+  `Caller` value (v0.54) all landed; every foundational and per-slice ADR
+  (0080–0082, 0085, 0088–0092) is accepted. The track is closed. **Q8
+  (replay/ordering) is deferred** — it is cross-track and rides with a future
+  **Events track** (not yet created), not a further actors slice. Reopen this
+  track only if a new actor *scheme* or *boundary feature* is needed.
   See [ADR 0076](../decisions/0076-feature-track-posture.md) for the track posture.
 - **Realises:** design notes §6 *Actor Declarations as Contracts*, §7 *Services
   and Protocol Composition* (the actor side).
