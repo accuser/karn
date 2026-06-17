@@ -27,7 +27,7 @@ export default {
           try {
             __raw = await request.text();
           } catch (e) {
-            return new Response(JSON.stringify({ kind: "MalformedJson", details: String(e) }), { status: 400, headers: { "content-type": "application/json" } });
+            return new Response(JSON.stringify({ kind: "MalformedJson", details: "Invalid request body" }), { status: 400, headers: { "content-type": "application/json" } });
           }
           const __secret = (env as Record<string, unknown>)["WEBHOOK_SECRET"] ?? (globalThis as { process?: { env?: Record<string, unknown> } }).process?.env?.["WEBHOOK_SECRET"];
           if (typeof __secret !== "string") return new Response(null, { status: 401 });
@@ -38,7 +38,7 @@ export default {
           try {
             __body_json = JSON.parse(__raw) as JsonValue;
           } catch (e) {
-            return new Response(JSON.stringify({ kind: "MalformedJson", details: String(e) }), { status: 400, headers: { "content-type": "application/json" } });
+            return new Response(JSON.stringify({ kind: "MalformedJson", details: "Invalid request body" }), { status: 400, headers: { "content-type": "application/json" } });
           }
           const __r_body = handlers.deserialise_Event(__body_json, "$");
           if (__r_body.tag === "Err") return new Response(JSON.stringify(__r_body.error), { status: 400, headers: { "content-type": "application/json" } });
