@@ -194,10 +194,10 @@ pub fn emit_worker_entry(context: &str, table: &UnitTable) -> String {
         out,
         "      return new Response(\"Not Found\", {{ status: 404 }});"
     );
-    let _ = writeln!(out, "    }} catch (e) {{");
+    let _ = writeln!(out, "    }} catch {{");
     let _ = writeln!(
         out,
-        "      return new Response(String(e), {{ status: 500 }});"
+        "      return new Response(\"Internal Server Error\", {{ status: 500 }});"
     );
     let _ = writeln!(out, "    }}");
     let _ = writeln!(out, "  }},");
@@ -408,10 +408,10 @@ fn emit_http_route_dispatch(out: &mut String, route: &HttpRoute) {
             let _ = writeln!(out, "          let __raw: string;");
             let _ = writeln!(out, "          try {{");
             let _ = writeln!(out, "            __raw = await request.text();");
-            let _ = writeln!(out, "          }} catch (e) {{");
+            let _ = writeln!(out, "          }} catch {{");
             let _ = writeln!(
                 out,
-                "            return new Response(JSON.stringify({{ kind: \"MalformedJson\", details: String(e) }}), {{ status: 400, headers: {{ \"content-type\": \"application/json\" }} }});"
+                "            return new Response(JSON.stringify({{ kind: \"MalformedJson\", details: \"Invalid request body\" }}), {{ status: 400, headers: {{ \"content-type\": \"application/json\" }} }});"
             );
             let _ = writeln!(out, "          }}");
             let _ = writeln!(
@@ -452,10 +452,10 @@ fn emit_http_route_dispatch(out: &mut String, route: &HttpRoute) {
                 out,
                 "            __body_json = JSON.parse(__raw) as JsonValue;"
             );
-            let _ = writeln!(out, "          }} catch (e) {{");
+            let _ = writeln!(out, "          }} catch {{");
             let _ = writeln!(
                 out,
-                "            return new Response(JSON.stringify({{ kind: \"MalformedJson\", details: String(e) }}), {{ status: 400, headers: {{ \"content-type\": \"application/json\" }} }});"
+                "            return new Response(JSON.stringify({{ kind: \"MalformedJson\", details: \"Invalid request body\" }}), {{ status: 400, headers: {{ \"content-type\": \"application/json\" }} }});"
             );
             let _ = writeln!(out, "          }}");
         } else {
@@ -464,10 +464,10 @@ fn emit_http_route_dispatch(out: &mut String, route: &HttpRoute) {
                 out,
                 "            __body_json = (await request.json()) as JsonValue;"
             );
-            let _ = writeln!(out, "          }} catch (e) {{");
+            let _ = writeln!(out, "          }} catch {{");
             let _ = writeln!(
                 out,
-                "            return new Response(JSON.stringify({{ kind: \"MalformedJson\", details: String(e) }}), {{ status: 400, headers: {{ \"content-type\": \"application/json\" }} }});"
+                "            return new Response(JSON.stringify({{ kind: \"MalformedJson\", details: \"Invalid request body\" }}), {{ status: 400, headers: {{ \"content-type\": \"application/json\" }} }});"
             );
             let _ = writeln!(out, "          }}");
         }
