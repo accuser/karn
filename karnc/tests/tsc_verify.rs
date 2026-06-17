@@ -270,3 +270,45 @@ fn emitted_typescript_passes_tsc_strict() {
         );
     }
 }
+
+/// v0.48: the embedded runtime (`firstparty/bindings/runtime.ts`) — which now
+/// carries the Bearer JWT verifier — must pass `tsc --strict` standalone, not
+/// only transitively inside a fixture. It is self-contained (no imports), so a
+/// temp dir with just `runtime.ts` + the emitted `tsconfig.json` type-checks it
+/// in isolation. (The `.ts` *bindings* import the emitted adapter surface and
+/// stay covered transitively by fixtures 177/201–211; their standalone scaffold
+/// is a follow-up.)
+#[test]
+fn embedded_runtime_passes_tsc_strict_standalone() {
+    let runner = match discover_tsc() {
+        Some(r) => r,
+        None => {
+            let require = std::env::var(REQUIRE_ENV).is_ok();
+            eprintln!(
+                "\n!!! TYPESCRIPT VERIFICATION SKIPPED (runtime standalone) !!!\n\
+                 neither `tsc` nor `npx` is on PATH.\n"
+            );
+            if require {
+                panic!("{REQUIRE_ENV} is set but no tsc runner was found");
+            }
+            return;
+        }
+    };
+    let tmp = std::env::temp_dir().join(format!("karn-runtime-tsc-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&tmp);
+    fs::create_dir_all(&tmp).unwrap();
+    fs::write(
+        tmp.join("runtime.ts"),
+        karnc::emitter::emit_runtime_module(),
+    )
+    .unwrap();
+    fs::write(tmp.join("tsconfig.json"), karnc::emitter::emit_tsconfig()).unwrap();
+    let (ok, output) = run_tsc_in(&runner, &tmp);
+    if ok {
+        let _ = fs::remove_dir_all(&tmp);
+    }
+    assert!(
+        ok,
+        "embedded runtime.ts failed tsc --strict --noEmit:\n{output}"
+    );
+}

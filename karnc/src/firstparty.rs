@@ -94,90 +94,13 @@ pub const MAP_UNIT: &str = "karn.map";
 /// traversal. Order-preserving combinators build with `fold` + `prepend`
 /// and a final `reverse` — O(n) builds, never `append` (which would be
 /// O(n²) over the array lowering).
-pub const KARN_LIST_SRC: &str = r#"commons karn.list {
-  fn reverse[A](xs: List[A]) -> List[A] {
-    let init: List[A] = List.empty()
-    xs.fold(init, (acc, x) => acc.prepend(x))
-  }
-
-  fn map[A, B](xs: List[A], f: A -> B) -> List[B] {
-    let init: List[B] = List.empty()
-    reverse(xs.fold(init, (acc, x) => acc.prepend(f(x))))
-  }
-
-  fn filter[A](xs: List[A], p: A -> Bool) -> List[A] {
-    let init: List[A] = List.empty()
-    reverse(xs.fold(init, (acc, x) => if p(x) { acc.prepend(x) } else { acc }))
-  }
-
-  fn find[A](xs: List[A], p: A -> Bool) -> Option[A] {
-    let init: Option[A] = None
-    xs.fold(init, (acc, x) => match acc {
-      Some(v) => Some(v)
-      None => if p(x) { Some(x) } else { None }
-    })
-  }
-
-  fn any[A](xs: List[A], p: A -> Bool) -> Bool {
-    match find(xs, p) {
-      Some(v) => true
-      None => false
-    }
-  }
-
-  fn all[A](xs: List[A], p: A -> Bool) -> Bool {
-    let init: Option[A] = None
-    let failed = xs.fold(init, (acc, x) => match acc {
-      Some(v) => Some(v)
-      None => if p(x) { None } else { Some(x) }
-    })
-    match failed {
-      Some(v) => false
-      None => true
-    }
-  }
-
-  fn traverse[A, B](xs: List[A], f: A -> Effect[B]) -> Effect[List[B]] {
-    let init: List[B] = List.empty()
-    let rev <- xs.foldEff(init, (acc, x) => {
-      let y <- f(x)
-      Effect.pure(acc.prepend(y))
-    })
-    Effect.pure(reverse(rev))
-  }
-}
-"#;
+pub const KARN_LIST_SRC: &str = include_str!("firstparty/karn.list.karn");
 
 /// `karn.map` — combinators over the `Map` kernel (`empty`, `insert`, `get`,
 /// `keys`, `length`). `fromList` is deliberately absent: Karn has no pair
 /// type to spell a `List[(K, V)]` with, so map construction is `Map.empty()`
 /// + `insert` (revisit with tuples or generic records).
-pub const KARN_MAP_SRC: &str = r#"commons karn.map {
-  uses karn.list
-
-  fn values[K, V](m: Map[K, V]) -> List[V] {
-    let init: List[V] = List.empty()
-    reverse(m.keys().fold(init, (acc, k) => match m.get(k) {
-      Some(v) => acc.prepend(v)
-      None => acc
-    }))
-  }
-
-  fn contains[K, V](m: Map[K, V], key: K) -> Bool {
-    match m.get(key) {
-      Some(v) => true
-      None => false
-    }
-  }
-
-  fn getOr[K, V](m: Map[K, V], key: K, fallback: V) -> V {
-    match m.get(key) {
-      Some(v) => v
-      None => fallback
-    }
-  }
-}
-"#;
+pub const KARN_MAP_SRC: &str = include_str!("firstparty/karn.map.karn");
 
 /// Inside the reserved `karn.*` prefix; injected when `uses`-imported.
 pub const STRING_UNIT: &str = "karn.string";
@@ -188,149 +111,18 @@ pub const STRING_UNIT: &str = "karn.string";
 /// live here. `join` folds to `Option[String]` so empty-string *elements*
 /// are joined faithfully (a bare `""` accumulator could not tell "nothing
 /// yet" from "first element was empty").
-pub const KARN_STRING_SRC: &str = r#"commons karn.string {
-  fn join(parts: List[String], sep: String) -> String {
-    let init: Option[String] = None
-    parts.fold(init, (acc, p) => match acc {
-      Some(s) => Some(s.concat(sep).concat(p))
-      None => Some(p)
-    }).getOrElse("")
-  }
-}
-"#;
+pub const KARN_STRING_SRC: &str = include_str!("firstparty/karn.string.karn");
 
 /// The reserved `karn` conformance-surface adapter (env-free core). It has no
 /// `binding` clause — the toolchain supplies one per platform (see
 /// [`Platform::karn_binding_source`]).
-pub const KARN_ADAPTER_SRC: &str = r#"adapter karn {
-  exports capability  { Clock, Random, Logger, Fetch, Secrets }
-  exports transparent { Uuid, Method, FetchError, Request, Response }
-
-  type Uuid = String where Matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
-
-  type Method     = enum { Get, Post, Put, Delete }
-  type FetchError = enum { Network, Timeout }
-
-  type Request = {
-    method: Method,
-    url: String,
-    contentType: Option[String],
-    authorization: Option[String],
-    body: Option[String],
-  }
-
-  type Response = {
-    status: Int,
-    body: String,
-  }
-
-  capability Clock {
-    fn now() -> Effect[Int]
-  }
-
-  capability Random {
-    fn uuid() -> Effect[Uuid]
-    fn int(lo: Int, hi: Int) -> Effect[Int]
-  }
-
-  capability Logger {
-    fn info(msg: String) -> Effect[()]
-    fn error(msg: String) -> Effect[()]
-  }
-
-  capability Fetch {
-    fn send(req: Request) -> Effect[Result[Response, FetchError]]
-  }
-
-  capability Secrets {
-    fn get(name: String) -> Effect[Option[String]]
-  }
-
-  provides Clock   = ClockProvider
-  provides Random  = RandomProvider
-  provides Logger  = LoggerProvider
-  provides Fetch   = FetchProvider
-  provides Secrets = SecretsProvider
-}
-"#;
+pub const KARN_ADAPTER_SRC: &str = include_str!("firstparty/karn.karn");
 
 /// The Cloudflare binding for the `karn` surface. Implements the canonical
 /// provider symbols against the platform host API. The refined `Uuid` is built
 /// through its emitted validating `.of` constructor (§4.4), treating the
 /// unreachable `Err` as a bug rather than trusting the value away.
-const KARN_CLOUDFLARE_BINDING: &str = r#"// Generated by karnc — do not edit by hand.
-// karn surface binding for the `cloudflare` platform.
-import type { Clock, Fetch, Logger, Random, Secrets } from "./karn.js";
-import type { Request as FetchRequest, Response as FetchResponse } from "./karn.js";
-import { FetchError, Uuid } from "./karn.js";
-import { Err, None, Ok, Some, type Option, type Result } from "./runtime.js";
-
-export class ClockProvider implements Clock {
-  async now(): Promise<number> {
-    return Date.now();
-  }
-}
-
-export class RandomProvider implements Random {
-  async uuid(): Promise<Uuid> {
-    const r = Uuid.of(crypto.randomUUID());
-    if (r.tag === "Err") {
-      throw new Error("unreachable: crypto.randomUUID() yields a valid UUID");
-    }
-    return r.value;
-  }
-  async int(lo: number, hi: number): Promise<number> {
-    return lo + Math.floor(Math.random() * (hi - lo));
-  }
-}
-
-export class LoggerProvider implements Logger {
-  async info(msg: string): Promise<void> {
-    console.log(msg);
-  }
-  async error(msg: string): Promise<void> {
-    console.error(msg);
-  }
-}
-
-export class FetchProvider implements Fetch {
-  async send(req: FetchRequest): Promise<Result<FetchResponse, FetchError>> {
-    const headers: Record<string, string> = {};
-    if (req.contentType.tag === "Some") {
-      headers["content-type"] = req.contentType.value;
-    }
-    if (req.authorization.tag === "Some") {
-      headers["authorization"] = req.authorization.value;
-    }
-    try {
-      const res = await fetch(req.url, {
-        method: req.method.tag.toUpperCase(),
-        headers,
-        body: req.body.tag === "Some" ? req.body.value : undefined,
-      });
-      return Ok({ status: res.status, body: await res.text() });
-    } catch (e) {
-      const name = e instanceof Error ? e.name : "";
-      return Err(name === "TimeoutError" || name === "AbortError" ? FetchError.Timeout : FetchError.Network);
-    }
-  }
-}
-
-export class SecretsProvider implements Secrets {
-  // Decision [B]: explicit env first (workers compose passes it), then a
-  // `globalThis` probe of `process.env` (bundle under node) — never bare
-  // `process`, which would demand @types/node at the tsc gate.
-  constructor(private env?: unknown) {}
-  async get(name: string): Promise<Option<string>> {
-    const fromEnv = (this.env as Record<string, unknown> | undefined)?.[name];
-    if (typeof fromEnv === "string") {
-      return Some(fromEnv);
-    }
-    const v = (globalThis as any).process?.env?.[name];
-    return typeof v === "string" ? Some(v) : None;
-  }
-}
-"#;
+const KARN_CLOUDFLARE_BINDING: &str = include_str!("firstparty/bindings/karn-cloudflare.ts");
 
 /// The Node (≥ [`NODE_MAJOR_FLOOR`](crate::NODE_MAJOR_FLOOR)) binding for the
 /// `karn` surface (v0.18). Deliberately
@@ -339,78 +131,7 @@ export class SecretsProvider implements Secrets {
 /// which is exactly the ambient-surface portability claim (spec §4.2). The
 /// `SecretsProvider` reads `process.env` through the same `globalThis` probe
 /// (never bare `process`, which would demand @types/node at the tsc gate).
-const KARN_NODE_BINDING: &str = r#"// Generated by karnc — do not edit by hand.
-// karn surface binding for the `node` platform.
-import type { Clock, Fetch, Logger, Random, Secrets } from "./karn.js";
-import type { Request as FetchRequest, Response as FetchResponse } from "./karn.js";
-import { FetchError, Uuid } from "./karn.js";
-import { Err, None, Ok, Some, type Option, type Result } from "./runtime.js";
-
-export class ClockProvider implements Clock {
-  async now(): Promise<number> {
-    return Date.now();
-  }
-}
-
-export class RandomProvider implements Random {
-  async uuid(): Promise<Uuid> {
-    const r = Uuid.of(crypto.randomUUID());
-    if (r.tag === "Err") {
-      throw new Error("unreachable: crypto.randomUUID() yields a valid UUID");
-    }
-    return r.value;
-  }
-  async int(lo: number, hi: number): Promise<number> {
-    return lo + Math.floor(Math.random() * (hi - lo));
-  }
-}
-
-export class LoggerProvider implements Logger {
-  async info(msg: string): Promise<void> {
-    console.log(msg);
-  }
-  async error(msg: string): Promise<void> {
-    console.error(msg);
-  }
-}
-
-export class FetchProvider implements Fetch {
-  async send(req: FetchRequest): Promise<Result<FetchResponse, FetchError>> {
-    const headers: Record<string, string> = {};
-    if (req.contentType.tag === "Some") {
-      headers["content-type"] = req.contentType.value;
-    }
-    if (req.authorization.tag === "Some") {
-      headers["authorization"] = req.authorization.value;
-    }
-    try {
-      const res = await fetch(req.url, {
-        method: req.method.tag.toUpperCase(),
-        headers,
-        body: req.body.tag === "Some" ? req.body.value : undefined,
-      });
-      return Ok({ status: res.status, body: await res.text() });
-    } catch (e) {
-      const name = e instanceof Error ? e.name : "";
-      return Err(name === "TimeoutError" || name === "AbortError" ? FetchError.Timeout : FetchError.Network);
-    }
-  }
-}
-
-export class SecretsProvider implements Secrets {
-  // Decision [B]: explicit env first, then the `globalThis` probe of
-  // `process.env` — on node the probe is the normal path.
-  constructor(private env?: unknown) {}
-  async get(name: string): Promise<Option<string>> {
-    const fromEnv = (this.env as Record<string, unknown> | undefined)?.[name];
-    if (typeof fromEnv === "string") {
-      return Some(fromEnv);
-    }
-    const v = (globalThis as any).process?.env?.[name];
-    return typeof v === "string" ? Some(v) : None;
-  }
-}
-"#;
+const KARN_NODE_BINDING: &str = include_str!("firstparty/bindings/karn-node.ts");
 
 /// The first-party Cloudflare platform adapter (v0.19): the platform's real
 /// infrastructure capabilities, as they are — no portable intersection
@@ -419,20 +140,7 @@ export class SecretsProvider implements Secrets {
 /// structured values are v0.22-codec composition, and `Queue` remains its
 /// own future increment. Like the `karn` surface it has no `binding`
 /// clause — the toolchain supplies the binding.
-pub const CLOUDFLARE_ADAPTER_SRC: &str = r#"adapter karn.cloudflare {
-  exports capability { Kv }
-
-  capability Kv {
-    fn get(key: String) -> Effect[Option[String]]
-    fn put(key: String, value: String) -> Effect[()]
-    fn putTtl(key: String, value: String, ttlSeconds: Int) -> Effect[()]
-    fn delete(key: String) -> Effect[()]
-    fn list(prefix: Option[String]) -> Effect[List[String]]
-  }
-
-  provides Kv = WorkersKv
-}
-"#;
+pub const CLOUDFLARE_ADAPTER_SRC: &str = include_str!("firstparty/karn.cloudflare.karn");
 
 /// The output path of the Cloudflare platform adapter's binding module,
 /// beside the adapter's emitted `karn/cloudflare.ts` (distinct from the
@@ -443,65 +151,7 @@ pub const CLOUDFLARE_BINDING_FILENAME: &str = "karn/cloudflare.binding.ts";
 /// `env` explicitly (decision 0025): KV namespaces exist only on `env` —
 /// there is no `globalThis` path — so a missing binding is a clear runtime
 /// error rather than a silent fallback.
-const CLOUDFLARE_BINDING: &str = r#"// Generated by karnc — do not edit by hand.
-// karn.cloudflare platform adapter binding.
-import type { Kv } from "./cloudflare.js";
-import { None, Some, type KVNamespace, type Option } from "../runtime.js";
-
-export class WorkersKv implements Kv {
-  constructor(private env?: unknown) {}
-
-  private ns(): KVNamespace {
-    const kv = (this.env as { KV?: KVNamespace } | undefined)?.KV;
-    if (!kv) {
-      throw new Error(
-        "karn.cloudflare.Kv requires a KV namespace binding (env.KV) — deploy with the generated [[kv_namespaces]] wrangler stanza",
-      );
-    }
-    return kv;
-  }
-
-  async get(key: string): Promise<Option<string>> {
-    const v = await this.ns().get(key);
-    return v === null ? None : Some(v);
-  }
-
-  async put(key: string, value: string): Promise<void> {
-    await this.ns().put(key, value);
-  }
-
-  // v0.23 (0051): TTL as a distinct op — Karn has no optional parameters,
-  // and a distinct method beats an options record until options proliferate.
-  async putTtl(key: string, value: string, ttlSeconds: number): Promise<void> {
-    await this.ns().put(key, value, { expirationTtl: ttlSeconds });
-  }
-
-  async delete(key: string): Promise<void> {
-    await this.ns().delete(key);
-  }
-
-  // v0.23 (0050): a binding-side *drain* — the cursor loops here, in host
-  // code, because no Karn routine can both recurse and hold a capability
-  // (the given-on-free-functions gap). Eager and unbounded by design;
-  // cursor-paging is deferred until the language can consume it.
-  async list(prefix: Option<string>): Promise<readonly string[]> {
-    const p = prefix.tag === "Some" ? prefix.value : undefined;
-    const out: string[] = [];
-    let cursor: string | undefined = undefined;
-    for (;;) {
-      const page = await this.ns().list({ prefix: p, cursor });
-      for (const k of page.keys) {
-        out.push(k.name);
-      }
-      if (page.list_complete || page.cursor === undefined) {
-        break;
-      }
-      cursor = page.cursor;
-    }
-    return out;
-  }
-}
-"#;
+const CLOUDFLARE_BINDING: &str = include_str!("firstparty/bindings/cloudflare.binding.ts");
 
 /// The toolchain-supplied binding for the Cloudflare platform adapter.
 pub fn cloudflare_binding_source() -> &'static str {
