@@ -34,6 +34,15 @@ and rendering via `ariadne`), `project.rs` (multi-file assembly), `fmt.rs` (the
 formatter), `diagnostics.rs` (the diagnostic-code registry), `cli.rs` (the clap
 CLI), and `keywords.rs` (the keyword registry).
 
+**First-party sources** (the `karn` surface + platform adapters, the Karn-written
+`karn.list`/`karn.map`/`karn.string` commons, the per-platform TypeScript
+bindings, and the emitted runtime) live as real `.karn`/`.ts` files under
+`karnc/src/firstparty/` and are embedded at compile time via `include_str!`
+(ADR 0086). **Edit the file, not a string literal.** They are checked standalone
+(`tests/firstparty_sources.rs` parses + `karn-fmt`-checks each `.karn`;
+`tsc_verify.rs` type-checks the embedded `runtime.ts`), and vendored into every
+emitted project rather than published.
+
 ## Entry points
 
 The library (`lib.rs`) exposes the flows the CLI and LSP build on:
