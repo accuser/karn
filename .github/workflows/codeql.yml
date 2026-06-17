@@ -1,0 +1,53 @@
+name: CodeQL
+
+# Static analysis (SAST) over the TypeScript (the vscode-karn extension + the
+# embedded runtime — a real file since v0.48, so the Bearer JWT verifier is now
+# in scope) and the Rust compiler. Free on this public repo; satisfies the
+# OpenSSF Scorecard SAST check. SHA-pinned, the repo's posture (ADR 0087).
+#
+# CodeQL's load-bearing coverage here is the TypeScript surface; the Rust leg is
+# maturing — defense-in-depth over what `clippy` + the type system already give.
+# The *behavioral* guard for the emitted auth verifier is the bearer-auth test
+# (`karnc/tests/bearer_auth.rs`), not SAST — see ADR 0087.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly drift check, offset from the other security workflows.
+    - cron: "40 7 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      # Upload results to the code-scanning dashboard.
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, rust]
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4
+        with:
+          languages: ${{ matrix.language }}
+
+      # JS/TS needs no build; Rust autobuild runs `cargo build`.
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4
+        with:
+          category: "/language:${{ matrix.language }}"
