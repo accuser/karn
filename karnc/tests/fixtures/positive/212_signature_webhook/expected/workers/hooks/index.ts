@@ -48,8 +48,8 @@ export default {
         }
       }
       return new Response("Not Found", { status: 404 });
-    } catch (e) {
-      return new Response(String(e), { status: 500 });
+    } catch (_e) {
+      return new Response("Internal Server Error", { status: 500 });
     }
   },
 };
