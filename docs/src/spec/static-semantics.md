@@ -391,16 +391,20 @@ declared `identity = T` MUST be a context-ownable value type, so the verified
 identity is sealed — minted only inside the owning context
 (`karn.actor.identity_not_sealed`).
 
-A handler consumes an actor on its `by <binder>: <Actor>` clause. The named actor
-MUST resolve to a declared actor or a prelude actor (`Visitor`, `Scheduler`,
-`Producer`, `Caller`) (`karn.actor.unknown_actor`), and its scheme MUST be
-admissible on the handler's protocol — HTTP admits `None`, the internal protocols
-(call/cron/queue) admit `Internal` (`karn.actor.scheme_not_admissible`). A handler
-that omits `by` inherits its protocol's default actor; an **HTTP handler has no
-safe default and MUST declare `by`** (`karn.actor.missing_by_on_http`). The
-verified identity binds to `<binder>` and is read as `<binder>.identity`; it is a
-sealed value, minted at the boundary before the body runs and never re-checked
-downstream.
+A handler consumes an actor on its `by (<binder>:)? <Actor>` clause. The named
+actor MUST resolve to a declared actor or a prelude actor (`Visitor`,
+`Scheduler`, `Producer`, `Caller`) (`karn.actor.unknown_actor`), and its scheme
+MUST be admissible on the handler's protocol — HTTP admits `None`, the internal
+protocols (call/cron/queue) admit `Internal` (`karn.actor.scheme_not_admissible`).
+A handler that omits `by` inherits its protocol's default actor; an **HTTP handler
+has no safe default and MUST declare `by`** (`karn.actor.missing_by_on_http`).
+The **binder is optional** (v0.50): with `by <binder>: <Actor>` the verified
+identity binds to `<binder>` and is read as `<binder>.identity` — a sealed value,
+minted at the boundary before the body runs and never re-checked downstream; with
+the binder-less `by <Actor>` the contract is still declared and verified
+fail-closed, but no identity is captured (anonymous / verify-and-discard). `_`
+MUST NOT be used as the binder (omit it instead). A named binder MUST NOT collide
+with a handler parameter (`karn.actor.binder_shadows_param`).
 
 ## §5.8 Boundaries & cross-context
 

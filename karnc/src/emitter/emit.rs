@@ -680,7 +680,7 @@ pub(crate) fn emit_service(
         // v0.47: a Bearer handler's identity is threaded through `deps`; tell the
         // body lowering so `<binder>.identity` reads `deps.identity`.
         let bearer_seam = crate::actors::bearer_seam_for(handler, &ctx.actors);
-        cx.bearer_identity_binder = bearer_seam.as_ref().map(|s| s.binder.clone());
+        cx.bearer_identity_binder = bearer_seam.as_ref().and_then(|s| s.binder.clone());
         let async_tail = is_effectful_return(&handler.return_type);
         emit_block_as_function_body(
             &mut body_out,
@@ -691,10 +691,11 @@ pub(crate) fn emit_service(
         );
         // Append the deps parameter (may include surface field if the body
         // made cross-context calls). v0.47: a Bearer handler's deps also carries
-        // the seam-minted `identity`.
+        // the seam-minted `identity` — but only when a binder captures it
+        // (v0.50: a binder-less Bearer handler verifies but mints no identity).
         let mut deps_ty =
             build_deps_object_ty_with_surface(&handler.given, &cx, &ctx.cross_context, ctx.target);
-        if let Some(seam) = &bearer_seam {
+        if let Some(seam) = bearer_seam.as_ref().filter(|s| s.binder.is_some()) {
             let field = format!("identity: {}", seam.identity_type);
             deps_ty = if deps_ty == "{}" {
                 format!("{{ {field} }}")

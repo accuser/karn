@@ -877,17 +877,20 @@ fn check_actor_contracts(
         for handler in &service.handlers {
             match &handler.by_clause {
                 Some(by) => {
-                    // The actor binder introduces a new binding; it must not
+                    // A named binder introduces a new binding; it must not
                     // collide with a handler parameter of the same name (which it
-                    // would otherwise silently shadow in the body scope).
-                    if handler.params.iter().any(|p| p.name.name == by.binder.name) {
+                    // would otherwise silently shadow in the body scope). The
+                    // binder-less form captures nothing, so it can't collide.
+                    if let Some(binder) = &by.binder
+                        && handler.params.iter().any(|p| p.name.name == binder.name)
+                    {
                         errors.push(
                             CompileError::new(
                                 "karn.actor.binder_shadows_param",
-                                by.binder.span,
+                                binder.span,
                                 format!(
                                     "the actor binder `{}` collides with a handler parameter of the same name",
-                                    by.binder.name,
+                                    binder.name,
                                 ),
                             )
                             .with_note("rename the `by` binder or the parameter"),
@@ -1141,14 +1144,16 @@ fn handler_actor_binding(
     resolved: &ResolvedCommons,
 ) -> Option<(String, checker::Ty)> {
     let by = handler.by_clause.as_ref()?;
+    // No binder (binder-less `by <Actor>`) ⇒ no identity binding in scope.
+    let binder = by.binder.as_ref()?;
     // A binder that collides with a parameter is diagnosed
     // (`karn.actor.binder_shadows_param`); suppress the binding so the body
     // scope keeps the real parameter rather than the clobbering actor binding.
-    if handler.params.iter().any(|p| p.name.name == by.binder.name) {
+    if handler.params.iter().any(|p| p.name.name == binder.name) {
         return None;
     }
     let identity = actor_identity_ty(&by.actor.name, table, resolved);
-    Some((by.binder.name.clone(), identity))
+    Some((binder.name.clone(), identity))
 }
 
 /// The identity `Ty` a named actor yields (a local declaration or a prelude

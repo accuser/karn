@@ -1158,7 +1158,10 @@ impl<'a> Formatter<'a> {
             if matches!(h.kind, HandlerKind::Call | HandlerKind::Message) {
                 self.push(" ");
             }
-            self.push(&format!("by {}: {} ", by.binder.name, by.actor.name));
+            match &by.binder {
+                Some(b) => self.push(&format!("by {}: {} ", b.name, by.actor.name)),
+                None => self.push(&format!("by {} ", by.actor.name)),
+            }
         }
         self.format_params(&h.params, false);
         self.push(" -> ");

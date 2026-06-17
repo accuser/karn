@@ -122,13 +122,17 @@ pub fn default_actor(protocol: &ServiceProtocol) -> Option<&'static str> {
 }
 
 /// v0.47: the data the emitter needs to lower a Bearer verification seam for a
-/// handler — the `by` binder, the signing-secret env name, and the identity
-/// type to construct from the JWT `sub` claim. Resolved only for a handler whose
-/// `by` clause names a local Bearer actor; the checker guarantees the secret is
+/// handler — the `by` binder (v0.50: `None` for the binder-less verify-and-
+/// discard form), the signing-secret env name, and the identity type to
+/// construct from the JWT `sub` claim. Resolved only for a handler whose `by`
+/// clause names a local Bearer actor; the checker guarantees the secret is
 /// present and the identity is a string-constructible local type.
 #[derive(Debug, Clone)]
 pub struct BearerSeam {
-    pub binder: String,
+    /// The identity binder, or `None` for `by <BearerActor>` (verify the token,
+    /// don't capture the identity). When `None` the seam still verifies fail-
+    /// closed but mints no identity and threads nothing into `deps`.
+    pub binder: Option<String>,
     pub secret: String,
     pub identity_type: String,
 }
@@ -150,7 +154,7 @@ pub fn bearer_seam_for(
         return None;
     };
     Some(BearerSeam {
-        binder: by.binder.name.clone(),
+        binder: by.binder.as_ref().map(|b| b.name.clone()),
         secret,
         identity_type: id.name.clone(),
     })

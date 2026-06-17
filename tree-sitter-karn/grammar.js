@@ -673,11 +673,12 @@ module.exports = grammar({
     scheme: () => choice("None", "Internal", "Bearer", "Signature"),
     // v0.45: the handler `by <binder>: <Actor>` clause — sits after the protocol
     // config and before the parameters.
+    // v0.50: the binder is optional — `by <Actor>` (verify, don't capture the
+    // identity) or `by <binder>: <Actor>` (capture it).
     by_clause: ($) =>
       seq(
         "by",
-        field("binder", $.identifier),
-        ":",
+        optional(seq(field("binder", $.identifier), ":")),
         field("actor", $.identifier),
       ),
 

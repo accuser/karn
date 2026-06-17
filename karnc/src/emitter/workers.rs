@@ -382,21 +382,34 @@ fn emit_http_wrapper(
             out,
             "      if (__claims.tag === \"Err\") return HttpResult.Unauthorized;"
         );
-        let _ = writeln!(
-            out,
-            "      const __id = handlers.{}.of(__claims.value.sub);",
-            seam.identity_type
-        );
-        let _ = writeln!(
-            out,
-            "      if (__id.tag === \"Err\") return HttpResult.Unauthorized;"
-        );
-        let _ = writeln!(
-            out,
-            "      return handlers.{sname}.{method_key}({}{}{{ ...deps, identity: __id.value }});",
-            param_args.join(", "),
-            if param_args.is_empty() { "" } else { ", " },
-        );
+        if seam.binder.is_some() {
+            // Capture the identity: construct the declared type from `sub`
+            // (fail-closed on a refinement violation) and thread it into deps.
+            let _ = writeln!(
+                out,
+                "      const __id = handlers.{}.of(__claims.value.sub);",
+                seam.identity_type
+            );
+            let _ = writeln!(
+                out,
+                "      if (__id.tag === \"Err\") return HttpResult.Unauthorized;"
+            );
+            let _ = writeln!(
+                out,
+                "      return handlers.{sname}.{method_key}({}{}{{ ...deps, identity: __id.value }});",
+                param_args.join(", "),
+                if param_args.is_empty() { "" } else { ", " },
+            );
+        } else {
+            // Binder-less: the token is verified (fail-closed above); the
+            // identity is not captured, so call the handler with plain deps.
+            let _ = writeln!(
+                out,
+                "      return handlers.{sname}.{method_key}({}{}deps);",
+                param_args.join(", "),
+                if param_args.is_empty() { "" } else { ", " },
+            );
+        }
         let _ = writeln!(out, "    }},");
         return;
     }

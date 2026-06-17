@@ -73,7 +73,7 @@ queue_handler ::= "on" "message" by_clause? "(" (param ("," param)*)? ","? ")" "
 given_clause ::= "given" qualified_name ("," qualified_name)*
 actor_decl ::= "actor" identifier ("{" "auth" "=" scheme ("(" "secret" "=" string_literal ")")? ("," "identity" "=" type_ref)? "}" | "=" identifier "where" refinement)
 scheme ::= "None" | "Internal" | "Bearer" | "Signature"
-by_clause ::= "by" identifier ":" identifier
+by_clause ::= "by" (identifier ":")? identifier
 mocks_decl ::= "mocks" identifier "=" identifier "{" provider_op* "}"
 test_case ::= "test" string_literal block
 block ::= "{" statement* expression? "}"
