@@ -11,6 +11,7 @@ topic and act on it without hopping between sections. New to Karn? Work through
 - [Effects & capabilities](effects-and-capabilities/index.md) — capabilities, providers, adapters.
 - [Agents & state](agents-and-state/index.md) — stateful, keyed agents.
 - [Entry points](entry-points/index.md) — HTTP, cron, and queue handlers.
+- [Actors & access control](actors/index.md) — authentication, authorisation, and the `by` clause.
 - [Testing](testing/index.md) — unit and integration testing.
 - [Projects, build & deployment](projects-build-and-deployment/index.md) — layout, build, Cloudflare Workers.
 - [Editor & tooling](editor-and-tooling/index.md) — formatting and editor support.
