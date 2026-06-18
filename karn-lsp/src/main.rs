@@ -1598,6 +1598,7 @@ fn to_completion_item(c: completion::Completion) -> CompletionItem {
             completion::CompletionKind::Member => CompletionItemKind::METHOD,
             completion::CompletionKind::Field => CompletionItemKind::FIELD,
             completion::CompletionKind::Constructor => CompletionItemKind::CONSTRUCTOR,
+            completion::CompletionKind::Function => CompletionItemKind::FUNCTION,
         }),
         // Snippet items carry `${n:…}` tab stops; everything else inserts its
         // label verbatim (the default).

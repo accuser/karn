@@ -1,9 +1,10 @@
 # Tooling track — LSP: complete the editor experience
 
-- **Phase:** **🔨 Active — slices 0–2 landed; the completion-overhaul arc is open.**
-  The surface-contract ADR (slice 0, ADR 0093) is accepted; slice 1 (G1–G3 quick
-  wins) and slice 2 (G4 expression-position surface) have landed; slices 3–4 (G5
-  free-function/stdlib completion, G6 the clean-file ceiling) implement the rest. The navigation and refactor table-stakes (references, rename,
+- **Phase:** **🔨 Active — slices 0–3 landed; one slice left in the arc.** The
+  surface-contract ADR (slice 0, ADR 0093) is accepted; slices 1 (G1–G3), 2 (G4
+  expression-position surface), and 3 (G5 free-function/stdlib completion) have
+  landed. Only slice 4 (G6 — lifting the value-receiver clean-file ceiling)
+  remains in the completion arc. The navigation and refactor table-stakes (references, rename,
   hover, code actions, signature help, code lens, inlay hints, semantic tokens,
   workspace symbols, document highlights, call hierarchy, implementation nav,
   folding/selection) **already shipped** across v0.24–v0.37; this track picks up
@@ -197,8 +198,12 @@ contract test, which the surface ADR below should establish.
    value positions, via a new `complete()` expression arm + a `Constructor` kind;
    locals/params still appended handler-side. No new ADR (implements D3). Exercised
    the contract's hardest partition (what belongs at an expression position).
-3. **Completion — free functions & stdlib (G5).** A producer for `uses`-imported
-   combinators and in-scope top-level `fn`s.
+3. **Completion — free functions & stdlib (G5).** ✅ **Landed.** A
+   `free_function_candidates` producer (a `Function` kind) offering the current
+   unit's own `fn`s + the combinators of every `uses`-imported module (project +
+   the embedded `karn.list`/`karn.map`/`karn.string` stdlib, now in
+   `for_each_unit`), gated on the `uses` set. No new ADR (implements D3); signature
+   help gained stdlib labels for free.
 4. **Completion — lift the clean-file ceiling (G6).** Error-tolerant receiver
    typing for the two overlay-gated contexts (value members + locals). The
    structural slice; lands its own ADR (the strategy choice below).
@@ -291,6 +296,16 @@ track's forward-ADR convention.
   group) are deferred to slice 3 / G5. Coverage:
   `expression_position_offers_constructors_and_types`. §3.15 row added; module-doc
   header refreshed to the eight-context contract.
+- **Slice 3 — free functions & stdlib, G5 (2026-06-18):** no new ADR (implements
+  0093 D3). Added a `free_function_candidates` producer (`CompletionKind::Function`)
+  at expression position offering the current unit's own free `fn`s + the
+  combinators of every `uses`-imported module, gated on the `uses` set; the
+  embedded stdlib commons (`karn.list`/`karn.map`/`karn.string`) joined
+  `for_each_unit` (harmless to other contexts — fns only — and a free win for
+  signature help). Signatures reuse `symbols::type_ref_str` (one renderer, like
+  hover/signature help). Coverage: `free_functions_offered_for_own_unit_and_used_
+  modules` (registry-driven over `KARN_LIST_SRC`) + `free_functions_require_a_uses_
+  import`. §3.15 row + module-doc header updated.
 
 ## Cross-references
 

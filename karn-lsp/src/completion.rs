@@ -15,13 +15,15 @@
 //!   `HttpResult`/`QueueResult`), refined/opaque `of`/`unsafe`, capability ops,
 //!   and built-in type statics (`Int.parse`/`List.empty`/`Effect.pure`/…);
 //! - **expression position** (after `=`/`(`/`,`/`=>`/an operator) — the value
-//!   constructors (`Ok`/`Some`/`true`/…) and in-scope type names (ADR 0093 D3).
+//!   constructors (`Ok`/`Some`/`true`/…), in-scope type names, and in-scope free
+//!   functions (the current unit's own `fn`s + `uses`-imported stdlib/project
+//!   combinators, gated on the `uses` set) (ADR 0093 D3).
 //!
 //! Two further contexts need the analysis overlay and so live handler-side
 //! (`main.rs`): **value-receiver `lower.`** members (kernel methods + record
 //! fields) and **in-scope locals/params**, both subject to the clean-file
-//! ceiling (ADR 0063; the boundary is D4). Free-function/stdlib completion (G5)
-//! and lifting that ceiling (G6) are later slices of the LSP tooling track.
+//! ceiling (ADR 0063; the boundary is D4). Lifting that ceiling (G6) is a later
+//! slice of the LSP tooling track.
 //!
 //! Context detection is lexical (it must work mid-edit, when the buffer rarely
 //! parses); candidates are semantic. Unit/type/capability/member enumeration
@@ -35,12 +37,14 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use karnc::ast::{CommonsItem, ExportKind, SourceUnit, TypeBody};
+use karnc::ast::{CommonsItem, ExportKind, FnName, SourceUnit, TypeBody, UsesDecl};
 use karnc::checker::Ty;
-use karnc::firstparty::{CLOUDFLARE_ADAPTER_SRC, KARN_ADAPTER_SRC};
+use karnc::firstparty::{
+    CLOUDFLARE_ADAPTER_SRC, KARN_ADAPTER_SRC, KARN_LIST_SRC, KARN_MAP_SRC, KARN_STRING_SRC,
+};
 use karnc::{kernel_methods, keywords, lexer, parser};
 
-use crate::symbols::walk_karn_files;
+use crate::symbols::{type_ref_str, walk_karn_files};
 
 /// What a candidate refers to — maps to an LSP `CompletionItemKind`.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -59,6 +63,9 @@ pub enum CompletionKind {
     Field,
     /// A value constructor at expression position (`Ok`/`Some`/`true`).
     Constructor,
+    /// A free function in scope at expression position — the current unit's own
+    /// top-level `fn`s and the `uses`-imported stdlib/project combinators.
+    Function,
 }
 
 pub struct Completion {
@@ -508,6 +515,106 @@ fn expression_candidates(doc_text: &str, src_root: Option<&Path>) -> Vec<Complet
     // Type names are valid here too (static receiver / record construction); the
     // `Type.` member context (slice 1) takes over once the user types the dot.
     out.extend(type_candidates(doc_text, src_root));
+    // In-scope free functions — the current unit's own `fn`s and the combinators
+    // of every `uses`-imported module (project + stdlib) — ADR 0093 D3 / G5.
+    out.extend(free_function_candidates(doc_text, src_root));
+    out
+}
+
+/// A unit's top-level items and its `uses` clauses, for the kinds that carry
+/// free functions. Service/other units contribute neither.
+fn unit_items_and_uses(unit: &SourceUnit) -> (&[CommonsItem], &[UsesDecl]) {
+    match unit {
+        SourceUnit::Commons(c) => (&c.items, &c.uses),
+        SourceUnit::Context(c) => (&c.items, &c.uses),
+        SourceUnit::Adapter(a) => (&a.items, &a.uses),
+        _ => (&[], &[]),
+    }
+}
+
+/// The qualified name of the unit the cursor's document declares, via a recovery
+/// parse (the header survives a mid-edit body). `None` for a headerless fragment
+/// that names no unit.
+fn current_unit_name(doc_text: &str) -> Option<String> {
+    let tokens = lexer::tokenize(doc_text).ok()?;
+    let (unit, _errs) = parser::parse_unit_with_recovery(&tokens, doc_text);
+    Some(unit?.name().joined())
+}
+
+/// Render a free function's signature for the completion detail, the same way
+/// hover and signature help do (`symbols::type_ref_str`) — one format, never
+/// divergent. Mirrors signature help: no generic-parameter list.
+fn free_fn_signature(name: &str, f: &karnc::ast::FnDecl) -> String {
+    let params = f
+        .params
+        .iter()
+        .map(|p| format!("{}: {}", p.name.name, type_ref_str(&p.type_ref)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("{name}({params}) -> {}", type_ref_str(&f.return_type))
+}
+
+/// Free-function candidates at expression position: the current unit's own
+/// top-level `fn`s plus the free `fn`s of every `uses`-imported module (project
+/// commons and the embedded stdlib). Gated on the `uses` set so a combinator is
+/// offered only where it is actually in scope (ADR 0093 D3 / G5).
+fn free_function_candidates(doc_text: &str, src_root: Option<&Path>) -> Vec<Completion> {
+    let Some(current) = current_unit_name(doc_text) else {
+        return Vec::new();
+    };
+    // One parse pass: collect each unit's name, its free `fn`s (name + signature),
+    // and its `uses` targets.
+    struct UnitFns {
+        name: String,
+        fns: Vec<(String, String)>,
+        uses: Vec<String>,
+    }
+    let mut units: Vec<UnitFns> = Vec::new();
+    for_each_unit(doc_text, src_root, |unit| {
+        let (items, uses) = unit_items_and_uses(unit);
+        let fns = items
+            .iter()
+            .filter_map(|it| match it {
+                CommonsItem::Fn(f) => match &f.name {
+                    FnName::Free(id) => Some((id.name.clone(), free_fn_signature(&id.name, f))),
+                    FnName::Method { .. } => None,
+                },
+                _ => None,
+            })
+            .collect();
+        units.push(UnitFns {
+            name: unit.name().joined(),
+            fns,
+            uses: uses.iter().map(|u| u.target.joined()).collect(),
+        });
+    });
+    // The import scope: the `uses` targets of every unit sharing the current name
+    // (a unit may span files, so union them).
+    let mut imported: BTreeSet<String> = BTreeSet::new();
+    for u in &units {
+        if u.name == current {
+            imported.extend(u.uses.iter().cloned());
+        }
+    }
+    // Offer the current unit's own fns and the fns of each imported module.
+    let mut out: Vec<Completion> = Vec::new();
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    for u in &units {
+        let own = u.name == current;
+        if !own && !imported.contains(&u.name) {
+            continue;
+        }
+        let origin = if own { "this unit" } else { u.name.as_str() };
+        for (name, sig) in &u.fns {
+            if seen.insert(name.clone()) {
+                out.push(Completion::item(
+                    name.clone(),
+                    CompletionKind::Function,
+                    Some(format!("{sig} — `{origin}`")),
+                ));
+            }
+        }
+    }
     out
 }
 
@@ -588,6 +695,14 @@ pub(crate) fn for_each_unit(
     let mut sources: Vec<String> = vec![
         KARN_ADAPTER_SRC.to_string(),
         CLOUDFLARE_ADAPTER_SRC.to_string(),
+        // The embedded stdlib commons (`karn.list`/`karn.map`/`karn.string`) so
+        // their free fns are enumerable for `uses`-imported completion (G5) and
+        // signature help. Harmless to the other contexts — these units declare
+        // only `fn`s (no types/capabilities), and they are `commons`, never a
+        // `consumes` target.
+        KARN_LIST_SRC.to_string(),
+        KARN_MAP_SRC.to_string(),
+        KARN_STRING_SRC.to_string(),
         doc_text.to_string(),
     ];
     if let Some(root) = src_root {
@@ -865,6 +980,66 @@ mod tests {
         // handler-side; see `record_value_and_decimal_receivers_yield_nothing`).
         assert!(complete("  let p = q.", "context a.b\n", None).is_empty());
         assert!(complete("  let n = 1.", "context a.b\n", None).is_empty());
+    }
+
+    /// Free `fn` names declared in a unit source (registry-driven test helper).
+    fn free_fn_names(src: &str) -> Vec<String> {
+        let tokens = lexer::tokenize(src).unwrap();
+        let (unit, _) = parser::parse_unit_with_recovery(&tokens, src);
+        let unit = unit.unwrap();
+        let (items, _) = unit_items_and_uses(&unit);
+        items
+            .iter()
+            .filter_map(|it| match it {
+                CommonsItem::Fn(f) => match &f.name {
+                    FnName::Free(id) => Some(id.name.clone()),
+                    FnName::Method { .. } => None,
+                },
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn free_functions_offered_for_own_unit_and_used_modules() {
+        // ADR 0093 D3/G5: expression position offers the current unit's own
+        // free `fn`s and the combinators of every `uses`-imported module.
+        let doc = "commons app {\n  uses karn.list\n  fn helper(x: Int) -> Int { x }\n}\n";
+        let items = complete("  let y = ", doc, None);
+        // The current unit's own function.
+        assert!(
+            find(&items, "helper", CompletionKind::Function).is_some(),
+            "own fn: {:?}",
+            items.iter().map(|i| &i.label).collect::<Vec<_>>()
+        );
+        // Every combinator of the imported `karn.list` — registry-driven over the
+        // embedded source, so a new stdlib combinator must surface or this fails.
+        for name in free_fn_names(KARN_LIST_SRC) {
+            assert!(
+                find(&items, &name, CompletionKind::Function).is_some(),
+                "karn.list.{name}: {:?}",
+                items.iter().map(|i| &i.label).collect::<Vec<_>>()
+            );
+        }
+        // A module that is not imported does not leak its fns.
+        assert!(
+            find(&items, "values", CompletionKind::Function).is_none(),
+            "karn.map.values leaked without `uses karn.map`"
+        );
+    }
+
+    #[test]
+    fn free_functions_require_a_uses_import() {
+        // Own fns are always in scope; stdlib combinators only with their `uses`.
+        let doc = "commons app {\n  fn helper(x: Int) -> Int { x }\n}\n";
+        let items = complete("  let y = ", doc, None);
+        assert!(find(&items, "helper", CompletionKind::Function).is_some());
+        for name in ["map", "filter", "reverse"] {
+            assert!(
+                find(&items, name, CompletionKind::Function).is_none(),
+                "karn.list.{name} offered without `uses karn.list`"
+            );
+        }
     }
 
     #[test]
