@@ -982,14 +982,13 @@ impl LanguageServer for Backend {
         let candidates = completion::complete(&line_prefix, &text, src_root.as_deref());
         let mut items: Vec<CompletionItem> =
             candidates.into_iter().map(to_completion_item).collect();
-        // v0.31 (ADR 0064): offer in-scope locals at keyword position (alongside
-        // keywords) and at expression position (where nothing else fires).
-        let append_locals = if items.is_empty() {
-            completion::is_expression_position(&line_prefix)
-        } else {
-            completion::is_keyword_position(&line_prefix)
-        };
-        if append_locals {
+        // ADR 0064/0093 D3: offer in-scope locals/params at keyword position
+        // (alongside keywords) and at expression position (alongside the
+        // constructors + type names `complete()` now yields there). Both are
+        // places a value or name can begin; the two positions are disjoint.
+        if completion::is_keyword_position(&line_prefix)
+            || completion::is_expression_position(&line_prefix)
+        {
             items.extend(self.locals_completions(&uri, pos).await);
         }
         if items.is_empty() {
@@ -1598,6 +1597,7 @@ fn to_completion_item(c: completion::Completion) -> CompletionItem {
             completion::CompletionKind::Variant => CompletionItemKind::ENUM_MEMBER,
             completion::CompletionKind::Member => CompletionItemKind::METHOD,
             completion::CompletionKind::Field => CompletionItemKind::FIELD,
+            completion::CompletionKind::Constructor => CompletionItemKind::CONSTRUCTOR,
         }),
         // Snippet items carry `${n:…}` tab stops; everything else inserts its
         // label verbatim (the default).

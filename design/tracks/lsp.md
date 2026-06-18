@@ -1,9 +1,9 @@
 # Tooling track — LSP: complete the editor experience
 
-- **Phase:** **🔨 Active — slices 0–1 landed; the completion-overhaul arc is open.**
-  The surface-contract ADR (slice 0, ADR 0093) is accepted and slice 1 (the G1–G3
-  quick wins + the coverage test) has landed; slices 2–4 implement the rest of the
-  contract next. The navigation and refactor table-stakes (references, rename,
+- **Phase:** **🔨 Active — slices 0–2 landed; the completion-overhaul arc is open.**
+  The surface-contract ADR (slice 0, ADR 0093) is accepted; slice 1 (G1–G3 quick
+  wins) and slice 2 (G4 expression-position surface) have landed; slices 3–4 (G5
+  free-function/stdlib completion, G6 the clean-file ceiling) implement the rest. The navigation and refactor table-stakes (references, rename,
   hover, code actions, signature help, code lens, inlay hints, semantic tokens,
   workspace symbols, document highlights, call hierarchy, implementation nav,
   folding/selection) **already shipped** across v0.24–v0.37; this track picks up
@@ -192,9 +192,11 @@ contract test, which the surface ADR below should establish.
    the D5 coverage test (`builtin_sum_variants_are_complete`,
    `builtin_statics_are_reachable`). Data-and-config only; no new ADR (implements
    the slice-0 contract for the member/static contexts).
-2. **Completion — expression-position surface (G4).** Constructors, in-scope type
-   names, and type statics at value positions, not just locals. *Exercises the
-   contract's hardest partition (what belongs at an expression position).*
+2. **Completion — expression-position surface (G4).** ✅ **Landed.** The value
+   constructors (`Ok`/`Err`/`Some`/`None`/`true`/`false`) + in-scope type names at
+   value positions, via a new `complete()` expression arm + a `Constructor` kind;
+   locals/params still appended handler-side. No new ADR (implements D3). Exercised
+   the contract's hardest partition (what belongs at an expression position).
 3. **Completion — free functions & stdlib (G5).** A producer for `uses`-imported
    combinators and in-scope top-level `fn`s.
 4. **Completion — lift the clean-file ceiling (G6).** Error-tolerant receiver
@@ -280,6 +282,15 @@ track's forward-ADR convention.
   (D2/G3); added the registry-driven coverage tests
   (`builtin_sum_variants_are_complete`, `builtin_statics_are_reachable`) — the
   first instances of the D5 guard. §3.15's as-built table updated.
+- **Slice 2 — expression-position surface, G4 (2026-06-18):** no new ADR
+  (implements 0093 D3). Added a `complete()` expression-position arm offering the
+  six value constructors (`CompletionKind::Constructor`, docs reused from the
+  `keywords` registry) + in-scope type names (reusing `type_candidates`); reworked
+  the handler so locals/params attach at keyword *or* expression position (the old
+  `items.is_empty()` proxy no longer holds). Free functions (the in-scope-values
+  group) are deferred to slice 3 / G5. Coverage:
+  `expression_position_offers_constructors_and_types`. §3.15 row added; module-doc
+  header refreshed to the eight-context contract.
 
 ## Cross-references
 
