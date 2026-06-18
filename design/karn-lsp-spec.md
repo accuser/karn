@@ -413,6 +413,7 @@ The recognised contexts and their candidate sources:
 | **keyword position** (a bare word at a decl/statement start) (v0.30) | reserved keywords (with registry docs) + declaration snippets | `KEYWORD` / `SNIPPET` |
 | **name-receiver member** (`UpperIdent.`) (v0.30.1; built-in sums + full statics in slice 1) | sum-type variants (project + built-in `HttpResult`/`QueueResult`); refined/opaque `of`/`unsafe`; capability ops; built-in type statics (`Int.parse`/`Float.parse`, `Json.encode`/`decode`, `List.empty`/`Map.empty`, `Effect.pure`) | `ENUM_MEMBER` / `METHOD` |
 | **value-receiver member** (`lowercase.`) (v0.30.2) | the receiver type's kernel methods (`xs.fold`/`s.split`/`o.map`) + record fields | `METHOD` / `FIELD` |
+| **expression position** (after `=`/`(`/`,`/`=>`/an operator) (slice 2) | the value constructors (`Ok`/`Err`/`Some`/`None`/`true`/`false`) + in-scope type names (static receiver / record construction) | `CONSTRUCTOR` / `STRUCT` |
 | **locals** (keyword / expression position) (v0.31.2) | in-scope `let`/param bindings (with inferred type) | `VARIABLE` |
 
 **Surface contract (ADR 0093).** The table above is the *as-built* state; the
@@ -429,10 +430,11 @@ buffer; **(c) `.` is a trigger character** so the member cells auto-fire. **Slic
 1 closed the registry-sourced gaps** tracked in `design/tracks/lsp.md` — the `.`
 trigger (G1), the statics table's missing `List.empty`/`Map.empty`/`Effect.pure`
 (G2), and the built-in `HttpResult`/`QueueResult` variants (G3) — and added the
-coverage test (the table above reflects them). Remaining: the locals-only
-expression position (G4 → values + constructors + functions + type names),
-free-function/stdlib completion (G5), and the value-receiver clean-file ceiling
-(G6).
+coverage test (the table above reflects them). **Slice 2 closed G4** — expression
+position now offers the value constructors and in-scope type names (the
+`complete()` arm), with locals/params still appended handler-side. Remaining:
+free-function/stdlib completion (G5 — the in-scope-values group of the
+expression-position cell) and the value-receiver clean-file ceiling (G6).
 
 **Built-ins/surface come from static registries, not the index (ADR 0061).** Because first-party symbols aren't indexed (§3.14's finding), the built-in types (`Int`/`Bool`/`Float`/`String`/`Option`/`Result`/`Effect`/`List`/`Map`), keyword docs, the `karn`-surface transparent types, and the built-in type statics (`Int.parse`/`Float.parse`/`Json.encode`/`decode`/`List.empty`/`Map.empty`/`Effect.pure`) are sourced from `karnc::{keywords, builtin_names, firstparty}` (and a small static statics table; built-in sum variants come from the `karnc::ast` `HTTP_VARIANTS`/`QUEUE_VARIANTS` registries) — the index (here, the project parse) supplies only *project* symbols. Keyword candidates are the lowercase-initial reserved words (declaration/statement keywords); uppercase type/value names belong to type/expression position. Snippets carry LSP `${n:…}` tab stops (`InsertTextFormat::SNIPPET`).
 

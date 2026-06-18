@@ -1,39 +1,36 @@
 //! Completion for the cursor, keyed off the line up to it.
 //!
-//! v0.17 recognised three adapter/capability contexts:
+//! The surface is the canonical *cursor context × candidate-kind* matrix fixed
+//! by ADR 0093 (`design/decisions/0093-completion-surface-contract.md`), spec'd
+//! at `design/karn-lsp-spec.md` §3.15. [`complete`] dispatches the six contexts
+//! it can serve purely (no analysis cache):
 //!
-//! - after `consumes ` — consumable units (contexts, adapters, and the `karn`
-//!   surface);
-//! - inside `consumes U { … }` — the capabilities `U` exports;
-//! - after `given …` — the capabilities in scope (local, flattened via a braced
-//!   `consumes`, and qualified `U.Cap` for whole-unit `consumes`).
-//!
-//! v0.30 slice 1 adds **positional** completion — contexts that need neither
-//! receiver typing nor scope tracking:
-//!
-//! - **type position** (after `:`, in `-> T`, inside a `[ … ]` type-argument
-//!   list) — built-in types, the `karn`-surface transparent types, and project
-//!   type declarations;
+//! - `consumes <prefix>` / `consumes U { … }` / `given …` — consumable units and
+//!   in-scope capabilities (v0.17);
+//! - **type position** (`: T`, `-> T`, inside `[ … ]` type args) — built-in
+//!   types, the `karn`-surface transparent types, and project `type` decls;
 //! - **keyword position** (a bare word at a declaration/statement start) — the
-//!   reserved keywords (with their registry docs) and declaration snippets.
+//!   reserved keywords (with registry docs) and declaration snippets;
+//! - **name-receiver `UpperIdent.`** — sum variants (project + built-in
+//!   `HttpResult`/`QueueResult`), refined/opaque `of`/`unsafe`, capability ops,
+//!   and built-in type statics (`Int.parse`/`List.empty`/`Effect.pure`/…);
+//! - **expression position** (after `=`/`(`/`,`/`=>`/an operator) — the value
+//!   constructors (`Ok`/`Some`/`true`/…) and in-scope type names (ADR 0093 D3).
 //!
-//! v0.30.1 slice 2 adds the **name-receiver `.`-member** context:
-//!
-//! - **`UpperIdent.<cursor>`** — where the receiver is a *name* (read from the
-//!   line prefix), not a typed value: sum-type variants (`Color.Red`),
-//!   refined/opaque `of`/`unsafe` constructors, capability operations, and
-//!   built-in type statics (`Int.parse`/`Json.decode`). Value receivers
-//!   (`list.map`) need the receiver's type and stay deferred (slice 3).
+//! Two further contexts need the analysis overlay and so live handler-side
+//! (`main.rs`): **value-receiver `lower.`** members (kernel methods + record
+//! fields) and **in-scope locals/params**, both subject to the clean-file
+//! ceiling (ADR 0063; the boundary is D4). Free-function/stdlib completion (G5)
+//! and lifting that ceiling (G6) are later slices of the LSP tooling track.
 //!
 //! Context detection is lexical (it must work mid-edit, when the buffer rarely
 //! parses); candidates are semantic. Unit/type/capability/member enumeration
 //! parses the project's `.karn` files (and the embedded `karn` surface) with
 //! recovery, so it works even while the file the cursor sits in is mid-edit.
-//! Built-ins and keywords come from the static `karnc` registries (`keywords`/
-//! `builtin_names`/`firstparty`), never the index — first-party symbols aren't
-//! indexed (the v0.28 finding). Value `.method`/`.field` and locals/params-in-
-//! scope need receiver typing + a scope-at-offset query and are deferred to
-//! slice 3.
+//! Built-ins, keywords, and constructors come from the static `karnc` registries
+//! (`keywords`/`builtin_names`/`firstparty`/`ast`), never the index — first-party
+//! symbols aren't indexed (the v0.28 finding); the project parse supplies only
+//! *project* symbols.
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -60,6 +57,8 @@ pub enum CompletionKind {
     Member,
     /// A record field on a value receiver (`order.total`).
     Field,
+    /// A value constructor at expression position (`Ok`/`Some`/`true`).
+    Constructor,
 }
 
 pub struct Completion {
@@ -129,6 +128,13 @@ pub fn complete(line_prefix: &str, doc_text: &str, src_root: Option<&Path>) -> V
     //    reserved keywords plus declaration snippets.
     if is_keyword_position(line_prefix) {
         return keyword_and_snippet_candidates();
+    }
+    // 7. Expression position (after `=`/`(`/`,`/`=>`/a binary operator) — a value
+    //    starts here: the constructor keywords + in-scope type names. In-scope
+    //    locals/params (and, from slice 3, free functions) are appended
+    //    handler-side, where the analysis cache lives (ADR 0093 D3).
+    if is_expression_position(line_prefix) {
+        return expression_candidates(doc_text, src_root);
     }
     Vec::new()
 }
@@ -477,6 +483,34 @@ const SNIPPETS: &[(&str, &str)] = &[
     ("test", "test \"${1:description}\" {\n\t$0\n}"),
 ];
 
+/// The value constructors offered at expression position (ADR 0093 D3) — the
+/// closed set of `Result`/`Option` variant constructors and the boolean
+/// literals. A value expression can begin with any of these; their docs reuse
+/// the `keywords` registry (one source of truth).
+const CONSTRUCTORS: &[&str] = &["Ok", "Err", "Some", "None", "true", "false"];
+
+/// Expression-position candidates: the value constructors plus in-scope type
+/// names (the entry to a static call like `Int.parse` or a record construction
+/// like `Order { … }`). In-scope values — locals/params, and from slice 3 free
+/// functions — are appended by the handler, which owns the analysis cache, so
+/// they are not produced here (ADR 0093 D3).
+fn expression_candidates(doc_text: &str, src_root: Option<&Path>) -> Vec<Completion> {
+    let mut out: Vec<Completion> = CONSTRUCTORS
+        .iter()
+        .map(|&name| {
+            Completion::item(
+                name,
+                CompletionKind::Constructor,
+                keyword_doc(name).map(str::to_string),
+            )
+        })
+        .collect();
+    // Type names are valid here too (static receiver / record construction); the
+    // `Type.` member context (slice 1) takes over once the user types the dot.
+    out.extend(type_candidates(doc_text, src_root));
+    out
+}
+
 /// The one-line doc for a name in the `keywords` registry, if present.
 fn keyword_doc(word: &str) -> Option<&'static str> {
     keywords::KEYWORDS
@@ -800,8 +834,37 @@ mod tests {
     }
 
     #[test]
-    fn no_completion_in_plain_position() {
-        assert!(labels("  let x = ", "context a.b\n").is_empty());
+    fn expression_position_offers_constructors_and_types() {
+        // ADR 0093 D3/D5: a value position (after `=`) yields every constructor
+        // keyword and in-scope type names — the entry to a static call or a
+        // record construction. (Locals/params are appended handler-side, not by
+        // `complete()`.) Registry-driven over CONSTRUCTORS.
+        let doc = "commons m {\n  type Order = { id: Int }\n}\n";
+        let items = complete("  let x = ", doc, None);
+        for &c in CONSTRUCTORS {
+            assert!(
+                find(&items, c, CompletionKind::Constructor).is_some(),
+                "constructor {c}: {:?}",
+                items.iter().map(|i| &i.label).collect::<Vec<_>>()
+            );
+        }
+        assert!(
+            find(&items, "Int", CompletionKind::Type).is_some(),
+            "builtin type"
+        );
+        assert!(
+            find(&items, "Order", CompletionKind::Type).is_some(),
+            "project type"
+        );
+    }
+
+    #[test]
+    fn value_receiver_and_decimal_are_not_expression_positions() {
+        // A trailing `x.`/`1.` is a member/decimal context, not an expression
+        // start — `complete()` yields nothing (the value-receiver path is
+        // handler-side; see `record_value_and_decimal_receivers_yield_nothing`).
+        assert!(complete("  let p = q.", "context a.b\n", None).is_empty());
+        assert!(complete("  let n = 1.", "context a.b\n", None).is_empty());
     }
 
     #[test]
@@ -860,10 +923,17 @@ mod tests {
 
     #[test]
     fn list_literal_is_not_a_type_position() {
-        // A bare `[` opening a list literal is an expression, not type args.
+        // A bare `[` opening a list literal is an expression, not type args…
         assert!(!is_type_position("  let xs = ["));
-        // And it yields no completion at all in slice 1.
-        assert!(labels("  let xs = [", "context a.b\n").is_empty());
+        // …so it is an expression position: a list element is a value, and the
+        // constructor keywords are offered there (ADR 0093 D3) — not a
+        // type-argument completion.
+        let items = complete("  let xs = [", "context a.b\n", None);
+        assert!(
+            find(&items, "Some", CompletionKind::Constructor).is_some(),
+            "{:?}",
+            items.iter().map(|c| &c.label).collect::<Vec<_>>()
+        );
     }
 
     #[test]

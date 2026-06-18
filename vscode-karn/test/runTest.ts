@@ -2,6 +2,14 @@ import * as path from "path";
 
 import { runTests } from "@vscode/test-electron";
 
+// Pin the VS Code build under test. An unpinned run resolves "stable" over the
+// network on every invocation — the flaky "Resolving version…" step that can
+// fail with ECONNRESET and reddens CI for reasons unrelated to the change. A
+// concrete version makes that resolve local and the download cacheable. Pinned
+// to a recent stable (what "stable" was already resolving to); CI overrides via
+// `VSCODE_TEST_VERSION` and caches the matching download. Bump deliberately.
+const VSCODE_VERSION = process.env.VSCODE_TEST_VERSION ?? "1.124.2";
+
 // Bootstraps a real VS Code instance with the extension under
 // `--extensionDevelopmentPath` plus the fixture workspace, then runs the Mocha
 // suite inside the extension host. See test/suite/index.ts for the runner.
@@ -25,6 +33,7 @@ async function main() {
     process.env.PATH = `${serverDir}${path.delimiter}${process.env.PATH ?? ""}`;
 
     await runTests({
+      version: VSCODE_VERSION,
       extensionDevelopmentPath,
       extensionTestsPath,
       // Open the fixture workspace; `--disable-extensions` keeps third-party
