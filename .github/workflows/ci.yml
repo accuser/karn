@@ -261,6 +261,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.extension == 'true' || needs.changes.outputs.all == 'true'
     runs-on: ubuntu-latest
+    env:
+      # The pinned VS Code build the suite runs against — `runTest.ts` reads this
+      # and the cache below keys on it (one source of truth). Pinned to the recent
+      # stable the suite was already testing against; bump here to test a newer one.
+      VSCODE_TEST_VERSION: "1.124.2"
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: dtolnay/rust-toolchain@e081816240890017053eacbb1bdf337761dc5582 # 1.95.0
@@ -273,6 +278,14 @@ jobs:
       - name: Install deps
         working-directory: vscode-karn
         run: npm ci
+      # Cache the downloaded VS Code build so the network "Resolving version…"
+      # + download (the ECONNRESET-prone step) runs at most once per pinned
+      # version. `@vscode/test-electron` caches into `vscode-karn/.vscode-test`.
+      - name: Cache the VS Code test build
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: vscode-karn/.vscode-test
+          key: vscode-test-${{ runner.os }}-${{ env.VSCODE_TEST_VERSION }}
       - name: Integration tests (xvfb)
         working-directory: vscode-karn
         run: xvfb-run -a npm test
