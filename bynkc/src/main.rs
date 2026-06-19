@@ -3,9 +3,9 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command as ProcCommand, ExitCode, Stdio};
 
-use clap::Parser;
 use bynkc::BuildTarget;
 use bynkc::cli::{Cli, Command, DiagFormat};
+use clap::Parser;
 
 /// Root a directory project the way every project command should (#46): a
 /// `bynk.toml` or a `src/` subdir selects **split-paths** mode (sources and

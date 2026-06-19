@@ -3,12 +3,12 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use clap::Parser;
 use bynk::cli::{Cli, Command};
 use bynk::compiler;
 use bynk::doctor::{self, Context, DoctorOptions};
 use bynk::probe::{SystemToolbox, Version};
 use bynk::report::{self, Format};
+use clap::Parser;
 
 fn main() -> ExitCode {
     let cli = Cli::parse();

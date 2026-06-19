@@ -43,7 +43,7 @@ use std::path::Path;
 use bynkc::ast::{CommonsItem, ExportKind, FnName, SourceUnit, TypeBody, UsesDecl};
 use bynkc::checker::Ty;
 use bynkc::firstparty::{
-    CLOUDFLARE_ADAPTER_SRC, BYNK_ADAPTER_SRC, BYNK_LIST_SRC, BYNK_MAP_SRC, BYNK_STRING_SRC,
+    BYNK_ADAPTER_SRC, BYNK_LIST_SRC, BYNK_MAP_SRC, BYNK_STRING_SRC, CLOUDFLARE_ADAPTER_SRC,
 };
 use bynkc::{kernel_methods, keywords, lexer, parser};
 
