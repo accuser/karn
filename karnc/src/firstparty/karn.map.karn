@@ -7,9 +7,9 @@ commons karn.map {
 	fn values[K, V](m: Map[K, V]) -> List[V] {
 		let init: List[V] = List.empty()
 		reverse(m.keys().fold(init, (acc, k) => match m.get(k) {
-	Some(v) => acc.prepend(v),
-	None => acc,
-}))
+			Some(v) => acc.prepend(v),
+			None => acc,
+		}))
 	}
 
 	---

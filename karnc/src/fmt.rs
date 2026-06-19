@@ -126,7 +126,33 @@ impl<'a> Formatter<'a> {
             self.emit_indent();
             self.at_line_start = false;
         }
-        self.out.push_str(s);
+        if s.contains('\n') {
+            self.push_reindented(s);
+        } else {
+            self.out.push_str(s);
+        }
+    }
+
+    /// Append a multi-line string, re-applying the current indent to every
+    /// continuation line. Multi-line strings come from the single-line
+    /// expression renderers (`expr_to_string` and friends), which build their
+    /// internal structure assuming column zero — they embed `\n` plus relative
+    /// tabs but know nothing about the current nesting depth. Without this an
+    /// argument-position `match` (or any embedded multi-line expression) would
+    /// print its arms and trailing brace at column one regardless of how deeply
+    /// it is nested. The first line is emitted as-is (its indent, if any, was
+    /// handled by `push`); blank lines are left empty rather than padded.
+    fn push_reindented(&mut self, s: &str) {
+        let prefix = self.indent_unit().repeat(self.indent_level as usize);
+        for (i, line) in s.split('\n').enumerate() {
+            if i > 0 {
+                self.out.push('\n');
+                if !line.is_empty() {
+                    self.out.push_str(&prefix);
+                }
+            }
+            self.out.push_str(line);
+        }
     }
 
     fn newline(&mut self) {
