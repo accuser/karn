@@ -39,11 +39,20 @@ export function serverVersion(context: vscode.ExtensionContext): string {
   return v;
 }
 
-/** `<owner>/<repo>` parsed from package.json `repository.url`. */
+/** `<owner>/<repo>` parsed from package.json `repository.url`.
+ *
+ * Parsed with linear string ops rather than a single regex: a
+ * `github\.com[/:]([^/]+\/…)` match backtracks polynomially on adversarial
+ * input (CodeQL js/polynomial-redos). indexOf + split has no such blowup. */
 function repoSlug(context: vscode.ExtensionContext): string {
+  const fallback = "accuser/bynk";
   const url: string = context.extension.packageJSON.repository?.url ?? "";
-  const m = url.match(/github\.com[/:]([^/]+\/[^/.]+)/);
-  return m ? m[1] : "accuser/bynk";
+  const host = url.indexOf("github.com");
+  if (host === -1) return fallback;
+  const after = url.slice(host + "github.com".length).replace(/^[/:]/, "");
+  const [owner, repoRaw] = after.split("/");
+  const repo = repoRaw?.replace(/\.git$/, "");
+  return owner && repo ? `${owner}/${repo}` : fallback;
 }
 
 /** Map the host to the Rust target triple used by the release assets, or
