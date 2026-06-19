@@ -1,5 +1,5 @@
 /**
- * @file Tree-sitter grammar for Karn.
+ * @file Tree-sitter grammar for Bynk.
  *
  * Covers the syntactic surface defined by the normative specification
  * (docs/src/spec/, §3–§4), which is generated from this grammar and kept
@@ -11,10 +11,10 @@
  * reject code anyway — e.g., `capability` declarations parse inside any
  * declaration body; the LSP surfaces the placement error.
  *
- * Validated by parsing the karnc fixture corpus (tests/fixtures) to zero
+ * Validated by parsing the bynkc fixture corpus (tests/fixtures) to zero
  * ERROR/MISSING nodes.
  *
- * @author Karn project
+ * @author Bynk project
  * @license see project root
  */
 
@@ -35,7 +35,7 @@ const PREC = {
 };
 
 module.exports = grammar({
-  name: "karn",
+  name: "bynk",
 
   externals: ($) => [$.doc_block],
 

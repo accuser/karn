@@ -40,7 +40,7 @@
     "grammars": [
       {
         "language": "karn",
-        "scopeName": "source.karn",
+        "scopeName": "source.bynk",
         "path": "./syntaxes/karn.tmLanguage.json"
       }
     ],

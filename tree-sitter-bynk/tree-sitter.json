@@ -1,9 +1,9 @@
 {
   "grammars": [
     {
-      "name": "karn",
-      "camelcase": "Karn",
-      "scope": "source.karn",
+      "name": "bynk",
+      "camelcase": "Bynk",
+      "scope": "source.bynk",
       "path": ".",
       "file-types": ["karn"],
       "highlights": ["queries/highlights.scm"]
@@ -12,8 +12,8 @@
   "metadata": {
     "version": "0.20.0",
     "license": "MIT OR Apache-2.0",
-    "description": "Tree-sitter grammar for the Karn DSL",
-    "authors": [{ "name": "Karn project" }]
+    "description": "Tree-sitter grammar for the Bynk DSL",
+    "authors": [{ "name": "Bynk project" }]
   },
   "bindings": {
     "c": false,

@@ -24,12 +24,12 @@ enum TokenType {
     DOC_BLOCK,
 };
 
-void *tree_sitter_karn_external_scanner_create(void) { return NULL; }
-void tree_sitter_karn_external_scanner_destroy(void *p) { (void)p; }
-unsigned tree_sitter_karn_external_scanner_serialize(void *p, char *buf) {
+void *tree_sitter_bynk_external_scanner_create(void) { return NULL; }
+void tree_sitter_bynk_external_scanner_destroy(void *p) { (void)p; }
+unsigned tree_sitter_bynk_external_scanner_serialize(void *p, char *buf) {
     (void)p; (void)buf; return 0;
 }
-void tree_sitter_karn_external_scanner_deserialize(void *p, const char *b, unsigned n) {
+void tree_sitter_bynk_external_scanner_deserialize(void *p, const char *b, unsigned n) {
     (void)p; (void)b; (void)n;
 }
 
@@ -68,7 +68,7 @@ static bool match_marker_line(TSLexer *l) {
     return false;
 }
 
-bool tree_sitter_karn_external_scanner_scan(void *payload, TSLexer *lexer,
+bool tree_sitter_bynk_external_scanner_scan(void *payload, TSLexer *lexer,
                                             const bool *valid_symbols) {
     (void)payload;
     if (!valid_symbols[DOC_BLOCK]) {

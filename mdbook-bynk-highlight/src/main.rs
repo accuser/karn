@@ -50,16 +50,16 @@ const HIGHLIGHT_NAMES: &[&str] = &[
 ];
 
 unsafe extern "C" {
-    fn tree_sitter_karn() -> *const ();
+    fn tree_sitter_bynk() -> *const ();
 }
 
 fn highlight_config() -> &'static HighlightConfiguration {
     static CONFIG: OnceLock<HighlightConfiguration> = OnceLock::new();
     CONFIG.get_or_init(|| {
-        let language = unsafe { tree_sitter::Language::from_raw(tree_sitter_karn().cast()) };
+        let language = unsafe { tree_sitter::Language::from_raw(tree_sitter_bynk().cast()) };
         let mut config = HighlightConfiguration::new(
             language,
-            "karn",
+            "bynk",
             include_str!("../../tree-sitter-bynk/queries/highlights.scm"),
             include_str!("../../tree-sitter-bynk/queries/injections.scm"),
             "",

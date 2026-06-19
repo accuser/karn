@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "name": "Karn",
-  "scopeName": "source.karn",
+  "scopeName": "source.bynk",
   "fileTypes": ["karn"],
   "patterns": [
     { "include": "#doc-block" },
