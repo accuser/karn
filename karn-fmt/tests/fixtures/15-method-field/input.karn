@@ -1,0 +1,10 @@
+commons access {
+  fn demo(p: Point, ts: Timestamp, xs: List[Int], data: String) -> Int {
+        let a = p.x
+    let b =     ts.raw
+        let n = xs.length()
+      let s = xs.fold(init, f)
+    let u =   Json.decode[User](data)
+        n
+  }
+}

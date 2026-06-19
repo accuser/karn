@@ -1,0 +1,13 @@
+commons patterns {
+  fn describe(r: Thing) -> String {
+        match r {
+    _ => "any",
+        None => "none",
+    Some(x) => "some",
+        User(id: uid, name: n) => uid,
+    Pair(first, second: s) => s,
+        Ok(_) => "ok",
+      Status.Pending(e) => "pending",
+    }
+  }
+}

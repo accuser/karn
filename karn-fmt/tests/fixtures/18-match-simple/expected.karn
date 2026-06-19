@@ -1,0 +1,8 @@
+commons matching {
+	fn unwrap(o: Option[Int]) -> Int {
+		match o {
+			Some(x) => x,
+			None => 0,
+		}
+	}
+}

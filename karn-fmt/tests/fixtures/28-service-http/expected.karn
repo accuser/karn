@@ -1,0 +1,27 @@
+context api
+
+type UserId = String where NonEmpty
+
+type View = { ok: Bool }
+
+capability Logger {
+	fn log(msg: String) -> Effect[()]
+}
+
+actor User { auth = Bearer(secret = "AUTH_JWT_SECRET"), identity = UserId }
+
+service api from http {
+	on GET("/ping") by Visitor () -> Effect[HttpResult[View]] { Ok(View { ok: true }) }
+
+	on GET("/me") by u: User () -> Effect[HttpResult[View]] given Logger {
+		let _ <- Logger.log("me")
+		Ok(View { ok: true })
+	}
+
+	on POST("/notes/:id") by who: User | Visitor (id: String) -> Effect[HttpResult[View]] {
+		match who {
+			User(u) => Ok(View { ok: true }),
+			Visitor => Ok(View { ok: false }),
+		}
+	}
+}

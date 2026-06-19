@@ -1,0 +1,12 @@
+commons matching {
+  fn classify(o: Option[Int]) -> Int {
+        match o {
+    Some(x) => {
+    let doubled = x + x
+        let bumped = doubled + 1
+    bumped
+    },
+        None => 0,
+    }
+  }
+}

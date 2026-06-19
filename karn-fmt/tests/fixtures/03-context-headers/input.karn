@@ -1,0 +1,17 @@
+context commerce.checkout {
+        uses commerce.money
+   uses commerce.identifiers
+
+  consumes commerce.payment
+      consumes commerce.shipping as Shipping
+  consumes tokens { Jwt, Secrets }
+
+    exports opaque { CheckoutId }
+exports transparent { Receipt }
+
+  type CheckoutId = opaque String
+        type Receipt = {
+  id:    CheckoutId,
+        total: Money,
+}
+}

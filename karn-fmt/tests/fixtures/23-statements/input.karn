@@ -1,0 +1,15 @@
+context demo.stmts
+
+capability Logger {
+  fn log(msg: String) -> Effect[()]
+}
+
+service worker {
+    on call(n: Int) -> Effect[Int] given Logger {
+  let x = n + n
+        let y: Int = x + 1
+   let _ <- Logger.log("working")
+            let z: Int <- Logger.log("again")
+    Effect.pure(y)
+  }
+}

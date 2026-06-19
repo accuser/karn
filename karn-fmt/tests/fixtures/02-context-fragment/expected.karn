@@ -1,0 +1,7 @@
+context commerce.orders
+
+uses commerce.money
+
+type Order = { id: String, total: Money }
+
+fn label(o: Order) -> String { o.id }
