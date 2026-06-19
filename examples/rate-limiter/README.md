@@ -33,11 +33,12 @@ rate-limiter/
 ## Run it
 
 ```sh
-bynkc check src
-bynkc compile src --output out --target workers
-cd out/workers/ratelimit
-npx wrangler dev
+bynk dev
 ```
+
+From anywhere inside the project, `bynk dev` compiles, picks the `ratelimit`
+worker, and serves it on `http://localhost:8787` in local mode — the Durable
+Object is simulated, with nothing to provision first. Then:
 
 ```sh
 # 10 requests / 60s per client (the :client segment is the key)
@@ -48,5 +49,6 @@ curl localhost:8787/check/acme
 for i in $(seq 1 12); do curl -s localhost:8787/check/acme; echo; done
 ```
 
-Deploy with `npx wrangler deploy`. The Durable Object migration is already in the
-generated `wrangler.toml`.
+*Under the hood,* `bynk dev` compiles to `out/workers/ratelimit/` and runs
+`wrangler dev` there. **Deploy** with `npx wrangler deploy` — the Durable Object
+migration is already in the generated `wrangler.toml`.

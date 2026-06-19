@@ -29,12 +29,12 @@ uptime-monitor/
 ## Run it
 
 ```sh
-bynkc check src
-bynkc compile src --output out --target workers
-cd out/workers/monitor
-#   npx wrangler kv namespace create KV     # paste the id into wrangler.toml
-npx wrangler dev
+bynk dev
 ```
+
+From anywhere inside the project, `bynk dev` compiles, picks the `monitor`
+worker, and serves it on `http://localhost:8787` in local mode — KV is
+simulated, with nothing to provision first.
 
 Trigger the schedule locally (wrangler exposes a scheduled endpoint in dev):
 
@@ -45,6 +45,9 @@ curl localhost:8787/status/example
 # {"name":"example","ok":true,"code":200,"at":...}
 ```
 
-The generated `wrangler.toml` already carries `crons = ["*/5 * * * *"]`. Deploy
-with `npx wrangler deploy`. To watch more sites, add another `Fetch`/`Kv` block in
-the cron handler.
+*Under the hood,* `bynk dev` compiles to `out/workers/monitor/` and runs
+`wrangler dev` there. The generated `wrangler.toml` already carries `crons =
+["*/5 * * * *"]`. **Deploy** with `npx wrangler deploy` (create the KV namespace
+first: `npx wrangler kv namespace create KV`, then paste the id into
+`wrangler.toml`). To watch more sites, add another `Fetch`/`Kv` block in the cron
+handler.

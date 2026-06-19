@@ -171,14 +171,19 @@ status code each maps to.
 
 ## Run it
 
-The emitted `out/workers/shortener/` directory is a standard Cloudflare Worker.
-With the [Wrangler](https://developers.cloudflare.com/workers/wrangler/) CLI you
-can run it locally from that directory:
+The fastest way to serve the project locally is `bynk dev`, which compiles and
+runs [Wrangler](https://developers.cloudflare.com/workers/wrangler/) for you in
+one step:
 
 ```sh
-cd out/workers/shortener
-npx wrangler dev
+bynk dev
 ```
+
+It comes up on `http://localhost:8787`. Under the hood the emitted
+`out/workers/shortener/` directory is a standard Cloudflare Worker, so you can
+also run it the manual way — `cd out/workers/shortener && npx wrangler dev`. See
+[Run your project locally](../guides/projects-build-and-deployment/run-locally.md)
+for more.
 
 Then `POST /links` with `{"target":"https://example.com"}` returns a `201`, and
 `GET /links/anything` returns `404` (until we add storage).

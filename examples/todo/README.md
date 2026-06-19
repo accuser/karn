@@ -47,11 +47,13 @@ todos:
 ## Run it
 
 ```sh
-bynkc compile src --output out --target workers
-cd out/workers/todos
-#   echo 'AUTH_JWT_SECRET = "dev-secret"' > .dev.vars
-npx wrangler dev
+# every request needs an AUTH_JWT_SECRET — supply a local one through the passthrough
+bynk dev -- --var AUTH_JWT_SECRET:dev-secret
 ```
+
+From anywhere inside the project, `bynk dev` compiles, picks the `todos` worker,
+and serves it on `http://localhost:8787` in local mode — the Durable Object is
+simulated, with nothing to provision first. Then:
 
 ```sh
 # every request carries a Bearer JWT signed with AUTH_JWT_SECRET; the `sub`
@@ -66,5 +68,6 @@ curl -XPOST localhost:8787/todos/1/complete -H "Authorization: Bearer $JWT"
 # (HTTP 204)
 ```
 
-Deploy with `npx wrangler deploy`; set the real secret with
+*Under the hood,* `bynk dev` compiles to `out/workers/todos/` and runs `wrangler
+dev` there. **Deploy** with `npx wrangler deploy`; set the real secret with
 `npx wrangler secret put AUTH_JWT_SECRET`.

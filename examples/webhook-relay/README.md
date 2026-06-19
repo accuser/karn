@@ -29,15 +29,14 @@ webhook-relay/
 ## Run it
 
 ```sh
-bynkc check src
-bynkc compile src --output out --target workers
-cd out/workers/relay
-#   cat > .dev.vars <<EOF
-#   WEBHOOK_SECRET = "dev-secret"
-#   RELAY_TARGET_URL = "https://httpbin.org/post"
-#   EOF
-npx wrangler dev
+# this service reads two values — supply local ones through the passthrough
+bynk dev \
+  -- --var WEBHOOK_SECRET:dev-secret \
+     --var RELAY_TARGET_URL:https://httpbin.org/post
 ```
+
+From anywhere inside the project, `bynk dev` compiles, picks the `relay` worker,
+and serves it on `http://localhost:8787` in local mode. Then:
 
 ```sh
 # a request with no / wrong X-Signature is rejected at the boundary
@@ -51,5 +50,6 @@ curl -XPOST localhost:8787/hooks/event \
 # "relayed"
 ```
 
-Deploy with `npx wrangler deploy`; set the real secrets with
+*Under the hood,* `bynk dev` compiles to `out/workers/relay/` and runs `wrangler
+dev` there. **Deploy** with `npx wrangler deploy`; set the real secrets with
 `npx wrangler secret put WEBHOOK_SECRET` and `… RELAY_TARGET_URL`.

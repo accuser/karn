@@ -79,9 +79,13 @@ the `bynk` surface.
 ## Run it locally
 
 ```sh
-cd out/workers/hello-web
-npx wrangler dev
+bynk dev
 ```
+
+From anywhere inside the project, `bynk dev` compiles, picks the `hello-web`
+worker, and serves it on `http://localhost:8787` — no need to build first or
+`cd` anywhere. (Under the hood it runs the `bynkc compile` above, then `cd
+out/workers/hello-web && npx wrangler dev`.)
 
 Then, in another terminal:
 

@@ -28,13 +28,13 @@ feature-flags/
 ## Run it
 
 ```sh
-bynkc check src
-bynkc compile src --output out --target workers
-cd out/workers/flags
-#   npx wrangler kv namespace create KV     # paste the id into wrangler.toml
-#   echo 'AUTH_JWT_SECRET = "dev-secret"' > .dev.vars
-npx wrangler dev
+# writes need an AUTH_JWT_SECRET — supply a local one through the passthrough
+bynk dev -- --var AUTH_JWT_SECRET:dev-secret
 ```
+
+From anywhere inside the project, `bynk dev` compiles, picks the `flags` worker,
+and serves it on `http://localhost:8787` in local mode — KV is simulated, so
+there's nothing to provision first. Then:
 
 ```sh
 # public read
@@ -53,5 +53,8 @@ curl localhost:8787/flags
 # ["new-dashboard"]
 ```
 
-Deploy with `npx wrangler deploy`. Set the real secret with
-`npx wrangler secret put AUTH_JWT_SECRET`.
+*Under the hood,* `bynk dev` compiles to `out/workers/flags/` and runs
+`wrangler dev` there. To **deploy** for real: `npx wrangler deploy`, set the real
+secret with `npx wrangler secret put AUTH_JWT_SECRET`, and create the KV
+namespace (`npx wrangler kv namespace create KV`, then paste the id into
+`wrangler.toml`).

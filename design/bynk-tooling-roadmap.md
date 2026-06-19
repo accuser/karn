@@ -187,11 +187,17 @@ orchestration lives in the driver. The arc is **`doctor` → `new` → `dev`**:
   safe place to stand the driver up.
 - **`new`** *(intent)* — scaffold a project (`bynk.toml` + layout); overlaps
   B‑2's "Commands / scaffolding" line, which it supersedes for the CLI path.
-- **`dev`** *(intent)* — build + watch + `wrangler dev` orchestration; carries
-  the real design weight (incremental recompile, multi‑context worker selection,
-  the v1 `workerd` dev‑server overlap noted in `bynk-status-and-roadmap.md`).
+- **`dev`** *(shipped v0.57)* — build + `wrangler dev` orchestration: locate the
+  project, pre-flight the `deploy` capability, compile to a managed `.bynk/dev/`,
+  select the context's worker (one served automatically; `--context` to choose),
+  and serve in local mode with `--` passthrough to wrangler. The compile-once MVP
+  (proposal v0.57). Deferred as named follow-ups: the **watch / incremental
+  recompile** loop, **multi-worker local dev** (live cross-context Service
+  Bindings), and the v1 `workerd` dev-server overlap noted in
+  `bynk-status-and-roadmap.md`. Provisioning + remote deploy are `deploy`'s
+  problem, the next slice.
 
-`new`/`dev` are named as *intent*, not version‑pinned milestones.
+`new` is named as *intent*, not a version‑pinned milestone; `deploy` follows.
 
 ## 6. Suggested sequencing
 

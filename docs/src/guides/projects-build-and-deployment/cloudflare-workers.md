@@ -42,6 +42,11 @@ cd out/workers/notes
 npx wrangler dev
 ```
 
+> **Or, in one step:** [`bynk dev`](run-locally.md) does this whole recipe for
+> you — compile, pick the worker, and `wrangler dev` — from anywhere inside the
+> project, with nothing to provision. The manual flow above is what it runs
+> under the hood.
+
 > An `from http` service only produces a runnable Worker on the `workers` target.
 > A stateful agent compiles to a Durable Object there; on `bundle` the same agent
 > uses an in-process state registry instead.

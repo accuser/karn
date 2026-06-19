@@ -29,13 +29,12 @@ link-shortener/
 ## Run it
 
 ```sh
-bynkc check src
-bynkc compile src --output out --target workers
-cd out/workers/links
-# KV needs a namespace; create one and paste its id into wrangler.toml:
-#   npx wrangler kv namespace create KV
-npx wrangler dev
+bynk dev
 ```
+
+From anywhere inside the project, `bynk dev` compiles, picks the `links` worker,
+and serves it on `http://localhost:8787` in local mode — Workers KV is
+simulated, so there's nothing to provision first. Then:
 
 ```sh
 curl -XPOST localhost:8787/links -d '{"target":"https://bynk.dev"}'
@@ -48,4 +47,17 @@ curl localhost:8787/links/missing0
 # (HTTP 404)
 ```
 
-Deploy with `npx wrangler deploy` from the same directory.
+*Under the hood,* `bynk dev` runs the manual recipe:
+
+```sh
+bynkc compile src --output out --target workers
+cd out/workers/links
+npx wrangler dev
+```
+
+To **deploy** for real, KV needs a namespace — create one and paste its id into
+`wrangler.toml`, then `npx wrangler deploy` from the worker directory:
+
+```sh
+npx wrangler kv namespace create KV
+```
