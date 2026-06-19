@@ -1,7 +1,7 @@
 # 0063 — Value-receiver `.`-member completion: rewrite, retained `expr_types`, enumerable kernels
 
 - **Status:** Accepted (v0.30.2)
-- **Spec:** `design/karn-lsp-spec.md` §3.15
+- **Spec:** `design/bynk-lsp-spec.md` §3.15
 - **Refines:** ADR 0062 (the `.`-member receiver split)
 
 ## Context

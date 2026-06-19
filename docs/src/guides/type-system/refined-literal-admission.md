@@ -1,7 +1,7 @@
 # The refined-literal admission model
 
 When you write a literal where a
-[refined type](../../reference/glossary.md#term-refined-type) is expected, Karn
+[refined type](../../reference/glossary.md#term-refined-type) is expected, Bynk
 checks it at compile time and admits it directly — no
 [`.of`](../../reference/glossary.md#term-of-unsafe), no
 [`Result`](../../reference/glossary.md#term-result-option):
@@ -21,7 +21,7 @@ The flip side is what makes it worth having. In TypeScript, a refined value is
 const age: number = 240; // compiles — 240 is a perfectly good `number`
 ```
 
-In Karn, a literal in a refined-type position is checked against the predicate at
+In Bynk, a literal in a refined-type position is checked against the predicate at
 compile time, so the out-of-range value cannot be constructed:
 
 ```karn,fail
@@ -54,7 +54,7 @@ known-good literal should be ergonomic.
 
 Both options trade away consistency for a little convenience.
 
-## The model Karn uses
+## The model Bynk uses
 
 Instead, admission is **expected-type-directed** and purely additive: in
 positions where the expected type is a refined type, a literal is checked against

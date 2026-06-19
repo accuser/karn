@@ -1,7 +1,7 @@
 # 0095 — The unit→source map: analysis exposes which files comprise each unit
 
 - **Status:** Accepted (LSP tooling track, slice 6b)
-- **Spec:** `design/karn-lsp-spec.md` §3.21
+- **Spec:** `design/bynk-lsp-spec.md` §3.21
 - **Realises:** the LSP tooling track (`design/tracks/lsp.md`), slice 6b; the unit→file map ADR 0068 flagged as deferred surface for context-source navigation.
 
 ## Context

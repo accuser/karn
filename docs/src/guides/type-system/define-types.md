@@ -1,6 +1,6 @@
 # Define and consume sum, record, and opaque types
 
-**Goal:** declare each of Karn's three composite type kinds and use their values.
+**Goal:** declare each of Bynk's three composite type kinds and use their values.
 
 ## Record — group fields
 

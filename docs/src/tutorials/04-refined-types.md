@@ -21,7 +21,7 @@ type Url = String where MinLength(1) and MaxLength(2048)
 ```
 
 `ShortCode` is a `String`, but only one of length 6–8; you combine predicates
-with `and`. Karn ships a fixed set — numeric ones like `NonNegative`, `Positive`,
+with `and`. Bynk ships a fixed set — numeric ones like `NonNegative`, `Positive`,
 and `InRange(lo, hi)`; string ones like `NonEmpty`, `MinLength(n)`, `MaxLength(n)`,
 `Length(n)`, and `Matches(regex)`. For a code we really want a character set too,
 which `Matches` gives us — `String where Matches("[a-zA-Z0-9]{6,8}")` — but the
@@ -37,7 +37,7 @@ type CreatedView       = { code: ShortCode, target: Url }
 
 ## Admit a literal — checked at compile time
 
-When you write a literal where a refined type is expected, Karn checks it **at
+When you write a literal where a refined type is expected, Bynk checks it **at
 compile time** and admits it directly. No validation call, no error handling:
 
 ```karn,ignore
@@ -183,7 +183,7 @@ service api from http {
 ```
 
 ```sh
-karnc compile . --output out --target workers
+bynkc compile . --output out --target workers
 ```
 
 ## What you have done

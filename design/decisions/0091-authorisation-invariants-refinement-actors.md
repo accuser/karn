@@ -56,7 +56,7 @@ base scheme (failure → **401**), check the predicate against the *verified* cl
 The authorisation half of the boundary, completing the 401/403 split. Built by
 *activating* a reserved grammar form and *extending* the Bearer seam — new surface,
 not a re-architecture. The closed claim-predicate set keeps the 403 decision total
-and reviewable; a standing behavioral guard (`karnc/tests/refinement_auth.rs`, the
+and reviewable; a standing behavioral guard (`bynkc/tests/refinement_auth.rs`, the
 ADR 0087 posture) drives the emitted trichotomy (401 / 403 / allow). Typed claims
 schemas and general predicate expressions, non-Bearer authorisation, nominal actor
 extension (adding structure, not restricting), and RBAC hierarchies extend this

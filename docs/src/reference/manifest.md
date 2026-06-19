@@ -1,6 +1,6 @@
-# `karn.toml` manifest
+# `bynk.toml` manifest
 
-A `karn.toml` at a project's root marks it as a project and configures its
+A `bynk.toml` at a project's root marks it as a project and configures its
 layout. A multi-file project with a `src/` and `tests/` split uses one.
 
 ```toml
@@ -45,7 +45,7 @@ commerce.orders` in `src/commerce/orders.karn`, `test commerce.orders` in
 
 ## `[fmt]`
 
-Formatter settings (consumed by `karnc fmt`):
+Formatter settings (consumed by `bynkc fmt`):
 
 | Key | Purpose |
 |---|---|
@@ -54,7 +54,7 @@ Formatter settings (consumed by `karnc fmt`):
 
 ## `[lsp]`
 
-Language-server settings (consumed by `karnc-lsp`):
+Language-server settings (consumed by `bynkc-lsp`):
 
 | Key | Purpose |
 |---|---|
@@ -62,6 +62,6 @@ Language-server settings (consumed by `karnc-lsp`):
 
 ## Legacy mode
 
-Without a `karn.toml`, a single `.karn` file compiles as a standalone unit (the
+Without a `bynk.toml`, a single `.karn` file compiles as a standalone unit (the
 [first-program](../tutorials/01-first-program.md) flow). Project features —
-a `src`/`tests` split, `karnc test` — expect the manifest-driven layout above.
+a `src`/`tests` split, `bynkc test` — expect the manifest-driven layout above.

@@ -72,7 +72,7 @@ new `Ty::ActorSum` whose variants `variants_of` reports means the entire `match`
 machinery (arm resolution, payload binding, exhaustiveness) works unchanged. The
 emission crux — first-wins over a header member and a body member with a single
 body read — is solved by the wrapper owning the boundary. A standing behavioral
-guard (`karnc/tests/multi_actor_sum.rs`, the ADR 0087 posture) drives the emitted
+guard (`bynkc/tests/multi_actor_sum.rs`, the ADR 0087 posture) drives the emitted
 resolution: first-wins, fall-through on an invalid earlier member, and
 fail-closed-total. Concrete-verification keying (same-scheme multi-provider),
 refinement members + the 403 path (Q3), and internal-channel sums extend this

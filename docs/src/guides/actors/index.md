@@ -1,6 +1,6 @@
 # Actors & access control
 
-An **actor** is a *boundary contract*: it tells Karn what to expect of the party
+An **actor** is a *boundary contract*: it tells Bynk what to expect of the party
 on the other side of a request, and the compiler generates the verification a
 service would otherwise hand-write. A handler names its actor with a **`by`
 clause**, and the body runs **only if the contract is satisfied** — the payload

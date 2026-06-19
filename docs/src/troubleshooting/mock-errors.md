@@ -22,7 +22,7 @@ type; a record/variant literal otherwise).
 ```
 
 **Cause:** you wrote a bare `Mock[T]` for a type whose refinement is a `Matches`
-pattern. Karn cannot invent a string that matches an arbitrary regex.
+pattern. Bynk cannot invent a string that matches an arbitrary regex.
 
 **Fix:** pin a concrete value that satisfies the pattern. Given the type:
 

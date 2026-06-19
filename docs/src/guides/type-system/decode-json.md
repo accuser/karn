@@ -1,7 +1,7 @@
 # Decode untrusted JSON into a typed value
 
 **Goal:** turn a raw JSON string from outside the program into a fully-typed —
-and validated — Karn value, with a typed error when it does not fit.
+and validated — Bynk value, with a typed error when it does not fit.
 
 `Json.decode[T](s)` parses a JSON string and checks it against `T`, returning a
 `Result[T, JsonError]`. The check covers both **shape** (the right fields and

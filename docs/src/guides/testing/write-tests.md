@@ -21,10 +21,10 @@ test counters {
 Run the suite:
 
 ```sh
-karnc test .
+bynkc test .
 ```
 
-`karnc test` compiles the project, type-checks it with `tsc`, and runs it with
+`bynkc test` compiles the project, type-checks it with `tsc`, and runs it with
 Node, so both must be on your path. `assert` is valid only inside a test case.
 
 ## Fabricate values with `Mock[T]`

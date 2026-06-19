@@ -2,12 +2,12 @@
 
 **Goal:** structure a multi-file project with source and tests, and build it.
 
-A project is a directory containing a `karn.toml` manifest plus `src/` and
+A project is a directory containing a `bynk.toml` manifest plus `src/` and
 `tests/` trees:
 
 ```text
 my-project/
-├── karn.toml
+├── bynk.toml
 ├── src/
 │   ├── counters.karn       # context counters
 │   └── quantities.karn     # commons quantities
@@ -18,7 +18,7 @@ my-project/
 
 ## The manifest
 
-`karn.toml` names the project and its directory layout:
+`bynk.toml` names the project and its directory layout:
 
 ```toml
 [project]
@@ -30,7 +30,7 @@ src = "src"
 tests = "tests"
 ```
 
-See the [`karn.toml` reference](../../reference/manifest.md) for every key.
+See the [`bynk.toml` reference](../../reference/manifest.md) for every key.
 
 ## Path identity
 
@@ -48,13 +48,13 @@ for grepping); use whichever you prefer.
 ## Build and test
 
 ```sh
-karnc compile . --output out      # compile the project
-karnc test .                      # compile and run the tests
-karnc check .                     # type-check only
+bynkc compile . --output out      # compile the project
+bynkc test .                      # compile and run the tests
+bynkc check .                     # type-check only
 ```
 
 ## Related
 
 - [Write tests and mock collaborators](../testing/write-tests.md).
 - [Target Cloudflare Workers](cloudflare-workers.md).
-- Reference: [`karn.toml` manifest](../../reference/manifest.md).
+- Reference: [`bynk.toml` manifest](../../reference/manifest.md).

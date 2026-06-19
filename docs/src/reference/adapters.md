@@ -1,10 +1,10 @@
 # Adapters
 
-An **adapter** is the one declaration kind where a Karn capability *contract*
-sits adjacent to a non-Karn *implementation*. It is the **only** place the host
+An **adapter** is the one declaration kind where a Bynk capability *contract*
+sits adjacent to a non-Bynk *implementation*. It is the **only** place the host
 boundary may exist — the single, named, greppable seam through which a
-deploy-target runtime or an npm library enters a Karn program. Everything else
-stays pure Karn.
+deploy-target runtime or an npm library enters a Bynk program. Everything else
+stays pure Bynk.
 
 An adapter declares capabilities and the boundary types they reference, names a
 TypeScript **binding** that supplies the implementations, and `exports` the
@@ -105,16 +105,16 @@ carries the full ambient set:
 
 `Fetch`'s `Request` carries `method` (`Method` enum), `url`, and
 `contentType`/`authorization`/`body` as `Option[String]` fields; a general
-`headers` list is deferred until Karn has a sequence type, and widening
+`headers` list is deferred until Bynk has a sequence type, and widening
 `Request` later is additive.
 
 ### Platforms
 
 The deploy **platform** (`--platform {cloudflare,node}`, default `cloudflare`)
-selects which `karn-<platform>.ts` binding is linked. It is distinct from
+selects which `bynk-<platform>.ts` binding is linked. It is distinct from
 `--target {bundle,workers}`, which chooses emit topology. Because the `karn`
 contract names canonical provider symbols, the generated compose is
-platform-identical — only the imported binding module differs. Porting Karn to
+platform-identical — only the imported binding module differs. Porting Bynk to
 a new runtime means implementing this one adapter's interfaces.
 
 ### Platform adapters & the lock
@@ -213,7 +213,7 @@ unit.
 ## The binding as privileged constructor
 
 A binding constructs its adapter's boundary types, which deliberately pierces
-Karn's construction discipline (only the defining unit may construct a type).
+Bynk's construction discipline (only the defining unit may construct a type).
 Inside a binding that rule does not apply — the binding *is* the host boundary.
 To avoid coupling to the emitter's lowering, bindings construct boundary values
 **only through the emitted constructors** — `Ok`/`Err`/`Some`/`None` from

@@ -1,6 +1,6 @@
 # The testing philosophy
 
-Testing is built into Karn rather than bolted on: `test` blocks, `assert`,
+Testing is built into Bynk rather than bolted on: `test` blocks, `assert`,
 `Mock[T]`, and `mocks` are language constructs. This page explains why they exist
 in the form they do.
 
@@ -48,7 +48,7 @@ the design already has.
 
 Test-only constructs are *checked* to be test-only; fabricated values are
 *honestly distinct* from real ones; collaborators are mocked *through the real
-seam*. Testing in Karn follows the same instinct as the rest of the language —
+seam*. Testing in Bynk follows the same instinct as the rest of the language —
 make the safe thing structural — applied to how you verify your code.
 
 ## See also

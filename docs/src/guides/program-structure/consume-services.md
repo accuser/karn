@@ -52,7 +52,7 @@ service placeOrder {
 
 ## How it compiles
 
-The call is the same Karn code on both targets, but the emitted wiring differs:
+The call is the same Bynk code on both targets, but the emitted wiring differs:
 
 - **`bundle`** (default) — a direct in-process function call through a composed
   surface.
@@ -65,4 +65,4 @@ target details.
 ## Related
 
 - Reference: [type system](../../reference/types.md).
-- Explanation: [How a Karn program is shaped](how-a-program-is-shaped.md).
+- Explanation: [How a Bynk program is shaped](how-a-program-is-shaped.md).

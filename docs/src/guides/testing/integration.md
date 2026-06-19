@@ -85,7 +85,7 @@ Both hops are exercised.
 ## Run it
 
 ```sh
-karnc test .
+bynkc test .
 ```
 
 ```text
@@ -98,7 +98,7 @@ integration · checkout:
 2 passed, 0 failed.
 ```
 
-`karnc test` compiles the participants in workers mode under `out/workers/`,
+`bynkc test` compiles the participants in workers mode under `out/workers/`,
 stands each one up as an in-process Worker, wires the bindings, type-checks
 everything with `tsc --strict`, and runs it on Node. No `wrangler` or `miniflare`
 is needed.

@@ -1,9 +1,9 @@
 # Hello, World!
 
-A complete Karn project in two source files and a test — run it locally,
+A complete Bynk project in two source files and a test — run it locally,
 then deploy it to Cloudflare, from the same build.
 
-It is small, but it is not a toy: it shows the things Karn is *for*.
+It is small, but it is not a toy: it shows the things Bynk is *for*.
 
 - **A refined type** — `Subject` is a `String` that is provably non-empty
   and at most 40 characters. `greeting` takes a `Subject`, so it never
@@ -20,7 +20,7 @@ It is small, but it is not a toy: it shows the things Karn is *for*.
 
 ```text
 hello-world/
-├── karn.toml               # project manifest ([paths])
+├── bynk.toml               # project manifest ([paths])
 ├── src/
 │   └── hello/
 │       ├── text.karn       # commons hello.text — Subject + greeting
@@ -42,9 +42,9 @@ Run `karn doctor` to check these for you (see the book's install page):
 karn doctor
 ```
 
-- `karnc` on your `PATH` (see the book's install page; from this
-  repository: `cargo build --release -p karnc` →
-  `target/release/karnc`).
+- `bynkc` on your `PATH` (see the book's install page; from this
+  repository: `cargo build --release -p bynkc` →
+  `target/release/bynkc`).
 - Node.js (for `karn test` and for Wrangler).
 
 ## Check and test
@@ -52,8 +52,8 @@ karn doctor
 From this directory:
 
 ```sh
-karnc check src
-karnc test .
+bynkc check src
+bynkc test .
 ```
 
 ```text
@@ -68,7 +68,7 @@ hello.text:
 ## Build the Worker
 
 ```sh
-karnc compile src --output out --target workers
+bynkc compile src --output out --target workers
 ```
 
 This emits a complete, standard Cloudflare Worker under
@@ -89,8 +89,8 @@ Then, in another terminal:
 curl http://localhost:8787/
 # "Hello, World!"
 
-curl http://localhost:8787/hello/Karn
-# "Hello, Karn!"
+curl http://localhost:8787/hello/Bynk
+# "Hello, Bynk!"
 
 curl http://localhost:8787/hello/this-name-is-way-too-long-to-be-a-valid-subject
 # {"error":"a name must be non-empty and at most 40 characters"}  (HTTP 400)
@@ -117,5 +117,5 @@ Wrangler prints the deployed URL — your greeting is live at
 
 - [Tutorials](../../docs/src/tutorials/01-first-program.md) — the URL
   shortener series grows these same ideas into a stateful service.
-- [How a Karn program is shaped](../../docs/src/guides/program-structure/how-a-program-is-shaped.md)
+- [How a Bynk program is shaped](../../docs/src/guides/program-structure/how-a-program-is-shaped.md)
   — why contexts, capabilities, and boundaries look the way they do.

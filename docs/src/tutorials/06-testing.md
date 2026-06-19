@@ -1,18 +1,18 @@
 # Test it
 
-A language built around correctness should make tests easy, and Karn builds
+A language built around correctness should make tests easy, and Bynk builds
 testing in: `test` blocks, `assert`, value fabrication with `Mock[T]`, and
 collaborator mocking with `mocks`. In this final tutorial we test the shortener
 from [Tutorial 5](05-stateful-agent.md) and meet each of those tools.
 
 ## Lay out a test project
 
-Tests live in their own tree, declared in a `karn.toml` manifest. Arrange the
+Tests live in their own tree, declared in a `bynk.toml` manifest. Arrange the
 project like this:
 
 ```text
 url-shortener/
-├── karn.toml
+├── bynk.toml
 ├── src/
 │   └── shortener.karn
 └── tests/
@@ -85,13 +85,13 @@ matches a value against a pattern and yields a `Bool`, perfect for "this is an
 
 ## Run the tests
 
-Run the whole suite with `karnc test`:
+Run the whole suite with `bynkc test`:
 
 ```sh
-karnc test .
+bynkc test .
 ```
 
-`karnc` compiles the project (including the tests), type-checks the generated
+`bynkc` compiles the project (including the tests), type-checks the generated
 TypeScript with `tsc`, and runs it with Node. You will need `tsc` and `node` on
 your path. The output:
 
@@ -165,7 +165,7 @@ through `create.call(url)` and assert it succeeded.
 Run everything again:
 
 ```sh
-karnc test .
+bynkc test .
 ```
 
 ```text
@@ -188,7 +188,7 @@ shortener:
 ## What you have done — and where to go
 
 You laid out a test project, wrote `test` cases with `assert`, ran them with
-`karnc test`, fabricated values with `Mock[T]`, and mocked a collaborator with
+`bynkc test`, fabricated values with `Mock[T]`, and mocked a collaborator with
 `mocks`. More than that: you have built one system the whole way — from a first
 compiled program, through an HTTP service, a data model, refined types, and a
 stateful agent, to a tested URL shortener.
@@ -200,7 +200,7 @@ From here:
 - **Need exact behaviour?** The [reference](../reference/index.md) is the
   consultable source of truth.
 - **Want the reasoning?** The [explanation](../guides/index.md) section
-  covers the *why* behind Karn's design.
+  covers the *why* behind Bynk's design.
 
 ---
 

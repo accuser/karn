@@ -1,7 +1,7 @@
 # 0072 — Richer inlay hints: parameter names + generic instantiations
 
 - **Status:** Accepted (v0.39)
-- **Spec:** `design/karn-lsp-spec.md` (inlay-hints section)
+- **Spec:** `design/bynk-lsp-spec.md` (inlay-hints section)
 - **Relates to:** ADR 0056 (the v0.27 inferred-type inlay hints this extends)
 
 ## Context

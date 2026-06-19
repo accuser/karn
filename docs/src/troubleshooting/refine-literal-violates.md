@@ -7,7 +7,7 @@
 ## What it means
 
 You wrote a literal in a position whose expected type is a refined type, and the
-literal does not satisfy that type's predicate. Because Karn checks admitted
+literal does not satisfy that type's predicate. Because Bynk checks admitted
 literals at compile time, this is a build error rather than a runtime failure.
 
 ```karn,fail

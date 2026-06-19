@@ -4,7 +4,7 @@
 without calling `.of` or handling a `Result`.
 
 When you write a literal in a position whose expected type is a refined type,
-Karn checks the literal against the predicate **at compile time** and admits it
+Bynk checks the literal against the predicate **at compile time** and admits it
 directly. A valid literal compiles; an invalid one is a compile error
 ([`karn.refine.literal_violates`](../../troubleshooting/refine-literal-violates.md)).
 

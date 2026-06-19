@@ -17,7 +17,7 @@ accumulator) because they are **compiler-known special forms typed directly
 by the checker**, not declared methods — the generic-methods deferral bites
 only on declared methods. (b) **Construction** is the `[…]` literal plus the
 qualified statics `List.empty()` / `Map.empty()`, reusing the
-`HttpResult.Ok` qualified-call shape. (c) **Combinators are Karn-written
+`HttpResult.Ok` qualified-call shape. (c) **Combinators are Bynk-written
 generic free functions** in `karn.list`/`karn.map` — `map(xs, f)`,
 `filter(xs, p)`, `traverse(xs, f)`, … — brought in by `uses karn.list`.
 **No method chaining (`xs.map`) in v0.20b**; it arrives additively when

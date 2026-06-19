@@ -1,4 +1,4 @@
-# 0092 — The cross-context `CallerId` value is the calling context's qualified name, stamped by the compiler into a reserved `X-Karn-Caller` header beside the args body, read at the callee's `/_karn/call/` boundary and threaded into `deps`; an absent caller on a `by c: Caller` handler is fail-closed; trust is static / channel-based (no crypto), first-party
+# 0092 — The cross-context `CallerId` value is the calling context's qualified name, stamped by the compiler into a reserved `X-Bynk-Caller` header beside the args body, read at the callee's `/_karn/call/` boundary and threaded into `deps`; an absent caller on a `by c: Caller` handler is fail-closed; trust is static / channel-based (no crypto), first-party
 
 - **Status:** Accepted (v0.54)
 - **Spec:** `static-semantics.md` (§5.7a the live `Caller`), `emission.md` (§7.3.4a the cross-context caller seam), `runtime-library.md` (`callService` caller param)
@@ -22,7 +22,7 @@ the calling context's qualified name — established at the boundary.**
   stamped by the compiler as a compile-time constant. It answers exactly "which
   context called me," the natural sealed identity for an `Internal` channel.
   `CallerId` stays `String`.
-- **Transmitted via a reserved `X-Karn-Caller` header**, not an args envelope.
+- **Transmitted via a reserved `X-Bynk-Caller` header**, not an args envelope.
   `callService` gains a `callerContext` argument and sets the header; the args
   body — and its typed (de)serialisation — is **untouched**. The identity rides
   beside the payload as metadata, not inside it.
@@ -31,9 +31,9 @@ the calling context's qualified name — established at the boundary.**
   handler's `deps` as its `CallerId` identity; `<binder>.identity` lowers to
   `deps.identity` (the same `deps_identity_binder` path Bearer uses). A
   binder-less `on call` reads no header and is byte-unchanged.
-- **Absent caller → fail-closed.** A Karn caller always stamps the header; its
+- **Absent caller → fail-closed.** A Bynk caller always stamps the header; its
   absence (or empty value) on a `by c: Caller` handler means a malformed /
-  non-Karn internal call — rejected before the body (the internal analogue of
+  non-Bynk internal call — rejected before the body (the internal analogue of
   401). This holds the sealed-identity guarantee: no body runs with a placeholder
   identity.
 - **Trust is static / channel-based, first-party.** The `Internal` scheme trusts
@@ -50,7 +50,7 @@ the header is additive, and the deps-threading reuses the Bearer path (the
 `bearer_identity_binder` field generalises to `deps_identity_binder`). With this
 slice the actors track's planned **Q1–Q7 scope is complete**; the only remaining
 item, Q8 (replay/ordering), is cross-track (Events) and may not be an actors
-slice at all. A standing behavioral guard (`karnc/tests/cross_context_caller.rs`)
+slice at all. A standing behavioral guard (`bynkc/tests/cross_context_caller.rs`)
 drives the callee dispatch with and without the header (live id vs fail-closed
 401). Signed caller headers (multi-trust-domain integrity), inter-context
 **authorisation**, and a structured `CallerId` extend this additively if a

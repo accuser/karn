@@ -2,7 +2,7 @@
 
 Everything so far has been stateless: a request comes in, a value goes out,
 nothing is remembered. A URL shortener has to remember — which code maps to which
-URL, and how often each was followed. In Karn, the unit of state is an
+URL, and how often each was followed. In Bynk, the unit of state is an
 **[agent](../reference/glossary.md#term-agent)**:
 a named thing, identified by a key, that owns some state and exposes handlers to
 read and change it.
@@ -47,7 +47,7 @@ Three parts make up the agent:
 ## State must be zeroable
 
 Here is the rule that shapes agent state: **every state field must have a zero
-value**. When you address a link whose code has never been seen, Karn initialises
+value**. When you address a link whose code has never been seen, Bynk initialises
 its state automatically — there is no constructor to call first — so each field
 needs a well-defined starting value. `Int` starts at `0`, `Bool` at `false`,
 `String` at `""`, and `Option[T]` at `None`.
@@ -286,7 +286,7 @@ service api from http {
 ```
 
 ```sh
-karnc compile . --output out --target workers
+bynkc compile . --output out --target workers
 ```
 
 The shortener now creates real links and resolves them, counting hits as it goes.

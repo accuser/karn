@@ -3,7 +3,7 @@
 **Goal:** produce and consume `Result` (success or error) and `Option` (a value
 or nothing).
 
-Karn has no exceptions and no `null`. Fallible operations return `Result[T, E]`;
+Bynk has no exceptions and no `null`. Fallible operations return `Result[T, E]`;
 possibly-absent values are `Option[T]`.
 
 ## Construct values

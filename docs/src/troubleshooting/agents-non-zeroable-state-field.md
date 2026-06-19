@@ -7,7 +7,7 @@ defined zero value, so a fresh key cannot be initialised
 
 ## What it means
 
-An agent's state field has a type with no zero value. Karn initialises a
+An agent's state field has a type with no zero value. Bynk initialises a
 never-seen key's state automatically, so every field needs a well-defined
 starting value. Types that have one include `Int` (`0`), `Bool` (`false`),
 `String` (`""`), `Option[T]` (`None`), and records of zeroable fields. Types that

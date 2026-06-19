@@ -5,7 +5,7 @@ across the rest of the tutorials. We begin with its HTTP front door: a service
 with a couple of endpoints, compiled to a ready-to-run Cloudflare Worker. Along
 the way you will meet `context`, `service`, HTTP handlers, and `HttpResult`.
 
-This builds on [Tutorial 1](01-first-program.md). You need `karnc` installed.
+This builds on [Tutorial 1](01-first-program.md). You need `bynkc` installed.
 
 ## Start a project
 
@@ -34,7 +34,7 @@ A few new things:
 
 - `context shortener` declares a
   **[context](../reference/glossary.md#term-context)** rather than a `commons`. Contexts
-  are the unit Karn deploys — each becomes one Worker.
+  are the unit Bynk deploys — each becomes one Worker.
 - `service api from http { … }` groups request handlers.
 - `on GET("/links/:code") by Visitor (code: String)` is a handler: it answers
   `GET /links/<something>`, binds the `:code` path segment to the `code`
@@ -52,7 +52,7 @@ A few new things:
 Compile the project, targeting Cloudflare Workers:
 
 ```sh
-karnc compile . --output out --target workers
+bynkc compile . --output out --target workers
 ```
 
 This writes a complete Worker under `out/`:
@@ -91,7 +91,7 @@ if (method === "GET" && __m) {
 }
 ```
 
-You wrote the *what* (answer `GET /links/:code` with `NotFound`); `karnc`
+You wrote the *what* (answer `GET /links/:code` with `NotFound`); `bynkc`
 generated the *how* (the router, the response encoding, the Worker scaffold).
 
 ## Accept a request body
@@ -123,7 +123,7 @@ parameter typed as `CreateLinkRequest`, and returns `Created(…)` — the
 `HttpResult` variant for `201 Created`. (For now it just echoes the target back;
 real storage and a minted code come later.)
 
-Recompile (`karnc compile . --output out --target workers`) and look again at
+Recompile (`bynkc compile . --output out --target workers`) and look again at
 `handlers.ts`. Your handler is there:
 
 ```typescript
@@ -132,7 +132,7 @@ async http_POST_links(body: CreateLinkRequest, deps: {}): Promise<HttpResult<str
 },
 ```
 
-…and `karnc` has *also* generated a validator that parses and type-checks the
+…and `bynkc` has *also* generated a validator that parses and type-checks the
 incoming JSON before your handler ever runs:
 
 ```typescript
@@ -198,4 +198,4 @@ will start modelling the shortener's data in earnest.
 ---
 
 *Curious why a context maps to a Worker, or how the boundary validation fits the
-design? See [How a Karn program is shaped](../guides/program-structure/how-a-program-is-shaped.md).*
+design? See [How a Bynk program is shaped](../guides/program-structure/how-a-program-is-shaped.md).*

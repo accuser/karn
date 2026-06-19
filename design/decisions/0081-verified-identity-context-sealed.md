@@ -19,7 +19,7 @@ downstream**. It is accessed as `name.identity` on the `by`-bound actor (the
 binding is the *verified actor*, leaving room for `name.scheme`/claim accessors
 later without a surface change).
 
-Sealed by reusing Karn's existing rule that context-owned types are minted only
+Sealed by reusing Bynk's existing rule that context-owned types are minted only
 inside the owning context (cf. refined boundary IDs, 0014): a declared
 `identity = T` must be a context-ownable type (`karn.actor.identity_not_sealed`
 otherwise), so unforgeability is by construction, not convention. This is the

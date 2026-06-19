@@ -4,7 +4,7 @@
 - **Spec:** §4.6.8, §5.2, §7.3.9
 
 ## Context
-Programs need JSON at the edges Karn doesn't own (request bodies built by
+Programs need JSON at the edges Bynk doesn't own (request bodies built by
 hand, stored blobs, third-party payloads). An untyped `Json` value type
 with navigation is against the grain of a language whose whole posture is
 typed boundaries; the boundary codec machinery (`serialise_<T>` /

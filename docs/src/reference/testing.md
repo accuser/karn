@@ -108,7 +108,7 @@ in-memory Durable Object instances — same key, same instance **within a case**
 state starts empty and is **fresh per case**. See
 [Test a flow across Workers](../guides/testing/integration.md).
 
-`karnc test` runs integration tests in plain Node alongside unit tests — it
+`bynkc test` runs integration tests in plain Node alongside unit tests — it
 compiles the participants in workers mode under `out/workers/`, stands them up
 in-process, and routes the real wire between them. No `wrangler`/`miniflare`
 needed.
@@ -116,9 +116,9 @@ needed.
 ## Running
 
 ```sh
-karnc test .
+bynkc test .
 ```
 
-`karnc test` compiles the project (including tests), type-checks the output with
+`bynkc test` compiles the project (including tests), type-checks the output with
 `tsc`, and runs it with Node — both must be on your path. `--no-run` emits the
 TypeScript without running it. Exit code is non-zero if any test fails.

@@ -4,7 +4,7 @@
 - **Spec:** §4.6.8, §5.2, §7.3.8
 
 ## Context
-The original v0.22 draft proposed Karn-written free-function commons
+The original v0.22 draft proposed Bynk-written free-function commons
 (`karn.option`, `karn.int`, …) per the 0037 pattern. Review killed that
 twice over: free functions imported by bare name collide
 (`karn.resolve.duplicate_fn` — `karn.list` already exports `map`, so
@@ -36,12 +36,12 @@ annotates a `let` — the same rule as generic-call lambdas, machinery
 shared deliberately.
 
 Deliberate gaps: no `isNone`/`isErr` (negate), no `unwrap` (no panics in
-Karn), no effectful combinator variants (the `foldEff` precedent says add
+Bynk), no effectful combinator variants (the `foldEff` precedent says add
 them when a fixture needs them).
 
 ## Consequences
 Zero collision surface, and **method chaining works from day one**
 (`o.map(f).getOrElse(x)`) — built-in methods chain without the deferred
 generic-user-methods feature. The cost: these combinators are compiler
-code, not dogfooded Karn; `karn.string`'s `join` keeps a foot in the
-Karn-written camp.
+code, not dogfooded Bynk; `karn.string`'s `join` keeps a foot in the
+Bynk-written camp.

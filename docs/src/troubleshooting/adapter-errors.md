@@ -11,7 +11,7 @@ These diagnostics relate to **adapters** — the host boundary. See the
 ```
 
 Providers inside an adapter are **external**: write `provides Cap = Name` with no
-brace block. The implementation lives in the binding, not in Karn.
+brace block. The implementation lives in the binding, not in Bynk.
 
 ```karn,ignore
 provides Jwt = JoseJwt        -- not `provides Jwt = JoseJwt { fn sign(…) { … } }`
@@ -20,11 +20,11 @@ provides Jwt = JoseJwt        -- not `provides Jwt = JoseJwt { fn sign(…) { �
 ## `karn.context.external_provider`
 
 ```text
-[karn.context.external_provider] an external (bodiless) provider is only allowed inside an `adapter` — a context provider must have a Karn body
+[karn.context.external_provider] an external (bodiless) provider is only allowed inside an `adapter` — a context provider must have a Bynk body
 ```
 
 A bodiless `provides` is only legal inside an adapter. In a context, give the
-provider a Karn body — or move it to an adapter if it wraps host code.
+provider a Bynk body — or move it to an adapter if it wraps host code.
 
 ## `karn.adapter.disallowed_item`
 

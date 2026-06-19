@@ -43,7 +43,7 @@ service outbox from queue("outbound-email") {
 ```
 
 A message that keeps retrying eventually hits the queue's dead-letter policy
-(configured outside Karn).
+(configured outside Bynk).
 
 ## Use a capability
 

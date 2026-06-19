@@ -1,7 +1,7 @@
 # Model your data with types
 
 In [Tutorial 2](02-http-service.md) the shortener echoed strings around. Now we
-give it a real data model. Karn gives you three ways to shape data, and choosing
+give it a real data model. Bynk gives you three ways to shape data, and choosing
 the right one is most of the work of modelling a domain well:
 
 - **Records** group related fields together.
@@ -190,14 +190,14 @@ service api from http {
 ```
 
 ```sh
-karnc compile . --output out --target workers
+bynkc compile . --output out --target workers
 ```
 
 ## What you have done
 
 You modelled the shortener's data with the core type kinds — `CreateLinkRequest`,
 `CreatedView`, and `ResolveView` records, and a `LinkError` enum — and consumed
-the sum with an exhaustive `match`. This is the everyday vocabulary of Karn data
+the sum with an exhaustive `match`. This is the everyday vocabulary of Bynk data
 modelling.
 
 Right now a `code` is any old `String`. Next we sharpen that: how do we stop an

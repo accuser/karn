@@ -49,7 +49,7 @@ Add **interpolation holes** to string literals: `"… \(expr) …"`.
   types are excluded deliberately — their base is hidden, so a value must be
   `.raw`-ed out first.
   - *Considered and rejected:* holes must already be `String` (strict, no
-    implicit). More consistent with Karn's no-coercion stance, but the
+    implicit). More consistent with Bynk's no-coercion stance, but the
     ergonomic cost (`"count: \(n.toString())"` everywhere) defeats the feature.
 - **Emission: a TS template literal.** Chunks become escaped literal text
   (backslash, backtick, and `$` escaped so a chunk can neither close the literal

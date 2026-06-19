@@ -1,7 +1,7 @@
 # Wrap a library as an adapter
 
-You want to use an npm library (or a remote HTTP API) from Karn. Wrap it in an
-**adapter**: declare the capability contract in Karn, implement it in a
+You want to use an npm library (or a remote HTTP API) from Bynk. Wrap it in an
+**adapter**: declare the capability contract in Bynk, implement it in a
 TypeScript **binding**, and consume it like any other capability.
 
 ## 1. Declare the adapter

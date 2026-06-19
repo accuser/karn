@@ -1,6 +1,6 @@
 # Syntax & grammar
 
-The annotated grammar reference: every Karn construct, with its production, what
+The annotated grammar reference: every Bynk construct, with its production, what
 it means, the diagnostics that govern it, and an example. The verbatim machine
 grammar — every production in one block — is the
 [complete grammar appendix](grammar-appendix.md).
@@ -18,7 +18,7 @@ Productions are written in EBNF:
   collapsed, so productions read as language rather than parser internals. The
   raw rules and the byte-exact grammar live in the
   [appendix](grammar-appendix.md).
-- Every production on this page is **generated** from the `tree-sitter-karn`
+- Every production on this page is **generated** from the `tree-sitter-bynk`
   grammar, so it cannot drift from the parser.
 - A production says what *parses*. A **Static semantics** block lists the
   `karn.*` diagnostics that constrain a construct beyond parsing; each links by
@@ -104,7 +104,7 @@ The unit value `()` — the single value of the unit type.
 
 {{#grammar line_comment}}
 
-A comment from `--` to end of line. Karn uses `--`, never `//`. Comments are
+A comment from `--` to end of line. Bynk uses `--`, never `//`. Comments are
 trivia: ignored between tokens.
 
 A `--- … ---` **doc-block** is an external token attached to the following
@@ -145,7 +145,7 @@ commons shop {
 }
 ```
 
-**See also.** [How a Karn program is shaped](../guides/program-structure/how-a-program-is-shaped.md) · [Lay out a project](../guides/projects-build-and-deployment/layout.md).
+**See also.** [How a Bynk program is shaped](../guides/program-structure/how-a-program-is-shaped.md) · [Lay out a project](../guides/projects-build-and-deployment/layout.md).
 
 ### item_fragment {#rule-_item_fragment}
 
@@ -189,14 +189,14 @@ service sweeper from cron {
 **Static semantics.**
 {{#grammar-semantics context_decl}}
 
-**See also.** [How a Karn program is shaped](../guides/program-structure/how-a-program-is-shaped.md).
+**See also.** [How a Bynk program is shaped](../guides/program-structure/how-a-program-is-shaped.md).
 
 ### adapter_decl {#rule-adapter_decl}
 
 {{#grammar adapter_decl}}
 
 An `adapter`: the host boundary. It co-locates a capability contract with a
-non-Karn `binding`, declaring capabilities, boundary types, inline pure helpers,
+non-Bynk `binding`, declaring capabilities, boundary types, inline pure helpers,
 and external (bodiless) providers. The only place host code may enter a program.
 
 **Example.**
@@ -875,7 +875,7 @@ field with no default must have an implicit zero value.
 
 ## Expressions
 
-Karn is expression-oriented: a block's value is its final expression. Operators
+Bynk is expression-oriented: a block's value is its final expression. Operators
 follow the usual precedence (see [Operators & built-ins](operators.md)).
 
 ### expression {#rule-_expression}
