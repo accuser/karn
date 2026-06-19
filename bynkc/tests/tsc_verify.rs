@@ -118,8 +118,8 @@ fn compile_fixture(
     fixture_root: &Path,
     target: bynkc::BuildTarget,
 ) -> Result<bynkc::ProjectOutput, Vec<bynkc::CompileError>> {
-    let karn_toml = fixture_root.join("bynk.toml");
-    if karn_toml.exists() {
+    let bynk_toml = fixture_root.join("bynk.toml");
+    if bynk_toml.exists() {
         let paths = bynkc::read_project_paths(fixture_root);
         bynkc::compile_project(
             &bynkc::CompileOptions::split(fixture_root.to_path_buf(), paths).target(target),

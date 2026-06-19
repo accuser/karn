@@ -43,15 +43,15 @@ code --install-extension bynk-vscode-*.vsix
 
 The extension needs `bynkc-lsp` available — build it with
 `cargo build --release -p bynk-lsp` and put it on `PATH`, or set
-`karn.executablePath`.
+`bynk.executablePath`.
 
 ## Settings
 
 | Setting | Default | Purpose |
 |---|---|---|
-| `karn.executablePath` | `bynkc-lsp` | Path to the language-server binary. |
-| `karn.compilerPath` | `bynkc` | Path to the `bynkc` compiler used by the `bynkc: check` build task. |
-| `karn.trace.server` | `off` | Trace LSP traffic (`off` / `messages` / `verbose`) in the "Bynk LSP" output channel. |
+| `bynk.executablePath` | `bynkc-lsp` | Path to the language-server binary. |
+| `bynk.compilerPath` | `bynkc` | Path to the `bynkc` compiler used by the `bynkc: check` build task. |
+| `bynk.trace.server` | `off` | Trace LSP traffic (`off` / `messages` / `verbose`) in the "Bynk LSP" output channel. |
 
 ## Layout
 
@@ -60,8 +60,8 @@ The extension needs `bynkc-lsp` available — build it with
 | `src/extension.ts` | Entry point: resolves and launches `bynkc-lsp` over stdio. |
 | `src/scaffold.ts` | The **New Project** / **New Context** command handlers. |
 | `src/tasks.ts` | The `bynkc: check` build-task provider. |
-| `snippets/karn.json` | Construct scaffolds, wired via `contributes.snippets`. |
+| `snippets/bynk.json` | Construct scaffolds, wired via `contributes.snippets`. |
 | `walkthroughs/*.md` | The getting-started walkthrough steps. |
-| `syntaxes/karn.tmLanguage.json` | TextMate grammar (highlighting fallback). |
+| `syntaxes/bynk.tmLanguage.json` | TextMate grammar (highlighting fallback). |
 | `language-configuration.json` | Brackets, comments, and editor behaviour. |
 | `package.json` | Manifest: activation events, settings, commands, build scripts. |

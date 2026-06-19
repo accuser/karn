@@ -41,7 +41,7 @@ A test file is a `test` block naming its target, containing one or more named
 cases. Inside a case, `assert` checks a condition. Put this in
 `tests/shortener.karn`:
 
-```karn,ignore
+```bynk,ignore
 test shortener
 
 test "a fresh code resolves to NotFound" {
@@ -106,7 +106,7 @@ shortener:
 ```
 
 `assert` is only valid inside a test case — using it elsewhere is a compile error
-(`karn.assert.outside_test`), so test-only checks can never leak into production
+(`bynk.assert.outside_test`), so test-only checks can never leak into production
 code.
 
 ## Fabricate values with `Mock[T]`
@@ -116,7 +116,7 @@ Tests often need a value of some type without caring exactly what it is.
 it produces a value that satisfies
 the refinement; pass an argument to pin a specific one:
 
-```karn,ignore
+```bynk,ignore
 test "a fabricated code is a valid ShortCode" {
   let code = Mock[ShortCode]
   assert code == code
@@ -130,9 +130,9 @@ test "a pinned mock takes the given value" {
 
 `Mock[ShortCode]` yields a valid `ShortCode`; `Mock[ShortCode]("abc123")` pins it,
 checked against the refinement at compile time. Like `assert`, `Mock[T]` is
-test-only (`karn.mock.outside_test` outside a test). Some types need a pin — a
+test-only (`bynk.mock.outside_test` outside a test). Some types need a pin — a
 `Matches`-refined string can't be fabricated blindly, so a bare `Mock` of one is
-rejected with `karn.mock.needs_pin`; pin it and you are fine.
+rejected with `bynk.mock.needs_pin`; pin it and you are fine.
 
 ## Mock a collaborator with `mocks`
 
@@ -140,7 +140,7 @@ The shortener's `create` service depends on the `CodeGen` capability (it asks fo
 it with `given CodeGen`). In a test you replace that collaborator with a
 deterministic stand-in using `mocks`, declared at the top of the test block:
 
-```karn,ignore
+```bynk,ignore
 mocks CodeGen = TestCodeGen {
   fn next() -> Effect[String] {
     "test01"

@@ -1,6 +1,6 @@
 adapter tokens {
   binding "./tokens.binding.ts" requires { "jose": "^5" }
-  consumes karn { Secrets }
+  consumes bynk { Secrets }
 
   exports capability  { Jwt }
   exports transparent { Claims, JwtError }

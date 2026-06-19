@@ -5,7 +5,7 @@
 A context declares the contexts it depends on with `consumes`, then calls their
 services. Suppose a `payment` context offers an `authorise` service:
 
-```karn
+```bynk
 context payment
 
 service authorise {
@@ -20,7 +20,7 @@ service authorise {
 In the consuming context, declare `consumes <context>` and call the service by
 its qualified name. Service calls are effectful, so bind the result with `<-`:
 
-```karn,ignore
+```bynk,ignore
 context orders
 
 consumes payment
@@ -37,7 +37,7 @@ service placeOrder {
 
 Add `as <Alias>` to call through a shorter name:
 
-```karn,ignore
+```bynk,ignore
 context orders
 
 consumes payment as Pay

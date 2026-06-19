@@ -82,7 +82,7 @@ fn first_party_references_land_in_the_side_table() {
             .index
             .symbols
             .keys()
-            .all(|k| !k.unit.starts_with("karn")),
+            .all(|k| !k.unit.starts_with("bynk")),
         "synthetic units stay out of `symbols`"
     );
 }

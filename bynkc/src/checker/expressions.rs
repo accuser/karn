@@ -49,7 +49,7 @@ pub(crate) fn check_ident(id: &Ident, expected: Option<&Ty>, ctx: &mut Ctx) -> O
         return Some(ty);
     }
     // v0.20a: a named function referenced as a *value* where a function type
-    // is expected (the contextual relaxation of `karn.resolve.fn_without_call`,
+    // is expected (the contextual relaxation of `bynk.resolve.fn_without_call`,
     // relocated here from the resolver). A Var-bearing expected (generic
     // instantiation, pass 1) counts as a function-type expectation.
     if let Some(fn_decl) = ctx.input.fns.get(&id.name).cloned() {
@@ -59,7 +59,7 @@ pub(crate) fn check_ident(id: &Ident, expected: Option<&Ty>, ctx: &mut Ctx) -> O
             if !fn_decl.type_params.is_empty() {
                 ctx.errors.push(
                     CompileError::new(
-                        "karn.generics.uninferable_type_arg",
+                        "bynk.generics.uninferable_type_arg",
                         id.span,
                         format!(
                             "generic function `{}` cannot be passed as a value in v0.20a — its type parameters cannot be instantiated here",
@@ -85,7 +85,7 @@ pub(crate) fn check_ident(id: &Ident, expected: Option<&Ty>, ctx: &mut Ctx) -> O
         // rule, with the checker's type knowledge behind it.
         ctx.errors.push(
             CompileError::new(
-                "karn.resolve.fn_without_call",
+                "bynk.resolve.fn_without_call",
                 id.span,
                 format!(
                     "`{}` is a function — call it (`{}(…)`), or pass it where a function type is expected",
@@ -113,7 +113,7 @@ pub(crate) fn check_ident(id: &Ident, expected: Option<&Ty>, ctx: &mut Ctx) -> O
             if !variant.payload.is_empty() {
                 ctx.errors.push(
                     CompileError::new(
-                        "karn.types.variant_missing_payload",
+                        "bynk.types.variant_missing_payload",
                         id.span,
                         format!(
                             "variant `{}` of `{}` has a payload — call it with arguments: `{}(...)`",
@@ -141,7 +141,7 @@ pub(crate) fn check_mock(
     if !ctx.in_test_body {
         ctx.errors.push(
             CompileError::new(
-                "karn.mock.outside_test",
+                "bynk.mock.outside_test",
                 span,
                 "`Mock[T]` is only valid inside a test case body",
             )
@@ -158,7 +158,7 @@ pub(crate) fn check_mock(
         }
         None => {
             ctx.errors.push(CompileError::new(
-                "karn.mock.unknown_type",
+                "bynk.mock.unknown_type",
                 span,
                 "`Mock[T]` refers to a type that does not resolve",
             ));
@@ -184,7 +184,7 @@ pub(crate) fn check_mock(
                     if refinement.is_some_and(refinement_needs_pin) {
                         ctx.errors.push(
                             CompileError::new(
-                                "karn.mock.needs_pin",
+                                "bynk.mock.needs_pin",
                                 span,
                                 format!(
                                     "bare `Mock[{name}]` cannot generate a value for a `Matches` refinement"
@@ -202,7 +202,7 @@ pub(crate) fn check_mock(
                                 && let Some(failed) = first_failed_predicate(r, &lit)
                             {
                                 ctx.errors.push(CompileError::new(
-                                    "karn.mock.literal_violates",
+                                    "bynk.mock.literal_violates",
                                     arg.span,
                                     format!(
                                         "literal {} does not satisfy `{}` required by type `{}`",
@@ -215,7 +215,7 @@ pub(crate) fn check_mock(
                         }
                         _ => {
                             ctx.errors.push(CompileError::new(
-                                "karn.mock.pin_not_literal",
+                                "bynk.mock.pin_not_literal",
                                 arg.span,
                                 format!(
                                     "`Mock[{name}](...)` requires a literal `{}` value",
@@ -227,7 +227,7 @@ pub(crate) fn check_mock(
                 }
                 _ => {
                     ctx.errors.push(CompileError::new(
-                        "karn.mock.arity",
+                        "bynk.mock.arity",
                         span,
                         format!(
                             "`Mock[{name}]` takes at most one pin argument, but {} were given",
@@ -247,7 +247,7 @@ pub(crate) fn check_mock(
             if !args.is_empty() {
                 ctx.errors.push(
                     CompileError::new(
-                        "karn.mock.pin_unsupported",
+                        "bynk.mock.pin_unsupported",
                         span,
                         format!(
                             "pinned `Mock[{name}](...)` is not yet supported for this kind of type — use bare `Mock[{name}]`"
@@ -258,7 +258,7 @@ pub(crate) fn check_mock(
             } else if !can_mock_bare(&ty, &ctx.input.types, MOCK_DEPTH) {
                 ctx.errors.push(
                     CompileError::new(
-                        "karn.mock.needs_pin",
+                        "bynk.mock.needs_pin",
                         span,
                         format!(
                             "bare `Mock[{name}]` cannot generate a value — it (transitively) needs a `Matches` refinement or is recursively unbounded"
@@ -270,7 +270,7 @@ pub(crate) fn check_mock(
         }
         _ => {
             ctx.errors.push(CompileError::new(
-                "karn.mock.unsupported_kind",
+                "bynk.mock.unsupported_kind",
                 span,
                 format!("`Mock` is not a value type: `{}`", ty.display()),
             ));
@@ -323,7 +323,7 @@ pub(crate) fn check_assert(inner: &Expr, span: Span, ctx: &mut Ctx) -> Option<Ty
     if !ctx.in_test_body {
         ctx.errors.push(
             CompileError::new(
-                "karn.assert.outside_test",
+                "bynk.assert.outside_test",
                 span,
                 "`assert` is only valid inside a test case body",
             )
@@ -337,7 +337,7 @@ pub(crate) fn check_assert(inner: &Expr, span: Span, ctx: &mut Ctx) -> Option<Ty
         && !compatible(&actual, &Ty::Base(BaseType::Bool))
     {
         ctx.errors.push(CompileError::new(
-            "karn.assert.non_bool",
+            "bynk.assert.non_bool",
             inner.span,
             format!(
                 "`assert` expression has type `{}`, but a `Bool` is required",
@@ -356,7 +356,7 @@ pub(crate) fn check_unary(op: UnaryOp, inner: &Expr, op_span: Span, ctx: &mut Ct
                 Some(Ty::Base(BaseType::Int))
             } else {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.type_mismatch",
+                    "bynk.types.type_mismatch",
                     op_span,
                     format!(
                         "unary `-` requires `Int`, but the operand has type `{}`",
@@ -371,7 +371,7 @@ pub(crate) fn check_unary(op: UnaryOp, inner: &Expr, op_span: Span, ctx: &mut Ct
                 Some(Ty::Base(BaseType::Bool))
             } else {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.type_mismatch",
+                    "bynk.types.type_mismatch",
                     op_span,
                     format!(
                         "unary `!` requires `Bool`, but the operand has type `{}`",
@@ -396,7 +396,7 @@ pub(crate) fn numeric_mix(a: Option<BaseType>, b: Option<BaseType>) -> bool {
 fn push_no_numeric_coercion(op: BinOp, span: Span, lt: &Ty, rt: &Ty, ctx: &mut Ctx) {
     ctx.errors.push(
         CompileError::new(
-            "karn.types.no_numeric_coercion",
+            "bynk.types.no_numeric_coercion",
             span,
             format!(
                 "operator `{}` cannot mix `Int` and `Float` operands; got `{}` and `{}`",
@@ -428,7 +428,7 @@ pub(crate) fn check_binop(op: BinOp, lhs: &Expr, rhs: &Expr, ctx: &mut Ctx) -> O
         let (lt, rt) = (lt?, rt?);
         if lt.base() != Some(BaseType::Bool) {
             ctx.errors.push(CompileError::new(
-                "karn.types.type_mismatch",
+                "bynk.types.type_mismatch",
                 lhs.span,
                 format!(
                     "operator `&&` requires `Bool` operands; left operand has type `{}`",
@@ -439,7 +439,7 @@ pub(crate) fn check_binop(op: BinOp, lhs: &Expr, rhs: &Expr, ctx: &mut Ctx) -> O
         }
         if rt.base() != Some(BaseType::Bool) {
             ctx.errors.push(CompileError::new(
-                "karn.types.type_mismatch",
+                "bynk.types.type_mismatch",
                 rhs.span,
                 format!(
                     "operator `&&` requires `Bool` operands; right operand has type `{}`",
@@ -477,7 +477,7 @@ pub(crate) fn check_binop(op: BinOp, lhs: &Expr, rhs: &Expr, ctx: &mut Ctx) -> O
                             ("right", rhs.span, &rt)
                         };
                     ctx.errors.push(CompileError::new(
-                        "karn.types.type_mismatch",
+                        "bynk.types.type_mismatch",
                         side_span,
                         format!(
                             "operator `{}` requires `Int` or `Float` operands; {side} operand has type `{}`",
@@ -496,7 +496,7 @@ pub(crate) fn check_binop(op: BinOp, lhs: &Expr, rhs: &Expr, ctx: &mut Ctx) -> O
                     return None;
                 }
                 ctx.errors.push(CompileError::new(
-                    "karn.types.type_mismatch",
+                    "bynk.types.type_mismatch",
                     span,
                     format!(
                         "operator `{}` requires both operands to have the same base type; got `{}` and `{}`",
@@ -512,7 +512,7 @@ pub(crate) fn check_binop(op: BinOp, lhs: &Expr, rhs: &Expr, ctx: &mut Ctx) -> O
                 Some(BaseType::Int) | Some(BaseType::String) | Some(BaseType::Float)
             ) {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.type_mismatch",
+                    "bynk.types.type_mismatch",
                     span,
                     format!(
                         "operator `{}` is only defined on `Int`, `Float`, and `String`, not `{}`",
@@ -532,7 +532,7 @@ pub(crate) fn check_binop(op: BinOp, lhs: &Expr, rhs: &Expr, ctx: &mut Ctx) -> O
                         return None;
                     }
                     ctx.errors.push(CompileError::new(
-                        "karn.types.type_mismatch",
+                        "bynk.types.type_mismatch",
                         span,
                         format!(
                             "operator `{}` requires both operands to have the same base type; got `{}` and `{}`",
@@ -545,7 +545,7 @@ pub(crate) fn check_binop(op: BinOp, lhs: &Expr, rhs: &Expr, ctx: &mut Ctx) -> O
                 }
             } else if !compatible(&lt, &rt) && !compatible(&rt, &lt) {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.type_mismatch",
+                    "bynk.types.type_mismatch",
                     span,
                     format!(
                         "operator `{}` requires both operands to have the same type; got `{}` and `{}`",
@@ -561,7 +561,7 @@ pub(crate) fn check_binop(op: BinOp, lhs: &Expr, rhs: &Expr, ctx: &mut Ctx) -> O
         BinOp::And | BinOp::Or => {
             if lt.base() != Some(BaseType::Bool) {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.type_mismatch",
+                    "bynk.types.type_mismatch",
                     lhs.span,
                     format!(
                         "operator `{}` requires `Bool` operands; left operand has type `{}`",
@@ -573,7 +573,7 @@ pub(crate) fn check_binop(op: BinOp, lhs: &Expr, rhs: &Expr, ctx: &mut Ctx) -> O
             }
             if rt.base() != Some(BaseType::Bool) {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.type_mismatch",
+                    "bynk.types.type_mismatch",
                     rhs.span,
                     format!(
                         "operator `{}` requires `Bool` operands; right operand has type `{}`",
@@ -601,14 +601,14 @@ pub(crate) fn check_binop(op: BinOp, lhs: &Expr, rhs: &Expr, ctx: &mut Ctx) -> O
 ///   expected return with `effectful` derived from it, and the result is the
 ///   expected type (checking-mode bidirectionality).
 /// - **Unconstrained**: every param must be annotated
-///   (`karn.lambda.unannotated_param`); effectfulness is decided by a
+///   (`bynk.lambda.unannotated_param`); effectfulness is decided by a
 ///   syntactic pre-scan of the body (`<-`, capability calls, effectful named
 ///   or value calls), and the result type wraps in `Effect` when it fired.
 ///
 /// The enclosing handler's capability map and `given` tracking stay shared —
 /// a lambda may close over and call a `given` capability (ADR 0033). The
 /// frame swap forbids `commit` inside a lambda (`agent_state_ty = None` →
-/// the existing `karn.commit.outside_agent`).
+/// the existing `bynk.commit.outside_agent`).
 pub(crate) fn check_lambda(
     lambda: &LambdaExpr,
     expected: Option<&Ty>,
@@ -625,7 +625,7 @@ pub(crate) fn check_lambda(
     if let Some((eps, _)) = &expected_fn {
         if eps.len() != lambda.params.len() {
             ctx.errors.push(CompileError::new(
-                "karn.types.lambda_mismatch",
+                "bynk.types.lambda_mismatch",
                 lambda.span,
                 format!(
                     "this lambda takes {} parameter(s), but a function of {} parameter(s) is expected",
@@ -641,7 +641,7 @@ pub(crate) fn check_lambda(
                     let annotated = resolve_type_ref(tr, &ctx.input.types)?;
                     if !compatible(ep, &annotated) {
                         ctx.errors.push(CompileError::new(
-                            "karn.types.lambda_mismatch",
+                            "bynk.types.lambda_mismatch",
                             p.span,
                             format!(
                                 "lambda parameter `{}` is annotated `{}`, but `{}` is expected here",
@@ -677,7 +677,7 @@ pub(crate) fn check_lambda(
                 None => {
                     ctx.errors.push(
                         CompileError::new(
-                            "karn.lambda.unannotated_param",
+                            "bynk.lambda.unannotated_param",
                             p.span,
                             format!(
                                 "lambda parameter `{}` needs a type annotation — no function type is expected here to infer it from",
@@ -782,7 +782,7 @@ pub(crate) fn check_lambda(
                     maybe_auto_lift(Some(bt.clone()), Some(&er)).unwrap_or_else(|| bt.clone());
                 if !compatible(&lifted, &er) {
                     ctx.errors.push(CompileError::new(
-                        "karn.types.lambda_mismatch",
+                        "bynk.types.lambda_mismatch",
                         lambda.body.span,
                         format!(
                             "lambda body has type `{}`, but `{}` is expected",
@@ -955,7 +955,7 @@ pub(crate) fn check_variant_construction(
     if variant.payload.len() != args.len() {
         ctx.errors.push(
             CompileError::new(
-                "karn.types.variant_arity",
+                "bynk.types.variant_arity",
                 span,
                 format!(
                     "variant `{}` of `{}` expects {} argument(s), but {} were given",
@@ -982,7 +982,7 @@ pub(crate) fn check_variant_construction(
         };
         if !compatible(&actual, &expected) {
             ctx.errors.push(CompileError::new(
-                "karn.types.variant_payload_mismatch",
+                "bynk.types.variant_payload_mismatch",
                 arg.span,
                 format!(
                     "argument {} to variant `{}` has type `{}`, but field `{}` expects `{}`",
@@ -1015,7 +1015,7 @@ pub(crate) fn check_if(
         && c.base() != Some(BaseType::Bool)
     {
         ctx.errors.push(CompileError::new(
-            "karn.types.if_non_bool_cond",
+            "bynk.types.if_non_bool_cond",
             cond.span,
             format!(
                 "`if` condition must have type `Bool`, but has type `{}`",
@@ -1039,7 +1039,7 @@ pub(crate) fn check_if(
             } else {
                 ctx.errors.push(
                     CompileError::new(
-                        "karn.types.if_branch_mismatch",
+                        "bynk.types.if_branch_mismatch",
                         if_span,
                         format!(
                             "`if` branches produce different types: `{}` and `{}`",
@@ -1081,7 +1081,7 @@ pub(crate) fn check_ok(
         (Some(_), Some(_)) => {
             ctx.errors.push(
                 CompileError::new(
-                    "karn.types.ambiguous_constructor",
+                    "bynk.types.ambiguous_constructor",
                     span,
                     "ambiguous constructor `Ok`: could be `Result.Ok` or `HttpResult.Ok`",
                 )
@@ -1095,7 +1095,7 @@ pub(crate) fn check_ok(
             let inner_ty = type_of(inner, Some(&t_ty), ctx)?;
             if !compatible(&inner_ty, &t_ty) {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.ok_value_mismatch",
+                    "bynk.types.ok_value_mismatch",
                     inner.span,
                     format!(
                         "`Ok(...)` value has type `{}`, but the surrounding context expects `HttpResult[{}]`",
@@ -1112,7 +1112,7 @@ pub(crate) fn check_ok(
             if !compatible(&inner_ty, &t_ty) {
                 ctx.errors.push(
                     CompileError::new(
-                        "karn.types.ok_value_mismatch",
+                        "bynk.types.ok_value_mismatch",
                         inner.span,
                         format!(
                             "`Ok(...)` value has type `{}`, but the surrounding context expects `Result[{}, {}]`",
@@ -1131,7 +1131,7 @@ pub(crate) fn check_ok(
             let _ = type_of(inner, None, ctx);
             ctx.errors.push(
                 CompileError::new(
-                    "karn.types.cannot_infer_result_type_params",
+                    "bynk.types.cannot_infer_result_type_params",
                     span,
                     "cannot infer the type parameter of `Ok(...)`",
                 )
@@ -1157,7 +1157,7 @@ pub(crate) fn check_queue_variant(
         QueueVariantPayload::None => {
             if !args.is_empty() {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.variant_arity",
+                    "bynk.types.variant_arity",
                     span,
                     format!(
                         "`QueueResult.{}` takes no arguments, but {} were given",
@@ -1172,7 +1172,7 @@ pub(crate) fn check_queue_variant(
         QueueVariantPayload::Message => {
             if args.len() != 1 {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.variant_arity",
+                    "bynk.types.variant_arity",
                     span,
                     format!(
                         "`QueueResult.{}` expects 1 `String` argument, but {} were given",
@@ -1185,7 +1185,7 @@ pub(crate) fn check_queue_variant(
             let arg_ty = type_of(&args[0], Some(&Ty::Base(BaseType::String)), ctx)?;
             if !compatible(&arg_ty, &Ty::Base(BaseType::String)) {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.argument_mismatch",
+                    "bynk.types.argument_mismatch",
                     args[0].span,
                     format!(
                         "`QueueResult.{}` expects a `String` reason, but got `{}`",
@@ -1224,7 +1224,7 @@ pub(crate) fn check_http_variant(
         HttpVariantPayload::Value => {
             if args.len() != 1 {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.variant_arity",
+                    "bynk.types.variant_arity",
                     span,
                     format!(
                         "`HttpResult.{}` expects 1 argument, but {} were given",
@@ -1239,7 +1239,7 @@ pub(crate) fn check_http_variant(
                 (Some(t), _) => {
                     if !compatible(&arg_ty, &t) {
                         ctx.errors.push(CompileError::new(
-                            "karn.types.ok_value_mismatch",
+                            "bynk.types.ok_value_mismatch",
                             args[0].span,
                             format!(
                                 "`HttpResult.{}` value has type `{}`, but the surrounding context expects `HttpResult[{}]`",
@@ -1259,7 +1259,7 @@ pub(crate) fn check_http_variant(
         HttpVariantPayload::Message => {
             if args.len() != 1 {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.variant_arity",
+                    "bynk.types.variant_arity",
                     span,
                     format!(
                         "`HttpResult.{}` expects 1 `String` argument, but {} were given",
@@ -1272,7 +1272,7 @@ pub(crate) fn check_http_variant(
             let arg_ty = type_of(&args[0], Some(&Ty::Base(BaseType::String)), ctx)?;
             if !compatible(&arg_ty, &Ty::Base(BaseType::String)) {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.argument_mismatch",
+                    "bynk.types.argument_mismatch",
                     args[0].span,
                     format!(
                         "`HttpResult.{}` expects a `String` message, but got `{}`",
@@ -1291,7 +1291,7 @@ pub(crate) fn check_http_variant(
         HttpVariantPayload::None => {
             if !args.is_empty() {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.variant_arity",
+                    "bynk.types.variant_arity",
                     span,
                     format!(
                         "`HttpResult.{}` takes no arguments, but {} were given",
@@ -1321,7 +1321,7 @@ pub(crate) fn check_err(
             if !compatible(&inner_ty, &e_ty) {
                 ctx.errors.push(
                     CompileError::new(
-                        "karn.types.err_value_mismatch",
+                        "bynk.types.err_value_mismatch",
                         inner.span,
                         format!(
                             "`Err(...)` value has type `{}`, but the surrounding context expects `Result[{}, {}]`",
@@ -1339,7 +1339,7 @@ pub(crate) fn check_err(
         None => {
             ctx.errors.push(
                 CompileError::new(
-                    "karn.types.cannot_infer_result_type_params",
+                    "bynk.types.cannot_infer_result_type_params",
                     span,
                     "cannot infer the value type parameter of `Err(...)`",
                 )
@@ -1366,7 +1366,7 @@ pub(crate) fn check_some(
         && !compatible(&inner_ty, exp)
     {
         ctx.errors.push(CompileError::new(
-            "karn.types.some_value_mismatch",
+            "bynk.types.some_value_mismatch",
             inner.span,
             format!(
                 "`Some(...)` value has type `{}`, but the surrounding context expects `Option[{}]`",
@@ -1388,7 +1388,7 @@ pub(crate) fn check_none(span: Span, expected: Option<&Ty>, ctx: &mut Ctx) -> Op
     }
     ctx.errors.push(
         CompileError::new(
-            "karn.types.cannot_infer_option_type_param",
+            "bynk.types.cannot_infer_option_type_param",
             span,
             "cannot infer the value type of `None`",
         )
@@ -1404,7 +1404,7 @@ pub(crate) fn check_question(inner: &Expr, span: Span, ctx: &mut Ctx) -> Option<
     let Ty::Result(t, e) = &inner_ty else {
         ctx.errors.push(
             CompileError::new(
-                "karn.types.question_on_non_result",
+                "bynk.types.question_on_non_result",
                 inner.span,
                 format!(
                     "the `?` operator requires a `Result[T, E]` value, but got `{}`",
@@ -1428,7 +1428,7 @@ pub(crate) fn check_question(inner: &Expr, span: Span, ctx: &mut Ctx) -> Option<
         if let Some(eff_e) = effect_result {
             if !compatible(e, &eff_e) {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.question_error_mismatch",
+                    "bynk.types.question_error_mismatch",
                     span,
                     format!(
                         "the `?` operator propagates an error of type `{}`, but the enclosing function returns `Effect[Result[_, {}]]`",
@@ -1442,7 +1442,7 @@ pub(crate) fn check_question(inner: &Expr, span: Span, ctx: &mut Ctx) -> Option<
         }
         ctx.errors.push(
             CompileError::new(
-                "karn.types.question_outside_result",
+                "bynk.types.question_outside_result",
                 span,
                 "the `?` operator can only be used inside a function returning `Result`",
             )
@@ -1455,7 +1455,7 @@ pub(crate) fn check_question(inner: &Expr, span: Span, ctx: &mut Ctx) -> Option<
     };
     if !compatible(e, ret_e) {
         ctx.errors.push(CompileError::new(
-            "karn.types.question_error_mismatch",
+            "bynk.types.question_error_mismatch",
             span,
             format!(
                 "the `?` operator propagates an error of type `{}`, but the enclosing function returns `Result[_, {}]`",
@@ -1485,7 +1485,7 @@ pub(crate) fn check_record_spread(
         } => name.clone(),
         _ => {
             ctx.errors.push(CompileError::new(
-                "karn.record_spread.non_record_base",
+                "bynk.record_spread.non_record_base",
                 base.span,
                 format!(
                     "record spread requires a record-typed base, but got `{}`",
@@ -1499,7 +1499,7 @@ pub(crate) fn check_record_spread(
         && tn.name != record_name
     {
         ctx.errors.push(CompileError::new(
-            "karn.record_spread.type_mismatch",
+            "bynk.record_spread.type_mismatch",
             tn.span,
             format!(
                 "spread type prefix `{}` does not match the base's type `{}`",
@@ -1517,7 +1517,7 @@ pub(crate) fn check_record_spread(
     for f in overrides {
         let Some(declared_field) = declared.get(f.name.name.as_str()) else {
             ctx.errors.push(CompileError::new(
-                "karn.record_spread.unknown_field",
+                "bynk.record_spread.unknown_field",
                 f.name.span,
                 format!(
                     "record type `{}` has no field `{}`",
@@ -1541,7 +1541,7 @@ pub(crate) fn check_record_spread(
             && !compatible(&actual, &expected_ty)
         {
             ctx.errors.push(CompileError::new(
-                "karn.record_spread.field_type_mismatch",
+                "bynk.record_spread.field_type_mismatch",
                 f.value.as_ref().map(|v| v.span).unwrap_or(f.name.span),
                 format!(
                     "spread override of field `{}` has type `{}`, but the declared type is `{}`",
@@ -1567,7 +1567,7 @@ pub(crate) fn check_record_construction(
     if matches!(decl.body, TypeBody::Opaque { .. }) {
         ctx.errors.push(
             CompileError::new(
-                "karn.types.opaque_record_construction",
+                "bynk.types.opaque_record_construction",
                 type_name.span,
                 format!(
                     "opaque type `{}` cannot be constructed with record-literal syntax",
@@ -1606,7 +1606,7 @@ pub(crate) fn check_record_construction(
             {
                 ctx.errors.push(
                     CompileError::new(
-                        "karn.types.field_value_mismatch",
+                        "bynk.types.field_value_mismatch",
                         f.value.as_ref().map(|v| v.span).unwrap_or(f.name.span),
                         format!(
                             "field `{}` expects `{}`, but the value has type `{}`",
@@ -1635,7 +1635,7 @@ pub(crate) fn check_field_access(receiver: &Expr, field: &Ident, ctx: &mut Ctx) 
         if !variant.payload.is_empty() {
             ctx.errors.push(
                 CompileError::new(
-                    "karn.types.variant_missing_payload",
+                    "bynk.types.variant_missing_payload",
                     field.span,
                     format!(
                         "variant `{}.{}` has a payload — call it with arguments",
@@ -1656,7 +1656,7 @@ pub(crate) fn check_field_access(receiver: &Expr, field: &Ident, ctx: &mut Ctx) 
             return Some((**identity).clone());
         }
         ctx.errors.push(CompileError::new(
-            "karn.types.unknown_field",
+            "bynk.types.unknown_field",
             field.span,
             format!(
                 "a verified actor exposes only `.identity`, not `.{}`",
@@ -1677,7 +1677,7 @@ pub(crate) fn check_field_access(receiver: &Expr, field: &Ident, ctx: &mut Ctx) 
         if !ctx.input.is_local_type(name) {
             ctx.errors.push(
                 CompileError::new(
-                    "karn.types.opaque_raw_outside",
+                    "bynk.types.opaque_raw_outside",
                     field.span,
                     format!(
                         "`.raw` on opaque type `{}` is only available within its defining commons",
@@ -1700,7 +1700,7 @@ pub(crate) fn check_field_access(receiver: &Expr, field: &Ident, ctx: &mut Ctx) 
             "kind" | "path" | "message" => Some(Ty::Base(BaseType::String)),
             other => {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.unknown_field",
+                    "bynk.types.unknown_field",
                     field.span,
                     format!(
                         "`JsonError` has no field `{other}` — its fields are `kind`, `path`, `message`"
@@ -1716,7 +1716,7 @@ pub(crate) fn check_field_access(receiver: &Expr, field: &Ident, ctx: &mut Ctx) 
     } = &recv_ty
     else {
         let mut err = CompileError::new(
-            "karn.types.field_access_on_non_record",
+            "bynk.types.field_access_on_non_record",
             field.span,
             format!(
                 "field access requires a record type, but the receiver has type `{}`",
@@ -1757,7 +1757,7 @@ pub(crate) fn check_field_access(receiver: &Expr, field: &Ident, ctx: &mut Ctx) 
     let Some(field_decl) = r.fields.iter().find(|f| f.name.name == field.name) else {
         ctx.errors.push(
             CompileError::new(
-                "karn.types.unknown_field",
+                "bynk.types.unknown_field",
                 field.span,
                 format!("record type `{}` has no field `{}`", name, field.name),
             )
@@ -1786,7 +1786,7 @@ pub(crate) fn check_match(
     let expected_variants = variants_of(&disc_ty, &ctx.input.types);
     let Some(expected_variants) = expected_variants else {
         ctx.errors.push(CompileError::new(
-            "karn.types.match_non_sum_discriminant",
+            "bynk.types.match_non_sum_discriminant",
             discriminant.span,
             format!(
                 "cannot match on a value of type `{}` — `match` requires a sum, `Result`, or `Option`",
@@ -1802,7 +1802,7 @@ pub(crate) fn check_match(
     for arm in arms {
         if saw_wildcard && !unreachable_reported {
             ctx.errors.push(CompileError::new(
-                "karn.types.unreachable_arm",
+                "bynk.types.unreachable_arm",
                 arm.span,
                 "this match arm is unreachable because a wildcard arm precedes it",
             ));
@@ -1829,7 +1829,7 @@ pub(crate) fn check_match(
                 let variant_info = expected_variants.iter().find(|v| v.name == variant.name);
                 let Some(variant_info) = variant_info else {
                     ctx.errors.push(CompileError::new(
-                        "karn.types.unknown_variant_in_pattern",
+                        "bynk.types.unknown_variant_in_pattern",
                         *pat_span,
                         format!(
                             "type `{}` has no variant `{}`",
@@ -1846,7 +1846,7 @@ pub(crate) fn check_match(
                     && &tn.name != name
                 {
                     ctx.errors.push(CompileError::new(
-                        "karn.types.pattern_type_mismatch",
+                        "bynk.types.pattern_type_mismatch",
                         tn.span,
                         format!(
                             "pattern qualifier `{}` does not match the discriminant type `{}`",
@@ -1856,7 +1856,7 @@ pub(crate) fn check_match(
                 }
                 if !covered.insert(variant.name.clone()) {
                     ctx.errors.push(CompileError::new(
-                        "karn.types.duplicate_variant_arm",
+                        "bynk.types.duplicate_variant_arm",
                         *pat_span,
                         format!("variant `{}` is matched more than once", variant.name),
                     ));
@@ -1884,7 +1884,7 @@ pub(crate) fn check_match(
                                         let Some((_, ty)) = payload_map.get(field.name.as_str())
                                         else {
                                             ctx.errors.push(CompileError::new(
-                                                "karn.types.unknown_pattern_field",
+                                                "bynk.types.unknown_pattern_field",
                                                 field.span,
                                                 format!(
                                                     "variant `{}` has no payload field `{}`",
@@ -1899,7 +1899,7 @@ pub(crate) fn check_match(
                                     }
                                     PatternBindingKind::Positional { .. } => {
                                         ctx.errors.push(CompileError::new(
-                                            "karn.types.mixed_pattern_bindings",
+                                            "bynk.types.mixed_pattern_bindings",
                                             b.span,
                                             "pattern bindings must be all named (`field: name`) or all positional",
                                         ));
@@ -1908,7 +1908,7 @@ pub(crate) fn check_match(
                             }
                         } else if bindings.len() != variant_info.payload.len() {
                             ctx.errors.push(CompileError::new(
-                                "karn.types.pattern_arity",
+                                "bynk.types.pattern_arity",
                                 *pat_span,
                                 format!(
                                     "variant `{}` has {} payload field(s), but the pattern has {} binding(s)",
@@ -1929,7 +1929,7 @@ pub(crate) fn check_match(
                         }
                     } else {
                         ctx.errors.push(CompileError::new(
-                            "karn.types.pattern_arity",
+                            "bynk.types.pattern_arity",
                             *pat_span,
                             format!(
                                 "variant `{}` has no payload, but the pattern binds fields",
@@ -1955,7 +1955,7 @@ pub(crate) fn check_match(
             if !covered.contains(&v.name) {
                 ctx.errors.push(
                     CompileError::new(
-                        "karn.types.non_exhaustive_match",
+                        "bynk.types.non_exhaustive_match",
                         span,
                         format!(
                             "non-exhaustive `match` — variant `{}` of `{}` is not covered",
@@ -1977,7 +1977,7 @@ pub(crate) fn check_match(
         if *t != first {
             ctx.errors.push(
                 CompileError::new(
-                    "karn.types.match_arm_mismatch",
+                    "bynk.types.match_arm_mismatch",
                     *span,
                     format!(
                         "match-arm body has type `{}`, but earlier arms have type `{}`",
@@ -2001,7 +2001,7 @@ pub(crate) fn check_is(value: &Expr, pattern: &Pattern, _span: Span, ctx: &mut C
             // `_` matches anything, but is only meaningful over a sum today.
             if variants.is_none() {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.is_non_sum",
+                    "bynk.types.is_non_sum",
                     pattern.span(),
                     format!(
                         "the `is` operator requires a sum, `Result`, or `Option` value, but got `{}`",
@@ -2043,7 +2043,7 @@ pub(crate) fn check_is(value: &Expr, pattern: &Pattern, _span: Span, ctx: &mut C
                         return Some(Ty::Base(BaseType::Bool));
                     }
                     ctx.errors.push(CompileError::new(
-                        "karn.types.is_base_mismatch",
+                        "bynk.types.is_base_mismatch",
                         pattern.span(),
                         format!(
                             "`is {}` checks an `{}` value, but got `{}`",
@@ -2057,7 +2057,7 @@ pub(crate) fn check_is(value: &Expr, pattern: &Pattern, _span: Span, ctx: &mut C
                 // 3. Neither a variant nor a base-compatible refined type.
                 if variants.is_none() {
                     ctx.errors.push(CompileError::new(
-                        "karn.types.is_non_sum",
+                        "bynk.types.is_non_sum",
                         pattern.span(),
                         format!(
                             "the `is` operator requires a sum, `Result`, or `Option` value, but got `{}`",
@@ -2066,7 +2066,7 @@ pub(crate) fn check_is(value: &Expr, pattern: &Pattern, _span: Span, ctx: &mut C
                     ));
                 } else {
                     ctx.errors.push(CompileError::new(
-                        "karn.types.is_unknown_variant",
+                        "bynk.types.is_unknown_variant",
                         variant.span,
                         format!(
                             "type `{}` has no variant `{}`",
@@ -2081,7 +2081,7 @@ pub(crate) fn check_is(value: &Expr, pattern: &Pattern, _span: Span, ctx: &mut C
             // `collect_is_bindings` are handled at the consumer site.
             if !bindings.is_empty() && info.payload.is_empty() {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.pattern_arity",
+                    "bynk.types.pattern_arity",
                     pattern.span(),
                     format!(
                         "variant `{}` has no payload, but the pattern binds fields",
@@ -2094,7 +2094,7 @@ pub(crate) fn check_is(value: &Expr, pattern: &Pattern, _span: Span, ctx: &mut C
                     .any(|b| matches!(b.kind, PatternBindingKind::Named { .. }));
                 if !any_named && bindings.len() != info.payload.len() {
                     ctx.errors.push(CompileError::new(
-                        "karn.types.pattern_arity",
+                        "bynk.types.pattern_arity",
                         pattern.span(),
                         format!(
                             "variant `{}` has {} payload field(s), but the pattern has {} binding(s)",

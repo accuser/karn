@@ -1,4 +1,4 @@
-# 0092 — The cross-context `CallerId` value is the calling context's qualified name, stamped by the compiler into a reserved `X-Bynk-Caller` header beside the args body, read at the callee's `/_karn/call/` boundary and threaded into `deps`; an absent caller on a `by c: Caller` handler is fail-closed; trust is static / channel-based (no crypto), first-party
+# 0092 — The cross-context `CallerId` value is the calling context's qualified name, stamped by the compiler into a reserved `X-Bynk-Caller` header beside the args body, read at the callee's `/_bynk/call/` boundary and threaded into `deps`; an absent caller on a `by c: Caller` handler is fail-closed; trust is static / channel-based (no crypto), first-party
 
 - **Status:** Accepted (v0.54)
 - **Spec:** `static-semantics.md` (§5.7a the live `Caller`), `emission.md` (§7.3.4a the cross-context caller seam), `runtime-library.md` (`callService` caller param)
@@ -7,7 +7,7 @@
 ## Context
 
 Cross-context calls already work (v0.6): context A calls B's `on call` over a
-Service Binding, dispatched at `/_karn/call/<service>` with a JSON args body. The
+Service Binding, dispatched at `/_bynk/call/<service>` with a JSON args body. The
 `Caller` prelude `Internal` actor and the `CallerId` type (resolved to `String`)
 landed in Foundations — but `c.identity` lowered to the placeholder `undefined`
 and the wire format carried only the arguments: nothing identified the caller. A
@@ -27,7 +27,7 @@ the calling context's qualified name — established at the boundary.**
   body — and its typed (de)serialisation — is **untouched**. The identity rides
   beside the payload as metadata, not inside it.
 - **Read and threaded at the callee boundary**, mirroring Bearer. The
-  `/_karn/call/<service>` dispatch reads the header and threads the name into the
+  `/_bynk/call/<service>` dispatch reads the header and threads the name into the
   handler's `deps` as its `CallerId` identity; `<binder>.identity` lowers to
   `deps.identity` (the same `deps_identity_binder` path Bearer uses). A
   binder-less `on call` reads no header and is byte-unchanged.
@@ -37,7 +37,7 @@ the calling context's qualified name — established at the boundary.**
   401). This holds the sealed-identity guarantee: no body runs with a placeholder
   identity.
 - **Trust is static / channel-based, first-party.** The `Internal` scheme trusts
-  the binding: `/_karn/call/` is platform-dispatched and not externally routable,
+  the binding: `/_bynk/call/` is platform-dispatched and not externally routable,
   and the compiler stamps the *real* name (no app-controlled forging path). A
   malicious *first-party* context forging the header is out of the threat model —
   all contexts in a deployment are one trust domain. This mints **identity**, not

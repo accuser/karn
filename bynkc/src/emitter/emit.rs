@@ -1,5 +1,5 @@
 //! Per-declaration emission — the functions `emit_project` drives to render
-//! each top-level Karn declaration into TypeScript: type/refined/record/sum
+//! each top-level Bynk declaration into TypeScript: type/refined/record/sum
 //! declarations and their checks, attached methods and free functions,
 //! capabilities, providers, services, contexts, and agents (plus the
 //! worker-dispatch lowering helpers those emitters use). Split out of
@@ -1234,7 +1234,7 @@ fn workers_inner_ts_name(t: &TypeRef) -> String {
     match t {
         TypeRef::Base(b, _) => b.name().to_string(),
         // v0.20a: function types are confined to non-boundary positions
-        // (`karn.types.function_at_boundary`), so the serialisation machinery
+        // (`bynk.types.function_at_boundary`), so the serialisation machinery
         // can never legally see one.
         TypeRef::Fn(..) => unreachable!("function types are rejected at boundaries"),
         TypeRef::Named(id) => id.name.clone(),
@@ -1302,7 +1302,7 @@ pub(crate) fn flatten_emit_ident_chain(e: &Expr) -> Option<String> {
 /// Cast an argument crossing a context boundary to the consumed context's
 /// type. For named types we emit `arg as <ns>.<TypeName>`. For other types
 /// (base, ()), no cast is needed. The structural compatibility check at the
-/// karn layer guarantees the cast is sound.
+/// bynk layer guarantees the cast is sound.
 pub(crate) fn param_cast(
     consumed: &str,
     info: &crate::resolver::CrossContextInfo,
@@ -1324,9 +1324,9 @@ pub(crate) fn param_cast(
         // v0.9.1: when both contexts brand the same commons type (e.g., both
         // see `Money` with their own `__ctxBrand`), a direct
         // `as <ns>.<Type>` cast is rejected by `tsc --strict` because the
-        // brand discriminants are incompatible. Karn guarantees the value's
+        // brand discriminants are incompatible. Bynk guarantees the value's
         // base type matches at the boundary, so route through `unknown` to
-        // tell TypeScript to trust the structural Karn-side check.
+        // tell TypeScript to trust the structural Bynk-side check.
         return format!("({arg} as unknown as {ns}.{name})");
     }
     arg
@@ -1375,7 +1375,7 @@ pub(crate) fn emit_agent(
     }
     writeln!(out, "}}").unwrap();
     writeln!(out).unwrap();
-    // v0.9.2: per-agent state registry (bundle mode + `karnc test`) and the
+    // v0.9.2: per-agent state registry (bundle mode + `bynkc test`) and the
     // zero-value factory used to initialise a fresh key's state.
     let registry = agent_registry_name(&a.name.name);
     let zero_fn = format!("__zeroOf{}State", a.name.name);
@@ -1501,19 +1501,19 @@ pub(crate) fn emit_agent(
         writeln!(out).unwrap();
     }
     // v0.9.2: workers-mode DO dispatch. Method calls arrive as `fetch` requests
-    // under `/_karn/agent/<method>`; decode `{ args, deps }`, invoke the
+    // under `/_bynk/agent/<method>`; decode `{ args, deps }`, invoke the
     // handler with deps as the trailing argument, and serialise the result.
     if matches!(ctx.target, BuildTarget::Workers) {
         writeln!(out, "  async fetch(request: Request): Promise<Response> {{").unwrap();
         writeln!(out, "    const url = new URL(request.url);").unwrap();
         writeln!(
             out,
-            "    if (url.pathname.startsWith(\"/_karn/agent/\")) {{"
+            "    if (url.pathname.startsWith(\"/_bynk/agent/\")) {{"
         )
         .unwrap();
         writeln!(
             out,
-            "      const methodName = url.pathname.slice(\"/_karn/agent/\".length);"
+            "      const methodName = url.pathname.slice(\"/_bynk/agent/\".length);"
         )
         .unwrap();
         writeln!(

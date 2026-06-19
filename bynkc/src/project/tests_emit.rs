@@ -82,7 +82,7 @@ pub(crate) fn process_tests(
                 let span = first_test_target_span(indices, parsed);
                 errors.push(
                     CompileError::new(
-                        "karn.test.unknown_target",
+                        "bynk.test.unknown_target",
                         span,
                         format!(
                             "test target `{target_name}` is not a declared commons or context in this project",
@@ -106,7 +106,7 @@ pub(crate) fn process_tests(
                         had_dup = true;
                         errors.push(
                             CompileError::new(
-                                "karn.test.duplicate_case_name",
+                                "bynk.test.duplicate_case_name",
                                 case.name_span,
                                 format!(
                                     "test case `\"{}\"` is declared more than once in tests targeting `{target_name}`",
@@ -140,7 +140,7 @@ pub(crate) fn process_tests(
                 if target_kind == UnitKind::Commons {
                     errors.push(
                         CompileError::new(
-                            "karn.mock.in_commons_test",
+                            "bynk.mock.in_commons_test",
                             mock.span,
                             format!(
                                 "`mocks` declarations are not allowed in a test of commons `{target_name}` — commons have no providers or consumes to replace",
@@ -155,7 +155,7 @@ pub(crate) fn process_tests(
                 if let Some(prev) = target_mocks.get(&mock.target_name.name) {
                     errors.push(
                         CompileError::new(
-                            "karn.mock.duplicate_target",
+                            "bynk.mock.duplicate_target",
                             mock.target_name.span,
                             format!(
                                 "name `{}` is mocked more than once in tests of `{target_name}`",
@@ -195,7 +195,7 @@ pub(crate) fn process_tests(
                     None => {
                         errors.push(
                             CompileError::new(
-                                "karn.mock.unknown_target",
+                                "bynk.mock.unknown_target",
                                 mock.target_name.span,
                                 format!(
                                     "`{}` is not a capability of context `{target_name}` and not a consumed-context alias",
@@ -323,7 +323,7 @@ pub(crate) fn process_integration_tests(
             duplicate = true;
             errors.push(
                 CompileError::new(
-                    "karn.integration.duplicate_suite",
+                    "bynk.integration.duplicate_suite",
                     decl.suite_span,
                     format!(
                         "integration test `\"{}\"` is declared more than once",
@@ -339,7 +339,7 @@ pub(crate) fn process_integration_tests(
             if let Some(other) = parsed[i].integration() {
                 errors.push(
                     CompileError::new(
-                        "karn.integration.duplicate_suite",
+                        "bynk.integration.duplicate_suite",
                         other.suite_span,
                         format!(
                             "integration test `\"{}\"` is declared more than once",
@@ -363,7 +363,7 @@ pub(crate) fn process_integration_tests(
                 _ => {
                     errors.push(
                         CompileError::new(
-                            "karn.integration.unknown_participant",
+                            "bynk.integration.unknown_participant",
                             p.span,
                             format!("`{q}` is not a declared context in this project"),
                         )
@@ -377,7 +377,7 @@ pub(crate) fn process_integration_tests(
             }
             if !participant_set.insert(q.clone()) {
                 errors.push(CompileError::new(
-                    "karn.integration.duplicate_participant",
+                    "bynk.integration.duplicate_participant",
                     p.span,
                     format!("context `{q}` is listed more than once in `wires`"),
                 ));
@@ -389,7 +389,7 @@ pub(crate) fn process_integration_tests(
         if participant_set.len() < 2 {
             errors.push(
                 CompileError::new(
-                    "karn.integration.too_few_participants",
+                    "bynk.integration.too_few_participants",
                     decl.suite_span,
                     "an integration test must wire at least two contexts",
                 )
@@ -407,7 +407,7 @@ pub(crate) fn process_integration_tests(
                     if !participant_set.contains(d) {
                         errors.push(
                             CompileError::new(
-                                "karn.integration.unwired_dependency",
+                                "bynk.integration.unwired_dependency",
                                 decl.suite_span,
                                 format!(
                                     "participant `{p}` consumes `{d}`, which is not wired into this integration test",
@@ -431,7 +431,7 @@ pub(crate) fn process_integration_tests(
                     if let Some(prev) = seen_cases.get(&case.name) {
                         errors.push(
                             CompileError::new(
-                                "karn.test.duplicate_case_name",
+                                "bynk.test.duplicate_case_name",
                                 case.name_span,
                                 format!(
                                     "test case `\"{}\"` is declared more than once in integration test `\"{}\"`",
@@ -647,7 +647,7 @@ fn emit_integration_module(
     let sanitized = sanitise_suite(&decl.suite);
     let module_path = PathBuf::from(format!("tests/integration_{sanitized}.test.ts"));
     let mut out = String::new();
-    out.push_str("// Generated by karnc — do not edit by hand.\n");
+    out.push_str("// Generated by bynkc — do not edit by hand.\n");
     out.push_str(&format!("// integration test: {}\n\n", decl.suite));
 
     // Runtime imports. When a participant owns agents, also pull in the
@@ -957,7 +957,7 @@ fn check_mock_signatures(
             for cap_op in &cap.ops {
                 if !mock.ops.iter().any(|o| o.name.name == cap_op.name.name) {
                     errors.push(CompileError::new(
-                        "karn.mock.signature_mismatch",
+                        "bynk.mock.signature_mismatch",
                         mock.span,
                         format!(
                             "mock `{}` for capability `{}` is missing operation `{}`",
@@ -969,7 +969,7 @@ fn check_mock_signatures(
             for op in &mock.ops {
                 let Some(cap_op) = cap.ops.iter().find(|o| o.name.name == op.name.name) else {
                     errors.push(CompileError::new(
-                        "karn.mock.signature_mismatch",
+                        "bynk.mock.signature_mismatch",
                         op.span,
                         format!(
                             "mock operation `{}.{}` does not match any operation in capability `{}`",
@@ -989,7 +989,7 @@ fn check_mock_signatures(
             for op in &mock.ops {
                 let Some(service) = table.services.get(&op.name.name) else {
                     errors.push(CompileError::new(
-                        "karn.mock.signature_mismatch",
+                        "bynk.mock.signature_mismatch",
                         op.span,
                         format!(
                             "mock operation `{}.{}` does not match any service in consumed context `{qualified}`",
@@ -1005,7 +1005,7 @@ fn check_mock_signatures(
                     .find(|h| matches!(h.kind, HandlerKind::Call))
                 else {
                     errors.push(CompileError::new(
-                        "karn.mock.signature_mismatch",
+                        "bynk.mock.signature_mismatch",
                         op.span,
                         format!(
                             "service `{}` in consumed context `{qualified}` has no `on call` handler to mock",
@@ -1029,7 +1029,7 @@ fn check_mock_op_signature(
 ) {
     if op.params.len() != target_params.len() {
         errors.push(CompileError::new(
-            "karn.mock.signature_mismatch",
+            "bynk.mock.signature_mismatch",
             op.span,
             format!(
                 "mock operation `{}` has {} parameter(s), but the target declares {}",
@@ -1043,7 +1043,7 @@ fn check_mock_op_signature(
     for (i, (target_p, mock_p)) in target_params.iter().zip(op.params.iter()).enumerate() {
         if !type_refs_match(&target_p.type_ref, &mock_p.type_ref) {
             errors.push(CompileError::new(
-                "karn.mock.signature_mismatch",
+                "bynk.mock.signature_mismatch",
                 mock_p.span,
                 format!(
                     "mock operation `{}` parameter {} has type `{}`, but the target declares `{}`",
@@ -1057,7 +1057,7 @@ fn check_mock_op_signature(
     }
     if !type_refs_match(target_return, &op.return_type) {
         errors.push(CompileError::new(
-            "karn.mock.signature_mismatch",
+            "bynk.mock.signature_mismatch",
             op.return_type.span(),
             format!(
                 "mock operation `{}` returns `{}`, but the target declares `{}`",
@@ -1433,7 +1433,7 @@ fn emit_test_module(
     // Output file: tests/<sanitised-target>.test.ts
     let module_path = PathBuf::from(format!("tests/{}.test.ts", target_name.replace('.', "_")));
 
-    out.push_str("// Generated by karnc — do not edit by hand.\n");
+    out.push_str("// Generated by bynkc — do not edit by hand.\n");
     out.push_str(&format!("// test target: {target_name}\n\n"));
 
     // Result/Option helpers — same shape as the production runtime imports.
@@ -1601,14 +1601,14 @@ fn assertion_runtime_helpers() -> String {
     out.push_str("  }\n");
     out.push_str("}\n");
     out.push_str(
-        "function __karnAssertionFailure(location: string, start: number, end: number) {\n",
+        "function __bynkAssertionFailure(location: string, start: number, end: number) {\n",
     );
     out.push_str("  return new AssertionError(location, start, end);\n");
     out.push_str("}\n");
     out.push_str(
-        "function __karnAssert(cond: boolean, location: string, start: number, end: number): void {\n",
+        "function __bynkAssert(cond: boolean, location: string, start: number, end: number): void {\n",
     );
-    out.push_str("  if (!cond) { throw __karnAssertionFailure(location, start, end); }\n");
+    out.push_str("  if (!cond) { throw __bynkAssertionFailure(location, start, end); }\n");
     out.push_str("}\n\n");
     out
 }
@@ -2049,7 +2049,7 @@ fn emit_test_case_function(
 
 pub(crate) fn emit_test_main(tests: &[RunnableTest]) -> String {
     let mut out = String::new();
-    out.push_str("// Generated by karnc — do not edit by hand.\n");
+    out.push_str("// Generated by bynkc — do not edit by hand.\n");
     out.push_str("// top-level test runner\n\n");
     // Node's `process` global isn't declared without @types/node. The
     // runner only uses `process.exit`, so we narrow the global with a

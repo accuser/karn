@@ -68,7 +68,7 @@ reference sites per symbol, exposed on `ProjectDiagnostics`.
   Edits are **versioned** (`TextDocumentEdit` against the analysed
   snapshot's captured document versions), so a drifted buffer rejects
   the rename instead of mis-applying it. Rename plans against a fresh
-  analysis; failures surface as LSP request errors, not `karn.*`
+  analysis; failures surface as LSP request errors, not `bynk.*`
   diagnostics.
 - **Rider:** `definition` and `hover` re-point at the index (binding-
   correct), keeping the legacy name-matching path only as fallback for

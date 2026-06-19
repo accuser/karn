@@ -1,2 +1,2 @@
-karn.parse.reserved_keyword
+bynk.parse.reserved_keyword
 reserved keyword

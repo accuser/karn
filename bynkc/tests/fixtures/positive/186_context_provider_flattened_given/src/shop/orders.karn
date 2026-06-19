@@ -1,6 +1,6 @@
 context shop.orders
 
-consumes karn { Clock }
+consumes bynk { Clock }
 
 capability Stamp {
   fn make() -> Effect[Int]

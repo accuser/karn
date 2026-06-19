@@ -1,2 +1,2 @@
-karn.types.if_non_bool_cond
+bynk.types.if_non_bool_cond
 must have type `Bool`

@@ -153,7 +153,7 @@ fn colliding_rename_is_refused_by_reanalysis() {
     let err = try_rename(&root, &pre, ("demo/util.karn", at), "Money")
         .expect_err("collision must refuse");
     assert!(
-        err.contains("karn.resolve.name_conflict") || err.contains("would introduce"),
+        err.contains("bynk.resolve.name_conflict") || err.contains("would introduce"),
         "refusal cites the introduced diagnostic: {err}"
     );
 }

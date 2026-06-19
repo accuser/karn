@@ -15,7 +15,7 @@ bynkc --help
 
 Create a file called `demo.karn` with this content:
 
-```karn
+```bynk
 commons demo {
   type Id = Int
 }
@@ -68,7 +68,7 @@ identity, even when they look like plain aliases.
 
 Let us make the program do something. Replace the contents of `demo.karn` with:
 
-```karn
+```bynk
 commons demo {
   type Id = Int
 

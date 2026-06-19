@@ -1,2 +1,2 @@
-karn.types.non_exhaustive_match
+bynk.types.non_exhaustive_match
 non-exhaustive

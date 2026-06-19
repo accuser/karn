@@ -29,7 +29,7 @@ fix two cross-cutting design points for all of completion:
 - **Built-ins/surface come from static registries, not the index.**
   First-party symbols aren't indexed (ADR 0057's finding — synthetic defs
   aren't on disk), so the built-in types, keyword docs, and the
-  `karn`-surface transparent types are sourced from
+  `bynk`-surface transparent types are sourced from
   `bynkc::{keywords, builtin_names, firstparty}`; the index (here, the
   project parse) supplies only *project* symbols. One source of truth —
   reuse the registries, don't hardcode a parallel list that can drift.

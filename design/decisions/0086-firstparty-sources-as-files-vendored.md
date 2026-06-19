@@ -32,7 +32,7 @@ compiler's **emit ABI** — coupled to emit shapes (`Result`/`Option` tag layout
 `JsonError`, `Uuid.of`, `FetchError`). Vendoring (emitting them into each output
 project) makes version skew impossible by construction: the compiler that emits
 your code emits the runtime it talks to. Publishing them as independently-versioned
-`@karn/*` packages would introduce a skew axis the compiler must then police,
+`@bynk/*` packages would introduce a skew axis the compiler must then police,
 invert the import graph, and add a registry dependency to currently-hermetic
 builds — not worth it pre-1.0. The package-shaped layout is the cheap hedge that
 keeps a future publish a lift-and-shift; **publishing is deferred to a future ADR,

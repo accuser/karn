@@ -7,7 +7,7 @@
 //! production therefore cannot drift from the parser or from the full grammar
 //! appendix. An unknown rule fails the build loudly.
 //!
-//! We emit `ebnf` (not `karn`) so the result composes with the `bynk-highlight`
+//! We emit `ebnf` (not `bynk`) so the result composes with the `bynk-highlight`
 //! preprocessor and the doc-example gate regardless of preprocessor ordering.
 //!
 //! Protocol (mdBook preprocessor):
@@ -282,11 +282,11 @@ mod tests {
 
         let content = rendered_chapter(&parsed);
         assert!(
-            content.contains("- `karn.http.path_param_not_stringy` — "),
+            content.contains("- `bynk.http.path_param_not_stringy` — "),
             "missing http diagnostic bullet:\n{content}"
         );
         assert!(
-            content.contains("- `karn.http.body_on_get_or_delete` — "),
+            content.contains("- `bynk.http.body_on_get_or_delete` — "),
             "missing http diagnostic bullet:\n{content}"
         );
         assert!(

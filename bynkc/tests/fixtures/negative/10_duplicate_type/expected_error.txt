@@ -1,2 +1,2 @@
-karn.resolve.duplicate_type
+bynk.resolve.duplicate_type
 type `T` is already declared

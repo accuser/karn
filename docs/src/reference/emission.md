@@ -44,7 +44,7 @@ boundary.
 | record | `interface` with `readonly` fields; object literal construction |
 | sum | discriminated union on `tag` + a constructor namespace |
 
-```karn
+```bynk
 type Status = | Pending | Shipped(tracking: String)
 ```
 

@@ -1,6 +1,6 @@
 import type { Jwt, Claims } from "./tokens.js";
 import { JwtError } from "./tokens.js";
-import type { Secrets } from "./karn.js";
+import type { Secrets } from "./bynk.js";
 import { Ok, Err, type Result } from "./runtime.js";
 
 export class JoseJwt implements Jwt {

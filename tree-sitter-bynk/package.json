@@ -45,7 +45,7 @@
     {
       "scope": "source.bynk",
       "file-types": [
-        "karn"
+        "bynk"
       ],
       "highlights": "queries/highlights.scm"
     }

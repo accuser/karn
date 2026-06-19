@@ -88,7 +88,7 @@ impl<'a> Parser<'a> {
             ) {
                 let t = self.peek().unwrap();
                 return Err(CompileError::new(
-                    "karn.parse.non_associative",
+                    "bynk.parse.non_associative",
                     t.span,
                     format!(
                         "`{}` is non-associative; chained equality is not allowed",
@@ -128,7 +128,7 @@ impl<'a> Parser<'a> {
             ) {
                 let t = self.peek().unwrap();
                 return Err(CompileError::new(
-                    "karn.parse.non_associative",
+                    "bynk.parse.non_associative",
                     t.span,
                     "comparison operators are non-associative; chained comparison is not allowed",
                 )
@@ -230,7 +230,7 @@ impl<'a> Parser<'a> {
                         && self.peek_kind() != Some(TokenKind::Ident)
                     {
                         return Err(CompileError::new(
-                            "karn.parse.malformed_float_literal",
+                            "bynk.parse.malformed_float_literal",
                             e.span.merge(dot.span),
                             "a float literal needs a digit on both sides of the `.`",
                         )
@@ -258,7 +258,7 @@ impl<'a> Parser<'a> {
                             self.expect(TokenKind::RBracket, "to close the type-argument list")?;
                         if self.peek_kind() != Some(TokenKind::LParen) {
                             return Err(CompileError::new(
-                                "karn.parse.expected_token",
+                                "bynk.parse.expected_token",
                                 close.span,
                                 "type arguments must be followed by an argument list — `name[T](…)`",
                             )
@@ -338,7 +338,7 @@ impl<'a> Parser<'a> {
     fn parse_primary(&mut self) -> Result<Expr, CompileError> {
         let t = self.peek().ok_or_else(|| {
             CompileError::new(
-                "karn.parse.unexpected_eof",
+                "bynk.parse.unexpected_eof",
                 self.eof_span(),
                 "expected an expression, found end of file",
             )
@@ -349,7 +349,7 @@ impl<'a> Parser<'a> {
                 let slice = self.slice(t.span);
                 let n: i64 = slice.parse().map_err(|_| {
                     CompileError::new(
-                        "karn.lex.integer_overflow",
+                        "bynk.lex.integer_overflow",
                         t.span,
                         format!("integer literal `{slice}` out of 64-bit range"),
                     )
@@ -381,7 +381,7 @@ impl<'a> Parser<'a> {
             {
                 let lit = self.tokens[self.pos + 1];
                 Err(CompileError::new(
-                    "karn.parse.malformed_float_literal",
+                    "bynk.parse.malformed_float_literal",
                     t.span.merge(lit.span),
                     "a float literal needs a digit on both sides of the `.`",
                 )
@@ -468,7 +468,7 @@ impl<'a> Parser<'a> {
                 let method = self.expect_ident("after `Effect.`")?;
                 if method.name != "pure" {
                     return Err(CompileError::new(
-                        "karn.parse.unknown_effect_method",
+                        "bynk.parse.unknown_effect_method",
                         method.span,
                         format!(
                             "the only operation on `Effect` in expression position is `pure`, but got `{}`",
@@ -515,7 +515,7 @@ impl<'a> Parser<'a> {
                         self.expect(TokenKind::RBracket, "to close the type-argument list")?;
                     if self.peek_kind() != Some(TokenKind::LParen) {
                         return Err(CompileError::new(
-                            "karn.parse.expected_token",
+                            "bynk.parse.expected_token",
                             close.span,
                             "type arguments must be followed by an argument list — `name[T](…)`",
                         )
@@ -604,7 +604,7 @@ impl<'a> Parser<'a> {
                     self.parse_bare_record_spread()
                 } else {
                     Err(CompileError::new(
-                        "karn.parse.expected_expression",
+                        "bynk.parse.expected_expression",
                         t.span,
                         "expected an expression, found `{`",
                     )
@@ -638,7 +638,7 @@ impl<'a> Parser<'a> {
                 })
             }
             _ => Err(CompileError::new(
-                "karn.parse.expected_expression",
+                "bynk.parse.expected_expression",
                 t.span,
                 format!("expected an expression, found {}", t.kind.describe()),
             )),
@@ -784,7 +784,7 @@ impl<'a> Parser<'a> {
         let close = self.expect(TokenKind::RBrace, "to close the match-arm list")?;
         if arms.is_empty() {
             return Err(CompileError::new(
-                "karn.parse.empty_match",
+                "bynk.parse.empty_match",
                 kw.span.merge(close.span),
                 "a `match` expression must have at least one arm",
             ));
@@ -1025,7 +1025,7 @@ impl<'a> Parser<'a> {
         let src = &self.source[hole.range()];
         if src.trim().is_empty() {
             return Err(CompileError::new(
-                "karn.parse.empty_interpolation",
+                "bynk.parse.empty_interpolation",
                 hole,
                 "empty interpolation hole",
             )
@@ -1041,7 +1041,7 @@ impl<'a> Parser<'a> {
         let expr = sub.parse_expr()?;
         if let Some(extra) = sub.peek() {
             return Err(CompileError::new(
-                "karn.parse.extra_tokens",
+                "bynk.parse.extra_tokens",
                 extra.span,
                 format!(
                     "unexpected {} after the interpolation expression",

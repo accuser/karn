@@ -1,7 +1,7 @@
 //! Compiler diagnostics.
 //!
 //! Every error has a category (a dotted namespace string like
-//! `karn.parse.expected_token`), a primary span, a primary message, and
+//! `bynk.parse.expected_token`), a primary span, a primary message, and
 //! optionally some secondary labels and notes. Rendering goes through
 //! [`ariadne`] for source-pointing colour output.
 

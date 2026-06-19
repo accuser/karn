@@ -1,2 +1,2 @@
-karn.resolve.duplicate_fn
+bynk.resolve.duplicate_fn
 function `run` is already declared

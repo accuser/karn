@@ -1,2 +1,2 @@
-karn.actor.unknown_scheme
+bynk.actor.unknown_scheme
 unknown authentication scheme

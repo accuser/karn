@@ -104,7 +104,7 @@ pub fn parse(tokens: &[Token], source: &str) -> Result<Commons, Vec<CompileError
         SourceUnit::Commons(c) => Ok(c),
         SourceUnit::Context(ctx) => Err(vec![
             CompileError::new(
-                "karn.parse.unexpected_context",
+                "bynk.parse.unexpected_context",
                 ctx.span,
                 "expected a `commons` declaration but found a `context` declaration",
             )
@@ -114,7 +114,7 @@ pub fn parse(tokens: &[Token], source: &str) -> Result<Commons, Vec<CompileError
         ]),
         SourceUnit::Test(t) => Err(vec![
             CompileError::new(
-                "karn.parse.unexpected_test",
+                "bynk.parse.unexpected_test",
                 t.span,
                 "expected a `commons` declaration but found a `test` declaration",
             )
@@ -124,7 +124,7 @@ pub fn parse(tokens: &[Token], source: &str) -> Result<Commons, Vec<CompileError
         ]),
         SourceUnit::Integration(i) => Err(vec![
             CompileError::new(
-                "karn.parse.unexpected_test",
+                "bynk.parse.unexpected_test",
                 i.span,
                 "expected a `commons` declaration but found an integration test",
             )
@@ -134,7 +134,7 @@ pub fn parse(tokens: &[Token], source: &str) -> Result<Commons, Vec<CompileError
         ]),
         SourceUnit::Adapter(a) => Err(vec![
             CompileError::new(
-                "karn.parse.unexpected_adapter",
+                "bynk.parse.unexpected_adapter",
                 a.span,
                 "expected a `commons` declaration but found an `adapter` declaration",
             )
@@ -166,7 +166,7 @@ pub fn parse_unit_with_recovery(
             if let Some(extra) = p.peek() {
                 p.recovered_errors.push(
                     CompileError::new(
-                        "karn.parse.extra_tokens",
+                        "bynk.parse.extra_tokens",
                         extra.span,
                         "unexpected token after top-level declaration",
                     )
@@ -199,7 +199,7 @@ pub fn parse_unit(tokens: &[Token], source: &str) -> Result<SourceUnit, Vec<Comp
             if let Some(extra) = p.peek() {
                 Err(vec![
                     CompileError::new(
-                        "karn.parse.extra_tokens",
+                        "bynk.parse.extra_tokens",
                         extra.span,
                         "unexpected token after top-level declaration",
                     )
@@ -385,7 +385,7 @@ impl<'a> Parser<'a> {
                 Ok(t)
             }
             Some(t) => Err(CompileError::new(
-                "karn.parse.expected_token",
+                "bynk.parse.expected_token",
                 t.span,
                 format!(
                     "expected {} {ctx}, found {}",
@@ -394,7 +394,7 @@ impl<'a> Parser<'a> {
                 ),
             )),
             None => Err(CompileError::new(
-                "karn.parse.unexpected_eof",
+                "bynk.parse.unexpected_eof",
                 self.eof_span(),
                 format!("expected {} {ctx}, found end of file", kind.describe()),
             )),
@@ -427,7 +427,7 @@ impl<'a> Parser<'a> {
                 })
             }
             Some(t) if is_reserved_keyword(t.kind) => Err(CompileError::new(
-                "karn.parse.reserved_keyword",
+                "bynk.parse.reserved_keyword",
                 t.span,
                 format!(
                     "expected identifier {ctx}, but `{}` is a reserved keyword",
@@ -436,12 +436,12 @@ impl<'a> Parser<'a> {
             )
             .with_note("rename the identifier to something that is not a keyword")),
             Some(t) => Err(CompileError::new(
-                "karn.parse.expected_token",
+                "bynk.parse.expected_token",
                 t.span,
                 format!("expected identifier {ctx}, found {}", t.kind.describe()),
             )),
             None => Err(CompileError::new(
-                "karn.parse.unexpected_eof",
+                "bynk.parse.unexpected_eof",
                 self.eof_span(),
                 format!("expected identifier {ctx}, found end of file"),
             )),
@@ -483,7 +483,7 @@ impl<'a> Parser<'a> {
         if has_blank_line_between(self.source, doc_span.end, next_span.start) {
             self.warnings.push(
                 CompileError::new(
-                    "karn.parse.orphan_doc_block",
+                    "bynk.parse.orphan_doc_block",
                     doc_span,
                     "documentation block is separated from the following declaration by a blank line; it will not be attached",
                 )
@@ -515,7 +515,7 @@ fn parse_string_literal(lexeme: &str, span: Span) -> Result<String, CompileError
                 Some('\\') => out.push('\\'),
                 other => {
                     return Err(CompileError::new(
-                        "karn.lex.bad_escape",
+                        "bynk.lex.bad_escape",
                         span,
                         format!(
                             "invalid escape sequence `\\{}` in string literal",
@@ -717,7 +717,7 @@ mod tests {
         let errs = parse_str("commons x\n\nfn f() -> String {\n  \"\\()\"\n}\n").unwrap_err();
         assert!(
             errs.iter()
-                .any(|e| e.category == "karn.parse.empty_interpolation"),
+                .any(|e| e.category == "bynk.parse.empty_interpolation"),
             "expected empty_interpolation; got {errs:?}"
         );
     }
@@ -823,14 +823,14 @@ mod tests {
     fn chained_comparison_is_error() {
         let errs = parse_str("commons x { fn f(a: Int, b: Int, c: Int) -> Bool { a < b < c } }")
             .unwrap_err();
-        assert_eq!(errs[0].category, "karn.parse.non_associative");
+        assert_eq!(errs[0].category, "bynk.parse.non_associative");
     }
 
     #[test]
     fn chained_equality_is_error() {
         let errs = parse_str("commons x { fn f(a: Int, b: Int, c: Int) -> Bool { a == b == c } }")
             .unwrap_err();
-        assert_eq!(errs[0].category, "karn.parse.non_associative");
+        assert_eq!(errs[0].category, "bynk.parse.non_associative");
     }
 
     #[test]
@@ -954,7 +954,7 @@ mod tests {
     #[test]
     fn result_missing_arg_count_errors() {
         let errs = parse_str("commons x { fn f(n: Int) -> Result[Int] { Ok(n) } }").unwrap_err();
-        assert_eq!(errs[0].category, "karn.parse.generic_arg_count");
+        assert_eq!(errs[0].category, "bynk.parse.generic_arg_count");
     }
 
     #[test]

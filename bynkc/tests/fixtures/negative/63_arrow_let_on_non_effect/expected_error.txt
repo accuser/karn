@@ -1,1 +1,1 @@
-karn.effect.bind_on_non_effect
+bynk.effect.bind_on_non_effect

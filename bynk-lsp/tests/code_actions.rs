@@ -93,7 +93,7 @@ fn unused_capability_quick_fix_round_trips() {
     let diag = file
         .diagnostics
         .iter()
-        .find(|d| d.error.category == "karn.given.unused_capability")
+        .find(|d| d.error.category == "bynk.given.unused_capability")
         .expect("the unused-capability diagnostic");
 
     // The request range sits on the squiggle (the diagnostic's span) — far

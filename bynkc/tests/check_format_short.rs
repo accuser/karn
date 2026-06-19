@@ -35,7 +35,7 @@ fn short_format_lines_match_the_problem_matcher_shape() {
             "severity word: {line:?}"
         );
         assert!(
-            after.contains("[karn.") && after.contains("]: "),
+            after.contains("[bynk.") && after.contains("]: "),
             "category in brackets + message: {line:?}"
         );
     }

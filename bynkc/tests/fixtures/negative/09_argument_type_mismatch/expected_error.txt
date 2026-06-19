@@ -1,2 +1,2 @@
-karn.types.argument_mismatch
+bynk.types.argument_mismatch
 argument 1 to `double`

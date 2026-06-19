@@ -22,11 +22,11 @@ use bynkc::parser::parse_unit;
 /// `bynkc::firstparty`, each now an `include_str!` of a real `.karn` file.
 fn sources() -> Vec<(&'static str, &'static str)> {
     vec![
-        ("karn.list", bynkc::firstparty::KARN_LIST_SRC),
-        ("karn.map", bynkc::firstparty::KARN_MAP_SRC),
-        ("karn.string", bynkc::firstparty::KARN_STRING_SRC),
-        ("karn", bynkc::firstparty::KARN_ADAPTER_SRC),
-        ("karn.cloudflare", bynkc::firstparty::CLOUDFLARE_ADAPTER_SRC),
+        ("bynk.list", bynkc::firstparty::BYNK_LIST_SRC),
+        ("bynk.map", bynkc::firstparty::BYNK_MAP_SRC),
+        ("bynk.string", bynkc::firstparty::BYNK_STRING_SRC),
+        ("bynk", bynkc::firstparty::BYNK_ADAPTER_SRC),
+        ("bynk.cloudflare", bynkc::firstparty::CLOUDFLARE_ADAPTER_SRC),
     ]
 }
 

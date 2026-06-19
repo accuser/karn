@@ -203,7 +203,7 @@ pub fn resolve(commons: Commons) -> Result<ResolvedCommons, Vec<CompileError>> {
                 if let Some(prev) = types.get(&t.name.name) {
                     errors.push(
                         CompileError::new(
-                            "karn.resolve.duplicate_type",
+                            "bynk.resolve.duplicate_type",
                             t.name.span,
                             format!("type `{}` is already declared", t.name.name),
                         )
@@ -212,7 +212,7 @@ pub fn resolve(commons: Commons) -> Result<ResolvedCommons, Vec<CompileError>> {
                 } else if let Some(prev) = fns.get(&t.name.name) {
                     errors.push(
                         CompileError::new(
-                            "karn.resolve.name_conflict",
+                            "bynk.resolve.name_conflict",
                             t.name.span,
                             format!(
                                 "type `{}` conflicts with a function of the same name",
@@ -231,7 +231,7 @@ pub fn resolve(commons: Commons) -> Result<ResolvedCommons, Vec<CompileError>> {
                     if let Some(prev) = fns.get(&id.name) {
                         errors.push(
                             CompileError::new(
-                                "karn.resolve.duplicate_fn",
+                                "bynk.resolve.duplicate_fn",
                                 id.span,
                                 format!("function `{}` is already declared", id.name),
                             )
@@ -240,7 +240,7 @@ pub fn resolve(commons: Commons) -> Result<ResolvedCommons, Vec<CompileError>> {
                     } else if let Some(prev) = types.get(&id.name) {
                         errors.push(
                             CompileError::new(
-                                "karn.resolve.name_conflict",
+                                "bynk.resolve.name_conflict",
                                 id.span,
                                 format!(
                                     "function `{}` conflicts with a type of the same name",
@@ -261,7 +261,7 @@ pub fn resolve(commons: Commons) -> Result<ResolvedCommons, Vec<CompileError>> {
                     if !types.contains_key(&type_name.name) {
                         errors.push(
                             CompileError::new(
-                                "karn.resolve.method_unknown_type",
+                                "bynk.resolve.method_unknown_type",
                                 type_name.span,
                                 format!(
                                     "method `{}.{}` attached to an unknown type `{}`",
@@ -283,7 +283,7 @@ pub fn resolve(commons: Commons) -> Result<ResolvedCommons, Vec<CompileError>> {
                     if let Some(prev) = bucket.get(&method_name.name) {
                         errors.push(
                             CompileError::new(
-                                "karn.resolve.duplicate_method",
+                                "bynk.resolve.duplicate_method",
                                 method_name.span,
                                 format!(
                                     "method `{}.{}` is already declared",
@@ -407,7 +407,7 @@ fn check_type_decl_refs(t: &TypeDecl, types: &HashMap<String, TypeDecl>, errors:
                 if let Some(prev_span) = seen.get(&f.name.name) {
                     errors.push(
                         CompileError::new(
-                            "karn.resolve.duplicate_field",
+                            "bynk.resolve.duplicate_field",
                             f.name.span,
                             format!("field `{}` is declared more than once", f.name.name),
                         )
@@ -425,7 +425,7 @@ fn check_type_decl_refs(t: &TypeDecl, types: &HashMap<String, TypeDecl>, errors:
                 {
                     errors.push(
                         CompileError::new(
-                            "karn.resolve.recursive_record_field",
+                            "bynk.resolve.recursive_record_field",
                             f.name.span,
                             format!(
                                 "record `{}` cannot directly contain a field of its own type",
@@ -447,7 +447,7 @@ fn check_type_decl_refs(t: &TypeDecl, types: &HashMap<String, TypeDecl>, errors:
                 if let Some(prev_span) = seen.get(&v.name.name) {
                     errors.push(
                         CompileError::new(
-                            "karn.resolve.duplicate_variant",
+                            "bynk.resolve.duplicate_variant",
                             v.name.span,
                             format!("variant `{}` is declared more than once", v.name.name),
                         )
@@ -461,7 +461,7 @@ fn check_type_decl_refs(t: &TypeDecl, types: &HashMap<String, TypeDecl>, errors:
                     if let Some(prev) = payload_seen.get(&f.name.name) {
                         errors.push(
                             CompileError::new(
-                                "karn.resolve.duplicate_field",
+                                "bynk.resolve.duplicate_field",
                                 f.name.span,
                                 format!(
                                     "payload field `{}` is declared more than once in variant `{}`",
@@ -501,7 +501,7 @@ fn check_fn_refs(
         if let Some(prev) = seen_params.get(p.name.name.as_str()) {
             errors.push(
                 CompileError::new(
-                    "karn.resolve.duplicate_param",
+                    "bynk.resolve.duplicate_param",
                     p.name.span,
                     format!("parameter `{}` is declared more than once", p.name.name),
                 )
@@ -536,7 +536,7 @@ fn check_fn_refs(
 
 fn unknown_type_error(id: &Ident) -> CompileError {
     CompileError::new(
-        "karn.resolve.unknown_type",
+        "bynk.resolve.unknown_type",
         id.span,
         format!("unknown type `{}`", id.name),
     )
@@ -634,7 +634,7 @@ fn check_map_key_keyable(
     if !keyable {
         errors.push(
             CompileError::new(
-                "karn.types.unkeyable_map_key",
+                "bynk.types.unkeyable_map_key",
                 k.span(),
                 "a `Map` key must be value-keyable — `String`, `Int`, or a refined/opaque type over them",
             )
@@ -687,7 +687,7 @@ fn check_block_references(
                 if let Some(prev) = types.get(&l.name.name) {
                     errors.push(
                         CompileError::new(
-                            "karn.resolve.let_shadows_type",
+                            "bynk.resolve.let_shadows_type",
                             l.name.span,
                             format!(
                                 "`let {}` shadows the declared type `{}`",
@@ -700,7 +700,7 @@ fn check_block_references(
                 } else if let Some(prev) = fns.get(&l.name.name) {
                     errors.push(
                         CompileError::new(
-                            "karn.resolve.let_shadows_fn",
+                            "bynk.resolve.let_shadows_fn",
                             l.name.span,
                             format!(
                                 "`let {}` shadows the declared function `{}`",
@@ -921,7 +921,7 @@ fn check_expr_references(
                 if !in_method {
                     errors.push(
                         CompileError::new(
-                            "karn.resolve.self_outside_method",
+                            "bynk.resolve.self_outside_method",
                             id.span,
                             "`self` can only be used inside a method body",
                         )
@@ -946,7 +946,7 @@ fn check_expr_references(
             } else if types.contains_key(&id.name) {
                 errors.push(
                     CompileError::new(
-                        "karn.resolve.type_in_expr",
+                        "bynk.resolve.type_in_expr",
                         id.span,
                         format!("`{}` is a type, not a value", id.name),
                     )
@@ -959,14 +959,14 @@ fn check_expr_references(
                 // v0.20a: a bare named-function reference may be a function
                 // VALUE where a function type is expected. The resolver has
                 // no type information, so the judgment (and the
-                // `karn.resolve.fn_without_call` diagnostic for non-function
+                // `bynk.resolve.fn_without_call` diagnostic for non-function
                 // positions) now lives in the checker's ident rule. Silent
                 // pass here keeps `unknown_name` from misfiring.
                 errors.refs.record(id.span, SymbolKind::Fn, &id.name);
             } else if find_ambiguous_variant_owners(&id.name, types).len() > 1 {
                 errors.push(
                     CompileError::new(
-                        "karn.resolve.ambiguous_variant",
+                        "bynk.resolve.ambiguous_variant",
                         id.span,
                         format!(
                             "the variant name `{}` is declared on multiple sum types — qualify it as `TypeName.{}`",
@@ -977,7 +977,7 @@ fn check_expr_references(
             } else {
                 errors.push(
                     CompileError::new(
-                        "karn.resolve.unknown_name",
+                        "bynk.resolve.unknown_name",
                         id.span,
                         format!("unknown name `{}`", id.name),
                     )
@@ -995,7 +995,7 @@ fn check_expr_references(
                     if decl.params.len() != args.len() {
                         errors.push(
                             CompileError::new(
-                                "karn.resolve.arity_mismatch",
+                                "bynk.resolve.arity_mismatch",
                                 name.span,
                                 format!(
                                     "function `{}` expects {} argument(s), but {} were given",
@@ -1018,7 +1018,7 @@ fn check_expr_references(
                         // checker validates arg count and types.
                     } else if owners.len() > 1 {
                         errors.push(CompileError::new(
-                            "karn.resolve.ambiguous_variant",
+                            "bynk.resolve.ambiguous_variant",
                             name.span,
                             format!(
                                 "the variant name `{}` is declared on multiple sum types — qualify it as `TypeName.{}(...)`",
@@ -1027,7 +1027,7 @@ fn check_expr_references(
                         ));
                     } else if types.contains_key(&name.name) {
                         errors.push(CompileError::new(
-                            "karn.resolve.type_as_function",
+                            "bynk.resolve.type_as_function",
                             name.span,
                             format!(
                                 "`{}` is a type, not a function — use `{}.of(value)` or `{} {{ ... }}` instead",
@@ -1038,13 +1038,13 @@ fn check_expr_references(
                         // v0.20a: an in-scope value being called may be a
                         // legal value application if its type is a function
                         // type. The resolver has no type information, so the
-                        // judgment (and `karn.resolve.param_as_function` for
+                        // judgment (and `bynk.resolve.param_as_function` for
                         // non-function-typed values) lives in the checker's
                         // call dispatch. Silent pass.
                     } else {
                         errors.push(
                             CompileError::new(
-                                "karn.resolve.unknown_function",
+                                "bynk.resolve.unknown_function",
                                 name.span,
                                 format!("unknown function `{}`", name.name),
                             )
@@ -1208,7 +1208,7 @@ fn check_expr_references(
             if type_name.name == "HttpResult" {
                 if http_variant(&method.name).is_none() {
                     errors.push(CompileError::new(
-                        "karn.resolve.unknown_static_member",
+                        "bynk.resolve.unknown_static_member",
                         method.span,
                         format!("`HttpResult` has no variant named `{}`", method.name),
                     ));
@@ -1248,7 +1248,7 @@ fn check_expr_references(
                 if !(is_static_method || is_of_constructor || is_unsafe_constructor || is_variant) {
                     errors.push(
                         CompileError::new(
-                            "karn.resolve.unknown_static_member",
+                            "bynk.resolve.unknown_static_member",
                             method.span,
                             format!(
                                 "type `{}` has no static method or variant named `{}`",
@@ -1290,7 +1290,7 @@ fn check_expr_references(
                                 if !declared.contains_key(f.name.name.as_str()) {
                                     errors.push(
                                         CompileError::new(
-                                            "karn.resolve.unknown_field",
+                                            "bynk.resolve.unknown_field",
                                             f.name.span,
                                             format!(
                                                 "record type `{}` has no field `{}`",
@@ -1303,7 +1303,7 @@ fn check_expr_references(
                                 if let Some(prev) = provided.get(f.name.name.as_str()) {
                                     errors.push(
                                         CompileError::new(
-                                            "karn.resolve.duplicate_field_init",
+                                            "bynk.resolve.duplicate_field_init",
                                             f.name.span,
                                             format!(
                                                 "field `{}` is initialised more than once",
@@ -1332,7 +1332,7 @@ fn check_expr_references(
                                         if !name_in_scope(&f.name.name, params, scopes) {
                                             errors.push(
                                             CompileError::new(
-                                                "karn.resolve.unknown_name",
+                                                "bynk.resolve.unknown_name",
                                                 f.name.span,
                                                 format!(
                                                     "shorthand field initialiser `{}` requires a binding of that name in scope",
@@ -1351,7 +1351,7 @@ fn check_expr_references(
                                 if !provided.contains_key(decl_field.name.name.as_str()) {
                                     errors.push(
                                         CompileError::new(
-                                            "karn.resolve.missing_field",
+                                            "bynk.resolve.missing_field",
                                             type_name.span,
                                             format!(
                                                 "missing required field `{}` for record `{}`",
@@ -1366,7 +1366,7 @@ fn check_expr_references(
                         TypeBody::Opaque { .. } => {
                             errors.push(
                             CompileError::new(
-                                "karn.resolve.opaque_record_construction",
+                                "bynk.resolve.opaque_record_construction",
                                 type_name.span,
                                 format!(
                                     "opaque type `{}` cannot be constructed with record-literal syntax",
@@ -1382,7 +1382,7 @@ fn check_expr_references(
                         _ => {
                             errors.push(
                             CompileError::new(
-                                "karn.resolve.not_a_record_type",
+                                "bynk.resolve.not_a_record_type",
                                 type_name.span,
                                 format!(
                                     "`{}` is not a record type — only record types can be constructed with `{{ ... }}`",
@@ -1405,7 +1405,7 @@ fn check_expr_references(
             {
                 if http_variant(&field.name).is_none() {
                     errors.push(CompileError::new(
-                        "karn.resolve.unknown_static_member",
+                        "bynk.resolve.unknown_static_member",
                         field.span,
                         format!("`HttpResult` has no variant named `{}`", field.name),
                     ));
@@ -1425,7 +1425,7 @@ fn check_expr_references(
                 if !known_variant {
                     errors.push(
                         CompileError::new(
-                            "karn.resolve.unknown_static_member",
+                            "bynk.resolve.unknown_static_member",
                             field.span,
                             format!(
                                 "type `{}` has no static method or variant named `{}`",
@@ -1462,7 +1462,7 @@ fn check_expr_references(
             {
                 if http_variant(&method.name).is_none() {
                     errors.push(CompileError::new(
-                        "karn.resolve.unknown_static_member",
+                        "bynk.resolve.unknown_static_member",
                         method.span,
                         format!("`HttpResult` has no variant named `{}`", method.name),
                     ));
@@ -1499,7 +1499,7 @@ fn check_expr_references(
                 let only = allowed.join("`/`");
                 if !allowed.contains(&method.name.as_str()) {
                     errors.push(CompileError::new(
-                        "karn.resolve.unknown_static_member",
+                        "bynk.resolve.unknown_static_member",
                         method.span,
                         format!(
                             "the built-in `{}` type has no static method named `{}` — the statics are `{only}`",
@@ -1548,7 +1548,7 @@ fn check_expr_references(
                 if !(is_static_method || is_of_constructor || is_unsafe_constructor || is_variant) {
                     errors.push(
                         CompileError::new(
-                            "karn.resolve.unknown_static_member",
+                            "bynk.resolve.unknown_static_member",
                             method.span,
                             format!(
                                 "type `{}` has no static method or variant named `{}`",

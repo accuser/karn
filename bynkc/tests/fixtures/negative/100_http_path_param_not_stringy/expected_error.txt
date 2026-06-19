@@ -1,1 +1,1 @@
-karn.http.path_param_not_stringy
+bynk.http.path_param_not_stringy

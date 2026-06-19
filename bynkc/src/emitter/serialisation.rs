@@ -1,7 +1,7 @@
 //! Per-type serialise / deserialise helper generation for workers mode
 //! (v0.8 §3.4 / §5.2).
 //!
-//! Every Karn type that crosses a context boundary needs:
+//! Every Bynk type that crosses a context boundary needs:
 //!   - `serialise_<Type>(value): JsonValue` — structural lowering.
 //!   - `deserialise_<Type>(json): Result<<Type>, BoundaryError>` —
 //!     structural validation + refinement re-validation, then a nominal
@@ -329,7 +329,7 @@ fn emit_sum(out: &mut String, name: &str, body: &SumBody) {
 fn emit_field_deserialise(out: &mut String, name: &str, t: &TypeRef, json: &str, path_expr: &str) {
     match t {
         // v0.20a: function types are confined to non-boundary positions
-        // (`karn.types.function_at_boundary`), so the serialisation machinery
+        // (`bynk.types.function_at_boundary`), so the serialisation machinery
         // can never legally see one.
         TypeRef::Fn(..) => unreachable!("function types are rejected at boundaries"),
         TypeRef::Base(b, _) => {
@@ -444,7 +444,7 @@ fn emit_field_deserialise(out: &mut String, name: &str, t: &TypeRef, json: &str,
 fn serialise_field_expr(t: &TypeRef, value: &str) -> String {
     match t {
         // v0.20a: function types are confined to non-boundary positions
-        // (`karn.types.function_at_boundary`), so the serialisation machinery
+        // (`bynk.types.function_at_boundary`), so the serialisation machinery
         // can never legally see one.
         TypeRef::Fn(..) => unreachable!("function types are rejected at boundaries"),
         // v0.21: serialising a non-finite `Float` is a contract violation
@@ -482,7 +482,7 @@ fn inner_ts_name(t: &TypeRef) -> String {
     match t {
         TypeRef::Base(b, _) => b.name().to_string(),
         // v0.20a: function types are confined to non-boundary positions
-        // (`karn.types.function_at_boundary`), so the serialisation machinery
+        // (`bynk.types.function_at_boundary`), so the serialisation machinery
         // can never legally see one.
         TypeRef::Fn(..) => unreachable!("function types are rejected at boundaries"),
         TypeRef::Named(id) => id.name.clone(),
@@ -607,7 +607,7 @@ pub fn deserialise_expr(t: &TypeRef, json: &str, path: &str) -> String {
 /// Collect the set of `Result<A, B>` / `Option<A>` instantiations used in
 /// boundary positions so the emitter can synthesise the specialised
 /// helpers. v0.18: an instantiation may also appear in the *fields* of a
-/// boundary record or sum payload (e.g. the karn surface's
+/// boundary record or sum payload (e.g. the bynk surface's
 /// `Request.contentType: Option[String]`) — the per-type serialisers
 /// delegate to the specialised generic helpers, so walk those too.
 pub fn collect_generic_instantiations(
@@ -953,7 +953,7 @@ pub fn emit_generic_helpers(out: &mut String, insts: &[GenericInst]) {
 fn ts_inner_type(t: &TypeRef) -> String {
     match t {
         // v0.20a: function types are confined to non-boundary positions
-        // (`karn.types.function_at_boundary`), so the serialisation machinery
+        // (`bynk.types.function_at_boundary`), so the serialisation machinery
         // can never legally see one.
         TypeRef::Fn(..) => unreachable!("function types are rejected at boundaries"),
         TypeRef::Base(b, _) => match b {

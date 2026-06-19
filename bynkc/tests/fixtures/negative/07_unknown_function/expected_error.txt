@@ -1,2 +1,2 @@
-karn.resolve.unknown_function
+bynk.resolve.unknown_function
 unknown function `missing`

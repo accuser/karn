@@ -20,7 +20,7 @@ cd url-shortener
 Inside it, create `shortener.karn` with a single endpoint — looking up a short
 code:
 
-```karn
+```bynk
 context shortener
 
 service api from http {
@@ -99,7 +99,7 @@ generated the *how* (the router, the response encoding, the Worker scaffold).
 Now the endpoint that *creates* a short link from a JSON body. First we need a
 type for the request. Update `shortener.karn`:
 
-```karn
+```bynk
 context shortener
 
 type CreateLinkRequest = {
@@ -186,7 +186,7 @@ Then `POST /links` with `{"target":"https://example.com"}` returns a `201`, and
 ## What you have done
 
 You built the shortener's HTTP front door, compiled it to a Cloudflare Worker,
-and saw how `karn` generates the router and boundary validation around the
+and saw how `bynk` generates the router and boundary validation around the
 handler logic you wrote. You returned several `HttpResult` variants and accepted
 a typed request body.
 

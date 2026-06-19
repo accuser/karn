@@ -1,12 +1,12 @@
 import type { Weather, Report } from "./weather.js";
 import { WeatherError } from "./weather.js";
-import type { Fetch, Secrets } from "./karn.js";
-import { Method } from "./karn.js";
+import type { Fetch, Secrets } from "./bynk.js";
+import { Method } from "./bynk.js";
 import { Ok, Err, None, Some, type Result } from "./runtime.js";
 
 export class FetchWeather implements Weather {
   // v0.18 ([M]/[N]): outbound IO and the API key are capability
-  // dependencies (karn.Fetch / karn.Secrets), not raw fetch + params.
+  // dependencies (bynk.Fetch / bynk.Secrets), not raw fetch + params.
   constructor(private deps: { Fetch: Fetch; Secrets: Secrets }) {}
 
   async current(city: string): Promise<Result<Report, WeatherError>> {

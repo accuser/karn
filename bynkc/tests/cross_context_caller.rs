@@ -1,7 +1,7 @@
 //! v0.54: behavioral test for the cross-context `CallerId` value (Q7).
 //!
-//! Drives the callee worker's `/_karn/call/` dispatch with and without the
-//! `X-Karn-Caller` header: present → the `by c: Caller` handler reads the live
+//! Drives the callee worker's `/_bynk/call/` dispatch with and without the
+//! `X-Bynk-Caller` header: present → the `by c: Caller` handler reads the live
 //! caller name; absent/empty → fail-closed (401, the `Internal`-channel
 //! analogue). Skips loudly without a toolchain; `BYNK_REQUIRE_TSC=1` turns the
 //! skip into a failure.
@@ -98,7 +98,7 @@ function assert(cond: boolean, msg: string): void {
 }
 
 function call(headers: Record<string, string>): Request {
-  return new Request("http://internal/_karn/call/whoami", {
+  return new Request("http://internal/_bynk/call/whoami", {
     method: "POST",
     headers: { "content-type": "application/json", ...headers },
     body: JSON.stringify("hello"),
@@ -108,7 +108,7 @@ function call(headers: Record<string, string>): Request {
 const env: any = {};
 
 // 1. With the caller header → the body reads the live caller name.
-let res = await worker.fetch(call({ "X-Karn-Caller": "app.a" }), env);
+let res = await worker.fetch(call({ "X-Bynk-Caller": "app.a" }), env);
 assert(res.status === 200, "with caller header → 200, got " + res.status);
 let body: any = await res.json();
 assert(body.kind === "Ok" && body.value === "app.a", "body returns the caller id");
@@ -118,7 +118,7 @@ res = await worker.fetch(call({}), env);
 assert(res.status === 401, "absent caller header → 401, got " + res.status);
 
 // 3. Empty caller header → fail-closed (401).
-res = await worker.fetch(call({ "X-Karn-Caller": "" }), env);
+res = await worker.fetch(call({ "X-Bynk-Caller": "" }), env);
 assert(res.status === 401, "empty caller header → 401, got " + res.status);
 
 console.log("ALL OK");

@@ -26,7 +26,7 @@ fn lock_violation(
     None
 }
 
-/// A platform-lock violation (v0.19, `karn.target.*`).
+/// A platform-lock violation (v0.19, `bynk.target.*`).
 #[derive(Debug, PartialEq, Eq)]
 enum LockViolation {
     /// The deployment unit needs `needed` but another platform is selected.
@@ -110,7 +110,7 @@ pub(crate) fn check_platform_lock(
             LockViolation::Required { needed, unit } => {
                 errors.push(
                     CompileError::new(
-                        "karn.target.vendor_required",
+                        "bynk.target.vendor_required",
                         span_for(&unit),
                         format!(
                             "context `{ctx}` uses the platform-native capabilities of `{unit}`, which run only on the `{}` platform, but the build selects `--platform {}`",
@@ -126,7 +126,7 @@ pub(crate) fn check_platform_lock(
             LockViolation::Conflict { a, b } => {
                 errors.push(
                     CompileError::new(
-                        "karn.target.vendor_conflict",
+                        "bynk.target.vendor_conflict",
                         span_for(&a.1),
                         format!(
                             "one deployment unit (via context `{ctx}`) uses platform-native capabilities from two mutually-exclusive platforms: `{}` (from `{}`) and `{}` (from `{}`)",
@@ -218,7 +218,7 @@ fn walk_expr_for_constraints(
             if let Some(ct) = consumed.get(&type_name.name) {
                 errors.push(
                     CompileError::new(
-                        "karn.context.external_construction",
+                        "bynk.context.external_construction",
                         type_name.span,
                         format!(
                             "cannot construct `{}` here — it is owned by context `{}`",
@@ -251,7 +251,7 @@ fn walk_expr_for_constraints(
                 if is_construct {
                     errors.push(
                         CompileError::new(
-                            "karn.context.external_construction",
+                            "bynk.context.external_construction",
                             type_name.span.merge(method.span),
                             format!(
                                 "cannot construct `{}.{}` here — `{}` is owned by context `{}`",
@@ -287,7 +287,7 @@ fn walk_expr_for_constraints(
                 if is_construct {
                     errors.push(
                         CompileError::new(
-                            "karn.context.external_construction",
+                            "bynk.context.external_construction",
                             id.span.merge(method.span),
                             format!(
                                 "cannot construct `{}.{}` here — `{}` is owned by context `{}`",
@@ -327,7 +327,7 @@ fn walk_expr_for_constraints(
             {
                 errors.push(
                     CompileError::new(
-                        "karn.context.opaque_inspection",
+                        "bynk.context.opaque_inspection",
                         id.span.merge(field.span),
                         format!(
                             "cannot inspect opaquely-exported type `{}` from outside context `{}`",
@@ -352,7 +352,7 @@ fn walk_expr_for_constraints(
                 {
                     errors.push(
                         CompileError::new(
-                            "karn.context.opaque_inspection",
+                            "bynk.context.opaque_inspection",
                             discriminant.span,
                             format!(
                                 "cannot `match` on opaquely-exported type `{}` from outside context `{}`",
@@ -678,11 +678,11 @@ fn check_provider_decls(
 /// Check service handlers across all services in this context: HTTP/cron/queue
 /// handler shape and per-kind duplicate detection (route/schedule/consumer),
 /// then each handler's `given` clause and body. The duplicate-detection passes
-/// run before the body pass so the `karn.<kind>.duplicate_*` diagnostics
+/// run before the body pass so the `bynk.<kind>.duplicate_*` diagnostics
 /// precede the body diagnostics in multi-error fixtures.
 /// v0.44: a service is one protocol adapter — every handler's form must match
 /// the `from <protocol>` header. A `from`-less service (`Call`) admits only
-/// `on call`; mismatches are `karn.service.{missing_from,mixed_protocols}`.
+/// `on call`; mismatches are `bynk.service.{missing_from,mixed_protocols}`.
 fn check_service_protocols(table: &UnitTable, errors: &mut Vec<CompileError>) {
     for service in table.services.values() {
         for handler in &service.handlers {
@@ -706,7 +706,7 @@ fn check_service_protocols(table: &UnitTable, errors: &mut Vec<CompileError>) {
                     };
                     errors.push(
                         CompileError::new(
-                            "karn.service.missing_from",
+                            "bynk.service.missing_from",
                             handler.span,
                             format!(
                                 "this handler needs a protocol on the service header — add `{suggested}` to `service {}`",
@@ -719,7 +719,7 @@ fn check_service_protocols(table: &UnitTable, errors: &mut Vec<CompileError>) {
                 wire => {
                     errors.push(
                         CompileError::new(
-                            "karn.service.mixed_protocols",
+                            "bynk.service.mixed_protocols",
                             handler.span,
                             format!(
                                 "a `{}` service admits only its own handler form; this handler does not match",
@@ -779,7 +779,7 @@ fn check_actor_contracts(
             } else {
                 errors.push(
                     CompileError::new(
-                        "karn.actor.refinement_base_unsupported",
+                        "bynk.actor.refinement_base_unsupported",
                         r.base.span,
                         format!(
                             "the base actor `{}` of refinement `{}` must be a declared `Bearer` actor",
@@ -795,7 +795,7 @@ fn check_actor_contracts(
             if let Err(span) = actors::parse_claim_predicate(&r.predicate) {
                 errors.push(
                     CompileError::new(
-                        "karn.actor.refinement_predicate_unsupported",
+                        "bynk.actor.refinement_predicate_unsupported",
                         span,
                         "a refinement predicate must be `hasClaim(\"…\")` or `claimEquals(\"…\", \"…\")`, composed with `&&`, `||`, `!`",
                     )
@@ -813,7 +813,7 @@ fn check_actor_contracts(
         match Scheme::from_name(&auth.name) {
             None => errors.push(
                 CompileError::new(
-                    "karn.actor.unknown_scheme",
+                    "bynk.actor.unknown_scheme",
                     auth.span,
                     format!("unknown authentication scheme `{}`", auth.name),
                 )
@@ -827,7 +827,7 @@ fn check_actor_contracts(
                 if actor.scheme_arg("secret").is_none() {
                     errors.push(
                         CompileError::new(
-                            "karn.actor.bearer_missing_secret",
+                            "bynk.actor.bearer_missing_secret",
                             auth.span,
                             "a `Bearer` actor must name its signing secret",
                         )
@@ -840,7 +840,7 @@ fn check_actor_contracts(
                 match &actor.identity {
                     None => errors.push(
                         CompileError::new(
-                            "karn.actor.bearer_identity_not_string_constructible",
+                            "bynk.actor.bearer_identity_not_string_constructible",
                             auth.span,
                             "a `Bearer` actor must declare a string-constructible `identity`",
                         )
@@ -851,7 +851,7 @@ fn check_actor_contracts(
                     ),
                     Some(id) if !is_string_constructible(id, &resolved.types) => errors.push(
                         CompileError::new(
-                            "karn.actor.bearer_identity_not_string_constructible",
+                            "bynk.actor.bearer_identity_not_string_constructible",
                             id.span(),
                             "a `Bearer` actor's identity must be string-constructible",
                         )
@@ -870,7 +870,7 @@ fn check_actor_contracts(
                 if actor.scheme_arg("secret").is_none() {
                     errors.push(
                         CompileError::new(
-                            "karn.actor.signature_missing_secret",
+                            "bynk.actor.signature_missing_secret",
                             auth.span,
                             "a `Signature` actor must name its signing secret",
                         )
@@ -882,7 +882,7 @@ fn check_actor_contracts(
                 if actor.scheme_arg("header").is_none() {
                     errors.push(
                         CompileError::new(
-                            "karn.actor.signature_missing_header",
+                            "bynk.actor.signature_missing_header",
                             auth.span,
                             "a `Signature` actor must name the signature header",
                         )
@@ -896,7 +896,7 @@ fn check_actor_contracts(
                 {
                     errors.push(
                         CompileError::new(
-                            "karn.actor.signature_tolerance_without_timestamp",
+                            "bynk.actor.signature_tolerance_without_timestamp",
                             tol.span,
                             "`tolerance` requires a `timestamp` header to check against",
                         )
@@ -906,7 +906,7 @@ fn check_actor_contracts(
                 if let Some(id) = &actor.identity {
                     errors.push(
                         CompileError::new(
-                            "karn.actor.signature_identity_unsupported",
+                            "bynk.actor.signature_identity_unsupported",
                             id.span(),
                             "a `Signature` actor does not yet support a declared `identity`",
                         )
@@ -931,7 +931,7 @@ fn check_actor_contracts(
             if !ownable {
                 errors.push(
                     CompileError::new(
-                        "karn.actor.identity_not_sealed",
+                        "bynk.actor.identity_not_sealed",
                         id.span(),
                         "an actor identity must be a context-ownable value type",
                     )
@@ -959,7 +959,7 @@ fn check_actor_contracts(
                     {
                         errors.push(
                             CompileError::new(
-                                "karn.actor.binder_shadows_param",
+                                "bynk.actor.binder_shadows_param",
                                 binder.span,
                                 format!(
                                     "the actor binder `{}` collides with a handler parameter of the same name",
@@ -975,7 +975,7 @@ fn check_actor_contracts(
                     if by.is_sum() && by.binder.is_none() {
                         errors.push(
                             CompileError::new(
-                                "karn.actor.sum_requires_binder",
+                                "bynk.actor.sum_requires_binder",
                                 by.span,
                                 "a multi-actor `by` clause must bind the resolved actor",
                             )
@@ -998,7 +998,7 @@ fn check_actor_contracts(
                         if by.is_sum() && local.is_some_and(|a| a.refinement.is_some()) {
                             errors.push(
                                 CompileError::new(
-                                    "karn.actor.refinement_in_sum",
+                                    "bynk.actor.refinement_in_sum",
                                     actor_ref.span,
                                     format!(
                                         "the refinement actor `{}` cannot be a peer in a multi-actor sum",
@@ -1038,7 +1038,7 @@ fn check_actor_contracts(
                             if local.is_none() {
                                 errors.push(
                                     CompileError::new(
-                                        "karn.actor.unknown_actor",
+                                        "bynk.actor.unknown_actor",
                                         actor_ref.span,
                                         format!("unknown actor `{}`", actor_ref.name),
                                     )
@@ -1053,7 +1053,7 @@ fn check_actor_contracts(
                         if !actors::scheme_admissible(&service.protocol, contract.scheme) {
                             errors.push(
                                 CompileError::new(
-                                    "karn.actor.scheme_not_admissible",
+                                    "bynk.actor.scheme_not_admissible",
                                     by.span,
                                     format!(
                                         "a `{}` actor is not admissible on a `{}` handler",
@@ -1080,7 +1080,7 @@ fn check_actor_contracts(
                         if is_caller && !matches!(service.protocol, ServiceProtocol::Call) {
                             errors.push(
                                 CompileError::new(
-                                    "karn.actor.scheme_not_admissible",
+                                    "bynk.actor.scheme_not_admissible",
                                     by.span,
                                     format!(
                                         "the `Caller` actor is not admissible on a `{}` handler",
@@ -1104,7 +1104,7 @@ fn check_actor_contracts(
                     {
                         errors.push(
                             CompileError::new(
-                                "karn.actor.signature_requires_body",
+                                "bynk.actor.signature_requires_body",
                                 by.span,
                                 "a `Signature` handler must take a `body` parameter (the signature is over the body)",
                             )
@@ -1123,7 +1123,7 @@ fn check_actor_contracts(
                             if seen_catch_all {
                                 errors.push(
                                     CompileError::new(
-                                        "karn.actor.unreachable_sum_arm",
+                                        "bynk.actor.unreachable_sum_arm",
                                         actor_ref.span,
                                         format!(
                                             "actor `{}` is unreachable — an earlier `None` peer accepts every caller",
@@ -1141,7 +1141,7 @@ fn check_actor_contracts(
                             } else if seen.contains(&contract.scheme) {
                                 errors.push(
                                     CompileError::new(
-                                        "karn.actor.duplicate_sum_scheme",
+                                        "bynk.actor.duplicate_sum_scheme",
                                         actor_ref.span,
                                         format!(
                                             "actor `{}` repeats the `{}` scheme of an earlier peer",
@@ -1165,7 +1165,7 @@ fn check_actor_contracts(
                     if actors::default_actor(&service.protocol).is_none() {
                         errors.push(
                             CompileError::new(
-                                "karn.actor.missing_by_on_http",
+                                "bynk.actor.missing_by_on_http",
                                 handler.span,
                                 "an HTTP handler must declare its actor with a `by` clause",
                             )
@@ -1213,7 +1213,7 @@ fn check_service_decls(
             if let Some(prev) = route_first_span.get(&key).copied() {
                 errors.push(
                     CompileError::new(
-                        "karn.http.duplicate_route",
+                        "bynk.http.duplicate_route",
                         handler.span,
                         format!(
                             "duplicate HTTP route: another handler already declares `{} {}`",
@@ -1243,7 +1243,7 @@ fn check_service_decls(
             if let Some(prev) = schedule_first_span.get(expr).copied() {
                 errors.push(
                     CompileError::new(
-                        "karn.cron.duplicate_schedule",
+                        "bynk.cron.duplicate_schedule",
                         handler.span,
                         format!(
                             "duplicate cron schedule: another handler already declares `{expr}`",
@@ -1274,7 +1274,7 @@ fn check_service_decls(
             if let Some(prev) = consumer_first_span.get(name).copied() {
                 errors.push(
                     CompileError::new(
-                        "karn.queue.duplicate_consumer",
+                        "bynk.queue.duplicate_consumer",
                         handler.span,
                         format!(
                             "duplicate queue consumer: another handler already consumes `{name}`",
@@ -1305,7 +1305,7 @@ fn check_service_decls(
             // The handler return type must be Effect[T].
             if !matches!(handler.return_type, TypeRef::Effect(_, _)) {
                 errors.push(CompileError::new(
-                    "karn.service.return_not_effect",
+                    "bynk.service.return_not_effect",
                     handler.return_type.span(),
                     format!(
                         "service handler must return `Effect[T]`, but got `{}`",
@@ -1355,7 +1355,7 @@ fn handler_actor_binding(
     // No binder (binder-less `by <Actor>`) ⇒ no identity binding in scope.
     let binder = by.binder.as_ref()?;
     // A binder that collides with a parameter is diagnosed
-    // (`karn.actor.binder_shadows_param`); suppress the binding so the body
+    // (`bynk.actor.binder_shadows_param`); suppress the binding so the body
     // scope keeps the real parameter rather than the clobbering actor binding.
     if handler.params.iter().any(|p| p.name.name == binder.name) {
         return None;
@@ -1508,7 +1508,7 @@ fn check_agent_decls(
             {
                 errors.push(
                     CompileError::new(
-                        "karn.agents.non_zeroable_state_field",
+                        "bynk.agents.non_zeroable_state_field",
                         field.span,
                         format!(
                             "agent `{}` state field `{}` has no defined zero value, so a \
@@ -1606,7 +1606,7 @@ fn check_agent_decls(
             // The handler return type must be Effect[T].
             if !matches!(handler.return_type, TypeRef::Effect(_, _)) {
                 errors.push(CompileError::new(
-                    "karn.agent.return_not_effect",
+                    "bynk.agent.return_not_effect",
                     handler.return_type.span(),
                     format!(
                         "agent handler must return `Effect[T]`, but got `{}`",
@@ -1660,7 +1660,7 @@ pub(crate) fn type_refs_match(a: &TypeRef, b: &TypeRef) -> bool {
 
 /// Validate an `on http METHOD "path"` handler (v0.9 §4.1):
 ///
-/// - Path must start with `/`, must not be `/_karn/...` (reserved).
+/// - Path must start with `/`, must not be `/_bynk/...` (reserved).
 /// - Every `:name` segment binds to a handler parameter of the same name.
 /// - Every parameter is either a path parameter or named `body`.
 /// - Path parameter types are constructible from `String` (`String`, refined
@@ -1676,19 +1676,19 @@ fn validate_http_handler(
 ) {
     if !path.starts_with('/') {
         errors.push(CompileError::new(
-            "karn.http.invalid_path",
+            "bynk.http.invalid_path",
             handler.span,
             format!("HTTP path `{path}` must start with `/`"),
         ));
     }
-    if path.starts_with("/_karn/") || path == "/_karn" {
+    if path.starts_with("/_bynk/") || path == "/_bynk" {
         errors.push(
             CompileError::new(
-                "karn.http.reserved_prefix",
+                "bynk.http.reserved_prefix",
                 handler.span,
-                format!("HTTP path `{path}` uses the reserved `/_karn/` prefix",),
+                format!("HTTP path `{path}` uses the reserved `/_bynk/` prefix",),
             )
-            .with_note("paths under `/_karn/` are reserved for internal Karn dispatch"),
+            .with_note("paths under `/_bynk/` are reserved for internal Bynk dispatch"),
         );
     }
     // Parse segments and collect path-parameter names.
@@ -1697,7 +1697,7 @@ fn validate_http_handler(
         if let Some(rest) = seg.strip_prefix(':') {
             if rest.is_empty() {
                 errors.push(CompileError::new(
-                    "karn.http.invalid_path",
+                    "bynk.http.invalid_path",
                     handler.span,
                     format!("HTTP path `{path}` has an empty parameter segment `:`"),
                 ));
@@ -1710,7 +1710,7 @@ fn validate_http_handler(
     for name in &path_param_names {
         if !handler.params.iter().any(|p| p.name.name == *name) {
             errors.push(CompileError::new(
-                "karn.http.unbound_path_param",
+                "bynk.http.unbound_path_param",
                 handler.span,
                 format!("path parameter `:{name}` has no matching handler parameter `{name}`",),
             ));
@@ -1723,7 +1723,7 @@ fn validate_http_handler(
         if !is_path && !is_body {
             errors.push(
                 CompileError::new(
-                    "karn.http.extra_param",
+                    "bynk.http.extra_param",
                     p.span,
                     format!(
                         "handler parameter `{}` is not a path parameter and is not named `body`",
@@ -1739,7 +1739,7 @@ fn validate_http_handler(
         if is_path && !is_string_constructible(&p.type_ref, types) {
             errors.push(
                 CompileError::new(
-                    "karn.http.path_param_not_stringy",
+                    "bynk.http.path_param_not_stringy",
                     p.type_ref.span(),
                     format!(
                         "path parameter `{}` must have a type constructible from `String` (got `{}`)",
@@ -1755,14 +1755,14 @@ fn validate_http_handler(
         if is_body && method.forbids_body() {
             errors.push(
                 CompileError::new(
-                    "karn.http.body_on_get_or_delete",
+                    "bynk.http.body_on_get_or_delete",
                     p.span,
                     format!(
                         "`on http {}` handlers may not declare a `body` parameter",
                         method.as_str()
                     ),
                 )
-                .with_note("GET and DELETE requests conventionally carry no body in Karn v0.9"),
+                .with_note("GET and DELETE requests conventionally carry no body in Bynk v0.9"),
             );
         }
     }
@@ -1773,7 +1773,7 @@ fn validate_http_handler(
     };
     if !return_ok {
         errors.push(CompileError::new(
-            "karn.http.return_not_effect_http_result",
+            "bynk.http.return_not_effect_http_result",
             handler.return_type.span(),
             format!(
                 "`on http` handler must return `Effect[HttpResult[T]]`, but got `{}`",
@@ -1787,14 +1787,14 @@ fn validate_http_handler(
 /// (v0.10a §4.1): at most one `Int` parameter (the scheduled time, Unix epoch
 /// milliseconds), a structurally well-formed schedule, and the unit-Result
 /// return shape. The service-only rule is enforced earlier, in the parser
-/// (`karn.parse.cron_in_agent`).
+/// (`bynk.parse.cron_in_agent`).
 fn validate_cron_handler(handler: &Handler, expr: &str, errors: &mut Vec<CompileError>) {
     // A cron handler takes at most one parameter — the scheduled time, typed
     // `Int` (epoch milliseconds). A scheduled trigger has no other payload.
     if handler.params.len() > 1 {
         errors.push(
             CompileError::new(
-                "karn.cron.bad_params",
+                "bynk.cron.bad_params",
                 handler.params[1].span,
                 "`on cron` handlers take at most one parameter (the scheduled time)",
             )
@@ -1805,7 +1805,7 @@ fn validate_cron_handler(handler: &Handler, expr: &str, errors: &mut Vec<Compile
     {
         errors.push(
             CompileError::new(
-                "karn.cron.bad_params",
+                "bynk.cron.bad_params",
                 p.type_ref.span(),
                 format!(
                     "an `on cron` parameter must be `Int` (the scheduled time in epoch milliseconds), got `{}`",
@@ -1821,7 +1821,7 @@ fn validate_cron_handler(handler: &Handler, expr: &str, errors: &mut Vec<Compile
     if fields != 5 {
         errors.push(
             CompileError::new(
-                "karn.cron.invalid_schedule",
+                "bynk.cron.invalid_schedule",
                 handler.span,
                 format!(
                     "cron expression `{expr}` must have exactly five whitespace-separated fields (got {fields})",
@@ -1840,7 +1840,7 @@ fn validate_cron_handler(handler: &Handler, expr: &str, errors: &mut Vec<Compile
     };
     if !return_ok {
         errors.push(CompileError::new(
-            "karn.cron.return_not_effect_result",
+            "bynk.cron.return_not_effect_result",
             handler.return_type.span(),
             format!(
                 "`on cron` handler must return `Effect[Result[(), E]]`, but got `{}`",
@@ -1854,11 +1854,11 @@ fn validate_cron_handler(handler: &Handler, expr: &str, errors: &mut Vec<Compile
 /// (v0.10b §4.2): a non-empty queue name, exactly one parameter (the message,
 /// any wire-deserialisable type), and the unit-Result return shape. `Ok(())`
 /// acknowledges the message at emission; `Err` retries it. The service-only
-/// rule is enforced earlier, in the parser (`karn.parse.queue_in_agent`).
+/// rule is enforced earlier, in the parser (`bynk.parse.queue_in_agent`).
 fn validate_queue_handler(handler: &Handler, name: &str, errors: &mut Vec<CompileError>) {
     if name.is_empty() {
         errors.push(CompileError::new(
-            "karn.queue.invalid_name",
+            "bynk.queue.invalid_name",
             handler.span,
             "`on queue` requires a non-empty queue name",
         ));
@@ -1867,7 +1867,7 @@ fn validate_queue_handler(handler: &Handler, name: &str, errors: &mut Vec<Compil
     if handler.params.len() != 1 {
         errors.push(
             CompileError::new(
-                "karn.queue.bad_params",
+                "bynk.queue.bad_params",
                 handler.span,
                 format!(
                     "`on message` handlers take exactly one parameter (the message), got {}",
@@ -1884,7 +1884,7 @@ fn validate_queue_handler(handler: &Handler, name: &str, errors: &mut Vec<Compil
     };
     if !return_ok {
         errors.push(CompileError::new(
-            "karn.queue.return_not_queue_result",
+            "bynk.queue.return_not_queue_result",
             handler.return_type.span(),
             format!(
                 "`on message` handler must return `Effect[QueueResult]`, but got `{}`",
@@ -1911,13 +1911,13 @@ fn is_string_constructible(r: &TypeRef, types: &HashMap<String, TypeDecl>) -> bo
 /// v0.20a: function types are confined to non-boundary positions — fn/lambda
 /// parameters, returns, and locals. Walk a type reference and reject any
 /// function type found in a position that would serialise, persist, or cross
-/// a boundary (`karn.types.function_at_boundary`).
+/// a boundary (`bynk.types.function_at_boundary`).
 fn reject_fn_types(r: &TypeRef, what: &str, errors: &mut Vec<CompileError>) {
     match r {
         TypeRef::Fn(_, _, span) => {
             errors.push(
                 CompileError::new(
-                    "karn.types.function_at_boundary",
+                    "bynk.types.function_at_boundary",
                     *span,
                     format!(
                         "a function type cannot appear in {what} — functions cannot serialise or cross a boundary"
@@ -2053,38 +2053,38 @@ mod platform_lock_tests {
 
     #[test]
     fn matching_platform_is_fine() {
-        let n = native(&[(Platform::Cloudflare, "karn.cloudflare")]);
+        let n = native(&[(Platform::Cloudflare, "bynk.cloudflare")]);
         assert_eq!(lock_violation(&n, Platform::Cloudflare), None);
     }
 
     #[test]
     fn mismatched_platform_is_required() {
-        let n = native(&[(Platform::Cloudflare, "karn.cloudflare")]);
+        let n = native(&[(Platform::Cloudflare, "bynk.cloudflare")]);
         assert_eq!(
             lock_violation(&n, Platform::Node),
             Some(LockViolation::Required {
                 needed: Platform::Cloudflare,
-                unit: "karn.cloudflare".to_string(),
+                unit: "bynk.cloudflare".to_string(),
             })
         );
     }
 
     // The conflict arm is not yet reachable end-to-end (only one platform
-    // ships native capabilities until `karn.aws`); the rule is exercised here
+    // ships native capabilities until `bynk.aws`); the rule is exercised here
     // with a synthetic two-platform set so it does not ship untested
     // (proposal v0.19, review call).
     #[test]
     fn two_platforms_conflict_regardless_of_selection() {
         let n = native(&[
-            (Platform::Cloudflare, "karn.cloudflare"),
-            (Platform::Node, "karn.synthetic"),
+            (Platform::Cloudflare, "bynk.cloudflare"),
+            (Platform::Node, "bynk.synthetic"),
         ]);
         let v = lock_violation(&n, Platform::Cloudflare);
         assert_eq!(
             v,
             Some(LockViolation::Conflict {
-                a: (Platform::Cloudflare, "karn.cloudflare".to_string()),
-                b: (Platform::Node, "karn.synthetic".to_string()),
+                a: (Platform::Cloudflare, "bynk.cloudflare".to_string()),
+                b: (Platform::Node, "bynk.synthetic".to_string()),
             })
         );
     }

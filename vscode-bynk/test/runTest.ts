@@ -25,7 +25,7 @@ async function main() {
       "../../test/fixtures/workspace",
     );
 
-    // The extension resolves `bynkc-lsp` from the `karn.executablePath`
+    // The extension resolves `bynkc-lsp` from the `bynk.executablePath`
     // setting, then PATH, then a cached download. Prepend the repo's release
     // dir so activation connects to a locally-built server deterministically —
     // tests must never hit the download-on-activate path.

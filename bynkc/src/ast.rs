@@ -166,7 +166,7 @@ pub struct AdapterDecl {
     /// (both enforced semantically, not in the parser).
     pub consumes: Vec<ConsumesDecl>,
     /// The `binding "<module>" requires { … }` clause, if present. Required
-    /// when the adapter declares any external provider (`karn.adapter.no_binding`).
+    /// when the adapter declares any external provider (`bynk.adapter.no_binding`).
     pub binding: Option<BindingDecl>,
     pub documentation: Option<String>,
     pub form: CommonsForm,
@@ -529,8 +529,8 @@ pub struct ActorDecl {
     /// The authentication scheme from `auth = <Scheme>`, stored as the raw
     /// identifier. The checker classifies it: `None`/`Internal`/`Bearer` are
     /// admitted; `Signature` is reserved-and-rejected
-    /// (`karn.actor.scheme_unsupported`); anything else is
-    /// `karn.actor.unknown_scheme`. `None` for the refinement form.
+    /// (`bynk.actor.scheme_unsupported`); anything else is
+    /// `bynk.actor.unknown_scheme`. `None` for the refinement form.
     pub auth: Option<Ident>,
     /// The scheme's keyed config from `auth = Scheme(key = value, …)` (v0.47
     /// `Bearer(secret = "…")`; v0.51 generalised for `Signature(secret, header,
@@ -543,7 +543,7 @@ pub struct ActorDecl {
     pub identity: Option<TypeRef>,
     /// The reserved-and-rejected refinement form `actor Admin = Base where p`
     /// (Q3). Parsed so the grammar is fixed now; the checker emits
-    /// `karn.actor.refinement_unsupported`.
+    /// `bynk.actor.refinement_unsupported`.
     pub refinement: Option<ActorRefinement>,
     pub documentation: Option<String>,
     pub span: Span,
@@ -1156,7 +1156,7 @@ pub enum TypeRef {
     List(Box<TypeRef>, Span),
     /// `Map[K, V]` — the built-in generic immutable map type (v0.20b).
     /// Keys are confined to value-keyable types
-    /// (`karn.types.unkeyable_map_key`).
+    /// (`bynk.types.unkeyable_map_key`).
     Map(Box<TypeRef>, Box<TypeRef>, Span),
     /// `ValidationError` — the built-in error type used by refined-type
     /// constructors (v0.1).
@@ -1170,7 +1170,7 @@ pub enum TypeRef {
     /// `A -> B` / `(A, B) -> C` / `() -> B` — a function type (v0.20a).
     /// Right-associative; effectful iff the return type is `Effect[_]`
     /// (the structural rule). Confined to non-boundary positions
-    /// (`karn.types.function_at_boundary`).
+    /// (`bynk.types.function_at_boundary`).
     Fn(Vec<TypeRef>, Box<TypeRef>, Span),
 }
 
@@ -1315,7 +1315,7 @@ pub enum ExprKind {
         args: Vec<Expr>,
     },
     /// `[a, b, c]` — list literal (v0.20b). An empty `[]` requires an
-    /// expected type (`karn.types.uninferable_element_type`).
+    /// expected type (`bynk.types.uninferable_element_type`).
     ListLit(Vec<Expr>),
 }
 

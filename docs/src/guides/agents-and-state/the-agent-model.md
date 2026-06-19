@@ -74,7 +74,7 @@ const next = g.level + 1; // compiles; `level` is undefined → NaN
 In Bynk, every state field must have a zero value, so the type with no honest
 zero does not build:
 
-```karn,fail
+```bynk,fail
 {{#include ../../../diagnostics/agents_non_zeroable.karn}}
 ```
 
@@ -85,7 +85,7 @@ and the compiler says so — verbatim, captured from `bynkc`:
 ```
 
 The fix is to give the field a starting value
-([`karn.agents.non_zeroable_state_field`](../../troubleshooting/agents-non-zeroable-state-field.md)).
+([`bynk.agents.non_zeroable_state_field`](../../troubleshooting/agents-non-zeroable-state-field.md)).
 
 ## Why "not set yet" is `Option`, not a special case
 

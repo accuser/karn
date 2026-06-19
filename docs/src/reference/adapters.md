@@ -13,10 +13,10 @@ providers are **external** (bodiless).
 
 ## Anatomy
 
-```karn,ignore
+```bynk,ignore
 adapter tokens {
   binding "./tokens.binding.ts" requires { "jose": "^5" }
-  consumes karn { Secrets }     -- v0.18: adapter-to-adapter dependency
+  consumes bynk { Secrets }     -- v0.18: adapter-to-adapter dependency
 
   exports capability  { Jwt }
   exports transparent { Claims, JwtError }
@@ -50,9 +50,9 @@ An adapter may depend on **another adapter's** capabilities (v0.18). Its
 `consumes` is restricted on two axes, each with its own diagnostic:
 
 - **braced form only** — an adapter has no services to call, so the whole-unit
-  and `as Alias` forms are rejected (`karn.adapter.consumes_requires_selection`);
+  and `as Alias` forms are rejected (`bynk.adapter.consumes_requires_selection`);
 - **adapter targets only** — an adapter may not consume a *context*
-  (`karn.adapter.consumes_context`).
+  (`bynk.adapter.consumes_context`).
 
 An external provider names its dependencies with the ordinary `given`; compose
 builds a **by-name deps object** and passes it to the binding class
@@ -69,14 +69,14 @@ export class JoseJwt implements Jwt {
 ```typescript
 // compose.ts (generated) — the dependency is instantiated recursively
 const Jwt = new tokens__binding.JoseJwt({
-  Secrets: new karn__binding.SecretsProvider(),
+  Secrets: new bynk__binding.SecretsProvider(),
 });
 ```
 
 The wiring is transitive: depending on a capability pulls its provider's
 binding into the compose (and *its* dependencies, recursively). This is how
 config and IO reach a binding — a secret or an HTTP client is a capability
-dependency (`given karn.Secrets`, `given karn.Fetch`), never an operation
+dependency (`given bynk.Secrets`, `given bynk.Fetch`), never an operation
 parameter or an env read in application code.
 
 ## The three flavours
@@ -84,14 +84,14 @@ parameter or an env read in application code.
 | Flavour | Binding | Portability |
 |---|---|---|
 | **Library adapter** | one, npm-backed, user-authored | runs anywhere |
-| **The `karn` surface** | one per platform, toolchain-supplied | portable |
-| **Platform adapter** (`karn.<platform>`) | one, platform-only, toolchain-supplied | **platform-locked** |
+| **The `bynk` surface** | one per platform, toolchain-supplied | portable |
+| **Platform adapter** (`bynk.<platform>`) | one, platform-only, toolchain-supplied | **platform-locked** |
 
-The **`karn` surface** is the reserved, agnostic conformance core shipped with
-the toolchain. The `karn` root namespace is reserved — no user unit may be
-named `karn` or `karn.*` — and every first-party adapter lives inside it: the
-surface unit `karn` (consuming only it keeps code **portable**) and the
-`karn.<platform>` platform adapters (consuming one **locks** the deployment
+The **`bynk` surface** is the reserved, agnostic conformance core shipped with
+the toolchain. The `bynk` root namespace is reserved — no user unit may be
+named `bynk` or `bynk.*` — and every first-party adapter lives inside it: the
+surface unit `bynk` (consuming only it keeps code **portable**) and the
+`bynk.<platform>` platform adapters (consuming one **locks** the deployment
 unit — the prefix means *first-party*, not *portable*). As of v0.18 the surface
 carries the full ambient set:
 
@@ -112,7 +112,7 @@ carries the full ambient set:
 
 The deploy **platform** (`--platform {cloudflare,node}`, default `cloudflare`)
 selects which `bynk-<platform>.ts` binding is linked. It is distinct from
-`--target {bundle,workers}`, which chooses emit topology. Because the `karn`
+`--target {bundle,workers}`, which chooses emit topology. Because the `bynk`
 contract names canonical provider symbols, the generated compose is
 platform-identical — only the imported binding module differs. Porting Bynk to
 a new runtime means implementing this one adapter's interfaces.
@@ -120,7 +120,7 @@ a new runtime means implementing this one adapter's interfaces.
 ### Platform adapters & the lock
 
 A **platform adapter** exposes a platform's real infrastructure as it is — no
-portable intersection. The toolchain ships `karn.cloudflare` (`Kv` since
+portable intersection. The toolchain ships `bynk.cloudflare` (`Kv` since
 v0.19; `putTtl`/`list` since v0.23):
 
 | Capability | Ops | Binding maps to |
@@ -135,7 +135,7 @@ deferred; see ADR 0050).
 **Structured values** are composition with the v0.22 codec, not extra ops —
 store `Json.encode(entry)`, read back through `Json.decode[Entry]`:
 
-```karn,ignore
+```bynk,ignore
 service cache {
   on call(key: String, e: Entry) -> Effect[Option[Entry]] given Kv {
     let _ <- Kv.putTtl(key, Json.encode(e), 60)
@@ -151,9 +151,9 @@ service cache {
 }
 ```
 
-```karn,ignore
+```bynk,ignore
 context cache.store {
-  consumes karn.cloudflare { Kv }   -- locks this deployment unit to cloudflare
+  consumes bynk.cloudflare { Kv }   -- locks this deployment unit to cloudflare
 
   service cache {
     on call(key: String, value: String) -> Effect[Option[String]] given Kv {
@@ -174,11 +174,11 @@ the namespace through. The application never touches `env`.
 It also **locks the deployment unit** — each context under `--target workers`,
 the whole program under `bundle` — to the platform, along in-process `given`
 edges (a service `consumes` between contexts is RPC and does not propagate).
-Building with a different `--platform` is `karn.target.vendor_required`;
+Building with a different `--platform` is `bynk.target.vendor_required`;
 spanning two native platforms in one deployment unit is
-`karn.target.vendor_conflict`. The `karn` surface and library adapters never
+`bynk.target.vendor_conflict`. The `bynk` surface and library adapters never
 lock; a remote vendor API over HTTPS belongs in a library adapter (`given
-karn.Fetch`), which stays portable. `Kv.list`, structured values, and `Queue`
+bynk.Fetch`), which stays portable. `Kv.list`, structured values, and `Queue`
 arrive with the v0.22 extension.
 
 ## Consuming an adapter
@@ -186,9 +186,9 @@ arrive with the v0.22 extension.
 A context `consumes` an adapter exactly as it consumes another context. Selected
 capabilities can be flattened to bare names:
 
-```karn,ignore
+```bynk,ignore
 context auth.sessions {
-  consumes karn   { Logger }   -- portable
+  consumes bynk   { Logger }   -- portable
   consumes tokens { Jwt }      -- library adapter; bare `Jwt` in scope
 
   service login {

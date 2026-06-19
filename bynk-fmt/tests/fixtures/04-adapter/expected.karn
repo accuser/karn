@@ -1,7 +1,7 @@
 adapter tokens {
 	binding "./tokens.binding.ts" requires { "jose": "^5" }
 	uses commerce.money
-	consumes karn { Secrets, Clock }
+	consumes bynk { Secrets, Clock }
 	exports capability { Jwt }
 
 	capability Jwt {

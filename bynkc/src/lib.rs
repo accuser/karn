@@ -45,9 +45,9 @@ pub use firstparty::Platform;
 /// Minimum supported Node.js **major** version for the `node` platform binding
 /// and for running Bynk's emitted TypeScript.
 ///
-/// Single source of truth for the Node floor: the `karn` driver's `doctor`
+/// Single source of truth for the Node floor: the `bynk` driver's `doctor`
 /// command compares a detected `node` against this, and the
-/// [`CliPlatform::Node`](cli::CliPlatform::Node) and `KARN_NODE_BINDING` doc
+/// [`CliPlatform::Node`](cli::CliPlatform::Node) and `BYNK_NODE_BINDING` doc
 /// comments link here rather than restating the number, so the floor is stated
 /// once (v0.46 — was duplicated prose at two sites before).
 pub const NODE_MAJOR_FLOOR: u32 = 18;
@@ -68,12 +68,12 @@ pub enum Severity {
 impl Severity {
     /// Classify a [`CompileError`] by its category prefix.
     ///
-    /// Categories starting with `karn.parse.orphan_doc_block` or
-    /// `karn.given.unused_capability` are warnings; everything else is an
+    /// Categories starting with `bynk.parse.orphan_doc_block` or
+    /// `bynk.given.unused_capability` are warnings; everything else is an
     /// error. Future categories can be added as the diagnostic surface grows.
     pub fn for_error(err: &CompileError) -> Severity {
         match err.category {
-            "karn.parse.orphan_doc_block" | "karn.given.unused_capability" => Severity::Warning,
+            "bynk.parse.orphan_doc_block" | "bynk.given.unused_capability" => Severity::Warning,
             _ => Severity::Error,
         }
     }

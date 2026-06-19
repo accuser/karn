@@ -1145,7 +1145,7 @@ impl LanguageServer for Backend {
                     crate::symbols::describe_symbol_cross_file(&root, &uri, &item.label)
                 })
                 .map(|(_uri, md)| md)
-                // Slice 9: stdlib/surface symbols (e.g. a `uses karn.list` combinator)
+                // Slice 9: stdlib/surface symbols (e.g. a `uses bynk.list` combinator)
                 // live in the embedded first-party sources, not the project's files.
                 .or_else(|| crate::symbols::describe_firstparty_symbol(&item.label)),
         };

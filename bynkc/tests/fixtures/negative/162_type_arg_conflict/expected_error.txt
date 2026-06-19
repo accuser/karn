@@ -1,1 +1,1 @@
-karn.generics.type_arg_mismatch
+bynk.generics.type_arg_mismatch

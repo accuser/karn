@@ -1,1 +1,1 @@
-karn.integration.unwired_dependency
+bynk.integration.unwired_dependency

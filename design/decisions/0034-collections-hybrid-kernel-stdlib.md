@@ -12,7 +12,7 @@ cannot be user-written) and a combinator library (`map`/`filter`/`find`/
 ## Decision
 Split the surface in two. Only the **irreducible primitives** are
 compiler/emitter built-ins (the kernel, 0036); **everything derivable is
-ordinary Bynk** in the first-party `karn.list`/`karn.map` commons (0037),
+ordinary Bynk** in the first-party `bynk.list`/`bynk.map` commons (0037),
 written over the kernel using v0.20a generics, lambdas, and effectful
 traversal. The stdlib is the first real consumer of the functional core —
 its compilation is a standing proof that generic functions, closures over

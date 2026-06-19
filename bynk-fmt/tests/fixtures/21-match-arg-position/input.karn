@@ -1,4 +1,4 @@
-commons karn.string {
+commons bynk.string {
   fn join(parts: List[String], sep: String) -> String {
         let init: Option[String] = None
     parts.fold(init, (acc, p) => match acc {

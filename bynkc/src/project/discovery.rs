@@ -21,7 +21,7 @@ pub(crate) struct ParsedFile {
     pub(crate) source: String,
     pub(crate) unit: SourceUnit,
     pub(crate) kind: UnitKind,
-    /// v0.17: true for toolchain-injected units (the `karn` surface) — exempt
+    /// v0.17: true for toolchain-injected units (the `bynk` surface) — exempt
     /// from the reserved-namespace and missing-binding checks.
     pub(crate) synthetic: bool,
 }
@@ -175,10 +175,10 @@ pub(crate) fn parse_source(
     })
 }
 
-pub(crate) fn discover_karn_files(root: &Path) -> Result<Vec<PathBuf>, CompileError> {
+pub(crate) fn discover_bynk_files(root: &Path) -> Result<Vec<PathBuf>, CompileError> {
     if !root.exists() {
         return Err(CompileError::new(
-            "karn.project.no_root",
+            "bynk.project.no_root",
             Span::default(),
             format!("project root does not exist: {}", root.display()),
         ));
@@ -190,7 +190,7 @@ pub(crate) fn discover_karn_files(root: &Path) -> Result<Vec<PathBuf>, CompileEr
             Ok(r) => r,
             Err(e) => {
                 return Err(CompileError::new(
-                    "karn.project.read_failed",
+                    "bynk.project.read_failed",
                     Span::default(),
                     format!("could not read directory `{}`: {e}", dir.display()),
                 ));
@@ -214,21 +214,21 @@ pub(crate) fn check_file_directory_conflicts(
     files: &[PathBuf],
 ) -> Result<(), Vec<CompileError>> {
     let mut errors: Vec<CompileError> = Vec::new();
-    let mut karn_files: HashSet<PathBuf> = HashSet::new();
-    let mut dirs_with_karn: HashSet<PathBuf> = HashSet::new();
+    let mut bynk_files: HashSet<PathBuf> = HashSet::new();
+    let mut dirs_with_bynk: HashSet<PathBuf> = HashSet::new();
     for p in files {
         let rel = p.strip_prefix(root).unwrap_or(p);
-        karn_files.insert(rel.to_path_buf());
+        bynk_files.insert(rel.to_path_buf());
         if let Some(parent) = rel.parent() {
-            dirs_with_karn.insert(parent.to_path_buf());
+            dirs_with_bynk.insert(parent.to_path_buf());
         }
     }
-    for f in &karn_files {
+    for f in &bynk_files {
         let stem = f.with_extension("");
-        if dirs_with_karn.contains(&stem) {
+        if dirs_with_bynk.contains(&stem) {
             errors.push(
                 CompileError::new(
-                    "karn.project.file_and_directory",
+                    "bynk.project.file_and_directory",
                     Span::default(),
                     format!(
                         "commons at `{}` is ambiguous: both `{}` and `{}/` exist with `.karn` content",

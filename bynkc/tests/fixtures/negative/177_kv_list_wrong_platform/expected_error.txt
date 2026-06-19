@@ -1,1 +1,1 @@
-karn.target.vendor_required
+bynk.target.vendor_required

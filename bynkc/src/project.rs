@@ -1,9 +1,9 @@
 //! Multi-file project compilation (v0.3 §3.2 and §3.3, v0.4 §3.5).
 //!
 //! A "project" is a directory tree of `.karn` source files. The dotted name
-//! of a commons or context (e.g., `karn.time`, `commerce.orders`) maps to a
-//! path under the project root — either a single file (`karn/time.karn`) or
-//! a directory of files all sharing the same header (`karn/time/*.karn`).
+//! of a commons or context (e.g., `bynk.time`, `commerce.orders`) maps to a
+//! path under the project root — either a single file (`bynk/time.karn`) or
+//! a directory of files all sharing the same header (`bynk/time/*.karn`).
 //!
 //! v0.4: each file is one of two kinds — commons or context. Both kinds share
 //! the same multi-file directory machinery; they differ in body content
@@ -69,7 +69,7 @@ pub(crate) use validate::check_function_type_boundary_items;
 
 /// One generated TypeScript file.
 pub struct CompiledFile {
-    /// The originating Karn source file, relative to the project root.
+    /// The originating Bynk source file, relative to the project root.
     pub source_path: PathBuf,
     /// Where the TS output should be written, relative to the output root.
     /// Mirrors the source tree, with `.karn` rewritten to `.ts`.
@@ -186,7 +186,7 @@ impl CompileOptions {
 
     /// v0.9.1 split layout (source and test units in separate subdirectories
     /// under `project_root`), bundle target, default platform. Use this from
-    /// `karnc test` so its rooting matches `karnc compile`'s.
+    /// `bynkc test` so its rooting matches `bynkc compile`'s.
     pub fn split(project_root: impl Into<PathBuf>, paths: ProjectPaths) -> Self {
         Self {
             target: BuildTarget::Bundle,
@@ -205,7 +205,7 @@ impl CompileOptions {
         self
     }
 
-    /// v0.17: select the deploy [`Platform`] (selects the `karn` surface
+    /// v0.17: select the deploy [`Platform`] (selects the `bynk` surface
     /// binding). The MVP ships `cloudflare` only.
     pub fn platform(mut self, platform: Platform) -> Self {
         self.platform = platform;
@@ -213,7 +213,7 @@ impl CompileOptions {
     }
 }
 
-/// Compile a Karn project, keeping error attribution + snapshots on failure
+/// Compile a Bynk project, keeping error attribution + snapshots on failure
 /// (so the CLI can render project errors with source context, ADR 0052). Use
 /// `.map_err(ProjectFailure::flatten)` for the flattened `Vec<CompileError>`
 /// shape.
@@ -319,7 +319,7 @@ pub fn analyse_project(root: &Path, overlay: &HashMap<PathBuf, String>) -> Proje
                 std::mem::take(&mut refs),
             );
             // ADR 0095: qualified unit name → its project source file(s), in
-            // discovery order. Synthetic (toolchain-injected `karn` surface)
+            // discovery order. Synthetic (toolchain-injected `bynk` surface)
             // units have no openable file and are excluded.
             let mut unit_sources: HashMap<String, Vec<PathBuf>> = HashMap::new();
             for pf in &parsed {
@@ -370,7 +370,7 @@ fn phase_discovery(
     split_mode: bool,
     errors: &mut ErrorSink,
 ) -> Result<(Vec<PathBuf>, Vec<PathBuf>), ()> {
-    let src_files = match discover_karn_files(src_root) {
+    let src_files = match discover_bynk_files(src_root) {
         Ok(f) => f,
         Err(e) => {
             errors.push_for(None, e);
@@ -381,7 +381,7 @@ fn phase_discovery(
         // Tests directory is optional in split mode — a project may have no
         // tests yet. Missing directory is not an error.
         if tests_root.exists() {
-            match discover_karn_files(tests_root) {
+            match discover_bynk_files(tests_root) {
                 Ok(f) => f,
                 Err(e) => {
                     errors.push_for(None, e);
@@ -398,7 +398,7 @@ fn phase_discovery(
         errors.push_for(
             None,
             CompileError::new(
-                "karn.project.no_sources",
+                "bynk.project.no_sources",
                 Span::default(),
                 format!("no `.karn` source files found under {}", src_root.display()),
             ),
@@ -416,10 +416,10 @@ fn phase_discovery(
 
 /// Phase 2: parse every discovered file into a `ParsedFile`, recording each
 /// file's source text into `snapshots` and any parse errors into `errors`.
-/// Then inject the first-party synthetic units (the `karn`/`karn.cloudflare`
-/// adapters and the `karn.{list,map,string}` commons) that the project
-/// consumes/uses. Returns the parsed units plus whether the `karn` and
-/// `karn.cloudflare` adapters were injected; signals a pipeline bail via
+/// Then inject the first-party synthetic units (the `bynk`/`bynk.cloudflare`
+/// adapters and the `bynk.{list,map,string}` commons) that the project
+/// consumes/uses. Returns the parsed units plus whether the `bynk` and
+/// `bynk.cloudflare` adapters were injected; signals a pipeline bail via
 /// `Err(())` when parsing produced errors and yielded no units at all.
 #[allow(clippy::too_many_arguments)]
 fn phase_parse(
@@ -446,7 +446,7 @@ fn phase_parse(
                     errors.push_for(
                         Some(&rel),
                         CompileError::new(
-                            "karn.project.read_failed",
+                            "bynk.project.read_failed",
                             Span::default(),
                             format!("could not read `{}`: {e}", path.display()),
                         ),
@@ -469,24 +469,24 @@ fn phase_parse(
         return Err(());
     }
 
-    // v0.17: if any user unit consumes the first-party `karn` surface, inject it
+    // v0.17: if any user unit consumes the first-party `bynk` surface, inject it
     // as a synthetic adapter so it flows through the normal pipeline (tables,
     // exports, emission, compose). Its binding is supplied by the toolchain for
     // the selected platform (§4.2). Injected only when consumed, so adapter-free
     // projects are unchanged.
-    let consumes_karn = parsed.iter().any(|pf| {
+    let consumes_bynk = parsed.iter().any(|pf| {
         pf.consumes()
             .iter()
-            .any(|c| c.target.joined() == firstparty::KARN_UNIT)
+            .any(|c| c.target.joined() == firstparty::BYNK_UNIT)
     });
-    if consumes_karn {
-        match lexer::tokenize(firstparty::KARN_ADAPTER_SRC)
+    if consumes_bynk {
+        match lexer::tokenize(firstparty::BYNK_ADAPTER_SRC)
             .map_err(|e| vec![e])
-            .and_then(|toks| parser::parse_unit(&toks, firstparty::KARN_ADAPTER_SRC))
+            .and_then(|toks| parser::parse_unit(&toks, firstparty::BYNK_ADAPTER_SRC))
         {
             Ok(unit) => parsed.push(ParsedFile {
-                source_path: PathBuf::from("karn.karn"),
-                source: firstparty::KARN_ADAPTER_SRC.to_string(),
+                source_path: PathBuf::from("bynk.karn"),
+                source: firstparty::BYNK_ADAPTER_SRC.to_string(),
                 unit,
                 kind: UnitKind::Adapter,
                 synthetic: true,
@@ -494,9 +494,9 @@ fn phase_parse(
             Err(errs) => errors.extend_for(None, errs),
         }
     }
-    // v0.19: likewise the first-party `karn.cloudflare` platform adapter —
+    // v0.19: likewise the first-party `bynk.cloudflare` platform adapter —
     // injected only when consumed, binding supplied by the toolchain. The
-    // unit name sits inside the reserved `karn.*` prefix (decision 0026).
+    // unit name sits inside the reserved `bynk.*` prefix (decision 0026).
     let consumes_cloudflare = parsed.iter().any(|pf| {
         pf.consumes()
             .iter()
@@ -508,7 +508,7 @@ fn phase_parse(
             .and_then(|toks| parser::parse_unit(&toks, firstparty::CLOUDFLARE_ADAPTER_SRC))
         {
             Ok(unit) => parsed.push(ParsedFile {
-                source_path: PathBuf::from("karn/cloudflare.karn"),
+                source_path: PathBuf::from("bynk/cloudflare.karn"),
                 source: firstparty::CLOUDFLARE_ADAPTER_SRC.to_string(),
                 unit,
                 kind: UnitKind::Adapter,
@@ -518,10 +518,10 @@ fn phase_parse(
         }
     }
     // v0.20b: the first-party collection commons. Unlike the adapters above
-    // these are *library* units — plain Karn commons of generic functions —
+    // these are *library* units — plain Bynk commons of generic functions —
     // imported via `uses` rather than `consumes`, and injected the same way
     // so they flow through the ordinary commons pipeline (tables, uses
-    // resolution, emission). `karn.map` itself `uses karn.list`, so using
+    // resolution, emission). `bynk.map` itself `uses bynk.list`, so using
     // the former injects both.
     let uses_unit = |parsed: &[ParsedFile], unit: &str| {
         parsed
@@ -530,13 +530,13 @@ fn phase_parse(
     };
     let uses_map = uses_unit(&parsed, firstparty::MAP_UNIT);
     if uses_map {
-        match lexer::tokenize(firstparty::KARN_MAP_SRC)
+        match lexer::tokenize(firstparty::BYNK_MAP_SRC)
             .map_err(|e| vec![e])
-            .and_then(|toks| parser::parse_unit(&toks, firstparty::KARN_MAP_SRC))
+            .and_then(|toks| parser::parse_unit(&toks, firstparty::BYNK_MAP_SRC))
         {
             Ok(unit) => parsed.push(ParsedFile {
-                source_path: PathBuf::from("karn/map.karn"),
-                source: firstparty::KARN_MAP_SRC.to_string(),
+                source_path: PathBuf::from("bynk/map.karn"),
+                source: firstparty::BYNK_MAP_SRC.to_string(),
                 unit,
                 kind: UnitKind::Commons,
                 synthetic: true,
@@ -545,13 +545,13 @@ fn phase_parse(
         }
     }
     if uses_map || uses_unit(&parsed, firstparty::LIST_UNIT) {
-        match lexer::tokenize(firstparty::KARN_LIST_SRC)
+        match lexer::tokenize(firstparty::BYNK_LIST_SRC)
             .map_err(|e| vec![e])
-            .and_then(|toks| parser::parse_unit(&toks, firstparty::KARN_LIST_SRC))
+            .and_then(|toks| parser::parse_unit(&toks, firstparty::BYNK_LIST_SRC))
         {
             Ok(unit) => parsed.push(ParsedFile {
-                source_path: PathBuf::from("karn/list.karn"),
-                source: firstparty::KARN_LIST_SRC.to_string(),
+                source_path: PathBuf::from("bynk/list.karn"),
+                source: firstparty::BYNK_LIST_SRC.to_string(),
                 unit,
                 kind: UnitKind::Commons,
                 synthetic: true,
@@ -562,13 +562,13 @@ fn phase_parse(
     // v0.22a: the first-party string commons — derived helpers over the
     // built-in string kernel (ADR 0046).
     if uses_unit(&parsed, firstparty::STRING_UNIT) {
-        match lexer::tokenize(firstparty::KARN_STRING_SRC)
+        match lexer::tokenize(firstparty::BYNK_STRING_SRC)
             .map_err(|e| vec![e])
-            .and_then(|toks| parser::parse_unit(&toks, firstparty::KARN_STRING_SRC))
+            .and_then(|toks| parser::parse_unit(&toks, firstparty::BYNK_STRING_SRC))
         {
             Ok(unit) => parsed.push(ParsedFile {
-                source_path: PathBuf::from("karn/string.karn"),
-                source: firstparty::KARN_STRING_SRC.to_string(),
+                source_path: PathBuf::from("bynk/string.karn"),
+                source: firstparty::BYNK_STRING_SRC.to_string(),
                 unit,
                 kind: UnitKind::Commons,
                 synthetic: true,
@@ -577,12 +577,12 @@ fn phase_parse(
         }
     }
 
-    Ok((parsed, consumes_karn, consumes_cloudflare))
+    Ok((parsed, consumes_bynk, consumes_cloudflare))
 }
 
 /// Phase 3: group the parsed units by qualified name (production units, unit
 /// tests, and integration suites tracked separately), run the per-directory
-/// and path/name consistency checks, enforce the reserved `karn` namespace and
+/// and path/name consistency checks, enforce the reserved `bynk` namespace and
 /// the adapter `binding` rules, resolve each adapter's binding module, and fold
 /// the adapters' pinned npm dependencies. Pushes diagnostics into `errors` and
 /// returns the production `groups`/`kinds`, the `test`/`integration` groups, the
@@ -593,7 +593,7 @@ fn phase_group(
     src_root: &Path,
     split_mode: bool,
     platform: Platform,
-    consumes_karn: bool,
+    consumes_bynk: bool,
     consumes_cloudflare: bool,
     errors: &mut ErrorSink,
 ) -> (
@@ -651,24 +651,24 @@ fn phase_group(
     check_function_type_boundaries(parsed, &mut fn_boundary_errors);
     errors.extend_for(None, fn_boundary_errors);
 
-    // v0.17: the `karn` root namespace is reserved for the toolchain. No user
-    // unit of any kind may be named `karn` or `karn.*` (§3.4).
+    // v0.17: the `bynk` root namespace is reserved for the toolchain. No user
+    // unit of any kind may be named `bynk` or `bynk.*` (§3.4).
     for pf in parsed {
         if pf.synthetic {
             continue;
         }
         let qn = pf.unit.name();
-        if qn.parts.first().is_some_and(|p| p.name == "karn") {
+        if qn.parts.first().is_some_and(|p| p.name == "bynk") {
             errors.push_for(None,
                 CompileError::new(
-                    "karn.namespace.reserved",
+                    "bynk.namespace.reserved",
                     qn.span,
                     format!(
-                        "`{}` uses the reserved `karn` namespace — the `karn` root is reserved for the toolchain's conformance surface",
+                        "`{}` uses the reserved `bynk` namespace — the `bynk` root is reserved for the toolchain's conformance surface",
                         qn.joined()
                     ),
                 )
-                .with_note("rename the unit so its first segment is not `karn`"),
+                .with_note("rename the unit so its first segment is not `bynk`"),
             );
         }
     }
@@ -688,7 +688,7 @@ fn phase_group(
             if has_external && a.binding.is_none() {
                 errors.push_for(None,
                     CompileError::new(
-                        "karn.adapter.no_binding",
+                        "bynk.adapter.no_binding",
                         a.span,
                         format!(
                             "adapter `{}` declares an external provider but has no `binding` clause to supply its implementation",
@@ -707,13 +707,13 @@ fn phase_group(
     // source file) and read it, so compose can import the external provider
     // symbols and the binding is copied into the output for the `tsc` gate.
     let mut adapter_bindings: HashMap<String, AdapterBinding> = HashMap::new();
-    // v0.17: the toolchain supplies the `karn` surface's binding, platform-keyed.
-    if consumes_karn {
+    // v0.17: the toolchain supplies the `bynk` surface's binding, platform-keyed.
+    if consumes_bynk {
         adapter_bindings.insert(
-            firstparty::KARN_UNIT.to_string(),
+            firstparty::BYNK_UNIT.to_string(),
             AdapterBinding {
-                output_path: PathBuf::from(platform.karn_binding_filename()),
-                content: platform.karn_binding_source().to_string(),
+                output_path: PathBuf::from(platform.bynk_binding_filename()),
+                content: platform.bynk_binding_source().to_string(),
             },
         );
     }
@@ -747,7 +747,7 @@ fn phase_group(
             Err(e) => {
                 errors.push_for(None,
                     CompileError::new(
-                        "karn.adapter.no_binding",
+                        "bynk.adapter.no_binding",
                         b.module_span,
                         format!(
                             "adapter `{}` names binding module `{}`, which could not be read ({e})",
@@ -774,7 +774,7 @@ fn phase_group(
             if is_unpinned_range(&dep.range) {
                 errors.push_for(None,
                     CompileError::new(
-                        "karn.requires.unpinned_dependency",
+                        "bynk.requires.unpinned_dependency",
                         dep.span,
                         format!(
                             "dependency `{}` has an unpinned version range `{}` — pin a concrete range (e.g. `^1.2.0`)",
@@ -840,7 +840,7 @@ fn phase_resolve_uses(
                     errors.push_for(
                         None,
                         CompileError::new(
-                            "karn.uses.unknown_commons",
+                            "bynk.uses.unknown_commons",
                             u.span,
                             format!("unknown commons `{target}`"),
                         )
@@ -854,7 +854,7 @@ fn phase_resolve_uses(
                 if target_kind != UnitKind::Commons {
                     errors.push_for(None,
                         CompileError::new(
-                            "karn.uses.target_is_context",
+                            "bynk.uses.target_is_context",
                             u.span,
                             format!(
                                 "`uses {target}` targets a context — `uses` may only target a commons"
@@ -870,7 +870,7 @@ fn phase_resolve_uses(
                     errors.push_for(
                         None,
                         CompileError::new(
-                            "karn.uses.self_reference",
+                            "bynk.uses.self_reference",
                             u.span,
                             format!("`{name}` cannot `uses` itself"),
                         ),
@@ -923,7 +923,7 @@ fn phase_resolve_consumes(
                 if kind != UnitKind::Context && kind != UnitKind::Adapter {
                     errors.push_for(None,
                         CompileError::new(
-                            "karn.consumes.in_commons",
+                            "bynk.consumes.in_commons",
                             c.span,
                             format!(
                                 "`consumes` is only valid inside a context or adapter, not a commons `{name}`",
@@ -941,7 +941,7 @@ fn phase_resolve_consumes(
                 if kind == UnitKind::Adapter && c.selected.is_none() {
                     errors.push_for(None,
                         CompileError::new(
-                            "karn.adapter.consumes_requires_selection",
+                            "bynk.adapter.consumes_requires_selection",
                             c.span,
                             format!(
                                 "an adapter's `consumes` must select capabilities — write `consumes {target} {{ Cap, … }}`",
@@ -957,7 +957,7 @@ fn phase_resolve_consumes(
                     errors.push_for(
                         None,
                         CompileError::new(
-                            "karn.consumes.unknown_context",
+                            "bynk.consumes.unknown_context",
                             c.span,
                             format!("unknown context `{target}`"),
                         )
@@ -973,7 +973,7 @@ fn phase_resolve_consumes(
                 if target_kind != UnitKind::Context && target_kind != UnitKind::Adapter {
                     errors.push_for(None,
                         CompileError::new(
-                            "karn.consumes.target_is_commons",
+                            "bynk.consumes.target_is_commons",
                             c.span,
                             format!(
                                 "`consumes {target}` targets a commons — `consumes` may only target a context or adapter"
@@ -991,14 +991,14 @@ fn phase_resolve_consumes(
                 if kind == UnitKind::Adapter && target_kind == UnitKind::Context {
                     errors.push_for(None,
                         CompileError::new(
-                            "karn.adapter.consumes_context",
+                            "bynk.adapter.consumes_context",
                             c.span,
                             format!(
                                 "adapter `{name}` cannot `consumes` the context `{target}` — adapter dependencies are adapter-to-adapter"
                             ),
                         )
                         .with_note(
-                            "an adapter may only depend on capabilities exported by other adapters (e.g. the `karn` surface)",
+                            "an adapter may only depend on capabilities exported by other adapters (e.g. the `bynk` surface)",
                         ),
                     );
                     continue;
@@ -1012,7 +1012,7 @@ fn phase_resolve_consumes(
                     errors.push_for(
                         None,
                         CompileError::new(
-                            "karn.consumes.self_reference",
+                            "bynk.consumes.self_reference",
                             c.span,
                             format!("{kind_word} `{name}` cannot `consumes` itself"),
                         ),
@@ -1033,7 +1033,7 @@ fn phase_resolve_consumes(
                             errors.push_for(
                                 None,
                                 CompileError::new(
-                                    "karn.given.cross_context_unknown_capability",
+                                    "bynk.given.cross_context_unknown_capability",
                                     cap.span,
                                     format!(
                                         "`{target}` does not export a capability named `{}`",
@@ -1045,7 +1045,7 @@ fn phase_resolve_consumes(
                         }
                         if local_caps.contains(&cap.name) {
                             errors.push_for(None, CompileError::new(
-                                "karn.consumes.capability_name_clash",
+                                "bynk.consumes.capability_name_clash",
                                 cap.span,
                                 format!(
                                     "flattened capability `{}` clashes with a capability declared locally — use qualified `given {target}.{}` instead",
@@ -1056,7 +1056,7 @@ fn phase_resolve_consumes(
                         }
                         if let Some(prev) = flattened.get(&cap.name) {
                             errors.push_for(None, CompileError::new(
-                                "karn.consumes.capability_name_clash",
+                                "bynk.consumes.capability_name_clash",
                                 cap.span,
                                 format!(
                                     "capability `{}` is flattened from both `{prev}` and `{target}` — qualify one with `given U.{}`",
@@ -1112,7 +1112,7 @@ fn phase_consumes_aliases(
                 if let Some(prev_span) = alias_spans.get(&alias.name) {
                     errors.push_for(None,
                         CompileError::new(
-                            "karn.consumes.alias_conflict",
+                            "bynk.consumes.alias_conflict",
                             alias.span,
                             format!(
                                 "alias `{}` is used by more than one `consumes` clause in context `{}`",
@@ -1157,7 +1157,7 @@ fn phase_consumes_aliases(
             if let Some(kind) = conflict_kind {
                 errors.push_for(None,
                     CompileError::new(
-                        "karn.consumes.alias_conflict",
+                        "bynk.consumes.alias_conflict",
                         alias_span,
                         format!(
                             "alias `{alias}` conflicts with a local {kind} of the same name in context `{name}`",
@@ -1196,7 +1196,7 @@ fn phase_uses_name_conflicts(
                     let span = uses_span_of(parsed, &groups[name], t).unwrap_or_default();
                     errors.push_for(None,
                         CompileError::new(
-                            "karn.uses.name_conflict",
+                            "bynk.uses.name_conflict",
                             span,
                             format!(
                                 "`{name}` uses two commons that both declare `{type_name}`: `{prev}` and `{t}`",
@@ -1218,7 +1218,7 @@ fn phase_uses_name_conflicts(
                     let span = uses_span_of(parsed, &groups[name], t).unwrap_or_default();
                     errors.push_for(None,
                         CompileError::new(
-                            "karn.uses.name_conflict",
+                            "bynk.uses.name_conflict",
                             span,
                             format!(
                                 "`{name}` uses two commons that both declare `{fn_name}`: `{prev}` and `{t}`",
@@ -1273,7 +1273,7 @@ fn phase_validate_type_exports(
                         errors.push_for(
                             None,
                             CompileError::new(
-                                "karn.exports.duplicate_in_clause",
+                                "bynk.exports.duplicate_in_clause",
                                 n.span,
                                 format!(
                                     "type `{}` appears more than once in this exports clause",
@@ -1289,7 +1289,7 @@ fn phase_validate_type_exports(
                     if !local.types.contains_key(&n.name) {
                         errors.push_for(None,
                             CompileError::new(
-                                "karn.exports.undeclared_type",
+                                "bynk.exports.undeclared_type",
                                 n.span,
                                 format!(
                                     "exports clause references `{}`, which is not a type declared in context `{}`",
@@ -1310,7 +1310,7 @@ fn phase_validate_type_exports(
                             errors.push_for(
                                 None,
                                 CompileError::new(
-                                    "karn.exports.duplicate_export",
+                                    "bynk.exports.duplicate_export",
                                     n.span,
                                     format!("type `{}` is exported more than once", n.name),
                                 )
@@ -1319,7 +1319,7 @@ fn phase_validate_type_exports(
                         } else {
                             errors.push_for(None,
                                 CompileError::new(
-                                    "karn.exports.conflicting_visibility",
+                                    "bynk.exports.conflicting_visibility",
                                     n.span,
                                     format!(
                                         "type `{}` is exported with conflicting visibilities — pick `opaque` or `transparent`",
@@ -1375,7 +1375,7 @@ fn phase_validate_capability_exports(
                         errors.push_for(
                             None,
                             CompileError::new(
-                                "karn.exports.duplicate_export",
+                                "bynk.exports.duplicate_export",
                                 n.span,
                                 format!("capability `{}` is exported more than once", n.name),
                             )
@@ -1392,7 +1392,7 @@ fn phase_validate_capability_exports(
                     if !local.capabilities.contains_key(&n.name) {
                         errors.push_for(None,
                             CompileError::new(
-                                "karn.exports.undeclared_capability",
+                                "bynk.exports.undeclared_capability",
                                 n.span,
                                 format!(
                                     "`exports capability` references `{}`, which is not a capability declared in context `{}`",
@@ -1408,7 +1408,7 @@ fn phase_validate_capability_exports(
                     if !local.providers.contains_key(&n.name) {
                         errors.push_for(None,
                             CompileError::new(
-                                "karn.exports.capability_not_provided",
+                                "bynk.exports.capability_not_provided",
                                 n.span,
                                 format!(
                                     "exported capability `{}` has no provider in context `{}` — a consumer cannot instantiate it",
@@ -1434,7 +1434,7 @@ fn phase_validate_providers(unit_tables: &HashMap<String, UnitTable>, errors: &m
     for (name, table) in unit_tables {
         let _ = name;
         for (cap_name, provider) in &table.providers {
-            // v0.17: an external provider has no Karn body to match against the
+            // v0.17: an external provider has no Bynk body to match against the
             // capability — its implementation is the binding, checked by `tsc`.
             if provider.external {
                 continue;
@@ -1442,7 +1442,7 @@ fn phase_validate_providers(unit_tables: &HashMap<String, UnitTable>, errors: &m
             let Some(cap) = table.capabilities.get(cap_name) else {
                 errors.push_for(None,
                     CompileError::new(
-                        "karn.provider.unknown_capability",
+                        "bynk.provider.unknown_capability",
                         provider.capability.span,
                         format!(
                             "provider targets unknown capability `{}` — declare the capability in the same context",
@@ -1458,7 +1458,7 @@ fn phase_validate_providers(unit_tables: &HashMap<String, UnitTable>, errors: &m
                     errors.push_for(
                         None,
                         CompileError::new(
-                            "karn.provider.missing_operation",
+                            "bynk.provider.missing_operation",
                             provider.span,
                             format!(
                                 "provider `{}` for capability `{}` is missing operation `{}`",
@@ -1473,7 +1473,7 @@ fn phase_validate_providers(unit_tables: &HashMap<String, UnitTable>, errors: &m
             for prov_op in &provider.ops {
                 let Some(cap_op) = cap.ops.iter().find(|o| o.name.name == prov_op.name.name) else {
                     errors.push_for(None, CompileError::new(
-                        "karn.provider.extra_operation",
+                        "bynk.provider.extra_operation",
                         prov_op.span,
                         format!(
                             "provider operation `{}.{}` does not match any operation in capability `{}`",
@@ -1484,7 +1484,7 @@ fn phase_validate_providers(unit_tables: &HashMap<String, UnitTable>, errors: &m
                 };
                 if cap_op.params.len() != prov_op.params.len() {
                     errors.push_for(None, CompileError::new(
-                        "karn.provider.signature_mismatch",
+                        "bynk.provider.signature_mismatch",
                         prov_op.span,
                         format!(
                             "provider operation `{}.{}` has {} parameter(s), but capability operation expects {}",
@@ -1501,7 +1501,7 @@ fn phase_validate_providers(unit_tables: &HashMap<String, UnitTable>, errors: &m
                 {
                     if !type_refs_match(&cap_p.type_ref, &prov_p.type_ref) {
                         errors.push_for(None, CompileError::new(
-                            "karn.provider.signature_mismatch",
+                            "bynk.provider.signature_mismatch",
                             prov_p.span,
                             format!(
                                 "provider operation `{}.{}` parameter {} has type `{}`, but capability declares `{}`",
@@ -1516,7 +1516,7 @@ fn phase_validate_providers(unit_tables: &HashMap<String, UnitTable>, errors: &m
                 }
                 if !type_refs_match(&cap_op.return_type, &prov_op.return_type) {
                     errors.push_for(None, CompileError::new(
-                        "karn.provider.signature_mismatch",
+                        "bynk.provider.signature_mismatch",
                         prov_op.return_type.span(),
                         format!(
                             "provider operation `{}.{}` returns `{}`, but capability declares `{}`",
@@ -1668,7 +1668,7 @@ fn merge_consumed_exports(
                     consumes_span_of(parsed, &unit_info[name].files, t).unwrap_or_default();
                 errors.push_for(None,
                     CompileError::new(
-                        "karn.consumes.name_conflict",
+                        "bynk.consumes.name_conflict",
                         consumes_span,
                         format!(
                             "context `{name}` consumes `{t}` which exports type `{type_name}`, but a type of the same name is already in scope",
@@ -2288,7 +2288,7 @@ fn run_checks(
         };
 
     // -- 2. Parse every file. --
-    let (parsed, consumes_karn, consumes_cloudflare) = match phase_parse(
+    let (parsed, consumes_bynk, consumes_cloudflare) = match phase_parse(
         src_root,
         tests_root,
         split_mode,
@@ -2316,7 +2316,7 @@ fn run_checks(
         src_root,
         split_mode,
         platform,
-        consumes_karn,
+        consumes_bynk,
         consumes_cloudflare,
         &mut errors,
     );
@@ -2882,7 +2882,7 @@ fn native_platforms_of_context(
 /// providers alike. Stateless providers, so fresh instances per use are fine.
 ///
 /// v0.18 (spec §4.5/§5.1): a *bare* `given` name resolves through the
-/// provider's own unit's flattened-capability map (`Fetch` → `karn`), falling
+/// provider's own unit's flattened-capability map (`Fetch` → `bynk`), falling
 /// back to the unit itself; an *external* provider's deps are built the same
 /// way and passed to the binding class constructor by name. Every unit whose
 /// namespace the expression references is recorded in `referenced_units` so
@@ -2960,8 +2960,8 @@ pub(crate) fn instantiate_provider_expr(
         Some(format!("{{ {} }}", deps.join(", ")))
     };
     let mut args: Vec<String> = deps_obj.into_iter().collect();
-    // v0.18/v0.19: env-taking first-party providers (the karn surface's
-    // SecretsProvider; karn.cloudflare's WorkersKv) receive the Worker `env`
+    // v0.18/v0.19: env-taking first-party providers (the bynk surface's
+    // SecretsProvider; bynk.cloudflare's WorkersKv) receive the Worker `env`
     // explicitly — decisions 0021/0025. Keyed by (unit, class).
     if provider.external
         && crate::firstparty::provider_takes_env(provider_ctx, &provider.provider_name.name)
@@ -3222,7 +3222,7 @@ fn emit_composition_root(
     // Assemble the header now that the body has recorded which units its
     // provider expressions reference.
     let mut header = String::new();
-    header.push_str("// Generated by karnc — do not edit by hand.\n");
+    header.push_str("// Generated by bynkc — do not edit by hand.\n");
     header.push_str("// composition root\n\n");
 
     // Import every context as a namespace.

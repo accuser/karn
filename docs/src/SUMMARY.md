@@ -63,7 +63,7 @@
     - [Lay out a project](guides/projects-build-and-deployment/layout.md)
     - [Target Cloudflare Workers](guides/projects-build-and-deployment/cloudflare-workers.md)
   - [Editor & tooling](guides/editor-and-tooling/index.md)
-    - [Check your environment with `karn doctor`](guides/editor-and-tooling/doctor.md)
+    - [Check your environment with `bynk doctor`](guides/editor-and-tooling/doctor.md)
     - [Format your code with `bynk-fmt`](guides/editor-and-tooling/format.md)
     - [Set up editor support](guides/editor-and-tooling/editor-support.md)
 
@@ -79,7 +79,7 @@
   - [Operators & built-ins](reference/operators.md)
   - [Agents](reference/agents.md)
   - [Capabilities & providers](reference/capabilities.md)
-  - [First-party `karn` capabilities](reference/bynk-capabilities.md)
+  - [First-party `bynk` capabilities](reference/bynk-capabilities.md)
   - [Adapters](reference/adapters.md)
   - [HTTP](reference/http.md)
   - [Cron](reference/cron.md)
@@ -119,17 +119,17 @@
 # Troubleshooting
 
 - [Troubleshooting](troubleshooting/index.md)
-  - [`karn.refine.literal_violates`](troubleshooting/refine-literal-violates.md)
-  - [`karn.agents.non_zeroable_state_field`](troubleshooting/agents-non-zeroable-state-field.md)
-  - [`karn.agents.bad_state_initialiser`](troubleshooting/agents-bad-state-initialiser.md)
-  - [`karn.provider.dependency_cycle`](troubleshooting/provider-dependency-cycle.md)
-  - [`karn.exports.*` cross-context capability errors](troubleshooting/exports-capability-errors.md)
-  - [`karn.adapter.*` / binding errors](troubleshooting/adapter-errors.md)
-  - [`karn.types.is_base_mismatch`](troubleshooting/is-base-mismatch.md)
-  - [`karn.mock.*` errors](troubleshooting/mock-errors.md)
-  - [`karn.cron.*` errors](troubleshooting/cron-errors.md)
-  - [`karn.queue.*` errors](troubleshooting/queue-errors.md)
-  - [`karn.integration.*` errors](troubleshooting/integration-errors.md)
+  - [`bynk.refine.literal_violates`](troubleshooting/refine-literal-violates.md)
+  - [`bynk.agents.non_zeroable_state_field`](troubleshooting/agents-non-zeroable-state-field.md)
+  - [`bynk.agents.bad_state_initialiser`](troubleshooting/agents-bad-state-initialiser.md)
+  - [`bynk.provider.dependency_cycle`](troubleshooting/provider-dependency-cycle.md)
+  - [`bynk.exports.*` cross-context capability errors](troubleshooting/exports-capability-errors.md)
+  - [`bynk.adapter.*` / binding errors](troubleshooting/adapter-errors.md)
+  - [`bynk.types.is_base_mismatch`](troubleshooting/is-base-mismatch.md)
+  - [`bynk.mock.*` errors](troubleshooting/mock-errors.md)
+  - [`bynk.cron.*` errors](troubleshooting/cron-errors.md)
+  - [`bynk.queue.*` errors](troubleshooting/queue-errors.md)
+  - [`bynk.integration.*` errors](troubleshooting/integration-errors.md)
 
 ---
 

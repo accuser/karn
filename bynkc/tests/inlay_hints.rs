@@ -145,7 +145,7 @@ fn let_bindings_and_lambda_params_get_inferred_type_hints() {
 }
 
 #[test]
-fn labels_read_in_karn_surface_syntax() {
+fn labels_read_in_bynk_surface_syntax() {
     let result = bynkc::diagnose_project(&fixture_root("clean"), &HashMap::new());
     let (hints, text) = hints_for(&result, "shop/util.karn");
 
@@ -222,7 +222,7 @@ fn hints_survive_a_transient_error_at_reached_sites() {
             .unwrap()
             .diagnostics
             .iter()
-            .any(|d| d.error.category.starts_with("karn.types.")),
+            .any(|d| d.error.category.starts_with("bynk.types.")),
         "the broken fixture carries its type error"
     );
     // ...but the erroring binding's sibling fn still hints: the sink is a

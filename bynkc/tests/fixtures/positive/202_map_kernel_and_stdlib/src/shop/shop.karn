@@ -1,6 +1,6 @@
 commons shop {
-  uses karn.list
-  uses karn.map
+  uses bynk.list
+  uses bynk.map
 
   fn tally(names: List[String]) -> Map[String, Int] {
     let init: Map[String, Int] = Map.empty()

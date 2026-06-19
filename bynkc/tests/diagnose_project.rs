@@ -1,6 +1,6 @@
 //! v0.24 (ADR 0052): project-wide diagnostics — non-bailing, overlay-aware,
 //! file-attributed. The before/after this proves: the context-file error
-//! below is handler-level (`karn.given.unused_capability`), which the old
+//! below is handler-level (`bynk.given.unused_capability`), which the old
 //! single-file `diagnose` cannot produce at all (it resolves/checks
 //! `Commons` units only).
 
@@ -32,7 +32,7 @@ fn context_diagnostic_is_attributed_to_its_file() {
         broken
             .diagnostics
             .iter()
-            .any(|d| d.error.category == "karn.given.unused_capability"),
+            .any(|d| d.error.category == "bynk.given.unused_capability"),
         "the handler-level diagnostic is attributed to the context file; got: {:?}",
         broken
             .diagnostics
@@ -121,12 +121,12 @@ fn analysis_does_not_bail_at_the_first_failure() {
         .collect();
     assert!(
         cats.iter()
-            .any(|(p, c)| p == "shop/util.karn" && c.starts_with("karn.parse")),
+            .any(|(p, c)| p == "shop/util.karn" && c.starts_with("bynk.parse")),
         "parse error attributed to the broken commons; got {cats:?}"
     );
     assert!(
         cats.iter()
-            .any(|(p, c)| p == "billing/charge.karn" && *c == "karn.given.unused_capability"),
+            .any(|(p, c)| p == "billing/charge.karn" && *c == "bynk.given.unused_capability"),
         "semantic error still produced for the other unit; got {cats:?}"
     );
 }

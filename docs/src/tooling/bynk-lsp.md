@@ -31,7 +31,7 @@ cargo build --release -p bynk-lsp
 ```
 
 The binary is `target/release/bynkc-lsp`. Put it on `PATH`, or point your editor
-at it explicitly (in VS Code, the `karn.executablePath` setting).
+at it explicitly (in VS Code, the `bynk.executablePath` setting).
 
 ## Internals
 

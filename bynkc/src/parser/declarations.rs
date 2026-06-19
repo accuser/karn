@@ -81,13 +81,13 @@ impl<'a> Parser<'a> {
                 let t = self.peek().unwrap();
                 if let Some((_, doc_span)) = leading_doc {
                     self.warnings.push(CompileError::new(
-                        "karn.parse.orphan_doc_block",
+                        "bynk.parse.orphan_doc_block",
                         doc_span,
                         "documentation block has no following declaration to attach to",
                     ));
                 }
                 Err(CompileError::new(
-                    "karn.parse.expected_unit_header",
+                    "bynk.parse.expected_unit_header",
                     t.span,
                     format!(
                         "expected `commons`, `context`, or `test` to start the file, found {}",
@@ -101,13 +101,13 @@ impl<'a> Parser<'a> {
             None => {
                 if let Some((_, doc_span)) = leading_doc {
                     self.warnings.push(CompileError::new(
-                        "karn.parse.orphan_doc_block",
+                        "bynk.parse.orphan_doc_block",
                         doc_span,
                         "documentation block has no following declaration to attach to",
                     ));
                 }
                 Err(CompileError::new(
-                    "karn.parse.unexpected_eof",
+                    "bynk.parse.unexpected_eof",
                     self.eof_span(),
                     "expected `commons`, `context`, or `test` to start the file, found end of file",
                 ))
@@ -135,7 +135,7 @@ impl<'a> Parser<'a> {
                     // body's trailing comments.
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block has no following declaration to attach to",
                         ));
@@ -147,7 +147,7 @@ impl<'a> Parser<'a> {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(
                             CompileError::new(
-                                "karn.parse.orphan_doc_block",
+                                "bynk.parse.orphan_doc_block",
                                 doc_span,
                                 "documentation block before `uses` is not allowed; only `type` and `fn` declarations carry docs",
                             ),
@@ -190,7 +190,7 @@ impl<'a> Parser<'a> {
                 }
                 Some(TokenKind::Capability) => {
                     let err = CompileError::new(
-                        "karn.capability.outside_context",
+                        "bynk.capability.outside_context",
                         self.peek().unwrap().span,
                         "`capability` declarations are only allowed inside a context, not a commons",
                     );
@@ -198,7 +198,7 @@ impl<'a> Parser<'a> {
                 }
                 Some(TokenKind::Provides) => {
                     let err = CompileError::new(
-                        "karn.provider.outside_context",
+                        "bynk.provider.outside_context",
                         self.peek().unwrap().span,
                         "`provides` declarations are only allowed inside a context, not a commons",
                     );
@@ -206,7 +206,7 @@ impl<'a> Parser<'a> {
                 }
                 Some(TokenKind::Service) => {
                     let err = CompileError::new(
-                        "karn.service.outside_context",
+                        "bynk.service.outside_context",
                         self.peek().unwrap().span,
                         "`service` declarations are only allowed inside a context, not a commons",
                     );
@@ -214,7 +214,7 @@ impl<'a> Parser<'a> {
                 }
                 Some(TokenKind::Agent) => {
                     let err = CompileError::new(
-                        "karn.agent.outside_context",
+                        "bynk.agent.outside_context",
                         self.peek().unwrap().span,
                         "`agent` declarations are only allowed inside a context, not a commons",
                     );
@@ -222,7 +222,7 @@ impl<'a> Parser<'a> {
                 }
                 Some(TokenKind::Actor) => {
                     let err = CompileError::new(
-                        "karn.actor.outside_context",
+                        "bynk.actor.outside_context",
                         self.peek().unwrap().span,
                         "`actor` declarations are only allowed inside a context, not a commons",
                     );
@@ -231,7 +231,7 @@ impl<'a> Parser<'a> {
                 Some(_) => {
                     let t = self.peek().unwrap();
                     let err = CompileError::new(
-                        "karn.parse.expected_item",
+                        "bynk.parse.expected_item",
                         t.span,
                         format!(
                             "expected `type`, `fn`, or `uses` declaration, found {}",
@@ -251,7 +251,7 @@ impl<'a> Parser<'a> {
                 }
                 None => {
                     return Err(CompileError::new(
-                        "karn.parse.unexpected_eof",
+                        "bynk.parse.unexpected_eof",
                         self.eof_span(),
                         "expected `}` to close the commons body, found end of file",
                     ));
@@ -289,7 +289,7 @@ impl<'a> Parser<'a> {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(
                             CompileError::new(
-                                "karn.parse.orphan_doc_block",
+                                "bynk.parse.orphan_doc_block",
                                 doc_span,
                                 "documentation block before `uses` is not allowed; only `type` and `fn` declarations carry docs",
                             ),
@@ -298,7 +298,7 @@ impl<'a> Parser<'a> {
                     if seen_item {
                         let t = self.peek().unwrap();
                         return Err(CompileError::new(
-                            "karn.parse.uses_after_decls",
+                            "bynk.parse.uses_after_decls",
                             t.span,
                             "`uses` clauses must appear before any `type` or `fn` declaration in a fragment-form commons",
                         )
@@ -349,7 +349,7 @@ impl<'a> Parser<'a> {
                 None => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block has no following declaration to attach to",
                         ));
@@ -363,7 +363,7 @@ impl<'a> Parser<'a> {
                 }
                 Some(TokenKind::Capability) => {
                     let err = CompileError::new(
-                        "karn.capability.outside_context",
+                        "bynk.capability.outside_context",
                         self.peek().unwrap().span,
                         "`capability` declarations are only allowed inside a context, not a commons",
                     );
@@ -371,7 +371,7 @@ impl<'a> Parser<'a> {
                 }
                 Some(TokenKind::Provides) => {
                     let err = CompileError::new(
-                        "karn.provider.outside_context",
+                        "bynk.provider.outside_context",
                         self.peek().unwrap().span,
                         "`provides` declarations are only allowed inside a context, not a commons",
                     );
@@ -379,7 +379,7 @@ impl<'a> Parser<'a> {
                 }
                 Some(TokenKind::Service) => {
                     let err = CompileError::new(
-                        "karn.service.outside_context",
+                        "bynk.service.outside_context",
                         self.peek().unwrap().span,
                         "`service` declarations are only allowed inside a context, not a commons",
                     );
@@ -387,7 +387,7 @@ impl<'a> Parser<'a> {
                 }
                 Some(TokenKind::Agent) => {
                     let err = CompileError::new(
-                        "karn.agent.outside_context",
+                        "bynk.agent.outside_context",
                         self.peek().unwrap().span,
                         "`agent` declarations are only allowed inside a context, not a commons",
                     );
@@ -395,7 +395,7 @@ impl<'a> Parser<'a> {
                 }
                 Some(TokenKind::Actor) => {
                     let err = CompileError::new(
-                        "karn.actor.outside_context",
+                        "bynk.actor.outside_context",
                         self.peek().unwrap().span,
                         "`actor` declarations are only allowed inside a context, not a commons",
                     );
@@ -404,7 +404,7 @@ impl<'a> Parser<'a> {
                 Some(_) => {
                     let t = self.peek().unwrap();
                     let err = CompileError::new(
-                        "karn.parse.expected_item",
+                        "bynk.parse.expected_item",
                         t.span,
                         format!(
                             "expected `type`, `fn`, or `uses` declaration, found {}",
@@ -508,7 +508,7 @@ impl<'a> Parser<'a> {
             Some(_) => {
                 let t = self.peek().unwrap();
                 return Err(CompileError::new(
-                    "karn.parse.expected_visibility",
+                    "bynk.parse.expected_visibility",
                     t.span,
                     format!(
                         "expected `opaque`, `transparent`, or `capability` after `exports`, found {}",
@@ -521,7 +521,7 @@ impl<'a> Parser<'a> {
             }
             None => {
                 return Err(CompileError::new(
-                    "karn.parse.unexpected_eof",
+                    "bynk.parse.unexpected_eof",
                     self.eof_span(),
                     "expected `opaque`, `transparent`, or `capability` after `exports`, found end of file",
                 ));
@@ -566,7 +566,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::RBrace) => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block has no following declaration to attach to",
                         ));
@@ -577,7 +577,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::Uses) => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block before `uses` is not allowed",
                         ));
@@ -620,7 +620,7 @@ impl<'a> Parser<'a> {
                 Some(_) => {
                     let t = self.peek().unwrap();
                     let err = CompileError::new(
-                        "karn.parse.expected_item",
+                        "bynk.parse.expected_item",
                         t.span,
                         format!(
                             "expected `uses`, `mocks`, or `test \"name\"` declaration, found {}",
@@ -640,7 +640,7 @@ impl<'a> Parser<'a> {
                 }
                 None => {
                     return Err(CompileError::new(
-                        "karn.parse.unexpected_eof",
+                        "bynk.parse.unexpected_eof",
                         self.eof_span(),
                         "expected `}` to close the test body, found end of file",
                     ));
@@ -679,7 +679,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::Uses) => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block before `uses` is not allowed",
                         ));
@@ -687,7 +687,7 @@ impl<'a> Parser<'a> {
                     if seen_non_uses {
                         let t = self.peek().unwrap();
                         return Err(CompileError::new(
-                            "karn.parse.uses_after_decls",
+                            "bynk.parse.uses_after_decls",
                             t.span,
                             "`uses` clauses must appear before any `mocks` or `test` declarations in a fragment-form test",
                         ));
@@ -735,7 +735,7 @@ impl<'a> Parser<'a> {
                 None => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block has no following declaration to attach to",
                         ));
@@ -747,7 +747,7 @@ impl<'a> Parser<'a> {
                 Some(_) => {
                     let t = self.peek().unwrap();
                     let err = CompileError::new(
-                        "karn.parse.expected_item",
+                        "bynk.parse.expected_item",
                         t.span,
                         format!(
                             "expected `uses`, `mocks`, or `test \"name\"` declaration, found {}",
@@ -821,7 +821,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::RBrace) if brace => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block has no following declaration to attach to",
                         ));
@@ -832,7 +832,7 @@ impl<'a> Parser<'a> {
                 None if !brace => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block has no following declaration to attach to",
                         ));
@@ -844,7 +844,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::Uses) => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block before `uses` is not allowed",
                         ));
@@ -852,7 +852,7 @@ impl<'a> Parser<'a> {
                     if seen_non_uses {
                         let t = self.peek().unwrap();
                         return Err(CompileError::new(
-                            "karn.parse.uses_after_decls",
+                            "bynk.parse.uses_after_decls",
                             t.span,
                             "`uses` clauses must appear before any `test` cases in an integration test",
                         ));
@@ -885,7 +885,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::Mocks) => {
                     let t = self.peek().unwrap();
                     let err = CompileError::new(
-                        "karn.integration.mock_in_integration",
+                        "bynk.integration.mock_in_integration",
                         t.span,
                         "`mocks` is not allowed in an integration test",
                     )
@@ -907,7 +907,7 @@ impl<'a> Parser<'a> {
                         None => (self.eof_span(), "end of file".to_string()),
                     };
                     let err = CompileError::new(
-                        "karn.parse.expected_item",
+                        "bynk.parse.expected_item",
                         span,
                         format!("expected `uses` or `test \"name\"` declaration, found {found}"),
                     )
@@ -951,7 +951,7 @@ impl<'a> Parser<'a> {
 
     /// Parse the required `wires C1, C2, …` clause that leads an integration
     /// test body. Accepts one-or-more here; the ≥ 2 rule is a checker
-    /// diagnostic (`karn.integration.too_few_participants`) for a better message.
+    /// diagnostic (`bynk.integration.too_few_participants`) for a better message.
     fn parse_wires_clause(&mut self) -> Result<Vec<QualifiedName>, CompileError> {
         self.expect(
             TokenKind::Wires,
@@ -982,7 +982,7 @@ impl<'a> Parser<'a> {
             let (leading, item_doc) = self.collect_item_lead();
             if let Some((_, doc_span)) = item_doc {
                 self.warnings.push(CompileError::new(
-                    "karn.parse.orphan_doc_block",
+                    "bynk.parse.orphan_doc_block",
                     doc_span,
                     "documentation blocks on mock operations are not supported",
                 ));
@@ -1000,7 +1000,7 @@ impl<'a> Parser<'a> {
         let end = self.expect(TokenKind::RBrace, "to close the mock body")?;
         if ops.is_empty() {
             return Err(CompileError::new(
-                "karn.parse.empty_mock_body",
+                "bynk.parse.empty_mock_body",
                 kw.span.merge(end.span),
                 "mocks declaration must contain at least one `fn` operation",
             ));
@@ -1078,7 +1078,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::RBrace) => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block has no following declaration to attach to",
                         ));
@@ -1089,7 +1089,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::Uses) => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block before `uses` is not allowed; only `type` and `fn` declarations carry docs",
                         ));
@@ -1106,7 +1106,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::Consumes) => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block before `consumes` is not allowed; only `type` and `fn` declarations carry docs",
                         ));
@@ -1123,7 +1123,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::Exports) => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block before `exports` is not allowed; only `type` and `fn` declarations carry docs",
                         ));
@@ -1231,7 +1231,7 @@ impl<'a> Parser<'a> {
                 Some(_) => {
                     let t = self.peek().unwrap();
                     let err = CompileError::new(
-                        "karn.parse.expected_item",
+                        "bynk.parse.expected_item",
                         t.span,
                         format!(
                             "expected a `type`, `fn`, `uses`, `consumes`, `exports`, `capability`, `provides`, `service`, `agent`, or `actor` declaration, found {}",
@@ -1248,7 +1248,7 @@ impl<'a> Parser<'a> {
                 }
                 None => {
                     return Err(CompileError::new(
-                        "karn.parse.unexpected_eof",
+                        "bynk.parse.unexpected_eof",
                         self.eof_span(),
                         "expected `}` to close the context body, found end of file",
                     ));
@@ -1289,7 +1289,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::Uses) => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block before `uses` is not allowed; only `type` and `fn` declarations carry docs",
                         ));
@@ -1297,7 +1297,7 @@ impl<'a> Parser<'a> {
                     if seen_item {
                         let t = self.peek().unwrap();
                         return Err(CompileError::new(
-                            "karn.parse.uses_after_decls",
+                            "bynk.parse.uses_after_decls",
                             t.span,
                             "`uses` clauses must appear before any `type` or `fn` declaration in a fragment-form context",
                         )
@@ -1318,7 +1318,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::Consumes) => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block before `consumes` is not allowed; only `type` and `fn` declarations carry docs",
                         ));
@@ -1326,7 +1326,7 @@ impl<'a> Parser<'a> {
                     if seen_item {
                         let t = self.peek().unwrap();
                         let err = CompileError::new(
-                            "karn.parse.consumes_after_decls",
+                            "bynk.parse.consumes_after_decls",
                             t.span,
                             "`consumes` clauses must appear before any `type` or `fn` declaration in a fragment-form context",
                         )
@@ -1355,7 +1355,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::Exports) => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block before `exports` is not allowed; only `type` and `fn` declarations carry docs",
                         ));
@@ -1363,7 +1363,7 @@ impl<'a> Parser<'a> {
                     if seen_item {
                         let t = self.peek().unwrap();
                         let err = CompileError::new(
-                            "karn.parse.exports_after_decls",
+                            "bynk.parse.exports_after_decls",
                             t.span,
                             "`exports` clauses must appear before any `type` or `fn` declaration in a fragment-form context",
                         )
@@ -1497,7 +1497,7 @@ impl<'a> Parser<'a> {
                 None => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block has no following declaration to attach to",
                         ));
@@ -1509,7 +1509,7 @@ impl<'a> Parser<'a> {
                 Some(_) => {
                     let t = self.peek().unwrap();
                     let err = CompileError::new(
-                        "karn.parse.expected_item",
+                        "bynk.parse.expected_item",
                         t.span,
                         format!(
                             "expected a `type`, `fn`, `uses`, `consumes`, `exports`, `capability`, `provides`, `service`, `agent`, or `actor` declaration, found {}",
@@ -1569,7 +1569,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::RBrace) if brace => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block has no following declaration to attach to",
                         ));
@@ -1580,7 +1580,7 @@ impl<'a> Parser<'a> {
                 None if !brace => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block has no following declaration to attach to",
                         ));
@@ -1596,7 +1596,7 @@ impl<'a> Parser<'a> {
                     last_span = b.span;
                     if binding.is_some() {
                         let err = CompileError::new(
-                            "karn.adapter.duplicate_binding",
+                            "bynk.adapter.duplicate_binding",
                             b.span,
                             "an adapter may declare at most one `binding` clause",
                         );
@@ -1692,7 +1692,7 @@ impl<'a> Parser<'a> {
                     }
                 }
                 // `service` and `agent` parse into items so the checker can
-                // reject them precisely (`karn.adapter.disallowed_item`).
+                // reject them precisely (`bynk.adapter.disallowed_item`).
                 Some(TokenKind::Service) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
@@ -1740,14 +1740,14 @@ impl<'a> Parser<'a> {
                         Some(t) => t,
                         None => {
                             return Err(CompileError::new(
-                                "karn.parse.unexpected_eof",
+                                "bynk.parse.unexpected_eof",
                                 self.eof_span(),
                                 "expected `}` to close the adapter body, found end of file",
                             ));
                         }
                     };
                     let err = CompileError::new(
-                        "karn.parse.expected_item",
+                        "bynk.parse.expected_item",
                         t.span,
                         format!(
                             "expected a `binding`, `type`, `fn`, `uses`, `consumes`, `exports`, `capability`, or `provides` declaration, found {}",
@@ -1827,7 +1827,7 @@ impl<'a> Parser<'a> {
                     _ => {
                         let t = self.peek().unwrap();
                         return Err(CompileError::new(
-                            "karn.parse.expected_item",
+                            "bynk.parse.expected_item",
                             t.span,
                             format!(
                                 "expected a `\"package\": \"range\"` entry or `}}` in the `requires` map, found {}",
@@ -1876,7 +1876,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::RBrace) => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block has no following operation to attach to",
                         ));
@@ -1895,7 +1895,7 @@ impl<'a> Parser<'a> {
                 Some(_) => {
                     let t = self.peek().unwrap();
                     return Err(CompileError::new(
-                        "karn.parse.expected_capability_op",
+                        "bynk.parse.expected_capability_op",
                         t.span,
                         format!(
                             "expected `fn` to declare a capability operation, found {}",
@@ -1905,7 +1905,7 @@ impl<'a> Parser<'a> {
                 }
                 None => {
                     return Err(CompileError::new(
-                        "karn.parse.unexpected_eof",
+                        "bynk.parse.unexpected_eof",
                         self.eof_span(),
                         "expected `}` to close the capability body, found end of file",
                     ));
@@ -1915,7 +1915,7 @@ impl<'a> Parser<'a> {
         let close = self.expect(TokenKind::RBrace, "to close the capability body")?;
         if ops.is_empty() {
             return Err(CompileError::new(
-                "karn.parse.empty_capability",
+                "bynk.parse.empty_capability",
                 kw.span.merge(close.span),
                 "a capability must declare at least one operation",
             ));
@@ -2035,7 +2035,7 @@ impl<'a> Parser<'a> {
                 Some(_) => {
                     let t = self.peek().unwrap();
                     return Err(CompileError::new(
-                        "karn.parse.expected_provider_op",
+                        "bynk.parse.expected_provider_op",
                         t.span,
                         format!(
                             "expected `fn` to declare a provider operation, found {}",
@@ -2045,7 +2045,7 @@ impl<'a> Parser<'a> {
                 }
                 None => {
                     return Err(CompileError::new(
-                        "karn.parse.unexpected_eof",
+                        "bynk.parse.unexpected_eof",
                         self.eof_span(),
                         "expected `}` to close the provider body, found end of file",
                     ));
@@ -2104,7 +2104,7 @@ impl<'a> Parser<'a> {
 
         // Refinement form: `actor Name = Base where <predicate>` (Q3). Parsed so
         // the grammar is fixed now; the checker emits
-        // `karn.actor.refinement_unsupported`.
+        // `bynk.actor.refinement_unsupported`.
         if self.peek_kind() == Some(TokenKind::Eq) {
             self.bump();
             let base = self.expect_ident("as the base actor after `=`")?;
@@ -2132,7 +2132,7 @@ impl<'a> Parser<'a> {
         let auth_kw = self.expect_ident("expected `auth` to start the actor body")?;
         if auth_kw.name != "auth" {
             return Err(CompileError::new(
-                "karn.parse.expected_token",
+                "bynk.parse.expected_token",
                 auth_kw.span,
                 format!(
                     "expected `auth` in the actor body, found `{}`",
@@ -2177,7 +2177,7 @@ impl<'a> Parser<'a> {
                         let t = self.expect(TokenKind::IntLit, "as a scheme config value")?;
                         let n: i64 = self.slice(t.span).parse().map_err(|_| {
                             CompileError::new(
-                                "karn.parse.expected_token",
+                                "bynk.parse.expected_token",
                                 t.span,
                                 "invalid integer in scheme config".to_string(),
                             )
@@ -2187,7 +2187,7 @@ impl<'a> Parser<'a> {
                     _ => {
                         let t = self.peek();
                         return Err(CompileError::new(
-                            "karn.parse.expected_token",
+                            "bynk.parse.expected_token",
                             t.map(|t| t.span).unwrap_or_else(|| self.eof_span()),
                             "expected a string or integer scheme config value".to_string(),
                         ));
@@ -2213,7 +2213,7 @@ impl<'a> Parser<'a> {
             let id_kw = self.expect_ident("expected `identity` after `,`")?;
             if id_kw.name != "identity" {
                 return Err(CompileError::new(
-                    "karn.parse.expected_token",
+                    "bynk.parse.expected_token",
                     id_kw.span,
                     format!("expected `identity`, found `{}`", id_kw.name),
                 )
@@ -2249,7 +2249,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::RBrace) => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block has no following handler to attach to",
                         ));
@@ -2268,7 +2268,7 @@ impl<'a> Parser<'a> {
                 Some(_) => {
                     let t = self.peek().unwrap();
                     return Err(CompileError::new(
-                        "karn.parse.expected_handler",
+                        "bynk.parse.expected_handler",
                         t.span,
                         format!(
                             "expected `on` to start a handler, found {}",
@@ -2278,7 +2278,7 @@ impl<'a> Parser<'a> {
                 }
                 None => {
                     return Err(CompileError::new(
-                        "karn.parse.unexpected_eof",
+                        "bynk.parse.unexpected_eof",
                         self.eof_span(),
                         "expected `}` to close the service body, found end of file",
                     ));
@@ -2288,7 +2288,7 @@ impl<'a> Parser<'a> {
         let close = self.expect(TokenKind::RBrace, "to close the service body")?;
         if handlers.is_empty() {
             return Err(CompileError::new(
-                "karn.parse.empty_service",
+                "bynk.parse.empty_service",
                 kw.span.merge(close.span),
                 "a service must declare at least one handler",
             ));
@@ -2339,7 +2339,7 @@ impl<'a> Parser<'a> {
                     None => (self.eof_span(), "end of file"),
                 };
                 Err(CompileError::new(
-                    "karn.service.unknown_protocol",
+                    "bynk.service.unknown_protocol",
                     span,
                     format!(
                         "unknown protocol after `from` — found {found}, expected `http`, `cron`, or `queue`"
@@ -2365,7 +2365,7 @@ impl<'a> Parser<'a> {
             self.expect_ident("expected `key id: Type` at the start of the agent body")?;
         if key_ident.name != "key" {
             return Err(CompileError::new(
-                "karn.parse.expected_agent_key",
+                "bynk.parse.expected_agent_key",
                 key_ident.span,
                 format!(
                     "expected `key id: Type` at the start of the agent body, found `{}`",
@@ -2399,7 +2399,7 @@ impl<'a> Parser<'a> {
                 Some(TokenKind::RBrace) => {
                     if let Some((_, doc_span)) = item_doc {
                         self.warnings.push(CompileError::new(
-                            "karn.parse.orphan_doc_block",
+                            "bynk.parse.orphan_doc_block",
                             doc_span,
                             "documentation block has no following handler to attach to",
                         ));
@@ -2418,7 +2418,7 @@ impl<'a> Parser<'a> {
                 Some(_) => {
                     let t = self.peek().unwrap();
                     return Err(CompileError::new(
-                        "karn.parse.expected_handler",
+                        "bynk.parse.expected_handler",
                         t.span,
                         format!(
                             "expected `on` to start a handler, found {}",
@@ -2428,7 +2428,7 @@ impl<'a> Parser<'a> {
                 }
                 None => {
                     return Err(CompileError::new(
-                        "karn.parse.unexpected_eof",
+                        "bynk.parse.unexpected_eof",
                         self.eof_span(),
                         "expected `}` to close the agent body, found end of file",
                     ));
@@ -2438,7 +2438,7 @@ impl<'a> Parser<'a> {
         let close = self.expect(TokenKind::RBrace, "to close the agent body")?;
         if handlers.is_empty() {
             return Err(CompileError::new(
-                "karn.parse.empty_agent",
+                "bynk.parse.empty_agent",
                 kw.span.merge(close.span),
                 "an agent must declare at least one handler",
             ));
@@ -2496,7 +2496,7 @@ impl<'a> Parser<'a> {
             }
             other => {
                 return Err(CompileError::new(
-                    "karn.parse.unknown_handler_kind",
+                    "bynk.parse.unknown_handler_kind",
                     kind_ident.span,
                     format!(
                         "unknown handler form `{other}` — expected `call`, an HTTP method (`GET`/`POST`/`PUT`/`PATCH`/`DELETE`), `schedule`, or `message`"
@@ -2510,7 +2510,7 @@ impl<'a> Parser<'a> {
         // Only `on call` handlers are valid inside an agent.
         if is_agent && !matches!(kind, HandlerKind::Call) {
             return Err(CompileError::new(
-                "karn.parse.handler_in_agent",
+                "bynk.parse.handler_in_agent",
                 kind_ident.span,
                 "only `on call` handlers are valid inside an `agent`; protocol handlers belong on a `service`",
             )
@@ -2539,7 +2539,7 @@ impl<'a> Parser<'a> {
             if self.peek_kind() == Some(TokenKind::Underscore) {
                 let t = self.peek().unwrap();
                 return Err(CompileError::new(
-                    "karn.parse.expected_token",
+                    "bynk.parse.expected_token",
                     t.span,
                     "`_` is not a valid actor binder".to_string(),
                 )
@@ -2560,7 +2560,7 @@ impl<'a> Parser<'a> {
             // v0.52: a `|`-separated list names an ordered sum of peer actors
             // (`by who: A | B`), resolved first-wins. One name is the ordinary
             // single-actor handler. The binder requirement for a sum is a
-            // semantic rule (`karn.actor.sum_requires_binder`), not a parse one.
+            // semantic rule (`bynk.actor.sum_requires_binder`), not a parse one.
             while self.eat(TokenKind::Pipe).is_some() {
                 actors.push(self.expect_ident("as a peer actor after `|`")?);
             }

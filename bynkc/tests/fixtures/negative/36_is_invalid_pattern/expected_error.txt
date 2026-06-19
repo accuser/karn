@@ -1,2 +1,2 @@
-karn.types.is_unknown_variant
+bynk.types.is_unknown_variant
 has no variant `Nope`

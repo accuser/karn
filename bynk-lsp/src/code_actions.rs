@@ -83,7 +83,7 @@ mod tests {
         bynkc::Diagnostic {
             severity: bynkc::Severity::Error,
             error: CompileError::new(
-                "karn.given.undeclared_capability",
+                "bynk.given.undeclared_capability",
                 Span::new(17, 21),
                 "capability `Used` is used but not listed",
             )
@@ -159,7 +159,7 @@ mod tests {
         let uri = Url::parse("file:///a.karn").unwrap();
         let d = bynkc::Diagnostic {
             severity: bynkc::Severity::Error,
-            error: CompileError::new("karn.test", Span::new(0, 1), "msg").with_suggestion(
+            error: CompileError::new("bynk.test", Span::new(0, 1), "msg").with_suggestion(
                 "fill in <T>",
                 vec![(Span::new(0, 1), "<T>".to_string())],
                 Applicability::HasPlaceholders,

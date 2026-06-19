@@ -17,7 +17,7 @@ impl<'a> Parser<'a> {
         if self.peek_kind() == Some(TokenKind::LBracket) {
             let open = self.bump().unwrap();
             return Err(CompileError::new(
-                "karn.generics.no_generic_types",
+                "bynk.generics.no_generic_types",
                 open.span,
                 format!(
                     "type `{}` declares type parameters — generic type declarations are not in v0.20a (type parameters belong to functions)",
@@ -240,7 +240,7 @@ impl<'a> Parser<'a> {
                     Ok((BaseType::Float, t.span))
                 }
                 _ => Err(CompileError::new(
-                    "karn.parse.expected_base_type",
+                    "bynk.parse.expected_base_type",
                     t.span,
                     format!(
                         "expected `Int`, `String`, `Bool`, or `Float`, found {}",
@@ -250,7 +250,7 @@ impl<'a> Parser<'a> {
                 .with_note("type declarations are refined base types in v0")),
             },
             None => Err(CompileError::new(
-                "karn.parse.unexpected_eof",
+                "bynk.parse.unexpected_eof",
                 self.eof_span(),
                 "expected `Int`, `String`, `Bool`, or `Float`, found end of file",
             )),
@@ -271,7 +271,7 @@ impl<'a> Parser<'a> {
     fn parse_refinement_pred(&mut self) -> Result<RefinementPred, CompileError> {
         let t = self.peek().ok_or_else(|| {
             CompileError::new(
-                "karn.parse.unexpected_eof",
+                "bynk.parse.unexpected_eof",
                 self.eof_span(),
                 "expected a refinement predicate, found end of file",
             )
@@ -280,7 +280,7 @@ impl<'a> Parser<'a> {
         // identifiers (and not keywords).
         if t.kind != TokenKind::Ident {
             return Err(CompileError::new(
-                "karn.parse.expected_predicate",
+                "bynk.parse.expected_predicate",
                 t.span,
                 format!(
                     "expected a refinement predicate name, found {}",
@@ -314,7 +314,7 @@ impl<'a> Parser<'a> {
                     (SignedNumLit::Float(a), SignedNumLit::Float(b)) => PredKind::InRangeF(a, b),
                     _ => {
                         return Err(CompileError::new(
-                            "karn.types.no_numeric_coercion",
+                            "bynk.types.no_numeric_coercion",
                             start.merge(close.span),
                             "`InRange` bounds mix an `Int` literal and a `Float` literal",
                         )
@@ -349,7 +349,7 @@ impl<'a> Parser<'a> {
             "NonEmpty" => (PredKind::NonEmpty, t.span),
             other => {
                 return Err(CompileError::new(
-                    "karn.parse.unknown_predicate",
+                    "bynk.parse.unknown_predicate",
                     t.span,
                     format!("unknown refinement predicate `{other}`"),
                 )
@@ -371,7 +371,7 @@ impl<'a> Parser<'a> {
         let slice = self.slice(t.span);
         let n: i64 = slice.parse().map_err(|_| {
             CompileError::new(
-                "karn.lex.integer_overflow",
+                "bynk.lex.integer_overflow",
                 t.span,
                 format!("integer literal `{slice}` is out of range for a 64-bit signed integer"),
             )
@@ -397,7 +397,7 @@ impl<'a> Parser<'a> {
                 let slice = self.slice(t.span);
                 let n: i64 = slice.parse().map_err(|_| {
                     CompileError::new(
-                        "karn.lex.integer_overflow",
+                        "bynk.lex.integer_overflow",
                         t.span,
                         format!(
                             "integer literal `{slice}` is out of range for a 64-bit signed integer"
@@ -426,7 +426,7 @@ impl<'a> Parser<'a> {
                 }))
             }
             Some(t) => Err(CompileError::new(
-                "karn.parse.expected_token",
+                "bynk.parse.expected_token",
                 t.span,
                 format!(
                     "expected a numeric literal {ctx}, found {}",
@@ -434,7 +434,7 @@ impl<'a> Parser<'a> {
                 ),
             )),
             None => Err(CompileError::new(
-                "karn.parse.unexpected_eof",
+                "bynk.parse.unexpected_eof",
                 self.eof_span(),
                 format!("expected a numeric literal {ctx}, found end of file"),
             )),
@@ -493,7 +493,7 @@ impl<'a> Parser<'a> {
             Group::Unit(s) => Ok(TypeRef::Unit(s)),
             Group::Single(t, _) => Ok(t),
             Group::Multi(_, s) => Err(CompileError::new(
-                "karn.parse.expected_token",
+                "bynk.parse.expected_token",
                 s,
                 "expected `->` after a parenthesised parameter list — a bare `(A, B)` is not a type",
             )),
@@ -525,7 +525,7 @@ impl<'a> Parser<'a> {
                     let lb = self.peek().map(|t| t.kind);
                     if lb != Some(TokenKind::LBracket) {
                         return Err(CompileError::new(
-                            "karn.parse.expected_token",
+                            "bynk.parse.expected_token",
                             t.span,
                             "the built-in `Result` type requires two type arguments: `Result[T, E]`",
                         )
@@ -539,7 +539,7 @@ impl<'a> Parser<'a> {
                     if self.peek_kind() == Some(TokenKind::RBracket) {
                         let close = self.bump().unwrap();
                         return Err(CompileError::new(
-                            "karn.parse.generic_arg_count",
+                            "bynk.parse.generic_arg_count",
                             t.span.merge(close.span),
                             "the built-in `Result` type requires two type arguments: `Result[T, E]`",
                         )
@@ -567,7 +567,7 @@ impl<'a> Parser<'a> {
                     self.bump();
                     if self.peek_kind() != Some(TokenKind::LBracket) {
                         return Err(CompileError::new(
-                            "karn.parse.expected_token",
+                            "bynk.parse.expected_token",
                             t.span,
                             "the built-in `Option` type requires one type argument: `Option[T]`",
                         ));
@@ -582,7 +582,7 @@ impl<'a> Parser<'a> {
                     self.bump();
                     if self.peek_kind() != Some(TokenKind::LBracket) {
                         return Err(CompileError::new(
-                            "karn.parse.expected_token",
+                            "bynk.parse.expected_token",
                             t.span,
                             "the built-in `Effect` type requires one type argument: `Effect[T]`",
                         ));
@@ -600,7 +600,7 @@ impl<'a> Parser<'a> {
                     if name == "HttpResult" {
                         if self.peek_kind() != Some(TokenKind::LBracket) {
                             return Err(CompileError::new(
-                                "karn.parse.expected_token",
+                                "bynk.parse.expected_token",
                                 t.span,
                                 "the built-in `HttpResult` type requires one type argument: `HttpResult[T]`",
                             ));
@@ -621,7 +621,7 @@ impl<'a> Parser<'a> {
                     if name == "List" {
                         if self.peek_kind() != Some(TokenKind::LBracket) {
                             return Err(CompileError::new(
-                                "karn.parse.expected_token",
+                                "bynk.parse.expected_token",
                                 t.span,
                                 "the built-in `List` type requires one type argument: `List[T]`",
                             ));
@@ -635,7 +635,7 @@ impl<'a> Parser<'a> {
                     if name == "Map" {
                         if self.peek_kind() != Some(TokenKind::LBracket) {
                             return Err(CompileError::new(
-                                "karn.parse.expected_token",
+                                "bynk.parse.expected_token",
                                 t.span,
                                 "the built-in `Map` type requires two type arguments: `Map[K, V]`",
                             ));
@@ -645,7 +645,7 @@ impl<'a> Parser<'a> {
                         if self.peek_kind() == Some(TokenKind::RBracket) {
                             let close = self.bump().unwrap();
                             return Err(CompileError::new(
-                                "karn.parse.generic_arg_count",
+                                "bynk.parse.generic_arg_count",
                                 t.span.merge(close.span),
                                 "the built-in `Map` type requires two type arguments: `Map[K, V]`",
                             ));
@@ -663,13 +663,13 @@ impl<'a> Parser<'a> {
                     Ok(TypeRef::Named(Ident { name, span: t.span }))
                 }
                 _ => Err(CompileError::new(
-                    "karn.parse.expected_type",
+                    "bynk.parse.expected_type",
                     t.span,
                     format!("expected a type {ctx}, found {}", t.kind.describe()),
                 )),
             },
             None => Err(CompileError::new(
-                "karn.parse.unexpected_eof",
+                "bynk.parse.unexpected_eof",
                 self.eof_span(),
                 format!("expected a type {ctx}, found end of file"),
             )),

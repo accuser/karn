@@ -138,7 +138,7 @@ The LSP server runs the existing Bynk compiler on the project's source corpus an
 - Primary message (the error description).
 - Primary range (the source span).
 - Secondary ranges where helpful (e.g., the conflicting declaration, the type mismatch source).
-- Error category code (e.g., `karn.types.if_branch_mismatch`) included in the diagnostic for filterability.
+- Error category code (e.g., `bynk.types.if_branch_mismatch`) included in the diagnostic for filterability.
 
 **Configuration:** Users can set `[lsp].diagnostics_mode = "on_save"` to disable live diagnostics. In on-save mode, diagnostics run only when the file is saved.
 
@@ -183,7 +183,7 @@ Hover content is rendered as Markdown by the editor. The LSP returns `MarkupCont
 
 **Markdown layout.** Hover content follows a consistent structure:
 
-1. A fenced code block (```` ```karn ```` ) containing the declaration's source form (formatted via the canonical formatter so it matches the project's style).
+1. A fenced code block (```` ```bynk ```` ) containing the declaration's source form (formatted via the canonical formatter so it matches the project's style).
 2. A blank line.
 3. The attached doc-block content (if any), as plain Markdown.
 4. For types with additional metadata (exported visibility, opaque representation note, etc.), a short list below the doc content.
@@ -191,7 +191,7 @@ Hover content is rendered as Markdown by the editor. The LSP returns `MarkupCont
 Example for a `Money` record type:
 
 ````markdown
-```karn
+```bynk
 type Money = {
   minorUnits: Int where NonNegative,
   currency:   CurrencyCode,
@@ -322,7 +322,7 @@ If a declaration has an attached doc block, its content (truncated to one line i
 
 **Local bindings (v0.31, ADR 0064).** `let`/`let <-` bindings and fn/handler/lambda params are **not** in the cross-file index (they are file-local); references for them come from the per-file **locals** instead — the definition plus every use that resolves to it within the binding's scope, recovered by a pure lexer scan over the snapshot (shadowing-safe). References/definition/highlight fall back to this when the index has no symbol at the cursor.
 
-**Deferred kinds** (no entries yet): match-arm / `is`-narrowing bindings, generic type parameters (methods, record fields, and capability ops are now indexed — see above). First-party `karn.*` units are excluded — they are not user-editable.
+**Deferred kinds** (no entries yet): match-arm / `is`-narrowing bindings, generic type parameters (methods, record fields, and capability ops are now indexed — see above). First-party `bynk.*` units are excluded — they are not user-editable.
 
 Positions convert against the **analysed snapshot** (§3.2's rule); `includeDeclaration` is honoured (the definition site is first). Requests outside a project (no `bynk.toml`) return no results.
 
@@ -337,7 +337,7 @@ Positions convert against the **analysed snapshot** (§3.2's rule); `includeDecl
 1. **Collisions by re-analysis.** The candidate edits are applied to an in-memory overlay and the project is re-analysed; any **new** diagnostic (per file + category) refuses the rename. This catches every collision class — same-unit name clash, `uses` import conflicts, flattened-capability clashes — without enumerating them.
 2. **Capture/escape by index equality.** Re-analysis alone misses *silent re-binding* (a rename can make an existing name resolve somewhere new with no diagnostic — declared fns shadow fn-typed locals in call position). The re-built index must equal the pre-rename index **modulo the rename**: the renamed symbol's sites are exactly the edited ones, every other symbol's reference set is unchanged (after remapping the edit deltas). Any difference refuses.
 
-A refused rename surfaces as an LSP request error with the reason — never a partial edit, and never a `karn.*` diagnostic.
+A refused rename surfaces as an LSP request error with the reason — never a partial edit, and never a `bynk.*` diagnostic.
 
 **Versioned edits.** The `WorkspaceEdit` uses `documentChanges` with `TextDocumentEdit`s carrying the document **versions captured when the analysed snapshots were taken** (disk-only files carry none). A buffer that drifted past its analysed version makes the client reject the rename rather than mis-apply it.
 
@@ -351,9 +351,9 @@ A refused rename surfaces as an LSP request error with the reason — never a pa
 
 **Applicability.** Only `MachineApplicable` suggestions surface as quick-fixes; `HasPlaceholders` exists for a future CLI `--fix` and is never offered as a one-click edit.
 
-**Available fixes.** The seed quick-fixes (ADR 0054) are the `given`-clause ones — add an undeclared capability, remove an unused one. v0.40 (ADR 0073) adds the **`InRange`-swap**: an inverted `InRange(hi, lo)` refinement bound (`karn.types.inverted_range`) offers a two-edit fix that swaps the bounds in place (ints and floats; float lexemes preserved), backed by per-bound source spans recorded in the AST.
+**Available fixes.** The seed quick-fixes (ADR 0054) are the `given`-clause ones — add an undeclared capability, remove an unused one. v0.40 (ADR 0073) adds the **`InRange`-swap**: an inverted `InRange(hi, lo)` refinement bound (`bynk.types.inverted_range`) offers a two-edit fix that swaps the bounds in place (ints and floats; float lexemes preserved), backed by per-bound source spans recorded in the AST.
 
-**The seed catalogue (v0.26):** remove an unused capability from the `given` clause (`karn.given.unused_capability`) and add an undeclared one (`karn.given.undeclared_capability`, bare and cross-context `B.Cap` — the cross-context entry inserts the canonical context path). Both edits are **list-aware**, authored in the checker: removal takes one adjacent comma and surrounding space with it, removing the *only* capability deletes the `given` keyword too, and adding inserts `, Cap` after the last entry or synthesises ` given Cap` after the handler's return type when the clause is absent. The result never double-commas, leading-commas, or leaves a dangling `given`.
+**The seed catalogue (v0.26):** remove an unused capability from the `given` clause (`bynk.given.unused_capability`) and add an undeclared one (`bynk.given.undeclared_capability`, bare and cross-context `B.Cap` — the cross-context entry inserts the canonical context path). Both edits are **list-aware**, authored in the checker: removal takes one adjacent comma and surrounding space with it, removing the *only* capability deletes the `given` keyword too, and adding inserts `, Cap` after the last entry or synthesises ` given Cap` after the handler's return type when the clause is absent. The result never double-commas, leading-commas, or leaves a dangling `given`.
 
 ### 3.11 Workspace symbols (v0.26 rider)
 
@@ -375,7 +375,7 @@ A refused rename surfaces as an LSP request error with the reason — never a pa
 
 **Harvesting (ADR 0056).** Hints are a curated per-file set recorded by the **checker** at each binding site as it computes the binding's final type — never a tool-side re-inference, and not the raw typed model (which cannot position a hint). The sink is a `&mut` parameter (the `RefSink` shape), so recorded hints **survive a transient type error** at every site the checker still reaches; a fn-body error short-circuits that file's v0.5 declaration pass, so its **handler-body** hints are suppressed until the error clears. Synthetic and test/integration files record nothing.
 
-**Serving.** Hints are served from the **cached analysis round** only, like code actions (§3.10): a request before the first round, or for a file outside the project, returns the empty list — as does a file whose group's composition failed (no analysed model). The visible range and the hint positions convert against the analysed snapshot (§3.2's rule). The server always produces hints; visibility is the client's (the editor's built-in inlay toggle; a `karn.inlayHints.enable` extension setting is a B-1 surface item). `inlayHint/resolve` is not declared — labels are computed eagerly.
+**Serving.** Hints are served from the **cached analysis round** only, like code actions (§3.10): a request before the first round, or for a file outside the project, returns the empty list — as does a file whose group's composition failed (no analysed model). The visible range and the hint positions convert against the analysed snapshot (§3.2's rule). The server always produces hints; visibility is the client's (the editor's built-in inlay toggle; a `bynk.inlayHints.enable` extension setting is a B-1 surface item). `inlayHint/resolve` is not declared — labels are computed eagerly.
 
 ### 3.14 Semantic tokens (v0.28)
 
@@ -388,11 +388,11 @@ A refused rename surfaces as an LSP request error with the reason — never a pa
 | **Token types** | `type`, `function`, `capability`, `service`, `agent`, `provider`, `variable` |
 | **Token modifiers** | `declaration`, `refined`, `opaque`, `platformNative` |
 
-`type`/`function`/`variable` are the standard LSP types; the other four are **custom** (theme defaults ship with the extension — a B-1 item; unthemed clients fall back to the syntactic colour). `declaration` marks a `def` site (references carry none); `refined` requires a refinement **present** (`type X = Int` is a plain alias and carries neither `refined` nor `opaque`); `opaque` is orthogonal, so `opaque B where …` carries both; `platformNative` marks symbols declared by a platform unit (e.g. `karn.cloudflare`'s `Kv`).
+`type`/`function`/`variable` are the standard LSP types; the other four are **custom** (theme defaults ship with the extension — a B-1 item; unthemed clients fall back to the syntactic colour). `declaration` marks a `def` site (references carry none); `refined` requires a refinement **present** (`type X = Int` is a plain alias and carries neither `refined` nor `opaque`); `opaque` is orthogonal, so `opaque B where …` carries both; `platformNative` marks symbols declared by a platform unit (e.g. `bynk.cloudflare`'s `Kv`).
 
 **Local bindings (v0.31.1, ADR 0064).** `let`/`let <-` bindings and fn/handler/lambda params (and their uses) carry the standard **`variable`** token — appended to the frozen legend at index 6, so existing indices are unchanged and VS Code themes it without an extension declaration (the legend-drift test adds `variable` to its standard-types allowlist). The producer merges local occurrences (the def carries `declaration`) into the same sorted stream as the index symbols — disjoint, since locals are never top-level. Occurrences come from the same per-file scope-resolved lexer scan as references (§3.8). A `parameter`-vs-`variable` split and match-arm/`is` bindings are later refinements.
 
-**Sources (ADR 0057).** A pure `index_queries` producer reads **two** sources from the cached round: `ProjectIndex.symbols` (user-defined defs + refs) and **`ProjectIndex.foreign_refs`** — references to first-party (`karn.*`) symbols, which `symbols` deliberately drops (synthetic defs point at files not on disk; definition/rename/workspace-symbol must never surface them). The side table is tokens-only; the v0.25 navigation invariants on `symbols` are untouched. `test`/`integration` files' references are in the index, so semantic tokens light up test files too.
+**Sources (ADR 0057).** A pure `index_queries` producer reads **two** sources from the cached round: `ProjectIndex.symbols` (user-defined defs + refs) and **`ProjectIndex.foreign_refs`** — references to first-party (`bynk.*`) symbols, which `symbols` deliberately drops (synthetic defs point at files not on disk; definition/rename/workspace-symbol must never surface them). The side table is tokens-only; the v0.25 navigation invariants on `symbols` are untouched. `test`/`integration` files' references are in the index, so semantic tokens light up test files too.
 
 **Serving & encoding.** Tokens are served from the **cached analysis round** only (no cached round / non-project file → empty); positions and the `range` request convert against the analysed snapshot (§3.2's rule). The token array is delta-encoded per the protocol — relative line/char, position-sorted (name segments never overlap), lengths in UTF-16 code units. The **`delta`** request variant is not declared (a later optimisation).
 
@@ -402,16 +402,16 @@ A refused rename surfaces as an LSP request error with the reason — never a pa
 
 `textDocument/completion` returns context-keyed candidates. **Context detection is lexical** — it keys off the line up to the cursor, not the parse tree, because completion fires mid-edit when the buffer rarely parses; **candidates are semantic** (drawn from parsing the *other* project files with recovery, plus the static `bynkc` registries). The `completion::complete(line_prefix, doc_text, src_root)` producer is a pure function, fully unit-tested; the handler builds `line_prefix` and maps `CompletionKind` → `CompletionItemKind`.
 
-**Lazy docs (`completionItem/resolve`, slice 5).** The list carries a one-line `detail` (the signature) eagerly; the richer **`documentation`** (markdown — doc comment + full rendering) is filled in only when an item is *focused*, via `completionItem/resolve`, so the initial list stays cheap. Each item stashes its document URI in `data` (a resolve request carries only the item, not a position); `completion_resolve` looks the symbol up by `label` through the **same hover renderer** (`symbols::describe_symbol`, local file → project-wide §3.4 → the embedded first-party sources). It is a no-op for an item that names no declared symbol (a keyword, kernel method, or local), whose `detail` already suffices. **First-party docs (slice 9):** hover and this resolver share a `describe_firstparty_symbol` fallback that scans the embedded `karn`/`karn.cloudflare`/`karn.list`/`karn.map`/`karn.string` sources — so stdlib combinators and the `karn` surface (which `walk_karn_files` never sees) surface their signature, and any `---` doc block once the sources carry one. Auto-import via resolve is deferred. The detail strings themselves are **typed signatures** (params + return, via `type_ref_str`) for capability operations as well as free functions, matching hover and signature help.
+**Lazy docs (`completionItem/resolve`, slice 5).** The list carries a one-line `detail` (the signature) eagerly; the richer **`documentation`** (markdown — doc comment + full rendering) is filled in only when an item is *focused*, via `completionItem/resolve`, so the initial list stays cheap. Each item stashes its document URI in `data` (a resolve request carries only the item, not a position); `completion_resolve` looks the symbol up by `label` through the **same hover renderer** (`symbols::describe_symbol`, local file → project-wide §3.4 → the embedded first-party sources). It is a no-op for an item that names no declared symbol (a keyword, kernel method, or local), whose `detail` already suffices. **First-party docs (slice 9):** hover and this resolver share a `describe_firstparty_symbol` fallback that scans the embedded `bynk`/`bynk.cloudflare`/`bynk.list`/`bynk.map`/`bynk.string` sources — so stdlib combinators and the `bynk` surface (which `walk_bynk_files` never sees) surface their signature, and any `---` doc block once the sources carry one. Auto-import via resolve is deferred. The detail strings themselves are **typed signatures** (params + return, via `type_ref_str`) for capability operations as well as free functions, matching hover and signature help.
 
 The recognised contexts and their candidate sources:
 
 | Context (lexical trigger) | Candidates | Item kind |
 |---|---|---|
-| `consumes <prefix>` (v0.17) | consumable units (contexts/adapters + `karn`) | `MODULE` |
+| `consumes <prefix>` (v0.17) | consumable units (contexts/adapters + `bynk`) | `MODULE` |
 | `consumes U { … ` (v0.17) | the capabilities `U` exports | `INTERFACE` |
 | `given … ` (v0.17) | in-scope capabilities (local, flattened, `U.Cap`) | `INTERFACE` |
-| **type position** (`: T`, `-> T`, `[ … ]` type args) (v0.30) | built-in types + `karn`-surface transparent types + project `type` decls | `STRUCT` |
+| **type position** (`: T`, `-> T`, `[ … ]` type args) (v0.30) | built-in types + `bynk`-surface transparent types + project `type` decls | `STRUCT` |
 | **keyword position** (a bare word at a decl/statement start) (v0.30) | reserved keywords (with registry docs) + declaration snippets | `KEYWORD` / `SNIPPET` |
 | **name-receiver member** (`UpperIdent.`) (v0.30.1; built-in sums + full statics in slice 1) | sum-type variants (project + built-in `HttpResult`/`QueueResult`); refined/opaque `of`/`unsafe`; capability ops; built-in type statics (`Int.parse`/`Float.parse`, `Json.encode`/`decode`, `List.empty`/`Map.empty`, `Effect.pure`) | `ENUM_MEMBER` / `METHOD` |
 | **value-receiver member** (`lowercase.`) (v0.30.2) | the receiver type's kernel methods (`xs.fold`/`s.split`/`o.map`) + record fields | `METHOD` / `FIELD` |
@@ -438,7 +438,7 @@ position now offers the value constructors and in-scope type names (the
 `complete()` arm), with locals/params still appended handler-side. **Slice 3
 closed G5** — expression position also offers in-scope free functions: the current
 unit's own `fn`s and the combinators of every `uses`-imported module (project +
-the embedded `karn.list`/`karn.map`/`karn.string` stdlib), gated on the `uses`
+the embedded `bynk.list`/`bynk.map`/`bynk.string` stdlib), gated on the `uses`
 set. (The stdlib sources joined `for_each_unit`, so signature help resolves their
 labels too.) **Slice 4 closed G6** — the value-receiver clean-file ceiling: Analyse
 mode records best-effort partial `expr_types` (ADR 0094), so value-member
@@ -447,11 +447,11 @@ file (the receiver types whenever it itself checks). The completion arc is
 complete; only the upstream resolve gate (an unresolved name elsewhere) remains a
 known limitation.
 
-**Built-ins/surface come from static registries, not the index (ADR 0061).** Because first-party symbols aren't indexed (§3.14's finding), the built-in types (`Int`/`Bool`/`Float`/`String`/`Option`/`Result`/`Effect`/`List`/`Map`), keyword docs, the `karn`-surface transparent types, and the built-in type statics (`Int.parse`/`Float.parse`/`Json.encode`/`decode`/`List.empty`/`Map.empty`/`Effect.pure`) are sourced from `bynkc::{keywords, builtin_names, firstparty}` (and a small static statics table; built-in sum variants come from the `bynkc::ast` `HTTP_VARIANTS`/`QUEUE_VARIANTS` registries) — the index (here, the project parse) supplies only *project* symbols. Keyword candidates are the lowercase-initial reserved words (declaration/statement keywords); uppercase type/value names belong to type/expression position. Snippets carry LSP `${n:…}` tab stops (`InsertTextFormat::SNIPPET`).
+**Built-ins/surface come from static registries, not the index (ADR 0061).** Because first-party symbols aren't indexed (§3.14's finding), the built-in types (`Int`/`Bool`/`Float`/`String`/`Option`/`Result`/`Effect`/`List`/`Map`), keyword docs, the `bynk`-surface transparent types, and the built-in type statics (`Int.parse`/`Float.parse`/`Json.encode`/`decode`/`List.empty`/`Map.empty`/`Effect.pure`) are sourced from `bynkc::{keywords, builtin_names, firstparty}` (and a small static statics table; built-in sum variants come from the `bynkc::ast` `HTTP_VARIANTS`/`QUEUE_VARIANTS` registries) — the index (here, the project parse) supplies only *project* symbols. Keyword candidates are the lowercase-initial reserved words (declaration/statement keywords); uppercase type/value names belong to type/expression position. Snippets carry LSP `${n:…}` tab stops (`InsertTextFormat::SNIPPET`).
 
 **Name-receiver members (v0.30.1, ADR 0062).** The `.`-member context is split by *what sits before the dot*. A **name** receiver — a single uppercase-initial identifier (`Color.`, `Email.`, `Clock.`) — is resolved from the project/surface parse to a sum/refined/opaque type or a capability, and its members are enumerated from the AST (no typed model, no scope query — the same mid-edit-safe recovery parse). A *plain* alias `type Id = Int` **does** carry `of`/`unsafe` (the emitter brands every `Refined` body), so they are offered; a **record** type has no name-receiver members (its fields are value-receiver).
 
-**Value-receiver members (v0.30.2, ADR 0063).** A **value** receiver — a lowercase `x.` — needs the receiver's *type*, which the checker discards on the analyse path and which a bare mid-edit `x.` doesn't even parse. So the LSP **rewrites** the buffer to drop the trailing `.partial` (then `x` parses), **re-analyses** it, and types the receiver via the retained `expr_types` (`type_at_offset`). The type maps to its **kernel methods** — from the enumerable `bynkc::kernel_methods` registry (`List`→`fold`/`get`/…, `String`→`split`/…, `Option`/`Result`→`map`/`andThen`/…, `Int`/`Float`→`abs`/`round`/…), drift-pinned against the checker's dispatch — plus **record fields** from the AST. (`karn.list`/`karn.map` combinators like `map`/`filter` are *free functions* `map(xs, f)`, not members.) **Error-tolerant since slice 4 (ADR 0094):** the checker already types every well-typed sub-expression, then discarded the file's whole `expr_types` map on a final `errors.is_empty()` gate. Analyse mode now records that **best-effort partial map** at every per-file check exit (`check_record` *and* the context/declaration checks, where handler bodies are typed), so the receiver types whenever it *itself* type-checks — completion and signature help work mid-edit despite an unrelated *type* error elsewhere. Build stays Ok-only (codegen untouched). One ceiling remains: an unresolved name elsewhere bails before the checker runs (the resolve gate), so it still blanks the receiver.
+**Value-receiver members (v0.30.2, ADR 0063).** A **value** receiver — a lowercase `x.` — needs the receiver's *type*, which the checker discards on the analyse path and which a bare mid-edit `x.` doesn't even parse. So the LSP **rewrites** the buffer to drop the trailing `.partial` (then `x` parses), **re-analyses** it, and types the receiver via the retained `expr_types` (`type_at_offset`). The type maps to its **kernel methods** — from the enumerable `bynkc::kernel_methods` registry (`List`→`fold`/`get`/…, `String`→`split`/…, `Option`/`Result`→`map`/`andThen`/…, `Int`/`Float`→`abs`/`round`/…), drift-pinned against the checker's dispatch — plus **record fields** from the AST. (`bynk.list`/`bynk.map` combinators like `map`/`filter` are *free functions* `map(xs, f)`, not members.) **Error-tolerant since slice 4 (ADR 0094):** the checker already types every well-typed sub-expression, then discarded the file's whole `expr_types` map on a final `errors.is_empty()` gate. Analyse mode now records that **best-effort partial map** at every per-file check exit (`check_record` *and* the context/declaration checks, where handler bodies are typed), so the receiver types whenever it *itself* type-checks — completion and signature help work mid-edit despite an unrelated *type* error elsewhere. Build stays Ok-only (codegen untouched). One ceiling remains: an unresolved name elsewhere bails before the checker runs (the resolve gate), so it still blanks the receiver.
 
 **Conservative detection.** Type-position triggers exclude a list-literal `[` (its bracket isn't preceded by a type constructor); the one accepted false positive is a record *construction* value (`Order { id: ` — lexically identical to a record field-type declaration), where offering type names is mild noise. Name-receiver detection requires a *single* uppercase-initial segment, excluding the decimal `1.` and the `.`-qualified `a.B.`. Out-of-context prefixes (e.g. `let x = `) yield `[]`.
 
@@ -506,7 +506,7 @@ The edge comes from the `provides Cap = Provider` clause, which records a `Capab
 
 ### 3.21 Document links (slice 6b, ADR 0095)
 
-`textDocument/documentLink` underlines each `uses`/`consumes` **unit name** and makes it clickable to that unit's source. It joins two pieces: the clickable **range** comes from parsing the *live buffer* (`symbols::unit_reference_spans` walks the recovered AST's `uses`/`consumes` declarations and returns each target's name span — so links track the document even mid-edit); the link **target** comes from the round's **unit→source map** (`unit_sources`), keyed by qualified unit name, resolving to the unit's first source file (a unit may span files). The map is **new analysis surface** (ADR 0095) — context/unit names aren't index symbols, the gap ADR 0068 flagged — built in one pass over the non-synthetic parsed units, available whenever the project structurally analyses (type errors included; empty only on a parse bail), and threaded `ProjectAnalysis` → `ProjectDiagnostics` → the LSP `Analysis`. A **first-party `uses`** (`karn.list`, embedded via `include_str!`, no on-disk file) and an unresolved unit yield no link, by design — their *symbols* still surface through hover/completion (slice 9). **Go-to-definition on the same `uses`/`consumes` names** rides the same map: when the cursor sits on a unit-reference span and the index/locals paths don't resolve it, `goto_definition` returns the unit's first source file (at the top — units have no finer def site than their header). This closes the consumed-context half of §3.19's deferral for unit *declarations*; a unit-qualified capability reference (`B.Cap`) inside an expression is not yet a navigation source.
+`textDocument/documentLink` underlines each `uses`/`consumes` **unit name** and makes it clickable to that unit's source. It joins two pieces: the clickable **range** comes from parsing the *live buffer* (`symbols::unit_reference_spans` walks the recovered AST's `uses`/`consumes` declarations and returns each target's name span — so links track the document even mid-edit); the link **target** comes from the round's **unit→source map** (`unit_sources`), keyed by qualified unit name, resolving to the unit's first source file (a unit may span files). The map is **new analysis surface** (ADR 0095) — context/unit names aren't index symbols, the gap ADR 0068 flagged — built in one pass over the non-synthetic parsed units, available whenever the project structurally analyses (type errors included; empty only on a parse bail), and threaded `ProjectAnalysis` → `ProjectDiagnostics` → the LSP `Analysis`. A **first-party `uses`** (`bynk.list`, embedded via `include_str!`, no on-disk file) and an unresolved unit yield no link, by design — their *symbols* still surface through hover/completion (slice 9). **Go-to-definition on the same `uses`/`consumes` names** rides the same map: when the cursor sits on a unit-reference span and the index/locals paths don't resolve it, `goto_definition` returns the unit's first source file (at the top — units have no finer def site than their header). This closes the consumed-context half of §3.19's deferral for unit *declarations*; a unit-qualified capability reference (`B.Cap`) inside an expression is not yet a navigation source.
 
 ---
 
@@ -632,12 +632,12 @@ On activation:
 
 ### 5.2 Configuration
 
-The extension reads VS Code settings under the `karn.*` namespace:
+The extension reads VS Code settings under the `bynk.*` namespace:
 
 ```json
 {
-  "karn.executablePath": "bynkc-lsp",    // path to the LSP server binary
-  "karn.trace.server": "off"             // "off" | "messages" | "verbose"
+  "bynk.executablePath": "bynkc-lsp",    // path to the LSP server binary
+  "bynk.trace.server": "off"             // "off" | "messages" | "verbose"
 }
 ```
 
@@ -645,7 +645,7 @@ VS Code's built-in `editor.formatOnSave` is honoured for format-on-save behaviou
 
 ### 5.3 Logging
 
-LSP server logs to `~/.bynk-lsp.log` at warning level by default. The `karn.trace.server` setting can crank this to verbose for debugging.
+LSP server logs to `~/.bynk-lsp.log` at warning level by default. The `bynk.trace.server` setting can crank this to verbose for debugging.
 
 The extension exposes a "Bynk LSP" output channel in VS Code for protocol-level traces.
 
@@ -712,7 +712,7 @@ The VS Code extension builds via `npm run package` in its directory. Output: `by
 For local sideload:
 
 1. Build all three components.
-2. Place `bynkc-lsp` in a location on `PATH` (or configure `karn.executablePath` in VS Code).
+2. Place `bynkc-lsp` in a location on `PATH` (or configure `bynk.executablePath` in VS Code).
 3. Install the VS Code extension: `code --install-extension bynk-vscode-<version>.vsix`.
 
 A bundled installer (single script or installer package) is not in scope for this increment; manual install is acceptable for first cut.

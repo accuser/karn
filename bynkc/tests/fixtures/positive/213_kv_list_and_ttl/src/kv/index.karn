@@ -1,6 +1,6 @@
 context kv.index
 
-consumes karn.cloudflare { Kv }
+consumes bynk.cloudflare { Kv }
 
 type Entry = {
   sku: String,

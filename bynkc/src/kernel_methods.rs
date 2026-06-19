@@ -8,7 +8,7 @@
 //! completion: per-kernel `(name, signature)` tables and a [`methods_for`]
 //! mapping from a receiver [`Ty`] to its methods.
 //!
-//! The signatures are human-readable Karn-surface display strings (generic in
+//! The signatures are human-readable Bynk-surface display strings (generic in
 //! the element/key/value type), for completion `detail` — not the checker's
 //! `Ty`-typed signatures. A drift test (`kernel_registry_pins_dispatch`)
 //! drives every listed method through the real checker and asserts none is

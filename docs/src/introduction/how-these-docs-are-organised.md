@@ -90,7 +90,7 @@ real source file, every declaration lives under a module header: a `commons`
 **optional at file scope**, so a single-file program is most often written as a
 header followed by its declarations:
 
-```karn
+```bynk
 commons greetings
 
 type Subject = String where NonEmpty

@@ -34,7 +34,7 @@ pub(crate) fn check_type_decl(
                         check_refinement(b, f.type_ref.span(), Some(ref_r), errors);
                     } else {
                         errors.push(CompileError::new(
-                            "karn.types.field_refinement_not_base",
+                            "bynk.types.field_refinement_not_base",
                             ref_r.span,
                             format!(
                                 "inline refinement on field `{}` requires a base or refined type",
@@ -181,7 +181,7 @@ pub(crate) fn admit_refined_literal(
         && let Some(failed) = first_failed_predicate(refinement, &lit)
     {
         ctx.errors.push(CompileError::new(
-            "karn.refine.literal_violates",
+            "bynk.refine.literal_violates",
             expr.span,
             format!(
                 "literal {} does not satisfy `{}` required by type `{}`",
@@ -222,7 +222,7 @@ fn check_refinement(
                 };
                 errors.push(
                     CompileError::new(
-                        "karn.types.no_numeric_coercion",
+                        "bynk.types.no_numeric_coercion",
                         pred.span,
                         format!(
                             "`InRange` bounds are {bounds} literals, but the base type is `{}`",
@@ -241,7 +241,7 @@ fn check_refinement(
             }
             errors.push(
                 CompileError::new(
-                    "karn.types.predicate_base_mismatch",
+                    "bynk.types.predicate_base_mismatch",
                     pred.span,
                     format!(
                         "predicate `{}` cannot be applied to base type `{}`",
@@ -261,7 +261,7 @@ fn check_refinement(
                 if let Err(e) = Regex::new(pat) {
                     errors.push(
                         CompileError::new(
-                            "karn.types.invalid_regex",
+                            "bynk.types.invalid_regex",
                             pred.span,
                             format!("invalid regular expression in `Matches(\"{pat}\")`"),
                         )
@@ -273,7 +273,7 @@ fn check_refinement(
                 if lo.value > hi.value {
                     errors.push(
                         CompileError::new(
-                            "karn.types.inverted_range",
+                            "bynk.types.inverted_range",
                             pred.span,
                             format!(
                                 "`InRange({}, {})` has its bounds inverted (`min` must be ≤ `max`)",
@@ -298,7 +298,7 @@ fn check_refinement(
                 if lo.value > hi.value {
                     errors.push(
                         CompileError::new(
-                            "karn.types.inverted_range",
+                            "bynk.types.inverted_range",
                             pred.span,
                             format!(
                                 "`InRange({}, {})` has its bounds inverted (`min` must be ≤ `max`)",
@@ -317,7 +317,7 @@ fn check_refinement(
             PredKind::MinLength(n) | PredKind::MaxLength(n) | PredKind::Length(n) => {
                 if *n < 0 {
                     errors.push(CompileError::new(
-                        "karn.types.negative_length",
+                        "bynk.types.negative_length",
                         pred.span,
                         format!("length argument must be non-negative, got {n}"),
                     ));
@@ -390,7 +390,7 @@ pub(crate) fn check_int_refinement_consistency(
     if lo > hi {
         errors.push(
             CompileError::new(
-                "karn.types.empty_refinement",
+                "bynk.types.empty_refinement",
                 refinement.span,
                 "this refinement has no valid values — the predicates contradict each other",
             )
@@ -432,7 +432,7 @@ pub(crate) fn check_float_refinement_consistency(
     if lo > hi || (lo == hi && lo_exclusive) {
         errors.push(
             CompileError::new(
-                "karn.types.empty_refinement",
+                "bynk.types.empty_refinement",
                 refinement.span,
                 "this refinement has no valid values — the predicates contradict each other",
             )
@@ -464,7 +464,7 @@ pub(crate) fn check_string_refinement_consistency(
                 if let Some(prev) = exact_len {
                     if prev != *n {
                         errors.push(CompileError::new(
-                            "karn.types.empty_refinement",
+                            "bynk.types.empty_refinement",
                             refinement.span,
                             format!(
                                 "conflicting exact lengths: `Length({prev})` and `Length({n})` cannot both hold"
@@ -483,7 +483,7 @@ pub(crate) fn check_string_refinement_consistency(
     if min_len > max_len {
         errors.push(
             CompileError::new(
-                "karn.types.empty_refinement",
+                "bynk.types.empty_refinement",
                 refinement.span,
                 "this refinement has no valid values — minimum length exceeds maximum length",
             )

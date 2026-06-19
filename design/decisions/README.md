@@ -28,10 +28,10 @@ or a row links to no file. Summaries and statuses are curated by hand; the
 | [0009](0009-integration-tests-simulated-wire.md) | Integration tests run a simulated wire in Node | Accepted (v0.16) |
 | [0010](0010-adapter-unit-kind.md) | Adapters are a distinct unit kind with no logic | Accepted (v0.17) |
 | [0011](0011-consumes-capability-selection.md) | Braced `consumes` flattens capabilities; clashes rejected | Accepted (v0.17) |
-| [0012](0012-reserved-karn-surface.md) | The `karn` surface is reserved, flat, ambient-only | Accepted (v0.17/v0.18) |
+| [0012](0012-reserved-bynk-surface.md) | The `bynk` surface is reserved, flat, ambient-only | Accepted (v0.17/v0.18) |
 | [0013](0013-explicit-binding-clause.md) | Explicit `binding` clause; pinned npm deps declared there | Accepted (v0.17) |
 | [0014](0014-refined-ids-privileged-constructor.md) | Refined boundary IDs; bindings construct through `.of` | Accepted (v0.17) |
-| [0015](0015-canonical-provider-symbols.md) | The `karn` surface names canonical provider symbols | Accepted (v0.17) |
+| [0015](0015-canonical-provider-symbols.md) | The `bynk` surface names canonical provider symbols | Accepted (v0.17) |
 | [0016](0016-no-portable-infrastructure.md) | No portable infrastructure tier | Accepted (v0.17) |
 | [0017](0017-platform-lock-per-deployment-unit.md) | Platform lock is per deployment unit | Accepted (v0.17 design) |
 | [0018](0018-config-as-capability.md) | Config and IO are capabilities; no `needs` clause | Accepted (v0.17/v0.18) |
@@ -42,7 +42,7 @@ or a row links to no file. Summaries and statuses are curated by hand; the
 | [0023](0023-platform-adapter-before-stdlib.md) | The Cloudflare adapter lands before the standard library | Accepted (post-v0.18) |
 | [0024](0024-platform-native-via-first-party-metadata.md) | Platform-native marking is first-party metadata, not syntax | Accepted (v0.19) |
 | [0025](0025-env-threading-for-platform-resources.md) | Platform resources reach bindings via threaded env, both targets | Accepted (v0.19) |
-| [0026](0026-platform-adapters-under-karn-prefix.md) | Platform adapters live inside the reserved `karn.*` prefix | Accepted (v0.19) |
+| [0026](0026-platform-adapters-under-bynk-prefix.md) | Platform adapters live inside the reserved `bynk.*` prefix | Accepted (v0.19) |
 | [0027](0027-lambda-value-syntax.md) | Lambda syntax is `(params) => expr`, the shared value arrow | Accepted (v0.20a) |
 | [0028](0028-open-narrow-generics.md) | Generics are Open-narrow: functions only, no bounds | Accepted (v0.20a) |
 | [0029](0029-type-argument-inference.md) | Type arguments: argument-directed inference + explicit fallback | Accepted (v0.20a) |
@@ -99,8 +99,8 @@ or a row links to no file. Summaries and statuses are curated by hand; the
 | [0080](0080-actor-schemes-closed-nominal.md) | Auth schemes are a closed, compiler-known nominal set; actors are nominal contracts (sealed-now-openable) | Accepted (v0.45) |
 | [0081](0081-verified-identity-context-sealed.md) | A verified actor identity is a context-sealed value: minted at the seam, threaded service→agent, never re-checked | Accepted (v0.45) |
 | [0082](0082-by-clause-verify-then-body-defaults.md) | The `by` clause; two-phase verify-then-body; silent per-protocol default actors; HTTP requires `by` | Accepted (v0.45) |
-| [0083](0083-bynk-driver-thin-orchestrator.md) | Introduce the `karn` driver as a thin orchestrator distinct from `bynkc`; resolution order (override → PATH → sibling); driver↔compiler skew; portable detection | Accepted (v0.46) |
-| [0084](0084-doctor-output-exit-contract.md) | The `karn doctor` output / exit-code contract: capability-grouped checks; bare informational, `--only` gates, `--strict` escalates; `--format short`/`json` pinned | Accepted (v0.46) |
+| [0083](0083-bynk-driver-thin-orchestrator.md) | Introduce the `bynk` driver as a thin orchestrator distinct from `bynkc`; resolution order (override → PATH → sibling); driver↔compiler skew; portable detection | Accepted (v0.46) |
+| [0084](0084-doctor-output-exit-contract.md) | The `bynk doctor` output / exit-code contract: capability-grouped checks; bare informational, `--only` gates, `--strict` escalates; `--format short`/`json` pinned | Accepted (v0.46) |
 | [0085](0085-bearer-token-jwt-hs256.md) | BearerToken is compiler-generated JWT/HS256; identity is the `sub` claim through a string-constructible identity type; HTTP-only; fail-closed → 401 | Accepted (v0.47) |
 | [0086](0086-firstparty-sources-as-files-vendored.md) | First-party sources authored as files (embedded via `include_str!`), vendored not published while part of the emit ABI | Accepted (v0.48) |
 | [0087](0087-security-ci-posture.md) | Emitted security boundaries carry a standing behavioral bypass-class test; CodeQL SAST + npm audit committed; native secret-scanning push protection | Accepted (v0.49) |

@@ -1,1 +1,1 @@
-karn.service.missing_from
+bynk.service.missing_from

@@ -99,7 +99,7 @@ its captured transcript:
 2. Run `BYNK_BLESS=1 cargo test -p bynkc --test doc_diagnostics`. This compiles
    the fixture, asserts it fails, and writes the real diagnostic — colour-free,
    with a stable `<id>.karn` label — to `docs/diagnostics/<id>.txt`.
-3. On the page, show the source in a `karn,fail` fence and the transcript in a
+3. On the page, show the source in a `bynk,fail` fence and the transcript in a
    `text` fence, each holding a single mdBook `#include` line pointing at
    `docs/diagnostics/<id>.karn` and `docs/diagnostics/<id>.txt` (the path is
    relative to the page). See [the agent model](../guides/agents-and-state/the-agent-model.md)
@@ -121,7 +121,7 @@ persuasive shape in the book. Two panels:
   compiles *with* the exact bug Bynk targets. Tag it `typescript` (the
   doc-example gate ignores it) and keep it honest — it must really compile.
 - **The program that won't build.** The Bynk equivalent via the mechanism above:
-  a `karn,fail` fixture include, then the generated transcript.
+  a `bynk,fail` fixture include, then the generated transcript.
 
 Weave it into the prose where the page already *asserts* the bug, so the
 demonstration replaces the assertion rather than bolting on. Keep it to
@@ -134,11 +134,11 @@ device in use.
 Four mechanisms keep the docs honest; all run in CI.
 
 1. **Every example compiles.** `bynkc/tests/doc_examples.rs` extracts every
-   fenced ```` ```karn ```` block from `docs/src/**` and compiles it — `commons`
+   fenced ```` ```bynk ```` block from `docs/src/**` and compiles it — `commons`
    blocks in-process, `context` blocks as a temp project. Annotate blocks that
    should not be compiled as-is:
-   - ```` ```karn,ignore ```` — a fragment, a `test` block, or pseudo-syntax;
-   - ```` ```karn,fail ```` — a negative example that must fail to compile.
+   - ```` ```bynk,ignore ```` — a fragment, a `test` block, or pseudo-syntax;
+   - ```` ```bynk,fail ```` — a negative example that must fail to compile.
    Bynk uses `--` for comments, not `//` (the gate will catch `//`).
 
 2. **Generated reference is generated.** Four reference pages are emitted from the
@@ -196,7 +196,7 @@ ways — read them as a tuning fork before you draft a page.
   give the field an initialiser (`field: T = value`)."
 - **Reference** (neutral, terse): "Each agent `state` field must be zeroable — it
   has an implicit zero value or an initialiser. A non-zeroable field without an
-  initialiser is rejected (`karn.agents.non_zeroable_state_field`)."
+  initialiser is rejected (`bynk.agents.non_zeroable_state_field`)."
 - **Explanation** (discursive, a view): "Why insist on a zero? A fresh key has no
   stored state, and no constructor was required first, so the agent must still
   come into being with a defined value. Zeroability is how Bynk makes 'never seen
@@ -228,7 +228,7 @@ lookup, the spec is the complete citable definition. The two share their
 generated facts.
 
 It is **translation-defined** — syntax by the grammar, static semantics by the
-`karn.*` well-formedness rules, dynamic meaning by emission plus the runtime
+`bynk.*` well-formedness rules, dynamic meaning by emission plus the runtime
 contract — and it **reuses the existing machinery**: it embeds `{{#grammar}}`
 productions and `{{#grammar-semantics}}` diagnostics just like the reference (the
 rendered output is shared from one source, so there is no drift), and every

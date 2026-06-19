@@ -1,2 +1,2 @@
-karn.actor.refinement_predicate_unsupported
+bynk.actor.refinement_predicate_unsupported
 hasClaim

@@ -5,7 +5,7 @@
 - **Relates to:** ADR 0054 (the `Suggestion` quick-fix mechanism)
 
 ## Context
-`InRange(lo, hi)` with `lo > hi` raises `karn.types.inverted_range` with a
+`InRange(lo, hi)` with `lo > hi` raises `bynk.types.inverted_range` with a
 textual note ("swap the arguments"). The note couldn't be a machine-applicable
 fix because the AST kept only the bound **values**, not their source spans — so
 the checker couldn't say which text to replace. The numeral spans exist at parse

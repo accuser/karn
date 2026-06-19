@@ -48,7 +48,7 @@ impl From<CliTarget> for BuildTarget {
     }
 }
 
-/// v0.17: the deploy platform that selects the `karn` surface binding. Distinct
+/// v0.17: the deploy platform that selects the `bynk` surface binding. Distinct
 /// from [`CliTarget`] (the emit topology). v0.18 adds `node`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default, ValueEnum)]
 pub enum CliPlatform {
@@ -85,7 +85,7 @@ pub enum Command {
         /// Service Binding plumbing (v0.8).
         #[arg(long, value_enum, default_value = "bundle")]
         target: CliTarget,
-        /// Deploy platform selecting the `karn` surface binding (v0.17). A new
+        /// Deploy platform selecting the `bynk` surface binding (v0.17). A new
         /// axis, distinct from `--target`. The MVP supports `cloudflare` only.
         #[arg(long, value_enum, default_value = "cloudflare")]
         platform: CliPlatform,

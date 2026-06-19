@@ -7,7 +7,7 @@ use super::*;
 
 /// v0.20b: `List.empty()` / `Map.empty()` — the built-in collection statics.
 /// Their element/key/value types are exactly as uninferable as an empty
-/// `[]`, so they share `karn.types.uninferable_element_type`. The resolver
+/// `[]`, so they share `bynk.types.uninferable_element_type`. The resolver
 /// has already rejected any static other than `empty`.
 pub(crate) fn check_collection_static(
     type_name: &Ident,
@@ -26,7 +26,7 @@ pub(crate) fn check_collection_static(
     }
     if !args.is_empty() {
         ctx.errors.push(CompileError::new(
-            "karn.types.method_arity",
+            "bynk.types.method_arity",
             span,
             format!("`{}.empty` takes no arguments", type_name.name),
         ));
@@ -43,7 +43,7 @@ pub(crate) fn check_collection_static(
     if inferred.is_none() {
         ctx.errors.push(
             CompileError::new(
-                "karn.types.uninferable_element_type",
+                "bynk.types.uninferable_element_type",
                 span,
                 format!(
                     "`{}.empty()` has no expected type to infer its type arguments from",
@@ -71,7 +71,7 @@ pub(crate) fn check_list_kernel_method(
     let arity = |n: usize, ctx: &mut Ctx| {
         if args.len() != n {
             ctx.errors.push(CompileError::new(
-                "karn.types.method_arity",
+                "bynk.types.method_arity",
                 span,
                 format!(
                     "`List.{}` takes {n} argument{}, got {}",
@@ -141,7 +141,7 @@ pub(crate) fn check_list_kernel_method(
             if !ctx.effectful {
                 ctx.errors.push(
                     CompileError::new(
-                        "karn.effect.fn_value_in_pure_context",
+                        "bynk.effect.fn_value_in_pure_context",
                         span,
                         "`List.foldEff` runs an effectful step function and cannot be called in a pure context",
                     )
@@ -154,7 +154,7 @@ pub(crate) fn check_list_kernel_method(
         }
         _ => {
             ctx.errors.push(CompileError::new(
-                "karn.types.method_not_found",
+                "bynk.types.method_not_found",
                 method.span,
                 format!(
                     "the built-in `List[{}]` type has no method `{}` — the kernel is `length`, `get`, `prepend`, `fold`, `foldEff`",
@@ -208,7 +208,7 @@ pub(crate) fn check_numeric_kernel_method(
             }
         };
         ctx.errors.push(CompileError::new(
-            "karn.types.method_not_found",
+            "bynk.types.method_not_found",
             method.span,
             format!(
                 "the built-in `{}` type has no method `{}` — the kernel is {kernel}",
@@ -223,7 +223,7 @@ pub(crate) fn check_numeric_kernel_method(
     };
     if args.len() != params.len() {
         ctx.errors.push(CompileError::new(
-            "karn.types.method_arity",
+            "bynk.types.method_arity",
             span,
             format!(
                 "`{}.{}` takes {} argument{}, got {}",
@@ -279,7 +279,7 @@ pub(crate) fn check_string_kernel_method(
     };
     let Some((params, ret)) = sig else {
         ctx.errors.push(CompileError::new(
-            "karn.types.method_not_found",
+            "bynk.types.method_not_found",
             method.span,
             format!(
                 "the built-in `String` type has no method `{}` — the kernel is \
@@ -295,7 +295,7 @@ pub(crate) fn check_string_kernel_method(
     };
     if args.len() != params.len() {
         ctx.errors.push(CompileError::new(
-            "karn.types.method_arity",
+            "bynk.types.method_arity",
             span,
             format!(
                 "`String.{}` takes {} argument{}, got {}",
@@ -342,7 +342,7 @@ fn check_kernel_fn_arg(arg: &Expr, params: Vec<Ty>, label: &str, ctx: &mut Ctx) 
         }
     }
     ctx.errors.push(CompileError::new(
-        "karn.types.argument_mismatch",
+        "bynk.types.argument_mismatch",
         arg.span,
         format!(
             "{label} expects a function over the receiver's value, but got `{}`",
@@ -365,7 +365,7 @@ pub(crate) fn check_option_kernel_method(
     let arity = |n: usize, ctx: &mut Ctx| {
         if args.len() != n {
             ctx.errors.push(CompileError::new(
-                "karn.types.method_arity",
+                "bynk.types.method_arity",
                 span,
                 format!(
                     "`Option.{}` takes {n} argument{}, got {}",
@@ -408,7 +408,7 @@ pub(crate) fn check_option_kernel_method(
                 Ty::Option(_) => Some(ret),
                 other => {
                     ctx.errors.push(CompileError::new(
-                        "karn.types.argument_mismatch",
+                        "bynk.types.argument_mismatch",
                         args[0].span,
                         format!(
                             "the `Option.andThen` function must return an `Option`, but returns `{}`",
@@ -441,7 +441,7 @@ pub(crate) fn check_option_kernel_method(
         }
         _ => {
             ctx.errors.push(CompileError::new(
-                "karn.types.method_not_found",
+                "bynk.types.method_not_found",
                 method.span,
                 format!(
                     "the built-in `Option[{}]` type has no method `{}` — the kernel is \
@@ -470,7 +470,7 @@ pub(crate) fn check_result_kernel_method(
     let arity = |n: usize, ctx: &mut Ctx| {
         if args.len() != n {
             ctx.errors.push(CompileError::new(
-                "karn.types.method_arity",
+                "bynk.types.method_arity",
                 span,
                 format!(
                     "`Result.{}` takes {n} argument{}, got {}",
@@ -509,7 +509,7 @@ pub(crate) fn check_result_kernel_method(
                 Ty::Result(b, e2) => {
                     if !compatible(&e2, err) && !compatible(err, &e2) {
                         ctx.errors.push(CompileError::new(
-                            "karn.types.argument_mismatch",
+                            "bynk.types.argument_mismatch",
                             args[0].span,
                             format!(
                                 "the `Result.andThen` function's error type `{}` does not match the receiver's `{}`",
@@ -523,7 +523,7 @@ pub(crate) fn check_result_kernel_method(
                 }
                 other => {
                     ctx.errors.push(CompileError::new(
-                        "karn.types.argument_mismatch",
+                        "bynk.types.argument_mismatch",
                         args[0].span,
                         format!(
                             "the `Result.andThen` function must return a `Result`, but returns `{}`",
@@ -561,7 +561,7 @@ pub(crate) fn check_result_kernel_method(
         }
         _ => {
             ctx.errors.push(CompileError::new(
-                "karn.types.method_not_found",
+                "bynk.types.method_not_found",
                 method.span,
                 format!(
                     "the built-in `Result[{}, {}]` type has no method `{}` — the kernel is \
@@ -617,7 +617,7 @@ pub(crate) fn check_json_static(
     let arity1 = |ctx: &mut Ctx| {
         if args.len() != 1 {
             ctx.errors.push(CompileError::new(
-                "karn.types.method_arity",
+                "bynk.types.method_arity",
                 span,
                 format!(
                     "`Json.{}` takes 1 argument, got {}",
@@ -636,7 +636,7 @@ pub(crate) fn check_json_static(
         "encode" => {
             if !type_args.is_empty() {
                 ctx.errors.push(CompileError::new(
-                    "karn.generics.type_arg_mismatch",
+                    "bynk.generics.type_arg_mismatch",
                     span,
                     "`Json.encode` takes no type arguments — its type comes from the value",
                 ));
@@ -648,7 +648,7 @@ pub(crate) fn check_json_static(
             if !json_codable(&t) {
                 ctx.errors.push(
                     CompileError::new(
-                        "karn.types.json_uncodable",
+                        "bynk.types.json_uncodable",
                         args[0].span,
                         format!("`{}` cannot be encoded as JSON", t.display()),
                     )
@@ -678,7 +678,7 @@ pub(crate) fn check_json_static(
                     _ => {
                         ctx.errors.push(
                             CompileError::new(
-                                "karn.generics.uninferable_type_arg",
+                                "bynk.generics.uninferable_type_arg",
                                 span,
                                 "cannot infer the target type of `Json.decode`",
                             )
@@ -692,7 +692,7 @@ pub(crate) fn check_json_static(
                 },
                 _ => {
                     ctx.errors.push(CompileError::new(
-                        "karn.generics.type_arg_mismatch",
+                        "bynk.generics.type_arg_mismatch",
                         span,
                         format!(
                             "`Json.decode` takes exactly one type argument, got {}",
@@ -705,7 +705,7 @@ pub(crate) fn check_json_static(
             if !json_codable(&t) || t == Ty::Unit {
                 ctx.errors.push(
                     CompileError::new(
-                        "karn.types.json_uncodable",
+                        "bynk.types.json_uncodable",
                         span,
                         format!("`{}` cannot be decoded from JSON", t.display()),
                     )
@@ -748,7 +748,7 @@ pub(crate) fn check_numeric_parse_static(
     }
     if args.len() != 1 {
         ctx.errors.push(CompileError::new(
-            "karn.types.method_arity",
+            "bynk.types.method_arity",
             span,
             format!(
                 "`{}.parse` takes 1 argument, got {}",
@@ -787,7 +787,7 @@ pub(crate) fn check_map_kernel_method(
     let arity = |n: usize, ctx: &mut Ctx| {
         if args.len() != n {
             ctx.errors.push(CompileError::new(
-                "karn.types.method_arity",
+                "bynk.types.method_arity",
                 span,
                 format!(
                     "`Map.{}` takes {n} argument{}, got {}",
@@ -833,7 +833,7 @@ pub(crate) fn check_map_kernel_method(
         }
         _ => {
             ctx.errors.push(CompileError::new(
-                "karn.types.method_not_found",
+                "bynk.types.method_not_found",
                 method.span,
                 format!(
                     "the built-in `Map[{}, {}]` type has no method `{}` — the kernel is `length`, `keys`, `get`, `insert`",

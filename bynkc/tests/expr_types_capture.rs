@@ -45,9 +45,9 @@ fn unit_sources_maps_project_units_excluding_synthetic() {
     };
     assert_eq!(rel("shop.util"), "shop/util.karn");
     assert_eq!(rel("billing.charge"), "billing/charge.karn");
-    // The synthetic `karn` surface has no openable file — excluded from the map.
+    // The synthetic `bynk` surface has no openable file — excluded from the map.
     assert!(
-        !result.unit_sources.contains_key("karn"),
+        !result.unit_sources.contains_key("bynk"),
         "synthetic surface excluded: {:?}",
         result.unit_sources.keys().collect::<Vec<_>>()
     );

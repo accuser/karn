@@ -27,7 +27,7 @@ string methods (the 0034/0037 hybrid posture): `length()`, `split(sep)`,
 
 `concat` is a method, **not** an extension of `+` (no operator change —
 `+` stays numeric). Derived helpers are Bynk-written in the injected
-`karn.string` commons (currently `join(parts, sep)`, folding to
+`bynk.string` commons (currently `join(parts, sep)`, folding to
 `Option[String]` so empty-string elements join faithfully).
 
 ## Consequences

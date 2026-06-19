@@ -1,2 +1,2 @@
-karn.types.return_mismatch
+bynk.types.return_mismatch
 declared return type is `Bool`

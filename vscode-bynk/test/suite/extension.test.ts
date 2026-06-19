@@ -2,7 +2,7 @@ import * as assert from "assert";
 
 import * as vscode from "vscode";
 
-const EXT_ID = "karn.bynk-vscode";
+const EXT_ID = "bynk.bynk-vscode";
 
 function fixtureUri(rel: string): vscode.Uri {
   const folder = vscode.workspace.workspaceFolders?.[0];
@@ -46,10 +46,10 @@ describe("Bynk extension", () => {
     await vscode.commands.executeCommand("workbench.action.closeAllEditors");
   });
 
-  it("activates and recognises the karn language", () => {
+  it("activates and recognises the bynk language", () => {
     const ext = vscode.extensions.getExtension(EXT_ID);
     assert.ok(ext?.isActive, "extension is active");
-    assert.strictEqual(doc.languageId, "karn", "the fixture file is a karn doc");
+    assert.strictEqual(doc.languageId, "bynk", "the fixture file is a bynk doc");
   });
 
   it("serves go-to-definition from the language server", async () => {

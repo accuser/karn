@@ -1,7 +1,7 @@
-# 0083 — Introduce the `karn` driver as a thin orchestrator distinct from the `bynkc` compiler
+# 0083 — Introduce the `bynk` driver as a thin orchestrator distinct from the `bynkc` compiler
 
 - **Status:** Accepted (v0.46)
-- **Realises:** the project-lifecycle wrapper arc (`design/bynk-tooling-roadmap.md` §5.1), v0.46 `karn doctor` proposal.
+- **Realises:** the project-lifecycle wrapper arc (`design/bynk-tooling-roadmap.md` §5.1), v0.46 `bynk doctor` proposal.
 - **Relates:** [[0060]] (named concern-modules), the `vscode-bynk` `bynkc-lsp` resolution order.
 
 ## Context
@@ -16,23 +16,23 @@ to stand the home up with — no language surface, mutates nothing.
 
 ## Decision
 
-Introduce a new published crate, **`karn`**, a thin orchestrator over `bynkc`
-and the Node toolchain — `karn` is to `bynkc` what `cargo` is to `rustc`. The
+Introduce a new published crate, **`bynk`**, a thin orchestrator over `bynkc`
+and the Node toolchain — `bynk` is to `bynkc` what `cargo` is to `rustc`. The
 compiler stays pure (compile / check / fmt / test); the driver shells it and
 reports on the environment. `doctor` is its first command; `new`/`dev` follow.
 
-`karn` resolves the `bynkc` it shells in this order:
+`bynk` resolves the `bynkc` it shells in this order:
 
-1. **`BYNK_BYNKC` override** — an explicit path (the `karn.executablePath`-style
+1. **`BYNK_BYNKC` override** — an explicit path (the `bynk.executablePath`-style
    escape hatch). When set it wins, and a bad override surfaces rather than
    silently falling through — an override that only applied after auto-discovery
    failed would be useless.
 2. **`PATH`** — a global `bynkc`.
-3. **sibling-of-`karn`** — a `bynkc` next to the running `karn` binary (mirrors
+3. **sibling-of-`bynk`** — a `bynkc` next to the running `bynk` binary (mirrors
    how `vscode-bynk` resolves `bynkc-lsp` beside itself).
 
 Because the driver and compiler are now **separate binaries that can drift**, a
-global `karn 0.46` can shell a stale `bynkc 0.44`. `doctor` therefore reports
+global `bynk 0.46` can shell a stale `bynkc 0.44`. `doctor` therefore reports
 **driver↔compiler version skew**: patch differences are ignored (wire-compatible
 under unified versioning), a **minor** drift warns (fails only under
 `--strict`), a **major** drift is a contract mismatch and an error even on a bare

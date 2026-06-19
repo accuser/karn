@@ -5,7 +5,7 @@
       "camelcase": "Bynk",
       "scope": "source.bynk",
       "path": ".",
-      "file-types": ["karn"],
+      "file-types": ["bynk"],
       "highlights": ["queries/highlights.scm"]
     }
   ],

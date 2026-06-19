@@ -142,7 +142,7 @@ const direct = await callDurableObjectMethod<{ args: unknown[]; deps: unknown }>
   [1, 2],
   { token: "t" },
 );
-assert(lastUrl === "https://_karn/_karn/agent/increment", "callDurableObjectMethod posts to the agent wire path");
+assert(lastUrl === "https://_bynk/_bynk/agent/increment", "callDurableObjectMethod posts to the agent wire path");
 assert(JSON.stringify(direct.args) === "[1,2]", "args round-trip");
 assert((direct.deps as any).token === "t", "deps round-trip");
 

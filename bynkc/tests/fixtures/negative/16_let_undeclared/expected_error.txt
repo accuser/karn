@@ -1,2 +1,2 @@
-karn.resolve.unknown_name
+bynk.resolve.unknown_name
 unknown name `y`

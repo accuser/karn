@@ -1,1 +1,1 @@
-karn.adapter.disallowed_item
+bynk.adapter.disallowed_item

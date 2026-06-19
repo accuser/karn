@@ -1,2 +1,2 @@
-karn.actor.duplicate_sum_scheme
+bynk.actor.duplicate_sum_scheme
 repeats the `Bearer` scheme

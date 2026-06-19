@@ -36,7 +36,7 @@ kinds*. Every item offered falls in a cell; every populated cell offers
 
 | # | Cursor context | Detection | Candidate kinds |
 |---|---|---|---|
-| 1 | `consumes <prefix>` | lexical | **Unit** (contexts, adapters, `karn` surface) |
+| 1 | `consumes <prefix>` | lexical | **Unit** (contexts, adapters, `bynk` surface) |
 | 2 | `consumes U { … }` | lexical | **Capability** exported by `U` |
 | 3 | `given …` | lexical | **Capability** in scope (local + `U.Cap`) |
 | 4 | type position (`: T`, `-> T`, `[ … ]`) | lexical | **Type** (builtins + surface transparent + project) |

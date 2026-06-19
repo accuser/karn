@@ -11,13 +11,13 @@ boundary types, and an external (bodiless) `provides`. Name the binding module
 and pin its npm dependency.
 
 Configuration the binding needs — here the signing secret — is a **capability
-dependency** (`consumes karn { Secrets }` + `given Secrets`), not an operation
+dependency** (`consumes bynk { Secrets }` + `given Secrets`), not an operation
 parameter (v0.18).
 
-```karn,ignore
+```bynk,ignore
 adapter tokens {
   binding "./tokens.binding.ts" requires { "jose": "^5" }
-  consumes karn { Secrets }
+  consumes bynk { Secrets }
 
   exports capability  { Jwt }
   exports transparent { Claims, JwtError }
@@ -50,7 +50,7 @@ constructor — the keys are the `given` names, and `tsc` checks them.
 import * as jose from "jose";
 import type { Jwt, Claims } from "./tokens.js";
 import { JwtError } from "./tokens.js";          // emitted variant constructors
-import type { Secrets } from "./karn.js";
+import type { Secrets } from "./bynk.js";
 import { Ok, Err, type Result } from "./runtime.js";
 
 export class JoseJwt implements Jwt {
@@ -81,12 +81,12 @@ export class JoseJwt implements Jwt {
 ```
 
 A **remote API** is the same shape with no npm dependency — drop the `requires`
-clause and take `given karn.Fetch` instead of calling the global `fetch`,
+clause and take `given bynk.Fetch` instead of calling the global `fetch`,
 mapping the typed `Response` to a `Result`.
 
 ## 3. Consume it
 
-```karn,ignore
+```bynk,ignore
 context auth.sessions {
   consumes tokens { Jwt }      -- flatten `Jwt` into the local namespace
 

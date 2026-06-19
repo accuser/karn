@@ -2,13 +2,13 @@
 //!
 //! The surface is the canonical *cursor context × candidate-kind* matrix fixed
 //! by ADR 0093 (`design/decisions/0093-completion-surface-contract.md`), spec'd
-//! at `design/karn-lsp-spec.md` §3.15. [`complete`] dispatches the six contexts
+//! at `design/bynk-lsp-spec.md` §3.15. [`complete`] dispatches the six contexts
 //! it can serve purely (no analysis cache):
 //!
 //! - `consumes <prefix>` / `consumes U { … }` / `given …` — consumable units and
 //!   in-scope capabilities (v0.17);
 //! - **type position** (`: T`, `-> T`, inside `[ … ]` type args) — built-in
-//!   types, the `karn`-surface transparent types, and project `type` decls;
+//!   types, the `bynk`-surface transparent types, and project `type` decls;
 //! - **keyword position** (a bare word at a declaration/statement start) — the
 //!   reserved keywords (with registry docs) and declaration snippets;
 //! - **name-receiver `UpperIdent.`** — sum variants (project + built-in
@@ -30,7 +30,7 @@
 //!
 //! Context detection is lexical (it must work mid-edit, when the buffer rarely
 //! parses); candidates are semantic. Unit/type/capability/member enumeration
-//! parses the project's `.karn` files (and the embedded `karn` surface) with
+//! parses the project's `.karn` files (and the embedded `bynk` surface) with
 //! recovery, so it works even while the file the cursor sits in is mid-edit.
 //! Built-ins, keywords, and constructors come from the static `bynkc` registries
 //! (`keywords`/`builtin_names`/`firstparty`/`ast`), never the index — first-party
@@ -43,11 +43,11 @@ use std::path::Path;
 use bynkc::ast::{CommonsItem, ExportKind, FnName, SourceUnit, TypeBody, UsesDecl};
 use bynkc::checker::Ty;
 use bynkc::firstparty::{
-    CLOUDFLARE_ADAPTER_SRC, KARN_ADAPTER_SRC, KARN_LIST_SRC, KARN_MAP_SRC, KARN_STRING_SRC,
+    CLOUDFLARE_ADAPTER_SRC, BYNK_ADAPTER_SRC, BYNK_LIST_SRC, BYNK_MAP_SRC, BYNK_STRING_SRC,
 };
 use bynkc::{kernel_methods, keywords, lexer, parser};
 
-use crate::symbols::{type_ref_str, walk_karn_files};
+use crate::symbols::{type_ref_str, walk_bynk_files};
 
 /// What a candidate refers to — maps to an LSP `CompletionItemKind`.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -130,7 +130,7 @@ pub fn complete(line_prefix: &str, doc_text: &str, src_root: Option<&Path>) -> V
         return member_candidates(&receiver, doc_text, src_root);
     }
     // 5. Type position (`: T`, `-> T`, `[ … ]` type args) — built-ins, the
-    //    `karn`-surface transparent types, and project type declarations.
+    //    `bynk`-surface transparent types, and project type declarations.
     if is_type_position(line_prefix) {
         return type_candidates(doc_text, src_root);
     }
@@ -293,7 +293,7 @@ pub fn is_expression_position(line: &str) -> bool {
 /// receiver whose members are statically enumerable (a sum/refined/opaque
 /// type or a capability). Conservative: the receiver is a **single**
 /// uppercase-initial identifier, not itself a `.`-qualified segment (so
-/// `karn.cloudflare.` and `a.B.` are excluded) and not a number (so the
+/// `bynk.cloudflare.` and `a.B.` are excluded) and not a number (so the
 /// decimal `1.` is excluded). A lowercase `x.` is a *value* receiver — deferred
 /// to slice 3 — and yields `None`.
 fn member_receiver(line: &str) -> Option<String> {
@@ -634,7 +634,7 @@ fn keyword_doc(word: &str) -> Option<&'static str> {
 }
 
 /// Type-position candidates: built-in types (with registry docs), then every
-/// `type` declaration found in the project sources and the embedded `karn`
+/// `type` declaration found in the project sources and the embedded `bynk`
 /// surface (so the transparent surface types `Uuid`/`Method`/… come for free).
 fn type_candidates(doc_text: &str, src_root: Option<&Path>) -> Vec<Completion> {
     let mut out: Vec<Completion> = Vec::new();
@@ -689,10 +689,10 @@ fn keyword_and_snippet_candidates() -> Vec<Completion> {
     out
 }
 
-// -- Enumeration (parse project sources + the embedded `karn` surface) --
+// -- Enumeration (parse project sources + the embedded `bynk` surface) --
 
 /// Parse every project unit, plus the embedded first-party adapters (the
-/// `karn` surface and the `karn.cloudflare` platform adapter), and call `f`
+/// `bynk` surface and the `bynk.cloudflare` platform adapter), and call `f`
 /// for each. Recovery parsing tolerates the in-progress edit at the cursor.
 pub(crate) fn for_each_unit(
     doc_text: &str,
@@ -700,20 +700,20 @@ pub(crate) fn for_each_unit(
     mut f: impl FnMut(&SourceUnit),
 ) {
     let mut sources: Vec<String> = vec![
-        KARN_ADAPTER_SRC.to_string(),
+        BYNK_ADAPTER_SRC.to_string(),
         CLOUDFLARE_ADAPTER_SRC.to_string(),
-        // The embedded stdlib commons (`karn.list`/`karn.map`/`karn.string`) so
+        // The embedded stdlib commons (`bynk.list`/`bynk.map`/`bynk.string`) so
         // their free fns are enumerable for `uses`-imported completion (G5) and
         // signature help. Harmless to the other contexts — these units declare
         // only `fn`s (no types/capabilities), and they are `commons`, never a
         // `consumes` target.
-        KARN_LIST_SRC.to_string(),
-        KARN_MAP_SRC.to_string(),
-        KARN_STRING_SRC.to_string(),
+        BYNK_LIST_SRC.to_string(),
+        BYNK_MAP_SRC.to_string(),
+        BYNK_STRING_SRC.to_string(),
         doc_text.to_string(),
     ];
     if let Some(root) = src_root {
-        for path in walk_karn_files(root) {
+        for path in walk_bynk_files(root) {
             if let Ok(s) = std::fs::read_to_string(&path) {
                 sources.push(s);
             }
@@ -730,7 +730,7 @@ pub(crate) fn for_each_unit(
     }
 }
 
-/// Consumable unit names: contexts and adapters (plus `karn`), deduplicated.
+/// Consumable unit names: contexts and adapters (plus `bynk`), deduplicated.
 fn consumable_units(doc_text: &str, src_root: Option<&Path>) -> Vec<Completion> {
     let mut seen: BTreeSet<String> = BTreeSet::new();
     let mut out: Vec<Completion> = Vec::new();
@@ -923,18 +923,18 @@ mod tests {
     }
 
     #[test]
-    fn consumes_target_suggests_units_including_karn() {
-        // An adapter in the open doc plus the always-available `karn` surface.
+    fn consumes_target_suggests_units_including_bynk() {
+        // An adapter in the open doc plus the always-available `bynk` surface.
         let doc = "adapter tokens {\n  binding \"./b.ts\"\n  capability Jwt { fn f() -> Effect[Int] }\n  provides Jwt = X\n}\n";
         let got = labels("  consumes ", doc);
-        assert!(got.contains(&"karn".to_string()), "{got:?}");
+        assert!(got.contains(&"bynk".to_string()), "{got:?}");
         assert!(got.contains(&"tokens".to_string()), "{got:?}");
     }
 
     #[test]
     fn consumes_brace_suggests_that_units_capabilities() {
-        let got = labels("  consumes karn { ", "context a.b\n");
-        // The embedded `karn` surface exports these.
+        let got = labels("  consumes bynk { ", "context a.b\n");
+        // The embedded `bynk` surface exports these.
         assert!(got.contains(&"Clock".to_string()), "{got:?}");
         assert!(got.contains(&"Random".to_string()), "{got:?}");
         assert!(got.contains(&"Logger".to_string()), "{got:?}");
@@ -943,7 +943,7 @@ mod tests {
     #[test]
     fn given_suggests_local_and_flattened_capabilities() {
         let doc = "context a.b\n\
-                   consumes karn { Clock }\n\
+                   consumes bynk { Clock }\n\
                    capability Local { fn f() -> Effect[Int] }\n\
                    service s {\n\
                    on call() -> Effect[Int] given Clock {\n\
@@ -1011,7 +1011,7 @@ mod tests {
     fn free_functions_offered_for_own_unit_and_used_modules() {
         // ADR 0093 D3/G5: expression position offers the current unit's own
         // free `fn`s and the combinators of every `uses`-imported module.
-        let doc = "commons app {\n  uses karn.list\n  fn helper(x: Int) -> Int { x }\n}\n";
+        let doc = "commons app {\n  uses bynk.list\n  fn helper(x: Int) -> Int { x }\n}\n";
         let items = complete("  let y = ", doc, None);
         // The current unit's own function.
         assert!(
@@ -1019,19 +1019,19 @@ mod tests {
             "own fn: {:?}",
             items.iter().map(|i| &i.label).collect::<Vec<_>>()
         );
-        // Every combinator of the imported `karn.list` — registry-driven over the
+        // Every combinator of the imported `bynk.list` — registry-driven over the
         // embedded source, so a new stdlib combinator must surface or this fails.
-        for name in free_fn_names(KARN_LIST_SRC) {
+        for name in free_fn_names(BYNK_LIST_SRC) {
             assert!(
                 find(&items, &name, CompletionKind::Function).is_some(),
-                "karn.list.{name}: {:?}",
+                "bynk.list.{name}: {:?}",
                 items.iter().map(|i| &i.label).collect::<Vec<_>>()
             );
         }
         // A module that is not imported does not leak its fns.
         assert!(
             find(&items, "values", CompletionKind::Function).is_none(),
-            "karn.map.values leaked without `uses karn.map`"
+            "bynk.map.values leaked without `uses bynk.map`"
         );
     }
 
@@ -1044,7 +1044,7 @@ mod tests {
         for name in ["map", "filter", "reverse"] {
             assert!(
                 find(&items, name, CompletionKind::Function).is_none(),
-                "karn.list.{name} offered without `uses karn.list`"
+                "bynk.list.{name} offered without `uses bynk.list`"
             );
         }
     }
@@ -1085,7 +1085,7 @@ mod tests {
     fn type_annotation_suggests_builtins_surface_and_project_types() {
         let doc = "commons m {\n  type Order = { id: Int }\n}\n";
         let got = labels("  let x: ", doc);
-        // Built-ins (with registry docs), the `karn`-surface transparent types,
+        // Built-ins (with registry docs), the `bynk`-surface transparent types,
         // and the project's own type declaration.
         for want in ["Int", "Option", "Result", "Effect", "List", "Map"] {
             assert!(got.contains(&want.to_string()), "built-in {want}: {got:?}");

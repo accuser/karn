@@ -27,7 +27,7 @@ Bynk-side inspection needs only field access (no built-in-sum match
 machinery), and the heterogeneous `BoundaryError` variants flatten
 losslessly enough for programs that branch on `kind`. Decode failures
 are runtime values, never compile diagnostics. `JsonError` itself is not
-codable (`karn.types.json_uncodable`) and not declarable.
+codable (`bynk.types.json_uncodable`) and not declarable.
 
 ## Consequences
 `match Json.decode[Order](s) { Err(e) => log(e.kind, e.path) … }` works

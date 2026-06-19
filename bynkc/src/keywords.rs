@@ -161,8 +161,8 @@ pub fn render_markdown() -> String {
     out.push_str("# Keywords\n\n");
     out.push_str(
         "<!-- GENERATED FILE — do not edit by hand.\n     \
-         Source: karnc/src/keywords.rs (`render_markdown`).\n     \
-         Regenerate with: KARN_BLESS=1 cargo test -p karnc --test keywords_reference -->\n\n",
+         Source: bynkc/src/keywords.rs (`render_markdown`).\n     \
+         Regenerate with: BYNK_BLESS=1 cargo test -p bynkc --test keywords_reference -->\n\n",
     );
     out.push_str(
         "Every reserved keyword, with a one-line description. Reserved words cannot \

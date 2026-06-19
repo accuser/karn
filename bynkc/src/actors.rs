@@ -371,7 +371,7 @@ fn claim_str_lit(e: &Expr) -> Option<String> {
 
 /// Recognise the closed claim-predicate vocabulary in a refinement `where`
 /// expression. `Err(span)` points at the first sub-expression outside the set
-/// (for `karn.actor.refinement_predicate_unsupported`).
+/// (for `bynk.actor.refinement_predicate_unsupported`).
 pub fn parse_claim_predicate(e: &Expr) -> Result<ClaimPredicate, Span> {
     match &e.kind {
         ExprKind::Paren(inner) => parse_claim_predicate(inner),

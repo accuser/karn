@@ -1,2 +1,2 @@
-karn.parse.expected_token
+bynk.parse.expected_token
 expected `}` to close the block, found `=`

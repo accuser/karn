@@ -9,7 +9,7 @@
 `uses B` / `consumes B` name a *unit*, not a symbol. To make those names
 navigable — clickable document links (slice 6b), and the consumed-context half of
 go-to-type-definition that ADR 0068 deferred — the LSP must resolve a qualified
-unit name (`billing.charge`, `karn.list`) to the file(s) that declare it. The
+unit name (`billing.charge`, `bynk.list`) to the file(s) that declare it. The
 binding index can't help: it indexes **user symbols** (types, fns, capabilities,
 …), and units deliberately aren't symbols. ADR 0068 named this exact gap — "context
 units aren't index symbols, so context-source nav needs a unit→file map, a
@@ -30,9 +30,9 @@ span files; entries are in discovery order). It is a new public field on
 threaded to the LSP `Analysis` and cached like the rest.
 
 - **Project units only.** Built from the parsed files, **excluding `synthetic`
-  ones** — the toolchain-injected `karn`/`karn.cloudflare` surface is embedded via
+  ones** — the toolchain-injected `bynk`/`bynk.cloudflare` surface is embedded via
   `include_str!`, not an on-disk file the editor can open. So the map resolves
-  only *openable* units; a `uses karn.list` resolves to nothing, by design.
+  only *openable* units; a `uses bynk.list` resolves to nothing, by design.
 - **Built on the structurally-analysed path.** The map is populated whenever the
   project reaches the checker (`RunChecks::Checked`) — which **includes
   type-error projects** (per-unit checks collect errors without bailing). It is

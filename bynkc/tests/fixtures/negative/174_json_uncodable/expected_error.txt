@@ -1,1 +1,1 @@
-karn.types.json_uncodable
+bynk.types.json_uncodable

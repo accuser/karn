@@ -1,1 +1,1 @@
-karn.types.is_non_sum
+bynk.types.is_non_sum

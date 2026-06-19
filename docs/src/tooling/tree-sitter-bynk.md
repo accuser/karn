@@ -40,7 +40,7 @@ source, a `---` separator, and the expected S-expression parse tree.
 `@type.builtin`, `@string`, `@number`, `@comment`, `@function`, `@variable`,
 `@operator`, `@punctuation.*`, and more. The book's highlighting preprocessor
 ([`mdbook-bynk-highlight`](../contributing/documentation.md)) compiles this
-grammar and renders ```` ```karn ```` blocks through these groups, so doc
+grammar and renders ```` ```bynk ```` blocks through these groups, so doc
 highlighting stays correct as the grammar evolves.
 
 ## Keeping it in sync

@@ -42,8 +42,8 @@ optional self-identifying suffix, `tests/counters.test.karn`. Both forms are
 accepted (the `.test.karn` suffix is what single-tree layouts use, and is handy
 for grepping); use whichever you prefer.
 
-> Mismatches are reported as `karn.project.inconsistent_commons_name` (source) or
-> `karn.project.inconsistent_test_path` (tests).
+> Mismatches are reported as `bynk.project.inconsistent_commons_name` (source) or
+> `bynk.project.inconsistent_test_path` (tests).
 
 ## Build and test
 

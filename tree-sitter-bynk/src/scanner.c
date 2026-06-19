@@ -1,4 +1,4 @@
-// External scanner for Karn doc blocks.
+// External scanner for Bynk doc blocks.
 //
 // A doc block is a multi-line construct of the form:
 //

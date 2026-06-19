@@ -1,7 +1,7 @@
 // Server provisioning for the Bynk LSP.
 //
 // Resolution order, most explicit first:
-//   1. `karn.executablePath` setting (absolute path the user pinned)
+//   1. `bynk.executablePath` setting (absolute path the user pinned)
 //   2. `bynkc-lsp` on PATH (a dev/global install)
 //   3. a previously-downloaded binary cached in the extension's global storage
 //   4. download-on-activate: fetch the matching per-platform `bynkc-lsp` from
@@ -108,7 +108,7 @@ export function resolveExistingServer(
   context: vscode.ExtensionContext,
 ): ResolvedServer | undefined {
   const configured = vscode.workspace
-    .getConfiguration("karn")
+    .getConfiguration("bynk")
     .get<string>("executablePath", "")
     .trim();
   if (configured) {
@@ -161,7 +161,7 @@ export async function downloadServer(
   if (!target) {
     throw new Error(
       `No prebuilt bynkc-lsp for ${process.platform}/${process.arch}. ` +
-        "Build it (`cargo build --release -p bynk-lsp`) and set `karn.executablePath`.",
+        "Build it (`cargo build --release -p bynk-lsp`) and set `bynk.executablePath`.",
     );
   }
   const version = serverVersion(context);

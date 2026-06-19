@@ -1,1 +1,1 @@
-karn.service.mixed_protocols
+bynk.service.mixed_protocols

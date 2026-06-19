@@ -120,7 +120,7 @@ context) is the completion-surface contract — see *Foundational ADRs*.
 
 ### G5 — No free-function / stdlib completion anywhere
 
-After `uses karn.list` / `karn.map` / `karn.string`, the combinators (`map`,
+After `uses bynk.list` / `bynk.map` / `bynk.string`, the combinators (`map`,
 `filter`, `find`, `values`, `getOr`, `join`, …) are never completable, nor are
 user-declared top-level `fn`s in scope. All are enumerable from the firstparty
 `.karn` sources + the project parse. **Decision:** add a free-function candidate
@@ -148,7 +148,7 @@ omitted as N/A — Bynk has no debugger and no color literals).
 - **Go-to-type-definition + type hierarchy** — deferred at ADR 0068 pending a
   unit→file map. High value for Bynk's refined/opaque/sum types and the
   `given Cap → provider` relationship; the index already has most of the edges.
-- **Document links** — make `uses karn.list`, `consumes B`, and split-path unit
+- **Document links** — make `uses bynk.list`, `consumes B`, and split-path unit
   references click through to their source. Cheap given the binding index.
 - **On-type formatting** — light auto-format on `}`/newline, deferring to
   `bynk-fmt`. Modest, but removes a manual format step.
@@ -157,7 +157,7 @@ omitted as N/A — Bynk has no debugger and no color literals).
 
 - Inlay-hint granularity + format-on-save + server-trace **settings**.
 - **Snippets** beyond the six completion scaffolds; **scaffolding commands** (new
-  context/adapter) — note these overlap the `karn` driver's `new` (roadmap §5.1),
+  context/adapter) — note these overlap the `bynk` driver's `new` (roadmap §5.1),
   which supersedes the CLI path.
 - A **problem matcher** so `bynkc` builds surface in the Problems panel.
 - A **getting-started walkthrough**; **marketplace + Open VSX publishing** (ties
@@ -209,7 +209,7 @@ contract test, which the surface ADR below should establish.
 3. **Completion — free functions & stdlib (G5).** ✅ **Landed.** A
    `free_function_candidates` producer (a `Function` kind) offering the current
    unit's own `fn`s + the combinators of every `uses`-imported module (project +
-   the embedded `karn.list`/`karn.map`/`karn.string` stdlib, now in
+   the embedded `bynk.list`/`bynk.map`/`bynk.string` stdlib, now in
    `for_each_unit`), gated on the `uses` set. No new ADR (implements D3); signature
    help gained stdlib labels for free.
 4. **Completion — lift the clean-file ceiling (G6).** ✅ **Landed
@@ -257,15 +257,15 @@ contract test, which the surface ADR below should establish.
    getting-started walkthrough, the `bynkc` build task + problem matcher,
    semantic-token theming, and the inlay-hints toggle. The genuine remaining gaps:
    **inlay-hint granularity** (per-kind `types`/`parameterNames` toggles filtering
-   on the server-tagged `kind`) and a **default-formatter config** (`[karn]` →
-   `karn.bynk-vscode`, so format-on-save works out of the box). `newAdapter`
+   on the server-tagged `kind`) and a **default-formatter config** (`[bynk]` →
+   `bynk.bynk-vscode`, so format-on-save works out of the box). `newAdapter`
    deferred — an adapter scaffold needs a `binding` + a matching `.ts` stub, more
    than mirroring `newContext`.
 8. **Editor-agnostic + publishing.** Neovim/Helix/Zed docs; marketplace + Open VSX
    (sequences with Tier 4 release work).
 9. **First-party symbol docs.** ✅ **Landed.** Hover and completion-doc resolution
-   walked only the project's files, so stdlib/surface symbols (`uses karn.list`
-   combinators, the `karn` capabilities/types) had no hover at all. A
+   walked only the project's files, so stdlib/surface symbols (`uses bynk.list`
+   combinators, the `bynk` capabilities/types) had no hover at all. A
    `symbols::describe_firstparty_symbol` fallback scans the embedded sources after
    the project scan, surfacing their signature — and any `---` doc block, once the
    sources carry one. No new ADR. (Adding the doc blocks themselves is a separate
@@ -358,7 +358,7 @@ track's forward-ADR convention.
   0093 D3). Added a `free_function_candidates` producer (`CompletionKind::Function`)
   at expression position offering the current unit's own free `fn`s + the
   combinators of every `uses`-imported module, gated on the `uses` set; the
-  embedded stdlib commons (`karn.list`/`karn.map`/`karn.string`) joined
+  embedded stdlib commons (`bynk.list`/`bynk.map`/`bynk.string`) joined
   `for_each_unit` (harmless to other contexts — fns only — and a free win for
   signature help). Signatures reuse `symbols::type_ref_str` (one renderer, like
   hover/signature help). Coverage: `free_functions_offered_for_own_unit_and_used_
@@ -390,8 +390,8 @@ track's forward-ADR convention.
   `advertises_completion_with_dot_trigger_and_resolve`. Auto-import via resolve
   deferred. §3.15 updated.
 - **Slice 9 — first-party symbol docs (2026-06-18):** no new ADR. The hover and
-  completion-doc paths resolved symbols only through `walk_karn_files` (project
-  files), so first-party symbols (stdlib combinators, the `karn` surface) had no
+  completion-doc paths resolved symbols only through `walk_bynk_files` (project
+  files), so first-party symbols (stdlib combinators, the `bynk` surface) had no
   hover at all. Added `symbols::describe_firstparty_symbol`, scanning the embedded
   sources (`BYNK_ADAPTER_SRC`/`CLOUDFLARE_ADAPTER_SRC`/`BYNK_LIST_SRC`/
   `BYNK_MAP_SRC`/`BYNK_STRING_SRC`) via the existing `describe_symbol`, wired as the
@@ -401,8 +401,8 @@ track's forward-ADR convention.
   `first_party_symbols_describe_their_signature_and_doc`.
 - **Slice 9 (content pass) — document the first-party sources (2026-06-18):** the
   follow-up that makes the wiring visible. Added `---` doc blocks to every
-  first-party combinator, capability, and surface type (`karn.list`/`map`/
-  `string`, the `karn` adapter's capabilities + transparent types, `karn.cloudflare`
+  first-party combinator, capability, and surface type (`bynk.list`/`map`/
+  `string`, the `bynk` adapter's capabilities + transparent types, `bynk.cloudflare`
   `Kv`). Doc blocks emit as JSDoc, so the first-party emit goldens were re-blessed
   via the existing `BYNK_BLESS=1 … --test e2e` path (468 insertions, 0 deletions —
   pure JSDoc, no semantic change); `tsc_verify` confirms the annotated output still
@@ -441,10 +441,10 @@ track's forward-ADR convention.
   Investigation found B‑1/B‑2 was **already ~90% shipped** with the v0.54 extension
   (settings, snippets, `newProject`/`newContext`, the walkthrough, the `bynkc`
   problem matcher, semantic-token theming, the inlay-hints toggle). Closed the two
-  genuine gaps: **inlay-hint granularity** — `karn.inlayHints.types` /
+  genuine gaps: **inlay-hint granularity** — `bynk.inlayHints.types` /
   `.parameterNames` settings + a client middleware filter on the server-tagged
   `InlayHintKind`; and a **default-formatter config** — `configurationDefaults`
-  maps `[karn]` to `karn.bynk-vscode` so the formatter (hence format-on-save) works
+  maps `[bynk]` to `bynk.bynk-vscode` so the formatter (hence format-on-save) works
   without manual setup. `newAdapter` deferred (adapters need a `binding` + a `.ts`
   stub). Validated: tsc + esbuild + `vsce package` clean.
 - **Slice 6c — type hierarchy: closed won't-do (2026-06-18):** `typeHierarchy` is

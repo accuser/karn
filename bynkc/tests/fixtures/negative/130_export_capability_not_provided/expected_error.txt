@@ -1,1 +1,1 @@
-karn.exports.capability_not_provided
+bynk.exports.capability_not_provided

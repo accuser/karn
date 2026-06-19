@@ -17,7 +17,7 @@ Clone the repository and install the `bynkc` binary with `cargo`:
 
 ```sh
 git clone https://github.com/accuser/bynk.git
-cd karn
+cd bynk
 cargo install --path bynkc
 ```
 
@@ -27,21 +27,21 @@ This puts `bynkc` on your `PATH` (under `~/.cargo/bin` by default). Verify it:
 bynkc --help
 ```
 
-## Check your environment with `karn doctor`
+## Check your environment with `bynk doctor`
 
 Rather than hunting down `node`, `tsc`, and `wrangler` one broken command at a
-time, install the **`karn` driver** and let it tell you exactly what your
+time, install the **`bynk` driver** and let it tell you exactly what your
 machine is ready for:
 
 ```sh
-cargo install --path karn
-karn doctor
+cargo install --path bynk
+bynk doctor
 ```
 
-`karn doctor` groups its checks by capability — compile/check/fmt, `karn test`,
+`bynk doctor` groups its checks by capability — compile/check/fmt, `bynk test`,
 `dev`/deploy, editor support — and prints the exact remedy for anything missing.
 It is the recommended first step: the prerequisites below are *checked*, not just
-listed. See [Check your environment with `karn
+listed. See [Check your environment with `bynk
 doctor`](../guides/editor-and-tooling/doctor.md) for the capability groups, exit
 codes, and `--format` outputs.
 

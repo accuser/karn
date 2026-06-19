@@ -56,7 +56,7 @@ pub(crate) fn normalize_rel(p: &Path) -> PathBuf {
     out.iter().collect()
 }
 
-/// v0.9.1: per-project source-tree layout, read from `karn.toml`'s `[paths]`
+/// v0.9.1: per-project source-tree layout, read from `bynk.toml`'s `[paths]`
 /// section.
 #[derive(Debug, Clone)]
 pub struct ProjectPaths {
@@ -67,7 +67,7 @@ pub struct ProjectPaths {
 }
 
 impl ProjectPaths {
-    /// The conventional layout used when `karn.toml` is absent: sources under
+    /// The conventional layout used when `bynk.toml` is absent: sources under
     /// `src/`, tests under `tests/`.
     pub fn conventional() -> Self {
         ProjectPaths {
@@ -77,12 +77,12 @@ impl ProjectPaths {
     }
 }
 
-/// v0.9.1: read `karn.toml` from `project_root`. Returns the conventional
+/// v0.9.1: read `bynk.toml` from `project_root`. Returns the conventional
 /// layout if the file is missing or doesn't declare `[paths]`. Only `src` and
 /// `tests` keys under `[paths]` are honoured; anything else is ignored. A
 /// minimal hand-rolled TOML reader — we only need string-valued keys here.
 pub fn read_project_paths(project_root: &Path) -> ProjectPaths {
-    let toml_path = project_root.join("karn.toml");
+    let toml_path = project_root.join("bynk.toml");
     let mut paths = ProjectPaths::conventional();
     let Ok(content) = fs::read_to_string(&toml_path) else {
         return paths;

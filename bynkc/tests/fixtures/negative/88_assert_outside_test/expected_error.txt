@@ -1,1 +1,1 @@
-karn.assert.outside_test
+bynk.assert.outside_test

@@ -1,5 +1,5 @@
 commons shop {
-  uses karn.list
+  uses bynk.list
 
   fn doubled(xs: List[Int]) -> List[Int] {
     map(xs, (x) => x * 2)

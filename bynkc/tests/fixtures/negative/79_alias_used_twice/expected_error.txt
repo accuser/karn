@@ -1,1 +1,1 @@
-karn.consumes.alias_conflict
+bynk.consumes.alias_conflict

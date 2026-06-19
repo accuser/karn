@@ -741,14 +741,14 @@ mod tests {
     #[test]
     fn diagnostic_budget_allows_removals_refuses_additions() {
         let pre = vec![
-            (PathBuf::from("a.karn"), "karn.x".to_string()),
-            (PathBuf::from("a.karn"), "karn.x".to_string()),
+            (PathBuf::from("a.karn"), "bynk.x".to_string()),
+            (PathBuf::from("a.karn"), "bynk.x".to_string()),
         ];
         let same = pre.clone();
         assert!(no_new_diagnostics(&pre, &same).is_ok());
         assert!(no_new_diagnostics(&pre, &pre[..1]).is_ok());
         let mut more = pre.clone();
-        more.push((PathBuf::from("b.karn"), "karn.resolve.duplicate_fn".into()));
+        more.push((PathBuf::from("b.karn"), "bynk.resolve.duplicate_fn".into()));
         assert!(no_new_diagnostics(&pre, &more).is_err());
     }
 

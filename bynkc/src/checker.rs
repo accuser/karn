@@ -349,7 +349,7 @@ pub fn check_handler_body(
     if !compatible(&body_ty, &return_ty) {
         ctx.errors.push(
             CompileError::new(
-                "karn.types.return_mismatch",
+                "bynk.types.return_mismatch",
                 body.tail.span,
                 format!(
                     "handler body has type `{}`, but the declared return type is `{}`",
@@ -376,7 +376,7 @@ pub fn check_handler_body(
         }
         ctx.errors.push(
             CompileError::new(
-                "karn.given.unused_capability",
+                "bynk.given.unused_capability",
                 return_ty_span,
                 format!("capability `{c}` is declared in `given` but never used in the body"),
             )
@@ -852,7 +852,7 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                     let r = resolve_type_ref_in(a, &ctx.input.types, &ctx.type_vars);
                     if r.is_none() {
                         ctx.errors.push(CompileError::new(
-                            "karn.resolve.unknown_type",
+                            "bynk.resolve.unknown_type",
                             a.span(),
                             "type in `let` annotation does not resolve",
                         ));
@@ -867,7 +867,7 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                         if !compatible(&rhs, &annot) {
                             ctx.errors.push(
                                 CompileError::new(
-                                    "karn.types.let_annotation_mismatch",
+                                    "bynk.types.let_annotation_mismatch",
                                     l.value.span,
                                     format!(
                                         "let binding's value has type `{}`, but the annotation declares `{}`",
@@ -911,7 +911,7 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                 if !ctx.effectful {
                     ctx.errors.push(
                         CompileError::new(
-                            "karn.effect.bind_in_pure_context",
+                            "bynk.effect.bind_in_pure_context",
                             l.span,
                             "the `<-` operator can only be used inside an effectful body (one returning `Effect[T]`)",
                         )
@@ -931,7 +931,7 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                     let r = resolve_type_ref_in(a, &ctx.input.types, &ctx.type_vars);
                     if r.is_none() {
                         ctx.errors.push(CompileError::new(
-                            "karn.resolve.unknown_type",
+                            "bynk.resolve.unknown_type",
                             a.span(),
                             "type in `let` annotation does not resolve",
                         ));
@@ -948,7 +948,7 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                     Some(other) => {
                         ctx.errors.push(
                             CompileError::new(
-                                "karn.effect.bind_on_non_effect",
+                                "bynk.effect.bind_on_non_effect",
                                 l.value.span,
                                 format!(
                                     "the `<-` operator requires an `Effect[T]` value, but got `{}`",
@@ -967,7 +967,7 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                     (Some(annot), Some(rhs)) => {
                         if !compatible(&rhs, &annot) {
                             ctx.errors.push(CompileError::new(
-                                "karn.types.let_annotation_mismatch",
+                                "bynk.types.let_annotation_mismatch",
                                 l.value.span,
                                 format!(
                                     "let-binding's value has type `Effect[{}]`, but the annotation declares `Effect[{}]`",
@@ -1006,7 +1006,7 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                 let Some(state_ty) = ctx.agent_state_ty.clone() else {
                     ctx.errors.push(
                         CompileError::new(
-                            "karn.commit.outside_agent",
+                            "bynk.commit.outside_agent",
                             c.span,
                             "`commit` is only valid inside an agent handler",
                         )
@@ -1021,7 +1021,7 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                 if ctx.commit_seen {
                     ctx.errors.push(
                         CompileError::new(
-                            "karn.commit.two_reachable_commits",
+                            "bynk.commit.two_reachable_commits",
                             c.span,
                             "two `commit` statements are reachable on the same execution path",
                         )
@@ -1035,7 +1035,7 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                     && !compatible(&actual, &state_ty)
                 {
                     ctx.errors.push(CompileError::new(
-                        "karn.commit.wrong_state_type",
+                        "bynk.commit.wrong_state_type",
                         c.value.span,
                         format!(
                             "`commit` expression has type `{}`, but the agent's state type is `{}`",
@@ -1050,7 +1050,7 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                 if !ctx.in_test_body {
                     ctx.errors.push(
                         CompileError::new(
-                            "karn.assert.outside_test",
+                            "bynk.assert.outside_test",
                             a.span,
                             "`assert` is only valid inside a test case body",
                         )
@@ -1064,7 +1064,7 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                     && !compatible(&actual, &Ty::Base(BaseType::Bool))
                 {
                     ctx.errors.push(CompileError::new(
-                        "karn.assert.non_bool",
+                        "bynk.assert.non_bool",
                         a.value.span,
                         format!(
                             "`assert` expression has type `{}`, but a `Bool` is required",
@@ -1149,7 +1149,7 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
                     Some(ty) if interpolable(&ty) => {}
                     Some(other) => ctx.errors.push(
                         CompileError::new(
-                            "karn.types.interpolation_non_scalar",
+                            "bynk.types.interpolation_non_scalar",
                             hole.span,
                             format!("type `{}` has no string form here", other.display()),
                         )
@@ -1175,7 +1175,7 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
                     None => {
                         ctx.errors.push(
                             CompileError::new(
-                                "karn.types.uninferable_element_type",
+                                "bynk.types.uninferable_element_type",
                                 expr.span,
                                 "an empty `[]` has no inferable element type",
                             )
@@ -1196,7 +1196,7 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
                         Some(et) => {
                             if !compatible(&t, et) {
                                 ctx.errors.push(CompileError::new(
-                                    "karn.types.list_element_mismatch",
+                                    "bynk.types.list_element_mismatch",
                                     e.span,
                                     format!(
                                         "list element has type `{}`, but the list's element type is `{}`",
@@ -1306,7 +1306,7 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
                     check_http_variant(expr.span, v, args, expected, ctx)
                 } else {
                     ctx.errors.push(CompileError::new(
-                        "karn.types.unknown_static_member",
+                        "bynk.types.unknown_static_member",
                         method.span,
                         format!("`HttpResult` has no variant named `{}`", method.name),
                     ));
@@ -1317,7 +1317,7 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
                     check_queue_variant(expr.span, qv, args, ctx)
                 } else {
                     ctx.errors.push(CompileError::new(
-                        "karn.types.unknown_static_member",
+                        "bynk.types.unknown_static_member",
                         method.span,
                         format!("`QueueResult` has no variant named `{}`", method.name),
                     ));
@@ -1339,7 +1339,7 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
                 if let Some(v) = http_variant(&field.name) {
                     if !matches!(v.payload, HttpVariantPayload::None) {
                         ctx.errors.push(CompileError::new(
-                            "karn.types.variant_missing_payload",
+                            "bynk.types.variant_missing_payload",
                             field.span,
                             format!(
                                 "`HttpResult.{}` has a payload — call it with an argument",
@@ -1351,7 +1351,7 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
                     check_http_variant(field.span, v, &[], expected, ctx)
                 } else {
                     ctx.errors.push(CompileError::new(
-                        "karn.types.unknown_static_member",
+                        "bynk.types.unknown_static_member",
                         field.span,
                         format!("`HttpResult` has no variant named `{}`", field.name),
                     ));
@@ -1376,7 +1376,7 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
                     check_http_variant(expr.span, v, args, expected, ctx)
                 } else {
                     ctx.errors.push(CompileError::new(
-                        "karn.types.unknown_static_member",
+                        "bynk.types.unknown_static_member",
                         method.span,
                         format!("`HttpResult` has no variant named `{}`", method.name),
                     ));
@@ -1536,7 +1536,7 @@ fn rebrand_return_type(t: &Ty, caller_types: &HashMap<String, TypeDecl>) -> Ty {
         | Ty::Actor(_)
         | Ty::ActorSum(_) => t.clone(),
         // v0.20a: function types are confined to non-boundary positions
-        // (`karn.types.function_at_boundary`), so a cross-context return can
+        // (`bynk.types.function_at_boundary`), so a cross-context return can
         // never carry one; Vars never escape call checking.
         Ty::Fn { .. } | Ty::Var(_) => t.clone(),
     }
@@ -2295,7 +2295,7 @@ mod pure_helper_pins {
         let mut errs = vec![];
         check_int_refinement_consistency(&refinement(vec![in_range(10, 1)]), &mut errs);
         assert_eq!(errs.len(), 1);
-        assert_eq!(errs[0].category, "karn.types.empty_refinement");
+        assert_eq!(errs[0].category, "bynk.types.empty_refinement");
     }
 
     #[test]
@@ -2314,7 +2314,7 @@ mod pure_helper_pins {
             &mut errs,
         );
         assert_eq!(errs.len(), 1);
-        assert_eq!(errs[0].category, "karn.types.empty_refinement");
+        assert_eq!(errs[0].category, "bynk.types.empty_refinement");
         // Degenerate-but-exclusive: Positive with InRangeF(0.0, 0.0) → lo==hi
         // and lo_exclusive → one error.
         let mut errs = vec![];
@@ -2344,7 +2344,7 @@ mod pure_helper_pins {
             &mut errs,
         );
         assert_eq!(errs.len(), 1);
-        assert_eq!(errs[0].category, "karn.types.empty_refinement");
+        assert_eq!(errs[0].category, "bynk.types.empty_refinement");
         // Conflicting exact lengths → TWO errors (pinned as-is): the explicit
         // `Length(3)`/`Length(5)` conflict push, *plus* the subsequent
         // min_len(5) > max_len(3) empty-range push (each `Length` clamps both
@@ -2357,7 +2357,7 @@ mod pure_helper_pins {
         assert_eq!(errs.len(), 2);
         assert!(
             errs.iter()
-                .all(|e| e.category == "karn.types.empty_refinement")
+                .all(|e| e.category == "bynk.types.empty_refinement")
         );
     }
 

@@ -1,6 +1,6 @@
 context bad.scan
 
-consumes karn.cloudflare { Kv }
+consumes bynk.cloudflare { Kv }
 
 service scan {
   on call(prefix: String) -> Effect[Result[List[String], ()]] given Kv {

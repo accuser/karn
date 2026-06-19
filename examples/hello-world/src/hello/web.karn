@@ -2,7 +2,7 @@ context hello.web
 
 uses hello.text
 
-consumes karn { Logger }
+consumes bynk { Logger }
 
 service api from http {
   on GET("/") by v: Visitor () -> Effect[HttpResult[String]] given Logger {

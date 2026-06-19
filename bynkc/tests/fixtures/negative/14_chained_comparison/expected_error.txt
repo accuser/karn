@@ -1,2 +1,2 @@
-karn.parse.non_associative
+bynk.parse.non_associative
 comparison operators are non-associative

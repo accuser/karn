@@ -43,7 +43,7 @@ pub(crate) fn check_fn(
         if input.types.contains_key(&tp.name.name) {
             errors.push(
                 CompileError::new(
-                    "karn.generics.type_arg_mismatch",
+                    "bynk.generics.type_arg_mismatch",
                     tp.span,
                     format!(
                         "type parameter `{}` shadows the declared type of the same name",
@@ -102,7 +102,7 @@ pub(crate) fn check_fn(
     if !compatible(&body_ty, &return_ty) {
         ctx.errors.push(
             CompileError::new(
-                "karn.types.return_mismatch",
+                "bynk.types.return_mismatch",
                 f.body.tail.span,
                 format!(
                     "function body has type `{}`, but the declared return type is `{}`",
@@ -121,7 +121,7 @@ pub(crate) fn check_fn(
 /// out of reach) with the field type as the expected type, so refined literals
 /// admit (v0.9.4) and sum variants resolve. The init's expression types are
 /// recorded into `expr_types` for emission; a single
-/// `karn.agents.bad_state_initialiser` is pushed on any failure.
+/// `bynk.agents.bad_state_initialiser` is pushed on any failure.
 #[allow(clippy::too_many_arguments)]
 pub fn check_state_initialiser(
     init: &Expr,
@@ -166,7 +166,7 @@ pub fn check_state_initialiser(
             .unwrap_or_else(|| "an invalid expression".to_string());
         errors.push(
             CompileError::new(
-                "karn.agents.bad_state_initialiser",
+                "bynk.agents.bad_state_initialiser",
                 init.span,
                 format!(
                     "state field initialiser must be a static value of type `{}` (got `{got}`)",
@@ -196,7 +196,7 @@ pub(crate) fn check_call(
     // v0.20a: explicit type arguments only apply to (generic) functions.
     if !type_args.is_empty() {
         ctx.errors.push(CompileError::new(
-            "karn.generics.type_arg_mismatch",
+            "bynk.generics.type_arg_mismatch",
             span,
             format!(
                 "`{}` is not a generic function — it takes no type arguments",
@@ -228,7 +228,7 @@ pub(crate) fn check_call(
         let key_ty = resolve_type_ref(&agent.key_type, &ctx.input.types);
         if args.len() != 1 {
             ctx.errors.push(CompileError::new(
-                "karn.agent.construction_arity",
+                "bynk.agent.construction_arity",
                 span,
                 format!(
                     "agent `{}` is constructed with one key argument, but {} were given",
@@ -246,7 +246,7 @@ pub(crate) fn check_call(
             && !compatible(a, k)
         {
             ctx.errors.push(CompileError::new(
-                "karn.agent.key_mismatch",
+                "bynk.agent.key_mismatch",
                 args[0].span,
                 format!(
                     "agent `{}` key is `{}`, but a value of type `{}` was given",
@@ -274,7 +274,7 @@ pub(crate) fn check_call(
                 // non-function-typed value called as a function.
                 ctx.errors.push(
                     CompileError::new(
-                        "karn.resolve.param_as_function",
+                        "bynk.resolve.param_as_function",
                         span,
                         format!(
                             "`{}` has type `{}` and is not callable",
@@ -306,7 +306,7 @@ fn check_value_application(
     if ret.is_effect() && !ctx.effectful {
         ctx.errors.push(
             CompileError::new(
-                "karn.effect.fn_value_in_pure_context",
+                "bynk.effect.fn_value_in_pure_context",
                 span,
                 format!(
                     "`{}` is an effectful function (`{}`) and cannot be called in a pure context",
@@ -325,7 +325,7 @@ fn check_value_application(
     }
     if params.len() != args.len() {
         ctx.errors.push(CompileError::new(
-            "karn.types.call_arity",
+            "bynk.types.call_arity",
             span,
             format!(
                 "`{}` takes {} argument(s), but {} were given",
@@ -345,7 +345,7 @@ fn check_value_application(
             && !compatible(a, param_ty)
         {
             ctx.errors.push(CompileError::new(
-                "karn.types.argument_mismatch",
+                "bynk.types.argument_mismatch",
                 arg.span,
                 format!(
                     "argument has type `{}`, but `{}` expects `{}`",
@@ -367,7 +367,7 @@ fn check_value_application(
 /// unifies; pass 2 types **lambda** arguments against the now-substituted
 /// expecteds (a lambda whose expected params are still Var-bearing is
 /// uninferable) and unifies the result, capturing return-position variables.
-/// Conflicts demand exact equality (`karn.generics.type_arg_mismatch`); the
+/// Conflicts demand exact equality (`bynk.generics.type_arg_mismatch`); the
 /// explicit `name[T](…)` form builds the substitution directly.
 fn check_generic_call(
     name: &Ident,
@@ -398,7 +398,7 @@ fn check_generic_call(
     if !type_args.is_empty() {
         if type_args.len() != fn_decl.type_params.len() {
             ctx.errors.push(CompileError::new(
-                "karn.generics.type_arg_mismatch",
+                "bynk.generics.type_arg_mismatch",
                 name.span,
                 format!(
                     "`{}` takes {} type argument(s), but {} were given",
@@ -430,7 +430,7 @@ fn check_generic_call(
             && !unify(pattern, actual, &mut subst)
         {
             ctx.errors.push(CompileError::new(
-                "karn.generics.type_arg_mismatch",
+                "bynk.generics.type_arg_mismatch",
                 arg.span,
                 format!(
                     "argument {} infers a type for `{}`'s type parameter that conflicts with an earlier argument — annotate with `{}[T](…)`",
@@ -460,7 +460,7 @@ fn check_generic_call(
         if params_unconstrained && !fully_annotated {
             ctx.errors.push(
                 CompileError::new(
-                    "karn.generics.uninferable_type_arg",
+                    "bynk.generics.uninferable_type_arg",
                     arg.span,
                     format!(
                         "the lambda's parameter types depend on `{}`'s type parameters, which the other arguments do not determine",
@@ -482,7 +482,7 @@ fn check_generic_call(
             && !unify(pattern, actual, &mut subst)
         {
             ctx.errors.push(CompileError::new(
-                "karn.generics.type_arg_mismatch",
+                "bynk.generics.type_arg_mismatch",
                 arg.span,
                 format!(
                     "the lambda's type conflicts with `{}`'s inferred type arguments",
@@ -498,7 +498,7 @@ fn check_generic_call(
         if !subst.contains_key(&tp.name.name) {
             ctx.errors.push(
                 CompileError::new(
-                    "karn.generics.uninferable_type_arg",
+                    "bynk.generics.uninferable_type_arg",
                     name.span,
                     format!(
                         "type parameter `{}` of `{}` is neither inferable from the arguments nor given explicitly",
@@ -521,7 +521,7 @@ fn check_generic_call(
         let ground = substitute(pattern, &subst);
         if !compatible(arg_ty, &ground) {
             ctx.errors.push(CompileError::new(
-                "karn.types.argument_mismatch",
+                "bynk.types.argument_mismatch",
                 arg.span,
                 format!(
                     "argument {} to `{}` has type `{}`, but `{}` is expected",
@@ -554,7 +554,7 @@ fn check_generic_call(
     }
     let ret = substitute(&ret_pattern, &subst);
     // v0.20b: the return is ground *up to the caller's rigid type
-    // parameters* — a generic fn calling another generic fn (karn.list's
+    // parameters* — a generic fn calling another generic fn (bynk.list's
     // `map` calling `reverse`) legitimately instantiates the callee at its
     // own rigid vars, which flow through `compatible` by name-equality.
     Some(ret)
@@ -575,7 +575,7 @@ fn check_call_against_fn(
     }
     if !type_args.is_empty() {
         ctx.errors.push(CompileError::new(
-            "karn.generics.type_arg_mismatch",
+            "bynk.generics.type_arg_mismatch",
             name.span,
             format!(
                 "`{}` is not a generic function — it takes no type arguments",
@@ -609,7 +609,7 @@ fn check_call_against_fn(
         if !compatible(&arg_ty, param_ty) {
             ctx.errors.push(
                 CompileError::new(
-                    "karn.types.argument_mismatch",
+                    "bynk.types.argument_mismatch",
                     arg.span,
                     format!(
                         "argument {} to `{}` has type `{}`, but parameter `{}` expects `{}`",
@@ -639,7 +639,7 @@ pub(crate) fn check_arg(arg: &Expr, expected: &Ty, what: &str, ctx: &mut Ctx) {
     };
     if !compatible(&actual, expected) {
         ctx.errors.push(CompileError::new(
-            "karn.types.type_mismatch",
+            "bynk.types.type_mismatch",
             arg.span,
             format!(
                 "{what} has type `{}`, but `{}` is required",
@@ -678,7 +678,7 @@ pub(crate) fn check_static_call(
     {
         record_capability_ref(type_name.span, &type_name.name, ctx);
         let mut err = CompileError::new(
-            "karn.given.undeclared_capability",
+            "bynk.given.undeclared_capability",
             type_name.span,
             format!(
                 "capability `{}` is used but not listed in the handler's `given` clause",
@@ -712,7 +712,7 @@ pub(crate) fn check_static_call(
         if !ctx.effectful {
             ctx.errors.push(
                 CompileError::new(
-                    "karn.effect.capability_in_pure_context",
+                    "bynk.effect.capability_in_pure_context",
                     span,
                     format!(
                         "capability `{}` can only be called inside an effectful body (one returning `Effect[T]`)",
@@ -724,7 +724,7 @@ pub(crate) fn check_static_call(
         ctx.caps.given_used.insert(type_name.name.clone());
         let Some(op) = cap.ops.iter().find(|o| o.name == method.name) else {
             ctx.errors.push(CompileError::new(
-                "karn.capability.unknown_operation",
+                "bynk.capability.unknown_operation",
                 method.span,
                 format!(
                     "capability `{}` has no operation named `{}`",
@@ -745,7 +745,7 @@ pub(crate) fn check_static_call(
         );
         if op.params.len() != args.len() {
             ctx.errors.push(CompileError::new(
-                "karn.capability.op_arity",
+                "bynk.capability.op_arity",
                 span,
                 format!(
                     "capability operation `{}.{}` expects {} argument(s), but {} were given",
@@ -767,7 +767,7 @@ pub(crate) fn check_static_call(
                 && !compatible(&actual, param_ty)
             {
                 ctx.errors.push(CompileError::new(
-                    "karn.types.argument_mismatch",
+                    "bynk.types.argument_mismatch",
                     arg.span,
                     format!(
                         "argument {} to capability `{}.{}` has type `{}`, but parameter expects `{}`",
@@ -803,7 +803,7 @@ pub(crate) fn check_static_call(
     {
         if args.len() != 1 {
             ctx.errors.push(CompileError::new(
-                "karn.types.constructor_arity",
+                "bynk.types.constructor_arity",
                 span,
                 format!(
                     "constructor `{}.of` expects 1 argument, but {} were given",
@@ -818,7 +818,7 @@ pub(crate) fn check_static_call(
         let arg_ty = type_of(arg, Some(&expected), ctx)?;
         if !compatible(&arg_ty, &expected) {
             ctx.errors.push(CompileError::new(
-                "karn.types.constructor_base_mismatch",
+                "bynk.types.constructor_base_mismatch",
                 arg.span,
                 format!(
                     "constructor `{}.of` expects a `{}` argument, but got `{}`",
@@ -848,7 +848,7 @@ pub(crate) fn check_static_call(
         if !ctx.input.is_local_type(&decl.name.name) {
             ctx.errors.push(
                 CompileError::new(
-                    "karn.types.opaque_unsafe_outside",
+                    "bynk.types.opaque_unsafe_outside",
                     method.span,
                     format!(
                         "`{}.unsafe(...)` is only available within the commons that defines the opaque type `{}`",
@@ -863,7 +863,7 @@ pub(crate) fn check_static_call(
         }
         if args.len() != 1 {
             ctx.errors.push(CompileError::new(
-                "karn.types.constructor_arity",
+                "bynk.types.constructor_arity",
                 span,
                 format!(
                     "`{}.unsafe` expects 1 argument, but {} were given",
@@ -878,7 +878,7 @@ pub(crate) fn check_static_call(
         let arg_ty = type_of(arg, Some(&expected), ctx)?;
         if !compatible(&arg_ty, &expected) {
             ctx.errors.push(CompileError::new(
-                "karn.types.constructor_base_mismatch",
+                "bynk.types.constructor_base_mismatch",
                 arg.span,
                 format!(
                     "`{}.unsafe` expects a `{}` argument, but got `{}`",
@@ -899,7 +899,7 @@ pub(crate) fn check_static_call(
 
     ctx.errors.push(
         CompileError::new(
-            "karn.types.unknown_static_member",
+            "bynk.types.unknown_static_member",
             method.span,
             format!(
                 "type `{}` has no static method or variant named `{}`",
@@ -921,7 +921,7 @@ fn check_method_args(
     if method_decl.params.len() != args.len() {
         ctx.errors.push(
             CompileError::new(
-                "karn.types.method_arity",
+                "bynk.types.method_arity",
                 method.span,
                 format!(
                     "static method `{}.{}` expects {} argument(s), but {} were given",
@@ -949,7 +949,7 @@ fn check_method_args(
         };
         if !compatible(&actual, &expected) {
             ctx.errors.push(CompileError::new(
-                "karn.types.argument_mismatch",
+                "bynk.types.argument_mismatch",
                 arg.span,
                 format!(
                     "argument {} to `{}.{}` has type `{}`, but parameter `{}` expects `{}`",
@@ -988,7 +988,7 @@ pub(crate) fn check_method_call(
             && !ctx.input.types.contains_key(JSON))
     {
         ctx.errors.push(CompileError::new(
-            "karn.generics.type_arg_mismatch",
+            "bynk.generics.type_arg_mismatch",
             span,
             format!(
                 "`{}` is not a generic method — it takes no type arguments",
@@ -1053,7 +1053,7 @@ pub(crate) fn check_method_call(
             if in_context && info.resolve_prefix(&chain).is_none() {
                 ctx.errors.push(
                     CompileError::new(
-                        "karn.resolve.unconsumed_context",
+                        "bynk.resolve.unconsumed_context",
                         receiver.span,
                         format!(
                             "`{chain}.{}` looks like a cross-context service call, but `{chain}` is not in this context's `consumes` clauses",
@@ -1158,7 +1158,7 @@ pub(crate) fn check_method_call(
         Ty::Named { name, .. } => name.clone(),
         _ => {
             ctx.errors.push(CompileError::new(
-                "karn.types.method_on_non_named_type",
+                "bynk.types.method_on_non_named_type",
                 method.span,
                 format!(
                     "type `{}` has no methods — only user-declared types support method calls",
@@ -1178,7 +1178,7 @@ pub(crate) fn check_method_call(
                 .is_some_and(|n| n.name == method.name)
         }) else {
             ctx.errors.push(CompileError::new(
-                "karn.agent.handler_not_found",
+                "bynk.agent.handler_not_found",
                 method.span,
                 format!(
                     "agent `{}` has no handler named `{}`",
@@ -1192,7 +1192,7 @@ pub(crate) fn check_method_call(
         };
         if handler.params.len() != args.len() {
             ctx.errors.push(CompileError::new(
-                "karn.agent.handler_arity",
+                "bynk.agent.handler_arity",
                 method.span,
                 format!(
                     "agent handler `{}.{}` expects {} argument(s), but {} were given",
@@ -1221,7 +1221,7 @@ pub(crate) fn check_method_call(
         .unwrap_or_default();
     let Some(method_decl) = table.instance.get(&method.name).cloned() else {
         ctx.errors.push(CompileError::new(
-            "karn.types.method_not_found",
+            "bynk.types.method_not_found",
             method.span,
             format!(
                 "type `{}` has no instance method named `{}`",
@@ -1243,7 +1243,7 @@ pub(crate) fn check_method_call(
     if method_decl.params.len() != args.len() {
         ctx.errors.push(
             CompileError::new(
-                "karn.types.method_arity",
+                "bynk.types.method_arity",
                 method.span,
                 format!(
                     "method `{}.{}` expects {} argument(s), but {} were given",
@@ -1271,7 +1271,7 @@ pub(crate) fn check_method_call(
         };
         if !compatible(&actual, &expected) {
             ctx.errors.push(CompileError::new(
-                "karn.types.argument_mismatch",
+                "bynk.types.argument_mismatch",
                 arg.span,
                 format!(
                     "argument {} to `{}.{}` has type `{}`, but parameter `{}` expects `{}`",
@@ -1354,7 +1354,7 @@ fn check_cross_context_capability_call(
     // Capability calls require an effectful body (same rule as local ones).
     if !ctx.effectful {
         ctx.errors.push(CompileError::new(
-            "karn.effect.capability_in_pure_context",
+            "bynk.effect.capability_in_pure_context",
             method.span,
             format!(
                 "capability `{consumed}.{cap}` can only be called inside an effectful body (one returning `Effect[T]`)"
@@ -1365,7 +1365,7 @@ fn check_cross_context_capability_call(
     // The local deps key is the capability's simple name.
     if !ctx.caps.given_remaining.contains(cap) {
         let mut err = CompileError::new(
-            "karn.given.undeclared_capability",
+            "bynk.given.undeclared_capability",
             receiver.span,
             format!("capability `{consumed}.{cap}` is used but not listed in the `given` clause"),
         )
@@ -1402,7 +1402,7 @@ fn check_cross_context_capability_call(
         .cloned();
     let Some(op) = op else {
         ctx.errors.push(CompileError::new(
-            "karn.capability.unknown_operation",
+            "bynk.capability.unknown_operation",
             method.span,
             format!(
                 "capability `{consumed}.{cap}` has no operation named `{}`",
@@ -1425,7 +1425,7 @@ fn check_cross_context_capability_call(
     );
     if op.params.len() != args.len() {
         ctx.errors.push(CompileError::new(
-            "karn.capability.op_arity",
+            "bynk.capability.op_arity",
             method.span,
             format!(
                 "capability operation `{consumed}.{cap}.{}` expects {} argument(s), but {} were given",
@@ -1456,7 +1456,7 @@ fn check_cross_context_capability_call(
         };
         if !structurally_compatible(&arg_ty, &param_ty, &ctx.input.types, &consumed_types) {
             ctx.errors.push(CompileError::new(
-                "karn.boundary.structural_mismatch",
+                "bynk.boundary.structural_mismatch",
                 arg.span,
                 format!(
                     "cross-context argument {} to `{consumed}.{cap}.{}` has type `{}`, but parameter `{pname}` expects `{}`",
@@ -1489,7 +1489,7 @@ fn check_cross_context_call(
     if !ctx.effectful {
         ctx.errors.push(
             CompileError::new(
-                "karn.effect.cross_context_in_pure_context",
+                "bynk.effect.cross_context_in_pure_context",
                 method.span,
                 format!(
                     "cross-context service call `{}.{}` can only be made inside an effectful body (one returning `Effect[T]`)",
@@ -1503,7 +1503,7 @@ fn check_cross_context_call(
     let Some(svcs) = info.consumed_services.get(consumed) else {
         ctx.errors.push(
             CompileError::new(
-                "karn.consumes.unknown_context",
+                "bynk.consumes.unknown_context",
                 receiver.span,
                 format!("context `{consumed}` is not in scope here"),
             )
@@ -1519,7 +1519,7 @@ fn check_cross_context_call(
     let Some(service) = svcs.get(&method.name).cloned() else {
         ctx.errors.push(
             CompileError::new(
-                "karn.consumes.unknown_service",
+                "bynk.consumes.unknown_service",
                 method.span,
                 format!(
                     "context `{consumed}` has no service named `{}`",
@@ -1541,7 +1541,7 @@ fn check_cross_context_call(
     if service.params.len() != args.len() {
         ctx.errors.push(
             CompileError::new(
-                "karn.consumes.service_arity",
+                "bynk.consumes.service_arity",
                 method.span,
                 format!(
                     "cross-context service `{consumed}.{}` expects {} argument(s), but {} were given",
@@ -1579,7 +1579,7 @@ fn check_cross_context_call(
         if !structurally_compatible(&arg_ty, &param_ty, &ctx.input.types, &consumed_types) {
             ctx.errors.push(
                 CompileError::new(
-                    "karn.boundary.structural_mismatch",
+                    "bynk.boundary.structural_mismatch",
                     arg.span,
                     format!(
                         "cross-context argument {} to `{consumed}.{}` has type `{}` in `{}`, but parameter `{pname}` expects `{}` in `{}`",

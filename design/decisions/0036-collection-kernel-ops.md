@@ -16,7 +16,7 @@ unbounded user recursion the no-loops stance exists to avoid.
 folds: **`fold(init, (Acc, T) -> Acc) -> Acc`** (pure) and
 **`foldEff(init, (Acc, T) -> Effect[Acc]) -> Effect[Acc]`** (sequential;
 an effect operation under 0031's confinement — calling it in a pure context
-is `karn.effect.fn_value_in_pure_context`). **`Map` kernel** =
+is `bynk.effect.fn_value_in_pure_context`). **`Map` kernel** =
 `Map.empty()`, `insert(k, v)`, `get(k) -> Option[V]`, `keys() -> List[K]`,
 `length()`.
 

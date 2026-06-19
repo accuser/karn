@@ -11,7 +11,7 @@ a flow end to end through the real wire — no mocks.
 
 Two contexts: `shop.payment` authorises a charge; `shop.orders` consumes it.
 
-```karn
+```bynk
 context shop.payment
 
 exports transparent { PayError }
@@ -36,7 +36,7 @@ service authorise {
 }
 ```
 
-```karn,ignore
+```bynk,ignore
 context shop.orders
 
 consumes shop.payment as Pay
@@ -61,7 +61,7 @@ service place {
 Put it under the project's `tests/` tree. `wires` lists every participating
 context; cases call in by qualified name.
 
-```karn
+```bynk
 test integration "checkout" {
   wires shop.orders, shop.payment
 
@@ -107,7 +107,7 @@ is needed.
 
 - **At least two participants** — a single context is a unit test's job.
 - **Closure**: every context a participant `consumes` must itself be wired. The
-  compiler names the missing one (`karn.integration.unwired_dependency`).
+  compiler names the missing one (`bynk.integration.unwired_dependency`).
 - **No `mocks`** — integration tests wire real implementations. Mock in unit
   tests instead.
 - Cross-context **capabilities** (`given B.Cap`) work unchanged: the provider is
@@ -119,4 +119,4 @@ is needed.
   agent can be exercised end to end, and you can assert on accumulated state.
 
 See the [testing reference](../../reference/testing.md#test-integration--multi-worker-integration-tests)
-and [`karn.integration.*` errors](../../troubleshooting/integration-errors.md).
+and [`bynk.integration.*` errors](../../troubleshooting/integration-errors.md).

@@ -1,1 +1,1 @@
-karn.consumes.capability_name_clash
+bynk.consumes.capability_name_clash

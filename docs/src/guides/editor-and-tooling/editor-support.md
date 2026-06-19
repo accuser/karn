@@ -15,7 +15,7 @@ cargo build --release -p bynk-lsp
 ```
 
 This produces `target/release/bynkc-lsp`. Put it on your `PATH`, or point the
-extension at it with the `karn.executablePath` setting.
+extension at it with the `bynk.executablePath` setting.
 
 **2. Build and install the extension** from the `vscode-bynk/` directory:
 
@@ -35,8 +35,8 @@ signatures, go-to-definition, and format-on-save (honouring
 
 | Setting | Default | Purpose |
 |---|---|---|
-| `karn.executablePath` | `bynkc-lsp` | Path to the language-server binary. |
-| `karn.trace.server` | `off` | Trace LSP traffic (`off` / `messages` / `verbose`) in the "Bynk LSP" output channel. |
+| `bynk.executablePath` | `bynkc-lsp` | Path to the language-server binary. |
+| `bynk.trace.server` | `off` | Trace LSP traffic (`off` / `messages` / `verbose`) in the "Bynk LSP" output channel. |
 
 ## Other editors
 

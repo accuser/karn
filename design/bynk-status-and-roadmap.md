@@ -1,7 +1,7 @@
 # Bynk — Status & Gap Audit
 
-_Refreshed 18 June 2026 for **v0.54.0** (head `9da282c`). Scope: the whole `karn`
-repo — compiler (`bynkc`), driver (`karn`), formatter (`bynk-fmt`), language
+_Refreshed 18 June 2026 for **v0.54.0** (head `9da282c`). Scope: the whole `bynk`
+repo — compiler (`bynkc`), driver (`bynk`), formatter (`bynk-fmt`), language
 server (`bynk-lsp`), tree-sitter grammar, and the VS Code extension — assessed
 against the language's own specs._
 
@@ -49,7 +49,7 @@ not broken.
 | Area | State | One-line verdict |
 |---|---|---|
 | **Compiler `bynkc`** (~42k LOC) | Feature-complete for v0–v0.54 | Whole language wired end-to-end; ~216 positive + ~40 negative fixtures; `tsc --strict` verifies every project fixture's emitted TypeScript. |
-| **Driver `karn`** (v0.46) | Complete | Thin orchestrator over `bynkc` (override → PATH → sibling resolution); `karn doctor` environment check with a pinned output/exit contract (ADRs 0083–0084). |
+| **Driver `bynk`** (v0.46) | Complete | Thin orchestrator over `bynkc` (override → PATH → sibling resolution); `bynk doctor` environment check with a pinned output/exit contract (ADRs 0083–0084). |
 | **Actors track** (v0.45–v0.54) | ✅ Complete & closed | `actor` contracts, the `by` clause, BearerToken (JWT/HS256), Signature (HMAC-SHA256), multi-actor sum dispatch, authorisation invariants, cross-context `CallerId`. Q8 (replay/ordering) deferred to a future Events track. |
 | **`bynk-fmt`** | Strong | Full formatter contract incl. comment preservation; idempotent, round-trip-tested over the corpus. |
 | **`bynk-lsp`** | Rich | Diagnostics, hover, definition, completion, signature help, inlay hints, semantic tokens, codeLens, call hierarchy, implementation nav, folding/selection, workspace symbols, rename/references (v0.24–v0.43). Remaining: the completion tail + B-1/B-2 polish — tracked in [`tracks/lsp.md`](tracks/lsp.md). |
@@ -121,7 +121,7 @@ formatter. The following are **fully wired end-to-end** and fixture-exercised
 - **Platform & config** (v0.17–v0.19): config and IO as capabilities (no `needs`
   clause), secrets via injected env + `globalThis` probe, a minimal typed
   `fetch`, env threading for platform resources, and platform adapters under the
-  reserved `karn.*` prefix.
+  reserved `bynk.*` prefix.
 - **Tests**: `test` units with provider/context mocking (`mocks`), assertions,
   a readable runner, and **integration tests** over a simulated Node wire
   (v0.16, ADR 0009).

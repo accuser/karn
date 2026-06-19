@@ -1,7 +1,7 @@
 //! Keeps the diagnostic registry, the compiler source, and the generated
 //! reference page in lock-step.
 //!
-//! 1. Every `karn.*` code used as a string literal in the compiler source must
+//! 1. Every `bynk.*` code used as a string literal in the compiler source must
 //!    appear in `bynkc::diagnostics::REGISTRY`, and vice versa.
 //! 2. `docs/src/reference/diagnostics.md` must match what the registry renders.
 //!
@@ -20,10 +20,10 @@ fn grammar_json() -> String {
     fs::read_to_string(path).expect("read grammar.json")
 }
 
-/// Collect every `"karn.x.y"` string literal across the compiler source,
+/// Collect every `"bynk.x.y"` string literal across the compiler source,
 /// excluding the registry module itself.
 fn codes_used_in_source() -> BTreeSet<String> {
-    let re = regex::Regex::new(r#""(karn\.[a-z_]+\.[a-z_]+)""#).unwrap();
+    let re = regex::Regex::new(r#""(bynk\.[a-z_]+\.[a-z_]+)""#).unwrap();
     let src = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
     let mut codes = BTreeSet::new();
     collect(&src, &re, &mut codes);

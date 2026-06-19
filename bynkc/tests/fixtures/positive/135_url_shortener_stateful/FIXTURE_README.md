@@ -21,19 +21,19 @@ roots per the v0.9.1 convention):
 
 ```
 135_url_shortener_stateful/
-├── karn.toml                       [paths] src = "src", tests = "tests"
+├── bynk.toml                       [paths] src = "src", tests = "tests"
 ├── src/shortener/{core,analytics,links}.karn
 └── tests/shortener/{analytics,links}.karn
 ```
 
 ## What it must satisfy
 
-- `karnc compile --target bundle --output out src` — clean.
-- `karnc compile --target workers --output out src` — clean.
+- `bynkc compile --target bundle --output out src` — clean.
+- `bynkc compile --target workers --output out src` — clean.
 - `tsc --strict --noEmit` over the emitted output (both targets) — clean. (This
   fixture exercises cross-context projection and module re-exports, the two
   areas where the v0.9.1 tsc stage already found bugs — so it's a strong guard.)
-- `karnc test` — runs all tests via Node.
+- `bynkc test` — runs all tests via Node.
 
 ## The agent-state-initialisation experiment
 

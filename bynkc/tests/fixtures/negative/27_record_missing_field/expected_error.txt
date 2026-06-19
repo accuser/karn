@@ -1,2 +1,2 @@
-karn.resolve.missing_field
+bynk.resolve.missing_field
 missing required field

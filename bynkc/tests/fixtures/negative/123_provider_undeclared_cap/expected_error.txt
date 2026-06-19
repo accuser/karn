@@ -1,1 +1,1 @@
-karn.given.undeclared_capability
+bynk.given.undeclared_capability

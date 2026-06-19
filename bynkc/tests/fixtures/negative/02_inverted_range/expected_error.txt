@@ -1,2 +1,2 @@
-karn.types.inverted_range
+bynk.types.inverted_range
 bounds inverted

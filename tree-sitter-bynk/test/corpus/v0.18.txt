@@ -4,7 +4,7 @@ adapter with consumes and an external provider given
 
 adapter tokens {
   binding "./tokens.binding.ts" requires { "jose": "^5" }
-  consumes karn { Fetch, Secrets }
+  consumes bynk { Fetch, Secrets }
   exports capability { Jwt }
   capability Jwt {
     fn verify(token: String) -> Effect[String]

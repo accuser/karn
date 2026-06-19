@@ -5,7 +5,7 @@ description = "The official guide and reference for the Bynk programming languag
 language = "en"
 src = "src"
 
-# Syntax-highlight ```karn code blocks using the tree-sitter-bynk grammar.
+# Syntax-highlight ```bynk code blocks using the tree-sitter-bynk grammar.
 # Build the binary first: `cargo build --release -p mdbook-bynk-highlight`.
 [preprocessor.bynk-highlight]
 command = "../target/release/mdbook-bynk-highlight"

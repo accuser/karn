@@ -21,7 +21,7 @@ slices become `proposals/` entries when scheduled.
 ## 0. Why the LSP feels absent today (fix first)
 
 The extension spawns a separate **`bynkc-lsp`** binary over stdio, discovered on `PATH`
-or via `karn.executablePath` (`vscode-bynk/src/extension.ts`); **the VSIX does not bundle
+or via `bynk.executablePath` (`vscode-bynk/src/extension.ts`); **the VSIX does not bundle
 the server**. With no `bynkc-lsp` on `PATH`, the editor still shows tmLanguage syntax
 highlighting (no server needed) but **no hover, diagnostics, or completion** — the server
 never starts. Start-up failures surface in the "Bynk LSP" output channel and a toast, but
@@ -111,7 +111,7 @@ do it first.
 
 `vscode-bynk`: a tmLanguage grammar (syntax highlighting — works with no server), a
 `language-configuration.json`, a `LanguageClient` that spawns `bynkc-lsp` over stdio
-(PATH or `karn.executablePath`), a status bar (project name from `bynk.toml` + compiler
+(PATH or `bynk.executablePath`), a status bar (project name from `bynk.toml` + compiler
 version), and an `openProjectConfig` command. Distributed as a VSIX (built at 0.17.0).
 **The server is not bundled** — the extension assumes it is already on `PATH`.
 
@@ -124,9 +124,9 @@ version), and an `openProjectConfig` command. Distributed as a VSIX (built at 0.
 A fresh install now provisions a working LSP. **Download‑on‑activate** was chosen over
 per‑platform VSIX bundling: it ships on the existing release infrastructure (the raw
 `bynkc-lsp-<target>` binaries + `SHA256SUMS` the release now publishes) as one small VSIX,
-and the `karn.executablePath` escape hatch covers offline/air‑gapped use. Implemented:
+and the `bynk.executablePath` escape hatch covers offline/air‑gapped use. Implemented:
 
-- **Resolution order** (`src/server.ts`): `karn.executablePath` → `bynkc-lsp` on PATH →
+- **Resolution order** (`src/server.ts`): `bynk.executablePath` → `bynkc-lsp` on PATH →
   cached download (global storage) → download the pinned release binary, **verified against
   `SHA256SUMS`**, cached, `chmod 0o755`.
 - **Loud, actionable failure** — an error toast with *Download Server / Open Settings / Show
@@ -172,9 +172,9 @@ rename UI (mostly automatic once the server advertises them), an **inlay‑hint 
 - **Distribution / CI.** Build and bundle `bynkc-lsp` per platform alongside the extension;
   publish to the VS Code Marketplace (and Open VSX for the non‑VS‑Code editors).
 
-## 5.1 The `karn` driver & the project-lifecycle arc
+## 5.1 The `bynk` driver & the project-lifecycle arc
 
-Distinct from the LSP/extension thread above: a **`karn` driver** — a thin
+Distinct from the LSP/extension thread above: a **`bynk` driver** — a thin
 orchestrator over `bynkc` and the Node toolchain, as `cargo` is to `rustc` (ADR
 0083). The compiler stays pure (compile / check / fmt / test); environment
 orchestration lives in the driver. The arc is **`doctor` → `new` → `dev`**:

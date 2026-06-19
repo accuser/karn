@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// One local binding: its name, the binding-name span (the def site), its
-/// rendered type (Karn surface syntax, as hints render — no `Ty` on the
+/// rendered type (Bynk surface syntax, as hints render — no `Ty` on the
 /// surface), and the source range over which it is in scope.
 #[derive(Debug, Clone)]
 pub struct LocalBinding {

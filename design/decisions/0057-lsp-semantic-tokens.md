@@ -7,7 +7,7 @@
 Tree-sitter / the extension's TextMate grammar colour syntax, but cannot
 tell a type from a capability from a value at a use site — the binding
 index (ADR 0053) already classified every occurrence. One gap blocks a
-pure index read: first-party (`karn.*`) references are **deliberately
+pure index read: first-party (`bynk.*`) references are **deliberately
 dropped** at assembly (synthetic defs point at files not on disk, which
 definition/rename/workspace-symbol must never surface) — yet the
 platform-native distinction on exactly those symbols (`Kv`, `Clock`,

@@ -24,7 +24,7 @@ impl<'a> Parser<'a> {
         };
         // v0.20a: optional `[A, B]` type parameters (free functions only —
         // generic methods are checked semantically; bounds are rejected here
-        // with `karn.generics.no_bounds`).
+        // with `bynk.generics.no_bounds`).
         let mut type_params = Vec::new();
         if self.peek_kind() == Some(TokenKind::LBracket) {
             self.bump();
@@ -33,7 +33,7 @@ impl<'a> Parser<'a> {
                 if self.peek_kind() == Some(TokenKind::Colon) {
                     let colon = self.bump().unwrap();
                     return Err(CompileError::new(
-                        "karn.generics.no_bounds",
+                        "bynk.generics.no_bounds",
                         colon.span,
                         format!(
                             "type parameter `{}` carries a bound — bounded generics are not in v0.20a",
@@ -60,7 +60,7 @@ impl<'a> Parser<'a> {
             let self_tok = self.bump().unwrap();
             if !matches!(name, FnName::Method { .. }) {
                 return Err(CompileError::new(
-                    "karn.parse.self_outside_method",
+                    "bynk.parse.self_outside_method",
                     self_tok.span,
                     "`self` can only appear as the first parameter of a method declaration",
                 )
@@ -232,7 +232,7 @@ impl<'a> Parser<'a> {
             Some(_) => {
                 let t = self.peek().unwrap();
                 Err(CompileError::new(
-                    "karn.parse.expected_token",
+                    "bynk.parse.expected_token",
                     t.span,
                     format!(
                         "expected `=` or `<-` after the let-binding's name, found {}",
@@ -241,7 +241,7 @@ impl<'a> Parser<'a> {
                 ))
             }
             None => Err(CompileError::new(
-                "karn.parse.unexpected_eof",
+                "bynk.parse.unexpected_eof",
                 self.eof_span(),
                 "expected `=` or `<-` after the let-binding's name, found end of file",
             )),

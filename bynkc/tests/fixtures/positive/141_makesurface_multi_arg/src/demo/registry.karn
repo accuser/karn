@@ -1,5 +1,5 @@
 ---
-A service whose `on call` takes more than one Karn-declared argument. The deps
+A service whose `on call` takes more than one Bynk-declared argument. The deps
 object is the *last* parameter, so `makeSurface` must derive its type from a
 named `<Ctx>Deps` interface rather than a fixed `Parameters<>[1]` index (which
 would resolve to the second real argument, `target`).

@@ -64,7 +64,7 @@ context calling in is an actor too (`auth = Internal`), verified statically.
 
 Illustrative spelling — the *semantics* below are settled; exact tokens may move.
 
-```karn,ignore
+```bynk,ignore
 // Schemes are a closed, compiler-known set. An actor is a nominal contract on a
 // scheme; `identity =` names the typed value a verified party yields.
 actor Visitor   { auth = None }                        // anonymous; identity = ()
@@ -276,7 +276,7 @@ the load-bearing, hard-to-reverse commitments most worth scrutiny:
 ## Internal architecture
 
 A sealed **scheme descriptor** — the spine — mirroring v0.44's protocol
-descriptor and the `karn`-surface capability treatment: each scheme contributes
+descriptor and the `bynk`-surface capability treatment: each scheme contributes
 its verification codegen, its admissible identity shape, and its
 failure-response mapping, behind one uniform interface. Adding a scheme later is
 new *surface* against that interface, not a re-architecture. The actor layer

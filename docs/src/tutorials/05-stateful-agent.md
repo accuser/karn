@@ -11,7 +11,7 @@ We give the shortener a `Link` agent. Keep editing `shortener.karn`.
 
 ## Declare an agent
 
-```karn,ignore
+```bynk,ignore
 agent Link {
   key code: ShortCode
 
@@ -60,7 +60,7 @@ A field that *excludes* its natural zero is rejected. You might reach for
 `Int where Positive` on the hit count — but a fresh link has had `0` hits, and
 `Positive` excludes `0`:
 
-```karn,ignore
+```bynk,ignore
 state {
   target: Option[Url],
   hits: Int where Positive,   -- no honest starting value
@@ -68,7 +68,7 @@ state {
 ```
 
 ```text
-[karn.agents.non_zeroable_state_field] agent `Link` state field `hits` has no
+[bynk.agents.non_zeroable_state_field] agent `Link` state field `hits` has no
 defined zero value, so a fresh key cannot be initialised
 ```
 
@@ -81,7 +81,7 @@ Inside a handler, read state through `self.state`. To change it, build a new
 state value and `commit` it. Add a `resolve` handler that returns the target and
 counts the hit:
 
-```karn,ignore
+```bynk,ignore
   on call resolve() -> Effect[Result[ResolveView, LinkError]] {
     match self.state.target {
       Some(url) => {
@@ -140,7 +140,7 @@ handler logic you wrote is identical.
 Now the API can do real work. A small `CodeGen` capability mints new codes, and
 the handlers store and resolve through the `Link` agent:
 
-```karn,ignore
+```bynk,ignore
 capability CodeGen {
   fn next() -> Effect[String]
 }
@@ -159,7 +159,7 @@ above is all we need: mint a raw string, then validate it into a `ShortCode`.
 
 ## The whole file
 
-```karn
+```bynk
 context shortener
 
 type ShortCode = String where MinLength(6) and MaxLength(8)

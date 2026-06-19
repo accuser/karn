@@ -1,7 +1,7 @@
-# `karn.refine.literal_violates`
+# `bynk.refine.literal_violates`
 
 ```text
-[karn.refine.literal_violates] Error: literal 0 does not satisfy `InRange` required by type `Reps`
+[bynk.refine.literal_violates] Error: literal 0 does not satisfy `InRange` required by type `Reps`
 ```
 
 ## What it means
@@ -10,7 +10,7 @@ You wrote a literal in a position whose expected type is a refined type, and the
 literal does not satisfy that type's predicate. Because Bynk checks admitted
 literals at compile time, this is a build error rather than a runtime failure.
 
-```karn,fail
+```bynk,fail
 commons demo {
   type Reps = Int where InRange(1, 100)
 
@@ -30,7 +30,7 @@ Pick the option that matches where the value comes from:
   [`.of`](../guides/type-system/define-and-validate.md), which returns a `Result` you
   handle:
 
-  ```karn
+  ```bynk
   fn parse(n: Int) -> Result[Reps, ValidationError] {
     Reps.of(n)
   }

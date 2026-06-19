@@ -1,1 +1,1 @@
-karn.assert.non_bool
+bynk.assert.non_bool

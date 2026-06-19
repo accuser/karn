@@ -6,7 +6,7 @@ service would otherwise hand-write. A handler names its actor with a **`by`
 clause**, and the body runs **only if the contract is satisfied** — the payload
 already parsed, the caller's identity available as a typed value.
 
-```karn,ignore
+```bynk,ignore
 actor User { auth = Bearer(secret = "AUTH_JWT_SECRET"), identity = UserId }
 
 service api from http {
@@ -58,4 +58,4 @@ things about a party:
 
 **See also:** [Reference — Actors](../../reference/actors.md),
 [Specification §5.7a](../../spec/static-semantics.md),
-[Diagnostic index (`karn.actor.*`)](../../reference/diagnostics.md).
+[Diagnostic index (`bynk.actor.*`)](../../reference/diagnostics.md).

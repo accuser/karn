@@ -1,4 +1,4 @@
-//! v0.23 behavioural test for the extended `karn.cloudflare` Kv adapter —
+//! v0.23 behavioural test for the extended `bynk.cloudflare` Kv adapter —
 //! the first **executed adapter-op** test (ADRs 0050/0051).
 //!
 //! Snapshots prove the emitted shape; this proves the behaviour: the
@@ -79,7 +79,7 @@ fn run(program: &str, prefix: &[String], args: &[&str], cwd: &Path) -> (bool, St
 
 const DRIVER_TS: &str = r#"
 import { scan, cache, allKeys } from "./kv/index.js";
-import { WorkersKv } from "./karn/cloudflare.binding.js";
+import { WorkersKv } from "./bynk/cloudflare.binding.js";
 
 function assert(cond: boolean, msg: string): void {
   if (!cond) {

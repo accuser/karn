@@ -7,7 +7,7 @@ you can judge the shape and the verbosity at a glance before committing to the
 tutorials. Read it once top to bottom; the walkthrough underneath names each
 part.
 
-```karn
+```bynk
 context analytics
 
 -- A refined domain type: a page id that has already been validated, so nothing

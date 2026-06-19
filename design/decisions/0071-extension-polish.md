@@ -15,24 +15,24 @@ default ariadne output is multi-line box-drawing and brittle to match).
 Ship B-2 across **two slices**:
 
 - **Slice 1 (v0.38.0, extension-only):**
-  - **Snippets** (`snippets/karn.json`, `contributes.snippets`) — `context`,
+  - **Snippets** (`snippets/bynk.json`, `contributes.snippets`) — `context`,
     `commons`, `type`/`enum`, `fn`, `capability`, `provides`, `service`,
     `on http`/`on cron`, `agent`. Bodies mirror the worked fixtures so they
     type-check as written; tab-stops walk the names.
   - **Scaffolding commands** (`src/scaffold.ts`, registered eagerly in
-    `activate()`): **`karn.newContext`** writes a `context <name>.karn` skeleton
-    into `src/` (or the workspace root); **`karn.newProject`** scaffolds
+    `activate()`): **`bynk.newContext`** writes a `context <name>.karn` skeleton
+    into `src/` (or the workspace root); **`bynk.newProject`** scaffolds
     `bynk.toml` + `src/<name>.karn`. Both validate the name, **refuse to
     overwrite**, and open what they create — `workspace.fs` only, no new deps.
   - **Getting-started walkthrough** (`contributes.walkthroughs` + three markdown
     steps under `walkthroughs/`): welcome → create a project (a `New Project`
-    command button, completed `onCommand:karn.newProject`) → write a context.
+    command button, completed `onCommand:bynk.newProject`) → write a context.
 - **Slice 2 (v0.38.1):** a terse **`bynkc check --format short`** renderer
   (`path:line:col: severity[category]: message`, severity from
   `Severity::for_error`, 1-indexed line/col) plus the `$bynkc`
   `contributes.problemMatchers` and a **`bynkc: check` build task** (a
   `TaskProvider` running `<bynkc> check . --format short` with `$bynkc`; the
-  compiler resolves from a new `karn.compilerPath` setting, else PATH). The LSP
+  compiler resolves from a new `bynk.compilerPath` setting, else PATH). The LSP
   already reports diagnostics for *open* files; this catches the rest (unopened
   files, project-level errors) on demand. The one `bynkc` change, isolated.
 

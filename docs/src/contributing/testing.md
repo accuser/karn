@@ -31,7 +31,7 @@ are checked separately).
 - **Negative** fixtures match by **substring**: each non-blank, non-`#` line of
   `expected_error.txt` must appear somewhere in the concatenated
   `"{code} {message}"` of the diagnostics. So a line is usually just a code, e.g.
-  `karn.refine.literal_violates`.
+  `bynk.refine.literal_violates`.
 
 ## The bless workflow
 

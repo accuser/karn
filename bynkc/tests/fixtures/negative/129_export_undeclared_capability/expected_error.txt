@@ -1,1 +1,1 @@
-karn.exports.undeclared_capability
+bynk.exports.undeclared_capability

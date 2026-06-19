@@ -91,7 +91,7 @@ service login {
 adapter in fragment form
 ================================================================================
 
-adapter karn
+adapter bynk
 
 capability Clock {
   fn now() -> Effect[Int]

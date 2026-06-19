@@ -1,1 +1,1 @@
-karn.adapter.consumes_requires_selection
+bynk.adapter.consumes_requires_selection

@@ -43,7 +43,7 @@ refund(order); // compiles — OrderId and CustomerId are both `string`
 
 In Bynk, the opaque types are distinct, so the same swap does not build:
 
-```karn,fail
+```bynk,fail
 {{#include ../../../diagnostics/types_opaque_swap.karn}}
 ```
 
@@ -83,7 +83,7 @@ Bynk has no special "must use the `Result`" rule — it does not need one. A
 `Result[Int, String]` simply *is not* an `Int`, so you cannot bind it to one and
 move on:
 
-```karn,fail
+```bynk,fail
 {{#include ../../../diagnostics/types_unhandled_result.karn}}
 ```
 

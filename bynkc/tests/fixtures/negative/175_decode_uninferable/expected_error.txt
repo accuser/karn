@@ -1,1 +1,1 @@
-karn.generics.uninferable_type_arg
+bynk.generics.uninferable_type_arg

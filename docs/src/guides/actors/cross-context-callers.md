@@ -9,7 +9,7 @@ channel that is not reachable from the outside. Bynk trusts that channel (the
 `Internal` scheme: "the channel itself is the assertion"), and the prelude actor
 `Caller` yields the **calling context's name** as its identity.
 
-```karn
+```bynk
 context billing
 
 service charges {

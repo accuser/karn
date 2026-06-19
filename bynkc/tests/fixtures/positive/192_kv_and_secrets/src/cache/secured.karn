@@ -1,7 +1,7 @@
 context cache.secured
 
-consumes karn { Secrets }
-consumes karn.cloudflare { Kv }
+consumes bynk { Secrets }
+consumes bynk.cloudflare { Kv }
 
 service vault {
   on call(key: String) -> Effect[Option[String]] given Kv, Secrets {

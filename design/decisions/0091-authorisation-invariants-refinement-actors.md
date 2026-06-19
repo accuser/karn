@@ -31,10 +31,10 @@ base scheme (failure → **401**), check the predicate against the *verified* cl
   (string equality), composed with `&&`/`||`/`!`. Claims are untyped JSON, so an
   arbitrary typed expression has no surface to bind against; the closed set covers
   the common RBAC shape and is the substrate a later typed-claims layer sits on.
-  An out-of-set predicate is `karn.actor.refinement_predicate_unsupported`.
+  An out-of-set predicate is `bynk.actor.refinement_predicate_unsupported`.
 - **Bearer base only (for now).** A refinement tests claims, which only a `Bearer`
   actor carries; refining `None`/`Internal`/`Signature` has nothing to test
-  (`karn.actor.refinement_base_unsupported`). Internal-channel authorisation is a
+  (`bynk.actor.refinement_base_unsupported`). Internal-channel authorisation is a
   later, separate question.
 - **Claims surface at the boundary, not the body.** `verifyBearerJwtHs256` now
   returns the verified `claims` alongside `sub`; the seam evaluates the predicate
@@ -60,4 +60,4 @@ and reviewable; a standing behavioral guard (`bynkc/tests/refinement_auth.rs`, t
 ADR 0087 posture) drives the emitted trichotomy (401 / 403 / allow). Typed claims
 schemas and general predicate expressions, non-Bearer authorisation, nominal actor
 extension (adding structure, not restricting), and RBAC hierarchies extend this
-additively. The `karn.actor.refinement_unsupported` blanket rejection is retired.
+additively. The `bynk.actor.refinement_unsupported` blanket rejection is retired.

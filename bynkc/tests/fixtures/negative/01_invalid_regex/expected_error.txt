@@ -1,2 +1,2 @@
-karn.types.invalid_regex
+bynk.types.invalid_regex
 invalid regular expression

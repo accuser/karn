@@ -7,11 +7,11 @@ import * as vscode from "vscode";
 
 const TASK_TYPE = "bynkc";
 
-/** The compiler command — `karn.compilerPath` setting, else `bynkc` on PATH. */
+/** The compiler command — `bynk.compilerPath` setting, else `bynkc` on PATH. */
 function compilerPath(): string {
   return (
     vscode.workspace
-      .getConfiguration("karn")
+      .getConfiguration("bynk")
       .get<string>("compilerPath", "")
       .trim() || "bynkc"
   );

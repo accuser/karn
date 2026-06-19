@@ -40,7 +40,7 @@ pub(crate) fn check_directory_name_consistency(
             if dir != first_dir {
                 errors.push(
                     CompileError::new(
-                        "karn.project.inconsistent_commons_name",
+                        "bynk.project.inconsistent_commons_name",
                         parsed[idx].unit.span(),
                         format!(
                             "files declaring `{}` are spread across different directories: `{}` vs `{}`",
@@ -90,7 +90,7 @@ pub(crate) fn check_path_name_alignment(parsed: &[ParsedFile]) -> Result<(), Vec
         if !unit_path_matches(rel, &name) {
             errors.push(
                 CompileError::new(
-                    "karn.project.inconsistent_commons_name",
+                    "bynk.project.inconsistent_commons_name",
                     pf.unit.span(),
                     format!(
                         "file `{}` declares `{name}`, but its path doesn't match — expected either `{}.karn` (single-file) or `{}/...karn` (multi-file)",
@@ -132,7 +132,7 @@ pub(crate) fn check_test_path_alignment(parsed: &[ParsedFile]) -> Result<(), Vec
             let p = target_parts.join("/");
             errors.push(
                 CompileError::new(
-                    "karn.project.inconsistent_test_path",
+                    "bynk.project.inconsistent_test_path",
                     pf.unit.span(),
                     format!(
                         "test file `{}` targets `{target_name}`, but its path doesn't match — expected `{p}.karn` / `{p}.test.karn` (single-file) or `{p}/...karn` (multi-file)",
@@ -140,7 +140,7 @@ pub(crate) fn check_test_path_alignment(parsed: &[ParsedFile]) -> Result<(), Vec
                     ),
                 )
                 .with_note(
-                    "in split-paths mode (configured via `karn.toml`'s `[paths]`), each test file's path under the `tests` directory must match its target's qualified name; a `.test.karn` suffix is allowed",
+                    "in split-paths mode (configured via `bynk.toml`'s `[paths]`), each test file's path under the `tests` directory must match its target's qualified name; a `.test.karn` suffix is allowed",
                 ),
             );
         }
@@ -167,7 +167,7 @@ pub(crate) fn check_group_kind_consistency(
             if parsed[idx].kind != first_kind {
                 errors.push(
                     CompileError::new(
-                        "karn.project.kind_conflict",
+                        "bynk.project.kind_conflict",
                         parsed[idx].unit.span(),
                         format!(
                             "name `{name}` is declared as both a {} and a {}",

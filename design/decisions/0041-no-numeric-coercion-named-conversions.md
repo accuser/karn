@@ -11,7 +11,7 @@ precedent the v0.22 numeric stdlib copies.
 
 ## Decision
 Mixing `Int` and `Float` in any operation is a static error,
-`karn.types.no_numeric_coercion`. Conversion is explicit, via the
+`bynk.types.no_numeric_coercion`. Conversion is explicit, via the
 **numeric kernel** — built-in **value methods on the bare base types**,
 the same dispatch as the collection kernel (0036/0037):
 

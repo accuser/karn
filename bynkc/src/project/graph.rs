@@ -44,7 +44,7 @@ fn dfs_consumes(
         let canon = canonicalise_cycle(&cycle);
         if reported.insert(canon.clone()) {
             errors.push(CompileError::new(
-                "karn.context.consumes_cycle",
+                "bynk.context.consumes_cycle",
                 Span::default(),
                 format!(
                     "`consumes` cycle detected: {}",
@@ -95,7 +95,7 @@ fn canonicalise_cycle(cycle: &[String]) -> Vec<String> {
 /// v0.12: detect cycles in the provider dependency graph. Each provided
 /// capability depends (via its provider's `given`) on other capabilities; a
 /// cycle means the composition root cannot order instantiation. Emits
-/// `karn.provider.dependency_cycle` on every provider that participates in a
+/// `bynk.provider.dependency_cycle` on every provider that participates in a
 /// cycle. `providers` is keyed by capability name.
 pub(crate) fn detect_provider_dependency_cycles(
     providers: &HashMap<String, ProviderDecl>,
@@ -165,7 +165,7 @@ pub(crate) fn detect_provider_dependency_cycles(
         if let Some(p) = providers.get(cap) {
             errors.push(
                 CompileError::new(
-                    "karn.provider.dependency_cycle",
+                    "bynk.provider.dependency_cycle",
                     p.span,
                     format!(
                         "provider `{}` for capability `{}` is part of a capability dependency cycle",

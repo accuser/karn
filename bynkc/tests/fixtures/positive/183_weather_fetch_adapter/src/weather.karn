@@ -1,6 +1,6 @@
 adapter weather {
   binding "./weather.binding.ts"
-  consumes karn { Fetch, Secrets }
+  consumes bynk { Fetch, Secrets }
 
   exports capability  { Weather }
   exports transparent { Report, WeatherError }

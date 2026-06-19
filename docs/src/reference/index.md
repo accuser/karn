@@ -18,7 +18,7 @@ tasks see the [how-to guides](../guides/index.md).
 
 - [`bynk.toml` manifest](manifest.md) — every manifest key.
 - [Emission](emission.md) — the TypeScript each construct emits.
-- [Diagnostic index](diagnostics.md) — every `karn.*` code (generated).
+- [Diagnostic index](diagnostics.md) — every `bynk.*` code (generated).
 - [Version compatibility & changelog](changelog.md).
 
 ## Generated reference

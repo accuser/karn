@@ -259,7 +259,7 @@ pub struct ImplEdge {
     pub site: SiteRef,
 }
 
-/// v0.28 (ADR 0057): one reference to a first-party (`karn.*`) symbol.
+/// v0.28 (ADR 0057): one reference to a first-party (`bynk.*`) symbol.
 /// Tokens-only: first-party defs point at synthetic files not on disk, so
 /// these sites are **never** read by definition/rename/workspace-symbol —
 /// the v0.25 exclusion of synthetic units from `symbols` stands untouched.
@@ -386,7 +386,7 @@ impl ProjectIndex {
 pub struct IndexBuilder {
     /// (unit, kind, name) → definition site + modifiers.
     defs: HashMap<SymbolKey, (SiteRef, SymbolModifiers)>,
-    /// v0.28 (ADR 0057): first-party (`karn.*`) symbols — kind + modifiers
+    /// v0.28 (ADR 0057): first-party (`bynk.*`) symbols — kind + modifiers
     /// only, no usable def site (synthetic files are not on disk). Edges
     /// qualifying here route into [`ProjectIndex::foreign_refs`].
     first_party_defs: HashMap<SymbolKey, SymbolModifiers>,

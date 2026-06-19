@@ -39,7 +39,7 @@ provisions and launches it.
 The extension needs the `bynkc-lsp` binary and resolves it in this order, most
 explicit first:
 
-1. the `karn.executablePath` setting, when set;
+1. the `bynk.executablePath` setting, when set;
 2. `bynkc-lsp` on your `PATH` (a dev or global install);
 3. a copy previously downloaded by the extension;
 4. otherwise it **downloads** the release matching this build for your platform
@@ -77,13 +77,13 @@ Available from the Command Palette under **Bynk**:
 
 | Setting | Default | Purpose |
 | ------- | ------- | ------- |
-| `karn.executablePath` | `""` (auto-resolve) | Absolute path to a `bynkc-lsp` binary to use. When empty, the extension resolves the server automatically (see above). |
-| `karn.trace.server` | `off` | Trace LSP protocol traffic (`off` / `messages` / `verbose`) in the "Bynk LSP" output channel. |
-| `karn.inlayHints.enable` | `true` | Show Bynk inferred-type inlay hints. A persistent, Bynk-only preference; takes effect on the next edit or scroll. |
+| `bynk.executablePath` | `""` (auto-resolve) | Absolute path to a `bynkc-lsp` binary to use. When empty, the extension resolves the server automatically (see above). |
+| `bynk.trace.server` | `off` | Trace LSP protocol traffic (`off` / `messages` / `verbose`) in the "Bynk LSP" output channel. |
+| `bynk.inlayHints.enable` | `true` | Show Bynk inferred-type inlay hints. A persistent, Bynk-only preference; takes effect on the next edit or scroll. |
 
 Two built-in VS Code settings also apply:
 
-- **`editor.inlayHints.enabled`** — the instant, editor-wide on/off for inlay hints (toggles immediately). Use `karn.inlayHints.enable` when you want hints off for Bynk specifically and left alone elsewhere.
+- **`editor.inlayHints.enabled`** — the instant, editor-wide on/off for inlay hints (toggles immediately). Use `bynk.inlayHints.enable` when you want hints off for Bynk specifically and left alone elsewhere.
 - **`editor.semanticHighlighting.enabled`** — turns semantic tokens (the type-aware highlighting) on or off. The extension ships theme fallbacks for Bynk's `capability` / `service` / `agent` / `provider` token types, so they colour out of the box.
 
 ## Build & install from source

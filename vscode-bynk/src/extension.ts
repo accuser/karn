@@ -38,29 +38,29 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.StatusBarAlignment.Left,
     100,
   );
-  projectNameItem.command = "karn.openProjectConfig";
+  projectNameItem.command = "bynk.openProjectConfig";
   serverItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left,
     99,
   );
-  serverItem.command = "karn.showServerOutput";
+  serverItem.command = "bynk.showServerOutput";
   context.subscriptions.push(projectNameItem, serverItem);
 
   // Commands work whether or not the server is currently running, so register
   // them before the first start attempt — that way "Restart"/"Download" are
   // available to recover from a failed start.
   context.subscriptions.push(
-    vscode.commands.registerCommand("karn.openProjectConfig", openProjectConfig),
-    vscode.commands.registerCommand("karn.showServerOutput", () => output.show()),
-    vscode.commands.registerCommand("karn.restartServer", () =>
+    vscode.commands.registerCommand("bynk.openProjectConfig", openProjectConfig),
+    vscode.commands.registerCommand("bynk.showServerOutput", () => output.show()),
+    vscode.commands.registerCommand("bynk.restartServer", () =>
       startServer(context, { interactive: true }),
     ),
-    vscode.commands.registerCommand("karn.downloadServer", () =>
+    vscode.commands.registerCommand("bynk.downloadServer", () =>
       startServer(context, { interactive: true, forceDownload: true }),
     ),
     // Scaffolding (B-2): work without the server, so register them eagerly too.
-    vscode.commands.registerCommand("karn.newContext", () => newContext()),
-    vscode.commands.registerCommand("karn.newProject", () => newProject()),
+    vscode.commands.registerCommand("bynk.newContext", () => newContext()),
+    vscode.commands.registerCommand("bynk.newProject", () => newProject()),
   );
 
   // B-2: the `bynkc: check` build task (errors → Problems via `$bynkc`).
@@ -93,21 +93,21 @@ async function startServer(
     debug: { command: resolved.path, transport: TransportKind.stdio },
   };
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: "file", language: "karn" }],
+    documentSelector: [{ scheme: "file", language: "bynk" }],
     synchronize: {
       fileEvents: vscode.workspace.createFileSystemWatcher("**/*.karn"),
-      configurationSection: "karn",
+      configurationSection: "bynk",
     },
     outputChannel: output,
     middleware: {
       // Client-side gate for the server's always-on inlay hints. The master
-      // `karn.inlayHints.enable` suppresses them entirely (returning []); when
-      // on, the per-kind `karn.inlayHints.types` / `.parameterNames` toggles
+      // `bynk.inlayHints.enable` suppresses them entirely (returning []); when
+      // on, the per-kind `bynk.inlayHints.types` / `.parameterNames` toggles
       // filter the result by the server-tagged `kind`. Takes effect on the next
       // request (edit/scroll). The built-in `editor.inlayHints.enabled` is the
       // instant, editor-wide toggle — these are the persistent Bynk preferences.
       provideInlayHints: async (document, viewPort, token, next) => {
-        const cfg = vscode.workspace.getConfiguration("karn");
+        const cfg = vscode.workspace.getConfiguration("bynk");
         if (!cfg.get<boolean>("inlayHints.enable", true)) return [];
         const showTypes = cfg.get<boolean>("inlayHints.types", true);
         const showParams = cfg.get<boolean>("inlayHints.parameterNames", true);
@@ -128,7 +128,7 @@ async function startServer(
     },
   };
 
-  client = new LanguageClient("karn", "Bynk LSP", serverOptions, clientOptions);
+  client = new LanguageClient("bynk", "Bynk LSP", serverOptions, clientOptions);
   try {
     await client.start();
   } catch (e) {
@@ -165,14 +165,14 @@ async function ensureServer(
   }
 
   const configured = vscode.workspace
-    .getConfiguration("karn")
+    .getConfiguration("bynk")
     .get<string>("executablePath", "")
     .trim();
   if (configured && !opts.forceDownload) {
     // An explicit setting that doesn't resolve: don't paper over it with a
     // download — tell the user their setting is wrong.
     await reportNoServer(
-      `Bynk: \`karn.executablePath\` is set to "${configured}", but no such executable was found.`,
+      `Bynk: \`bynk.executablePath\` is set to "${configured}", but no such executable was found.`,
       context,
     );
     return undefined;
@@ -181,7 +181,7 @@ async function ensureServer(
   if (!targetTriple()) {
     await reportNoServer(
       `Bynk: no prebuilt language server for ${process.platform}/${process.arch}. ` +
-        "Build it with `cargo build --release -p bynk-lsp` and set `karn.executablePath`.",
+        "Build it with `cargo build --release -p bynk-lsp` and set `bynk.executablePath`.",
       context,
     );
     return undefined;
@@ -216,7 +216,7 @@ async function reportNoServer(
   } else if (pick === "Open Settings") {
     await vscode.commands.executeCommand(
       "workbench.action.openSettings",
-      "karn.executablePath",
+      "bynk.executablePath",
     );
   } else if (pick === "Show Output") {
     output.show();
@@ -278,7 +278,7 @@ function setServerItem(state: "ok" | "error", text: string): void {
 
 function updateProjectItem(): void {
   const show =
-    vscode.window.activeTextEditor?.document.languageId === "karn";
+    vscode.window.activeTextEditor?.document.languageId === "bynk";
   if (!projectNameItem || !serverItem) return;
   if (!show) {
     projectNameItem.hide();
@@ -310,7 +310,7 @@ async function findBynkToml(): Promise<vscode.Uri | undefined> {
   // nested project (a `bynk.toml` below the workspace-folder root) is found,
   // not just one at the root.
   const active = vscode.window.activeTextEditor?.document;
-  if (active?.languageId === "karn" && active.uri.scheme === "file") {
+  if (active?.languageId === "bynk" && active.uri.scheme === "file") {
     let dir = vscode.Uri.joinPath(active.uri, "..");
     for (;;) {
       const candidate = vscode.Uri.joinPath(dir, "bynk.toml");

@@ -1,2 +1,2 @@
-karn.actor.signature_requires_body
+bynk.actor.signature_requires_body
 must take a `body`

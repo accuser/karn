@@ -19,7 +19,7 @@ A **[record](../reference/glossary.md#term-record)** groups fields into a single
 value. The shortener needs a request
 body and two response shapes:
 
-```karn
+```bynk
 type CreateLinkRequest = {
   target: String,
 }
@@ -39,7 +39,7 @@ type ResolveView = {
 [Tutorial 4](04-refined-types.md); for now plain strings keep us moving.) You
 construct a record by naming it and giving every field a value:
 
-```karn,ignore
+```bynk,ignore
 Created(CreatedView { code: "abc123", target: body.target })
 ```
 
@@ -62,7 +62,7 @@ what a **[sum type](../reference/glossary.md#term-sum-type)** expresses — a va
 that is one of several named variants.
 When none of the variants carries a payload, the shorthand is an **enum**:
 
-```karn
+```bynk
 type LinkError = enum {
   AlreadyExists,
   NotFound,
@@ -97,7 +97,7 @@ To read a sum type, you `match` on it. `match` forces you to handle **every**
 variant, so adding a case later makes the compiler revisit every place that
 inspects the type:
 
-```karn
+```bynk
 fn describe(error: LinkError) -> String {
   match error {
     AlreadyExists => "code already in use"
@@ -133,7 +133,7 @@ The third tool is the **opaque type**: a value backed by some base type but with
 its own identity, so the compiler refuses to mix it up with another value of the
 same underlying shape.
 
-```karn,ignore
+```bynk,ignore
 type LinkId = opaque String   -- a String, but not interchangeable with one
 ```
 
@@ -147,7 +147,7 @@ job for **refined types**, and it is exactly where we go next.
 
 Here is `shortener.karn` so far — the data model wired into the API:
 
-```karn
+```bynk
 context shortener
 
 type LinkError = enum {

@@ -1,9 +1,9 @@
 //! `mdbook-bynk-highlight` — an mdBook preprocessor that syntax-highlights
-//! fenced ```karn code blocks using the `tree-sitter-bynk` grammar.
+//! fenced ```bynk code blocks using the `tree-sitter-bynk` grammar.
 //!
 //! The grammar (and its highlight queries) are the single source of truth, so
 //! highlighting stays correct as the language evolves. Highlighted blocks are
-//! emitted as `<pre class="karn"><code>…</code></pre>` with `hl-*` span classes;
+//! emitted as `<pre class="bynk"><code>…</code></pre>` with `hl-*` span classes;
 //! the colours live in `docs/theme/bynk-highlight.css`.
 //!
 //! Protocol (mdBook preprocessor):
@@ -64,7 +64,7 @@ fn highlight_config() -> &'static HighlightConfiguration {
             include_str!("../../tree-sitter-bynk/queries/injections.scm"),
             "",
         )
-        .expect("karn highlight queries should compile");
+        .expect("bynk highlight queries should compile");
         config.configure(HIGHLIGHT_NAMES);
         config
     })
@@ -82,7 +82,7 @@ fn class_attrs() -> &'static [String] {
 }
 
 /// Highlight one block of Bynk source into inner `<code>` HTML.
-fn highlight_karn(code: &str) -> Option<String> {
+fn highlight_bynk(code: &str) -> Option<String> {
     let config = highlight_config();
     let attrs = class_attrs();
     let mut highlighter = Highlighter::new();
@@ -98,19 +98,19 @@ fn highlight_karn(code: &str) -> Option<String> {
     String::from_utf8(renderer.html).ok()
 }
 
-/// Rewrite every fenced ```karn block in a chapter's Markdown to highlighted
+/// Rewrite every fenced ```bynk block in a chapter's Markdown to highlighted
 /// HTML. Other fenced blocks (```typescript, ```text, …) are left untouched.
 fn process_markdown(content: &str) -> String {
     let mut out = String::new();
     let mut lines = content.lines().peekable();
     while let Some(line) = lines.next() {
         let trimmed = line.trim_start();
-        // Match a ```karn fence (with or without a `,annotation` suffix), but
-        // not ```karnx or other languages.
-        let is_karn_fence = trimmed.strip_prefix("```karn").is_some_and(|rest| {
+        // Match a ```bynk fence (with or without a `,annotation` suffix), but
+        // not ```bynkx or other languages.
+        let is_bynk_fence = trimmed.strip_prefix("```bynk").is_some_and(|rest| {
             rest.is_empty() || rest.starts_with(',') || rest.starts_with(char::is_whitespace)
         });
-        if is_karn_fence {
+        if is_bynk_fence {
             let mut code = String::new();
             for body in lines.by_ref() {
                 if body.trim() == "```" {
@@ -119,15 +119,15 @@ fn process_markdown(content: &str) -> String {
                 code.push_str(body);
                 code.push('\n');
             }
-            match highlight_karn(&code) {
+            match highlight_bynk(&code) {
                 Some(html) => {
-                    out.push_str("\n<pre class=\"karn\"><code>");
+                    out.push_str("\n<pre class=\"bynk\"><code>");
                     out.push_str(&html);
                     out.push_str("</code></pre>\n\n");
                 }
                 None => {
                     // Fall back to a plain code block if highlighting failed.
-                    out.push_str("```karn\n");
+                    out.push_str("```bynk\n");
                     out.push_str(&code);
                     out.push_str("```\n");
                 }

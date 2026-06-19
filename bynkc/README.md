@@ -32,8 +32,8 @@ Each phase lives in its own module under `src/`:
   a tree of TypeScript mirroring the source layout.
 
 Diagnostics flow through `error.rs` and [`ariadne`](https://crates.io/crates/ariadne).
-Every error carries a dotted category (`karn.parse.expected_token`,
-`karn.types.invalid_regex`, …), a source span, and a primary message; many carry
+Every error carries a dotted category (`bynk.parse.expected_token`,
+`bynk.types.invalid_regex`, …), a source span, and a primary message; many carry
 secondary labels and notes.
 
 ## Install

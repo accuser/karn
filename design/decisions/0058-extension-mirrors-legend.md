@@ -34,7 +34,7 @@ the crate, so it is **`exclude`d from the published `bynk-lsp` tarball**
 sibling).
 
 Token *visibility* stays with the client built-ins — inlay hints via a
-`provideInlayHints` middleware gated on `karn.inlayHints.enable` (the
+`provideInlayHints` middleware gated on `bynk.inlayHints.enable` (the
 persistent per-language preference; `editor.inlayHints.enabled` is the
 instant toggle), semantic tokens via `editor.semanticHighlighting.enabled`.
 No server change.

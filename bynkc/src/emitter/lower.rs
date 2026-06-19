@@ -1,5 +1,5 @@
 //! Expression and statement lowering — the `LowerCtx`-driven engine that
-//! turns Karn expressions, statements, matches, and mocks into TypeScript
+//! turns Bynk expressions, statements, matches, and mocks into TypeScript
 //! source. Split out of `emitter.rs` (ADR 0060); `LowerCtx` and the `ts_*`
 //! type renderers stay in the parent and are reached via `use super::*`.
 
@@ -253,7 +253,7 @@ fn emit_statement(out: &mut String, stmt: &Statement, cx: &mut LowerCtx, indent:
                 out,
                 indent,
                 &format!(
-                    "if (!({value})) {{ throw __karnAssertionFailure(\"offset {display}\", {span_start}, {span_end}); }}",
+                    "if (!({value})) {{ throw __bynkAssertionFailure(\"offset {display}\", {span_start}, {span_end}); }}",
                 ),
             );
         }
@@ -450,12 +450,12 @@ pub(crate) fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -
         ExprKind::Assert(inner) => {
             // v0.9.1: assert as an expression. Emit a runtime helper call
             // that returns void (i.e., evaluates to `undefined` at runtime
-            // and is treated as the unit value `()` in Karn terms).
+            // and is treated as the unit value `()` in Bynk terms).
             let value = lower_expr(inner, stmts, cx);
             let display = inner.span.start;
             let span_start = inner.span.start;
             let span_end = inner.span.end;
-            format!("__karnAssert(({value}), \"offset {display}\", {span_start}, {span_end})")
+            format!("__bynkAssert(({value}), \"offset {display}\", {span_start}, {span_end})")
         }
         ExprKind::Mock { type_ref, args } => lower_mock(type_ref, args, stmts, cx),
     }

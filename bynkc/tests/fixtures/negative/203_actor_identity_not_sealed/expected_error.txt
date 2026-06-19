@@ -1,2 +1,2 @@
-karn.actor.identity_not_sealed
+bynk.actor.identity_not_sealed
 context-ownable

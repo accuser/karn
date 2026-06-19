@@ -172,7 +172,7 @@ test commerce.money {
 doc block attached to fragment-form commons
 ================================================================================
 
-commons karn.time
+commons bynk.time
 
 ---
 A length of time in milliseconds.

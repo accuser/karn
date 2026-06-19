@@ -12,7 +12,7 @@ them — is part of the language, not a convention layered on top. Bynk compiles
 
 A minimal Bynk program declares a context and a type:
 
-```karn
+```bynk
 commons demo {
   type Id = Int
 }
@@ -20,7 +20,7 @@ commons demo {
 
 A small HTTP service is not much larger:
 
-```karn
+```bynk
 context greet
 
 service api from http {
@@ -63,7 +63,7 @@ planned. See [Versioning & roadmap](../about/versioning-and-roadmap.md).
 
 *Bynk* is Cornish for a rocky outcrop, or cairn: the name is meant to evoke
 something solid and structural that will not shift under you. It nods in
-particular to **Roughtor** on Bodmin Moor, one of Cornwall's great granite karns.
+particular to **Roughtor** on Bodmin Moor, one of Cornwall's great granite bynks.
 
 ## Next steps
 

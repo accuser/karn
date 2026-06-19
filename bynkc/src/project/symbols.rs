@@ -242,7 +242,7 @@ pub(crate) fn build_unit_table(
                 if let Some(prev) = table.types.get(&t.name.name) {
                     errors.push(
                         CompileError::new(
-                            "karn.resolve.duplicate_type",
+                            "bynk.resolve.duplicate_type",
                             t.name.span,
                             format!("type `{}` is already declared", t.name.name),
                         )
@@ -275,7 +275,7 @@ pub(crate) fn build_unit_table(
                 CommonsItem::Capability(c) => {
                     if kind != UnitKind::Context && kind != UnitKind::Adapter {
                         errors.push(CompileError::new(
-                            "karn.capability.outside_context",
+                            "bynk.capability.outside_context",
                             c.span,
                             "`capability` declarations are only allowed inside a context or adapter",
                         ));
@@ -284,7 +284,7 @@ pub(crate) fn build_unit_table(
                     if let Some(prev) = table.capabilities.get(&c.name.name) {
                         errors.push(
                             CompileError::new(
-                                "karn.resolve.duplicate_capability",
+                                "bynk.resolve.duplicate_capability",
                                 c.name.span,
                                 format!("capability `{}` is already declared", c.name.name),
                             )
@@ -301,9 +301,9 @@ pub(crate) fn build_unit_table(
                             // inside an adapter.
                             if p.external {
                                 errors.push(CompileError::new(
-                                    "karn.context.external_provider",
+                                    "bynk.context.external_provider",
                                     p.span,
-                                    "an external (bodiless) provider is only allowed inside an `adapter` — a context provider must have a Karn body",
+                                    "an external (bodiless) provider is only allowed inside an `adapter` — a context provider must have a Bynk body",
                                 ));
                                 continue;
                             }
@@ -313,7 +313,7 @@ pub(crate) fn build_unit_table(
                             // implementation comes from the binding.
                             if !p.external {
                                 errors.push(CompileError::new(
-                                    "karn.adapter.provider_has_body",
+                                    "bynk.adapter.provider_has_body",
                                     p.span,
                                     "a provider inside an `adapter` must be external (no body) — its implementation is supplied by the binding",
                                 ));
@@ -322,7 +322,7 @@ pub(crate) fn build_unit_table(
                         }
                         _ => {
                             errors.push(CompileError::new(
-                                "karn.provider.outside_context",
+                                "bynk.provider.outside_context",
                                 p.span,
                                 "`provides` declarations are only allowed inside a context or adapter",
                             ));
@@ -332,7 +332,7 @@ pub(crate) fn build_unit_table(
                     if let Some(prev) = table.providers.get(&p.capability.name) {
                         errors.push(
                             CompileError::new(
-                                "karn.resolve.duplicate_provider",
+                                "bynk.resolve.duplicate_provider",
                                 p.span,
                                 format!(
                                     "capability `{}` already has a provider in this context",
@@ -348,7 +348,7 @@ pub(crate) fn build_unit_table(
                 CommonsItem::Service(s) => {
                     if kind == UnitKind::Adapter {
                         errors.push(CompileError::new(
-                            "karn.adapter.disallowed_item",
+                            "bynk.adapter.disallowed_item",
                             s.span,
                             "an `adapter` may not declare a `service` — adapters contain only capabilities, boundary types, external providers, and helpers",
                         ));
@@ -356,7 +356,7 @@ pub(crate) fn build_unit_table(
                     }
                     if kind != UnitKind::Context {
                         errors.push(CompileError::new(
-                            "karn.service.outside_context",
+                            "bynk.service.outside_context",
                             s.span,
                             "`service` declarations are only allowed inside a context, not a commons",
                         ));
@@ -365,7 +365,7 @@ pub(crate) fn build_unit_table(
                     if let Some(prev) = table.services.get(&s.name.name) {
                         errors.push(
                             CompileError::new(
-                                "karn.resolve.duplicate_service",
+                                "bynk.resolve.duplicate_service",
                                 s.name.span,
                                 format!("service `{}` is already declared", s.name.name),
                             )
@@ -378,7 +378,7 @@ pub(crate) fn build_unit_table(
                 CommonsItem::Agent(a) => {
                     if kind == UnitKind::Adapter {
                         errors.push(CompileError::new(
-                            "karn.adapter.disallowed_item",
+                            "bynk.adapter.disallowed_item",
                             a.span,
                             "an `adapter` may not declare an `agent` — adapters contain only capabilities, boundary types, external providers, and helpers",
                         ));
@@ -386,7 +386,7 @@ pub(crate) fn build_unit_table(
                     }
                     if kind != UnitKind::Context {
                         errors.push(CompileError::new(
-                            "karn.agent.outside_context",
+                            "bynk.agent.outside_context",
                             a.span,
                             "`agent` declarations are only allowed inside a context, not a commons",
                         ));
@@ -395,7 +395,7 @@ pub(crate) fn build_unit_table(
                     if let Some(prev) = table.agents.get(&a.name.name) {
                         errors.push(
                             CompileError::new(
-                                "karn.resolve.duplicate_agent",
+                                "bynk.resolve.duplicate_agent",
                                 a.name.span,
                                 format!("agent `{}` is already declared", a.name.name),
                             )
@@ -408,7 +408,7 @@ pub(crate) fn build_unit_table(
                 CommonsItem::Actor(a) => {
                     if kind == UnitKind::Adapter {
                         errors.push(CompileError::new(
-                            "karn.adapter.disallowed_item",
+                            "bynk.adapter.disallowed_item",
                             a.span,
                             "an `adapter` may not declare an `actor` — adapters contain only capabilities, boundary types, external providers, and helpers",
                         ));
@@ -417,7 +417,7 @@ pub(crate) fn build_unit_table(
                     if let Some(prev) = table.actors.get(&a.name.name) {
                         errors.push(
                             CompileError::new(
-                                "karn.resolve.duplicate_actor",
+                                "bynk.resolve.duplicate_actor",
                                 a.name.span,
                                 format!("actor `{}` is already declared", a.name.name),
                             )
@@ -439,7 +439,7 @@ pub(crate) fn build_unit_table(
                     if let Some(prev) = table.fns.get(&id.name) {
                         errors.push(
                             CompileError::new(
-                                "karn.resolve.duplicate_fn",
+                                "bynk.resolve.duplicate_fn",
                                 id.span,
                                 format!("function `{}` is already declared", id.name),
                             )
@@ -448,7 +448,7 @@ pub(crate) fn build_unit_table(
                     } else if let Some(prev) = table.types.get(&id.name) {
                         errors.push(
                             CompileError::new(
-                                "karn.resolve.name_conflict",
+                                "bynk.resolve.name_conflict",
                                 id.span,
                                 format!(
                                     "function `{}` conflicts with a type of the same name",
@@ -468,7 +468,7 @@ pub(crate) fn build_unit_table(
                     if !table.types.contains_key(&type_name.name) {
                         errors.push(
                             CompileError::new(
-                                "karn.resolve.method_unknown_type",
+                                "bynk.resolve.method_unknown_type",
                                 type_name.span,
                                 format!(
                                     "method `{}.{}` attached to an unknown type `{}`",
@@ -490,7 +490,7 @@ pub(crate) fn build_unit_table(
                     if let Some(prev) = bucket.get(&method_name.name) {
                         errors.push(
                             CompileError::new(
-                                "karn.resolve.duplicate_method",
+                                "bynk.resolve.duplicate_method",
                                 method_name.span,
                                 format!(
                                     "method `{}.{}` is already declared",
@@ -738,7 +738,7 @@ pub(crate) fn resolve_given_cap_ref(
             }
             None => {
                 errors.push(CompileError::new(
-                    "karn.given.unknown_capability",
+                    "bynk.given.unknown_capability",
                     cap_ref.span,
                     format!(
                         "capability `{}` is not declared in this context",
@@ -753,7 +753,7 @@ pub(crate) fn resolve_given_cap_ref(
     let Some(ctx_name) = cross_context.resolve_prefix(&prefix) else {
         errors.push(
             CompileError::new(
-                "karn.resolve.unconsumed_context",
+                "bynk.resolve.unconsumed_context",
                 cap_ref.span,
                 format!(
                     "`given {}.{}` refers to a context that this context does not `consumes`",
@@ -784,7 +784,7 @@ pub(crate) fn resolve_given_cap_ref(
     if !exports_it {
         errors.push(
             CompileError::new(
-                "karn.given.cross_context_unknown_capability",
+                "bynk.given.cross_context_unknown_capability",
                 cap_ref.span,
                 format!(
                     "context `{}` does not export a capability named `{}`",

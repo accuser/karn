@@ -1,1 +1,1 @@
-karn.consumes.unknown_service
+bynk.consumes.unknown_service

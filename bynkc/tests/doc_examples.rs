@@ -1,12 +1,12 @@
 //! The example-compilation gate.
 //!
-//! Extracts every fenced ```karn block from `docs/src/**` and compiles it, so a
+//! Extracts every fenced ```bynk block from `docs/src/**` and compiles it, so a
 //! doc example can never fall out of step with the compiler.
 //!
 //! Block handling, by the fence's info string and the block's first line:
-//! - ```karn,ignore  → skipped (fragments, pseudo-syntax, partial snippets).
-//! - ```karn,fail    → must FAIL to compile (negative examples).
-//! - ```karn         → checked:
+//! - ```bynk,ignore  → skipped (fragments, pseudo-syntax, partial snippets).
+//! - ```bynk,fail    → must FAIL to compile (negative examples).
+//! - ```bynk         → checked:
 //!     * a block starting `commons …` is compiled as a single file;
 //!     * a block starting `context …` is compiled as a one-file project;
 //!     * anything else (a fragment, a `test` block, a bare expression) is
@@ -45,8 +45,8 @@ fn collect_blocks() -> Vec<Block> {
         let mut lines = text.lines().enumerate();
         while let Some((idx, line)) = lines.next() {
             let trimmed = line.trim_start();
-            if let Some(rest) = trimmed.strip_prefix("```karn") {
-                // `rest` is "" for ```karn, or ",fail" / ",ignore" etc.
+            if let Some(rest) = trimmed.strip_prefix("```bynk") {
+                // `rest` is "" for ```bynk, or ",fail" / ",ignore" etc.
                 let info = rest.trim_start_matches(',').to_string();
                 let mut body = String::new();
                 for (_, l) in lines.by_ref() {
@@ -121,7 +121,7 @@ fn compile_context(body: &str, idx: usize) -> Result<(), String> {
 #[test]
 fn every_doc_example_compiles() {
     let blocks = collect_blocks();
-    assert!(!blocks.is_empty(), "found no ```karn blocks under docs/src");
+    assert!(!blocks.is_empty(), "found no ```bynk blocks under docs/src");
 
     let (mut checked_ok, mut checked_fail, mut skip_ignored, mut skip_fragment, mut skip_include) =
         (0, 0, 0, 0, 0);

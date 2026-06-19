@@ -14,7 +14,7 @@ bynkc fmt src/*.karn
 This rewrites the named files to canonical form (tab indentation, normalised
 spacing). For example:
 
-```karn
+```bynk
 commons demo {
 type Id=Int
 fn add(a:Int,b:Int)->Int{a+b}
@@ -23,7 +23,7 @@ fn add(a:Int,b:Int)->Int{a+b}
 
 becomes:
 
-```karn
+```bynk
 commons demo {
 	type Id = Int
 

@@ -1,1 +1,1 @@
-karn.cron.invalid_schedule
+bynk.cron.invalid_schedule

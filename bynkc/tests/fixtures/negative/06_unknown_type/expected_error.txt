@@ -1,2 +1,2 @@
-karn.resolve.unknown_type
+bynk.resolve.unknown_type
 unknown type `Missing`

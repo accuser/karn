@@ -186,7 +186,7 @@ mod tests {
 
     #[test]
     fn callout_becomes_div_with_markdown_body() {
-        let md = "> [!DANGER]\n> The `/_karn/` prefix is **reserved**.\n";
+        let md = "> [!DANGER]\n> The `/_bynk/` prefix is **reserved**.\n";
         let out = process_markdown(md);
         assert!(
             out.contains("<div class=\"callout callout-danger\">"),
@@ -198,7 +198,7 @@ mod tests {
         );
         // Body preserved as Markdown (blank lines around it let it render).
         assert!(
-            out.contains("The `/_karn/` prefix is **reserved**."),
+            out.contains("The `/_bynk/` prefix is **reserved**."),
             "{out}"
         );
         assert!(out.contains("</div>"), "{out}");

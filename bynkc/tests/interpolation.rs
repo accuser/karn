@@ -48,7 +48,7 @@ fn a_non_scalar_hole_is_rejected() {
     let errs = bynkc::compile(&src, "demo.karn").expect_err("a non-scalar hole is an error");
     assert!(
         errs.iter()
-            .any(|e| e.category == "karn.types.interpolation_non_scalar"),
+            .any(|e| e.category == "bynk.types.interpolation_non_scalar"),
         "expected interpolation_non_scalar; got {errs:?}"
     );
 }

@@ -51,7 +51,7 @@ This produces the **`bynkc-lsp`** binary. Requires a stable Rust toolchain,
 `bynkc-lsp` speaks LSP over stdio. Most users consume it through the
 [VS Code extension](https://github.com/accuser/bynk/tree/main/vscode-bynk),
 which bundles and launches it automatically. For other editors, point your LSP
-client at the `bynkc-lsp` binary and associate it with the `karn` language /
+client at the `bynkc-lsp` binary and associate it with the `bynk` language /
 `.karn` files. See
 [Set up editor support](https://github.com/accuser/bynk/blob/main/docs/src/guides/editor-and-tooling/editor-support.md).
 

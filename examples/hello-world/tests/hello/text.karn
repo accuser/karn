@@ -4,7 +4,7 @@ test hello.text {
   }
 
   test "greets any valid subject" {
-    assert greeting(Mock[Subject]("Karn")) == "Hello, Karn!"
+    assert greeting(Mock[Subject]("Bynk")) == "Hello, Bynk!"
   }
 
   test "rejects an empty subject" {

@@ -63,20 +63,20 @@ pub fn describe_symbol(source: &str, name: &str) -> Option<String> {
     None
 }
 
-/// Describe a symbol declared in the embedded first-party sources — the `karn`
-/// and `karn.cloudflare` adapters and the `karn.list`/`karn.map`/`karn.string`
+/// Describe a symbol declared in the embedded first-party sources — the `bynk`
+/// and `bynk.cloudflare` adapters and the `bynk.list`/`bynk.map`/`bynk.string`
 /// stdlib. Hover and completion-doc resolution otherwise walk only the project's
-/// files (`walk_karn_files`), so stdlib/surface symbols had no surfaced signature
+/// files (`walk_bynk_files`), so stdlib/surface symbols had no surfaced signature
 /// or doc; this is the fallback after the project scan. Any `---` doc block on a
 /// first-party declaration rides along (via `describe_fn`/`describe_type`/…),
 /// once the sources carry one.
 pub(crate) fn describe_firstparty_symbol(name: &str) -> Option<String> {
     const SOURCES: &[&str] = &[
-        bynkc::firstparty::KARN_ADAPTER_SRC,
+        bynkc::firstparty::BYNK_ADAPTER_SRC,
         bynkc::firstparty::CLOUDFLARE_ADAPTER_SRC,
-        bynkc::firstparty::KARN_LIST_SRC,
-        bynkc::firstparty::KARN_MAP_SRC,
-        bynkc::firstparty::KARN_STRING_SRC,
+        bynkc::firstparty::BYNK_LIST_SRC,
+        bynkc::firstparty::BYNK_MAP_SRC,
+        bynkc::firstparty::BYNK_STRING_SRC,
     ];
     SOURCES.iter().find_map(|src| describe_symbol(src, name))
 }
@@ -122,7 +122,7 @@ fn describe_item(item: &CommonsItem, name: &str) -> Option<String> {
 
 fn describe_type(t: &TypeDecl) -> String {
     let mut out = String::new();
-    out.push_str("```karn\n");
+    out.push_str("```bynk\n");
     let body = match &t.body {
         TypeBody::Refined { base, .. } => format!("type {} = {}", t.name.name, base.name()),
         TypeBody::Opaque { base, .. } => format!("type {} = opaque {}", t.name.name, base.name()),
@@ -141,7 +141,7 @@ fn describe_type(t: &TypeDecl) -> String {
 
 fn describe_fn(f: &FnDecl) -> String {
     let mut out = String::new();
-    out.push_str("```karn\n");
+    out.push_str("```bynk\n");
     out.push_str("fn ");
     out.push_str(&f.name.display());
     out.push('(');
@@ -166,7 +166,7 @@ fn describe_fn(f: &FnDecl) -> String {
 
 fn describe_capability(c: &CapabilityDecl) -> String {
     let mut out = String::new();
-    out.push_str("```karn\ncapability ");
+    out.push_str("```bynk\ncapability ");
     out.push_str(&c.name.name);
     out.push_str(" {\n");
     for op in &c.ops {
@@ -193,7 +193,7 @@ fn describe_capability(c: &CapabilityDecl) -> String {
 }
 
 fn describe_service(s: &ServiceDecl) -> String {
-    let mut out = format!("```karn\nservice {}\n```\n", s.name.name);
+    let mut out = format!("```bynk\nservice {}\n```\n", s.name.name);
     if let Some(doc) = &s.documentation {
         out.push('\n');
         out.push_str(doc);
@@ -205,7 +205,7 @@ fn describe_service(s: &ServiceDecl) -> String {
 
 fn describe_agent(a: &AgentDecl) -> String {
     let mut out = format!(
-        "```karn\nagent {} {{\n\tkey {}: {}\n\tstate {{ {} field(s) }}\n}}\n```\n",
+        "```bynk\nagent {} {{\n\tkey {}: {}\n\tstate {{ {} field(s) }}\n}}\n```\n",
         a.name.name,
         a.key_name.name,
         type_ref_str(&a.key_type),
@@ -221,7 +221,7 @@ fn describe_agent(a: &AgentDecl) -> String {
 
 fn describe_provider(p: &ProviderDecl) -> String {
     let mut out = format!(
-        "```karn\nprovides {} = {}\n```\n",
+        "```bynk\nprovides {} = {}\n```\n",
         p.capability.name, p.provider_name.name
     );
     if let Some(doc) = &p.documentation {
@@ -255,7 +255,7 @@ pub fn find_declaration_cross_file(
     current_uri: &Url,
     name: &str,
 ) -> Option<CrossFileSymbol> {
-    for path in walk_karn_files(src_root) {
+    for path in walk_bynk_files(src_root) {
         let Ok(uri) = Url::from_file_path(&path) else {
             continue;
         };
@@ -280,7 +280,7 @@ pub fn describe_symbol_cross_file(
     current_uri: &Url,
     name: &str,
 ) -> Option<(Url, String)> {
-    for path in walk_karn_files(src_root) {
+    for path in walk_bynk_files(src_root) {
         let Ok(uri) = Url::from_file_path(&path) else {
             continue;
         };
@@ -299,7 +299,7 @@ pub fn describe_symbol_cross_file(
 
 /// Recursively collect every `.karn` file under `root`. Returns an empty
 /// vector if the root is missing or unreadable.
-pub(crate) fn walk_karn_files(root: &Path) -> Vec<PathBuf> {
+pub(crate) fn walk_bynk_files(root: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     while let Some(dir) = stack.pop() {
@@ -321,7 +321,7 @@ pub(crate) fn walk_karn_files(root: &Path) -> Vec<PathBuf> {
 
 pub(crate) fn type_ref_str(t: &TypeRef) -> String {
     match t {
-        // v0.20a: function types render in Karn surface syntax.
+        // v0.20a: function types render in Bynk surface syntax.
         TypeRef::Fn(params, ret, _) => {
             let lhs = match params.len() {
                 0 => "()".to_string(),
@@ -364,7 +364,7 @@ mod tests {
     /// if they care.
     fn setup_project(test_name: &str, files: &[(&str, &str)]) -> PathBuf {
         let root = std::env::temp_dir().join(format!(
-            "karn-lsp-test-{}-{}",
+            "bynk-lsp-test-{}-{}",
             test_name,
             std::process::id()
         ));
@@ -472,7 +472,7 @@ mod tests {
         // Slice 9: stdlib/surface symbols live in the embedded sources, not the
         // project — the hover/completion-doc fallback finds them there, signature
         // and `---` doc block alike.
-        let reverse = describe_firstparty_symbol("reverse").expect("`karn.list.reverse` described");
+        let reverse = describe_firstparty_symbol("reverse").expect("`bynk.list.reverse` described");
         assert!(
             reverse.contains("reverse") && reverse.contains("List"),
             "{reverse}"
@@ -481,8 +481,8 @@ mod tests {
             reverse.contains("reverse order"),
             "doc block surfaced: {reverse}"
         );
-        // The `karn` adapter surface too (a capability, exercising the adapter path).
-        let clock = describe_firstparty_symbol("Clock").expect("`karn`-surface `Clock`");
+        // The `bynk` adapter surface too (a capability, exercising the adapter path).
+        let clock = describe_firstparty_symbol("Clock").expect("`bynk`-surface `Clock`");
         assert!(
             clock.contains("wall-clock"),
             "capability doc surfaced: {clock}"

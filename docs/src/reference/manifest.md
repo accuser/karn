@@ -40,8 +40,8 @@ In a project (split-paths) layout, source units live under `src/` and test units
 under `tests/`, each at a path matching its qualified name — `context
 commerce.orders` in `src/commerce/orders.karn`, `test commerce.orders` in
 `tests/commerce/orders.karn`. Mismatches raise
-`karn.project.inconsistent_commons_name` or
-`karn.project.inconsistent_test_path`.
+`bynk.project.inconsistent_commons_name` or
+`bynk.project.inconsistent_test_path`.
 
 ## `[fmt]`
 

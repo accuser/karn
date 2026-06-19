@@ -15,7 +15,7 @@ Workers**.
 
 ## The idea in one example
 
-```karn
+```bynk
 context greet
 
 service api {
@@ -52,7 +52,7 @@ source with a recent Rust toolchain (stable, 2024 edition — see
 
 ```sh
 git clone https://github.com/accuser/bynk.git
-cd karn
+cd bynk
 cargo install --path bynkc      # the `bynkc` compiler
 cargo install --path bynk-lsp   # optional: the `bynkc-lsp` language server
 ```

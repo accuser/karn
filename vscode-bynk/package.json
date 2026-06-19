@@ -3,7 +3,7 @@
   "displayName": "Bynk",
   "description": "Language support for Bynk (.karn) source files.",
   "version": "0.55.0",
-  "publisher": "karn",
+  "publisher": "bynk",
   "license": "MIT OR Apache-2.0",
   "repository": {
     "url": "https://github.com/accuser/bynk"
@@ -19,17 +19,17 @@
     "Formatters"
   ],
   "activationEvents": [
-    "onLanguage:karn",
+    "onLanguage:bynk",
     "workspaceContains:bynk.toml"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "languages": [
       {
-        "id": "karn",
+        "id": "bynk",
         "aliases": [
           "Bynk",
-          "karn"
+          "bynk"
         ],
         "extensions": [
           ".karn"
@@ -39,9 +39,9 @@
     ],
     "grammars": [
       {
-        "language": "karn",
+        "language": "bynk",
         "scopeName": "source.bynk",
-        "path": "./syntaxes/karn.tmLanguage.json"
+        "path": "./syntaxes/bynk.tmLanguage.json"
       }
     ],
     "semanticTokenTypes": [
@@ -82,12 +82,12 @@
       },
       {
         "id": "platformNative",
-        "description": "Declared by a platform adapter (e.g. karn.cloudflare's Kv)."
+        "description": "Declared by a platform adapter (e.g. bynk.cloudflare's Kv)."
       }
     ],
     "semanticTokenScopes": [
       {
-        "language": "karn",
+        "language": "bynk",
         "scopes": {
           "capability": [
             "entity.name.type.interface"
@@ -127,40 +127,40 @@
     ],
     "commands": [
       {
-        "command": "karn.restartServer",
+        "command": "bynk.restartServer",
         "title": "Restart Language Server",
         "category": "Bynk"
       },
       {
-        "command": "karn.downloadServer",
+        "command": "bynk.downloadServer",
         "title": "Download Language Server",
         "category": "Bynk"
       },
       {
-        "command": "karn.showServerOutput",
+        "command": "bynk.showServerOutput",
         "title": "Show Language Server Output",
         "category": "Bynk"
       },
       {
-        "command": "karn.openProjectConfig",
+        "command": "bynk.openProjectConfig",
         "title": "Open Project Config (bynk.toml)",
         "category": "Bynk"
       },
       {
-        "command": "karn.newProject",
+        "command": "bynk.newProject",
         "title": "New Project",
         "category": "Bynk"
       },
       {
-        "command": "karn.newContext",
+        "command": "bynk.newContext",
         "title": "New Context",
         "category": "Bynk"
       }
     ],
     "snippets": [
       {
-        "language": "karn",
-        "path": "./snippets/karn.json"
+        "language": "bynk",
+        "path": "./snippets/bynk.json"
       }
     ],
     "taskDefinitions": [
@@ -171,7 +171,7 @@
     "problemMatchers": [
       {
         "name": "bynkc",
-        "owner": "karn",
+        "owner": "bynk",
         "source": "bynkc",
         "fileLocation": [
           "relative",
@@ -192,12 +192,12 @@
       "type": "object",
       "title": "Bynk",
       "properties": {
-        "karn.executablePath": {
+        "bynk.executablePath": {
           "type": "string",
           "default": "",
           "description": "Absolute path to a bynkc-lsp executable to use. When empty, the extension resolves the server automatically: `bynkc-lsp` on PATH, then a previously-downloaded copy, then it downloads the matching release."
         },
-        "karn.trace.server": {
+        "bynk.trace.server": {
           "type": "string",
           "enum": [
             "off",
@@ -207,22 +207,22 @@
           "default": "off",
           "description": "Trace LSP protocol communication (visible in the Bynk LSP output channel)."
         },
-        "karn.inlayHints.enable": {
+        "bynk.inlayHints.enable": {
           "type": "boolean",
           "default": true,
           "description": "Show Bynk inlay hints. When off, the Bynk server's hints are hidden; this takes effect on the next edit or scroll. For an instant on/off use the built-in `editor.inlayHints.enabled`."
         },
-        "karn.inlayHints.types": {
+        "bynk.inlayHints.types": {
           "type": "boolean",
           "default": true,
-          "description": "Show inferred-type hints (on `let` bindings and lambda parameters). Requires `karn.inlayHints.enable`."
+          "description": "Show inferred-type hints (on `let` bindings and lambda parameters). Requires `bynk.inlayHints.enable`."
         },
-        "karn.inlayHints.parameterNames": {
+        "bynk.inlayHints.parameterNames": {
           "type": "boolean",
           "default": true,
-          "description": "Show parameter-name hints at call arguments. Requires `karn.inlayHints.enable`."
+          "description": "Show parameter-name hints at call arguments. Requires `bynk.inlayHints.enable`."
         },
-        "karn.compilerPath": {
+        "bynk.compilerPath": {
           "type": "string",
           "default": "",
           "description": "Path to the `bynkc` compiler used by the `bynkc: check` build task. When empty, `bynkc` is taken from PATH."
@@ -230,13 +230,13 @@
       }
     },
     "configurationDefaults": {
-      "[karn]": {
-        "editor.defaultFormatter": "karn.bynk-vscode"
+      "[bynk]": {
+        "editor.defaultFormatter": "bynk.bynk-vscode"
       }
     },
     "walkthroughs": [
       {
-        "id": "karn.gettingStarted",
+        "id": "bynk.gettingStarted",
         "title": "Get Started with Bynk",
         "description": "Set up a project and write your first Bynk context.",
         "steps": [
@@ -251,12 +251,12 @@
           {
             "id": "project",
             "title": "Create a project",
-            "description": "Scaffold a `bynk.toml` and a starter context.\n[New Project](command:karn.newProject)",
+            "description": "Scaffold a `bynk.toml` and a starter context.\n[New Project](command:bynk.newProject)",
             "media": {
               "markdown": "walkthroughs/project.md"
             },
             "completionEvents": [
-              "onCommand:karn.newProject"
+              "onCommand:bynk.newProject"
             ]
           },
           {

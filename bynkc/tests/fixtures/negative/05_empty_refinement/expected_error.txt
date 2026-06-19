@@ -1,2 +1,2 @@
-karn.types.empty_refinement
+bynk.types.empty_refinement
 no valid values

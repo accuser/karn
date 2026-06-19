@@ -6,7 +6,7 @@ checks it at compile time and admits it directly — no
 [`.of`](../../reference/glossary.md#term-of-unsafe), no
 [`Result`](../../reference/glossary.md#term-result-option):
 
-```karn
+```bynk
 fn defaultQty() -> Quantity {   -- Quantity = Int where InRange(1, 100)
   5
 }
@@ -24,7 +24,7 @@ const age: number = 240; // compiles — 240 is a perfectly good `number`
 In Bynk, a literal in a refined-type position is checked against the predicate at
 compile time, so the out-of-range value cannot be constructed:
 
-```karn,fail
+```bynk,fail
 {{#include ../../../diagnostics/refine_out_of_range.karn}}
 ```
 
@@ -61,7 +61,7 @@ positions where the expected type is a refined type, a literal is checked agains
 the predicate and admitted. Those positions are the return position, a `let` with
 a type annotation, an `Ok`/`Some`/`Err` payload, and a refined-typed call
 argument. A valid literal compiles (lowering to `.unsafe`); an invalid one is a
-compile error, [`karn.refine.literal_violates`](../../troubleshooting/refine-literal-violates.md).
+compile error, [`bynk.refine.literal_violates`](../../troubleshooting/refine-literal-violates.md).
 
 ```mermaid
 flowchart TD
@@ -69,7 +69,7 @@ flowchart TD
   q -->|yes| check["checked against the predicate at compile time"]
   check --> ok{"satisfies it?"}
   ok -->|yes| admitted["admitted — emits T.unsafe(literal)"]
-  ok -->|no| err["compile error: karn.refine.literal_violates"]
+  ok -->|no| err["compile error: bynk.refine.literal_violates"]
   q -->|"no — dynamic or untrusted"| of["T.of(value)"]
   of --> res["Result[T, ValidationError]"]
   res --> handle["caller must handle Err"]
@@ -82,7 +82,7 @@ through `.of` and a `Result`.*
 Text equivalent: to get a value into a refined type `T`, a literal known at
 compile time is checked against the predicate — if it satisfies it the literal is
 admitted (emitting `T.unsafe(literal)`), otherwise it is a compile error
-(`karn.refine.literal_violates`). Dynamic or untrusted input goes through
+(`bynk.refine.literal_violates`). Dynamic or untrusted input goes through
 `T.of(value)`, which returns `Result[T, ValidationError]` that the caller must
 handle. `T.unsafe(value)` is the explicit escape hatch: it asserts validity with
 no check.

@@ -1,6 +1,6 @@
 context jobs
 
-uses karn.list
+uses bynk.list
 
 capability Clock {
   fn now() -> Effect[Int]

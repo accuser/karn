@@ -406,7 +406,7 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, CompileError> {
                 }
                 None => {
                     return Err(CompileError::new(
-                        "karn.lex.unclosed_doc_block",
+                        "bynk.lex.unclosed_doc_block",
                         Span::new(pos, open_end),
                         "documentation block opened but never closed",
                     )
@@ -462,7 +462,7 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, CompileError> {
             let ch = source[pos..].chars().next().unwrap_or('\0');
             let span = Span::new(pos, pos + ch.len_utf8());
             return Err(CompileError::new(
-                "karn.lex.unexpected_character",
+                "bynk.lex.unexpected_character",
                 span,
                 format!("unexpected character `{ch}`"),
             ));
@@ -475,7 +475,7 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, CompileError> {
                     let slice = &source[span.range()];
                     if slice.parse::<i64>().is_err() {
                         return Err(CompileError::new(
-                            "karn.lex.integer_overflow",
+                            "bynk.lex.integer_overflow",
                             span,
                             format!(
                                 "integer literal `{slice}` is out of range for a 64-bit signed integer"
@@ -490,7 +490,7 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, CompileError> {
                         Ok(v) if v.is_finite() => {}
                         _ => {
                             return Err(CompileError::new(
-                                "karn.lex.float_literal_overflow",
+                                "bynk.lex.float_literal_overflow",
                                 span,
                                 format!(
                                     "float literal `{slice}` is out of range for a 64-bit float"
@@ -511,7 +511,7 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, CompileError> {
                 let ch = slice.chars().next().unwrap_or('\0');
                 let err = if ch == '"' {
                     CompileError::new(
-                        "karn.lex.unterminated_string",
+                        "bynk.lex.unterminated_string",
                         span,
                         "unterminated string literal",
                     )
@@ -521,7 +521,7 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, CompileError> {
                     )
                 } else {
                     CompileError::new(
-                        "karn.lex.unexpected_character",
+                        "bynk.lex.unexpected_character",
                         span,
                         format!("unexpected character `{ch}`"),
                     )
@@ -565,7 +565,7 @@ fn scan_str(bytes: &[u8], source: &str, start: usize) -> Result<usize, CompileEr
     loop {
         if i >= bytes.len() || bytes[i] == b'\n' {
             return Err(CompileError::new(
-                "karn.lex.unterminated_string",
+                "bynk.lex.unterminated_string",
                 Span::new(start, i.min(bytes.len())),
                 "unterminated string literal",
             )
@@ -582,7 +582,7 @@ fn scan_str(bytes: &[u8], source: &str, start: usize) -> Result<usize, CompileEr
                 other => {
                     let shown = other.map(|b| (*b as char).to_string()).unwrap_or_default();
                     return Err(CompileError::new(
-                        "karn.lex.bad_escape",
+                        "bynk.lex.bad_escape",
                         Span::new(i, (i + 2).min(bytes.len())),
                         format!("invalid escape sequence `\\{shown}` in string literal"),
                     )
@@ -606,7 +606,7 @@ fn scan_hole(bytes: &[u8], source: &str, start: usize) -> Result<usize, CompileE
     loop {
         if i >= bytes.len() || bytes[i] == b'\n' {
             return Err(CompileError::new(
-                "karn.lex.unterminated_interpolation",
+                "bynk.lex.unterminated_interpolation",
                 Span::new(start.saturating_sub(2), i.min(bytes.len())),
                 "unterminated interpolation hole",
             )
@@ -950,19 +950,19 @@ mod tests {
     #[test]
     fn unterminated_string_is_error() {
         let err = tokenize("\"oops\n").unwrap_err();
-        assert_eq!(err.category, "karn.lex.unterminated_string");
+        assert_eq!(err.category, "bynk.lex.unterminated_string");
     }
 
     #[test]
     fn integer_overflow_is_error() {
         let err = tokenize("99999999999999999999").unwrap_err();
-        assert_eq!(err.category, "karn.lex.integer_overflow");
+        assert_eq!(err.category, "bynk.lex.integer_overflow");
     }
 
     #[test]
     fn unexpected_character_is_error() {
         let err = tokenize("type X = Int $").unwrap_err();
-        assert_eq!(err.category, "karn.lex.unexpected_character");
+        assert_eq!(err.category, "bynk.lex.unexpected_character");
     }
 
     #[test]
@@ -1043,19 +1043,19 @@ mod tests {
     fn unterminated_hole_is_an_error() {
         // The hole runs to end of line without its closing `)`.
         let err = tokenize("\"value \\(x + 1\n\"").unwrap_err();
-        assert_eq!(err.category, "karn.lex.unterminated_interpolation");
+        assert_eq!(err.category, "bynk.lex.unterminated_interpolation");
     }
 
     #[test]
     fn unterminated_interp_string_is_an_error() {
         // A hole closes but the string never does (newline before the `"`).
         let err = tokenize("\"value \\(x) more\n").unwrap_err();
-        assert_eq!(err.category, "karn.lex.unterminated_string");
+        assert_eq!(err.category, "bynk.lex.unterminated_string");
     }
 
     #[test]
     fn bad_escape_in_interp_string_is_an_error() {
         let err = tokenize(r#""a \q \(x)""#).unwrap_err();
-        assert_eq!(err.category, "karn.lex.bad_escape");
+        assert_eq!(err.category, "bynk.lex.bad_escape");
     }
 }

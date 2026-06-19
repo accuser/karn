@@ -95,8 +95,8 @@ fn compile_fixture(
     fixture_root: &Path,
     target: bynkc::BuildTarget,
 ) -> Result<bynkc::ProjectOutput, Vec<bynkc::CompileError>> {
-    let karn_toml = fixture_root.join("bynk.toml");
-    if karn_toml.exists() {
+    let bynk_toml = fixture_root.join("bynk.toml");
+    if bynk_toml.exists() {
         // Split-paths mode compiles at the default platform — a bynk.toml
         // fixture with a platform.txt would silently ignore it.
         assert!(

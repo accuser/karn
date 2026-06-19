@@ -73,9 +73,9 @@ fn diagnostic_transcripts_are_up_to_date() {
     let bless = std::env::var_os("BYNK_BLESS").is_some();
     let mut failures: Vec<String> = Vec::new();
 
-    for karn in fixtures {
-        let id = karn.file_stem().unwrap().to_str().unwrap().to_string();
-        let source = fs::read_to_string(&karn).unwrap();
+    for bynk in fixtures {
+        let id = bynk.file_stem().unwrap().to_str().unwrap().to_string();
+        let source = fs::read_to_string(&bynk).unwrap();
 
         // A diagnostics fixture that compiles is a bug — it has nothing to show.
         let errors = match compile_fixture(&id, &source) {

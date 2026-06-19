@@ -66,7 +66,7 @@ A type scheme is a polymorphic type; a type is a monotype. Generalisation happen
 
 The `PrimType` set is fixed by the language. New primitive types require language work, not user definition. The current set covers numeric (`Int`, `Decimal`), text (`String`, `Bytes`), logical (`Bool`), temporal (`Timestamp`, `Duration`), and the unit type (`Unit`).
 
-**Temporal primitives.** `Timestamp` is an unsigned integer count of milliseconds since the Unix epoch (1970-01-01T00:00:00Z). It carries the semantic of "an instant in time" but exposes only integer-like operations: comparison, arithmetic with `Duration`, equality. No calendar awareness — no year/month/day decomposition, no timezone handling, no parsing of date strings. `Duration` is a signed integer count of milliseconds, with arithmetic that composes with itself and with `Timestamp` (Timestamp + Duration = Timestamp; Timestamp - Timestamp = Duration; Duration + Duration = Duration; Duration * Int = Duration). The temporal primitives are the lowest layer; richer calendrical types (`Date`, `DateTime`, etc.) are library types built on these primitives in `karn.time` and consumed by applications that need them.
+**Temporal primitives.** `Timestamp` is an unsigned integer count of milliseconds since the Unix epoch (1970-01-01T00:00:00Z). It carries the semantic of "an instant in time" but exposes only integer-like operations: comparison, arithmetic with `Duration`, equality. No calendar awareness — no year/month/day decomposition, no timezone handling, no parsing of date strings. `Duration` is a signed integer count of milliseconds, with arithmetic that composes with itself and with `Timestamp` (Timestamp + Duration = Timestamp; Timestamp - Timestamp = Duration; Duration + Duration = Duration; Duration * Int = Duration). The temporal primitives are the lowest layer; richer calendrical types (`Date`, `DateTime`, etc.) are library types built on these primitives in `bynk.time` and consumed by applications that need them.
 
 ### 1.2 Term grammar — Settled in shape
 
@@ -233,7 +233,7 @@ What consumers do not do: construct values of foreign types directly, even via "
 **Diagnostic when violated.**
 
 ```
-karn.types.external_construction:
+bynk.types.external_construction:
   cannot construct values of type `Voucher` outside its defining context
   type `Voucher` is owned by context `commerce.vouchers`
   this construction is in context `commerce.orders`
@@ -300,8 +300,8 @@ commons commerce.money {
   exports transparent { CurrencyCode, Money, CurrencyMismatch }
 }
 
-commons karn.time {
-  uses karn.primitives    -- if another commons existed at that name
+commons bynk.time {
+  uses bynk.primitives    -- if another commons existed at that name
   
   type Date     -- opaque, wrapping Timestamp
   type DateTime
@@ -331,7 +331,7 @@ The compiler enforces these constraints. A commons that violates any of them is 
 - `exports opaque`, `exports transparent`, `exports private` clauses — same mechanism as contexts.
 - `uses` of other commons (cycles permitted; no runtime coupling).
 
-**Naming and the architectural flat-ness.** A commons has a qualified name like `karn.time`, `commerce.money`, or just `money`. The dotted hierarchy is purely organisational — it groups names in the project's filesystem and signposts logical clustering, but carries no architectural meaning. A commons named `commerce.money` is not "for" `commerce.*` contexts any more than for any other context; any context can `uses commerce.money` regardless of its own name. The naming hierarchy reflects organisation; the language imposes no implicit relationships from it.
+**Naming and the architectural flat-ness.** A commons has a qualified name like `bynk.time`, `commerce.money`, or just `money`. The dotted hierarchy is purely organisational — it groups names in the project's filesystem and signposts logical clustering, but carries no architectural meaning. A commons named `commerce.money` is not "for" `commerce.*` contexts any more than for any other context; any context can `uses commerce.money` regardless of its own name. The naming hierarchy reflects organisation; the language imposes no implicit relationships from it.
 
 This sits with DDD's strict view that bounded contexts are flat. The dotted naming captures subdomain organisation; the commons captures shared kernel. Neither imposes containment.
 
@@ -341,8 +341,8 @@ This sits with DDD's strict view that bounded contexts are flat. The dotted nami
 
 ```
 src/
-├── karn/
-│   └── time.karn                       -- commons karn.time
+├── bynk/
+│   └── time.karn                       -- commons bynk.time
 ├── commerce/
 │   ├── money.karn                      -- commons commerce.money
 │   ├── inventory.karn                  -- context commerce.inventory
@@ -1268,7 +1268,7 @@ The `?` operator (§2.8.3) propagates `Err` from `Result[T, E]` in any function 
 
 *Primitive value types* (per §1.1) — `Int`, `Decimal`, `String`, `Bool`, `Bytes`, `Timestamp`, `Duration`, `Unit` — carry standard operations: arithmetic on numerics; comparison on totally-ordered types; string operations (length, slice, concatenation `++`, etc.); boolean logic (`&&`, `||`, `!`); temporal arithmetic where `Timestamp + Duration = Timestamp`, `Timestamp - Timestamp = Duration`, `Duration + Duration = Duration`, and `Duration * Int = Duration`.
 
-`Duration` literals use the `N.unit` form on integer literals: `5.minutes`, `24.hours`, `7.days`, `100.milliseconds`, `2.weeks`. Each desugars to a `Duration` value with the integer count converted to milliseconds. The recognised units are `milliseconds`, `seconds`, `minutes`, `hours`, `days`, `weeks` — calendrical units like `months` and `years` are *not* available on `Duration` because their length varies; those belong to `karn.time` calendrical arithmetic.
+`Duration` literals use the `N.unit` form on integer literals: `5.minutes`, `24.hours`, `7.days`, `100.milliseconds`, `2.weeks`. Each desugars to a `Duration` value with the integer count converted to milliseconds. The recognised units are `milliseconds`, `seconds`, `minutes`, `hours`, `days`, `weeks` — calendrical units like `months` and `years` are *not* available on `Duration` because their length varies; those belong to `bynk.time` calendrical arithmetic.
 
 Comparison between a refined type and its underlying representation works on the representation's equality/ordering: `(x: Int where InRange(0, 100)) < (y: Int)` compiles and behaves like `Int` comparison. Refinement is a constraint on values, not a different comparable kind.
 
@@ -1627,7 +1627,7 @@ This is both a performance property and a safety property. An invariant like `st
 **Static proof and optimisation.** When a type-level refinement on a field makes an invariant statically provable, the compiler optimises out the runtime check and emits a warning:
 
 ```
-karn.invariants.statically_provable (warning):
+bynk.invariants.statically_provable (warning):
   invariant `available_non_negative` is statically provable from the refinement on `available`
   (Cell[Int where NonNegative])
   the runtime check has been optimised out
@@ -1642,7 +1642,7 @@ The warning surfaces the overlap between refinement and invariant, which usually
 **Fault diagnostics.** When an invariant fails at runtime, the diagnostic identifies the invariant by name, the handler in which the commit occurred, the expression body, and the values at violation:
 
 ```
-karn.runtime.invariant_violated:
+bynk.runtime.invariant_violated:
   invariant: held_implies_recent (in agent Booking)
   handler:   hold (in context hotel.bookings)
   expression: state is Held(_, _, _, _, since) implies since > epoch
@@ -1656,7 +1656,7 @@ karn.runtime.invariant_violated:
 When an invariant evaluation faults rather than returning false:
 
 ```
-karn.runtime.invariant_evaluation_faulted:
+bynk.runtime.invariant_evaluation_faulted:
   invariant: connections_subset_of_members (in agent Room)
   handler:   broadcast (in context chat)
   cause:     storage read failure (Map.keys on connections)
@@ -1668,7 +1668,7 @@ The two are distinct because they're different operator concerns: violations ind
 **Compile-time diagnostics** when an invariant body is malformed:
 
 ```
-karn.types.invariant_writes_storage:
+bynk.types.invariant_writes_storage:
   invariant body cannot perform storage writes
   found: members.add(u) on line 47
   invariants are read-only over state; consider whether this belongs in the handler instead
@@ -1711,7 +1711,7 @@ The type checker produces diagnostics in a canonical structured form for downstr
 
 - *Severity*: error, warning, info, hint.
 - *Source location*: file, line range, column range.
-- *Code*: a stable identifier for the kind of diagnostic (e.g., `karn.types.refinement.unprovable`).
+- *Code*: a stable identifier for the kind of diagnostic (e.g., `bynk.types.refinement.unprovable`).
 - *Message*: human-readable summary.
 - *Detail*: extended explanation when relevant (e.g., for refinement-propagation failures, which predicate couldn't be derived).
 - *Suggestions*: optional code-action proposals (e.g., "wrap in `T.of(...)?`").

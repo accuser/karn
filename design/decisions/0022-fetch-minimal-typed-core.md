@@ -4,7 +4,7 @@
 - **Spec:** §7.3.6 (the surface set)
 
 ## Context
-`karn.Fetch` wants `headers: List[Header]`, but Bynk has no sequence type —
+`bynk.Fetch` wants `headers: List[Header]`, but Bynk has no sequence type —
 `TypeRef` supports only `Result`/`Option`/`Effect`/`HttpResult` generics,
 records, and enum sums.
 
