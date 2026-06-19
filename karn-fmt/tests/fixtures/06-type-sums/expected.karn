@@ -1,0 +1,10 @@
+commons sums {
+	type Status = enum { Pending, Active, Done }
+
+	type Outcome = | Won(prize: Int)
+	| Lost(reason: String)
+
+	type Shipment = | Pending
+	| Shipped(tracking: String)
+	| Cancelled(reason: String, code: Int)
+}

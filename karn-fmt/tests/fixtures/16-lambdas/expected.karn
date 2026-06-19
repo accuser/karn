@@ -1,0 +1,12 @@
+commons lambdas {
+	fn demo(xs: List[Int]) -> Int {
+		let add = xs.fold(0, (x, y) => x + y)
+		let id = xs.map((x: Int) => x)
+		let blk = xs.map((x) => {
+			let y = x
+			y
+		})
+		let five = xs.map(() => 5)
+		add
+	}
+}

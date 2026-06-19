@@ -1,0 +1,39 @@
+context demo.svc
+
+consumes platform.time
+
+capability Store {
+	fn put(key: String, value: String) -> Effect[()]
+	fn get(key: String) -> Effect[Option[String]]
+	fn delete(key: String) -> Effect[()]
+}
+
+capability Logger {
+	fn info(message: String) -> Effect[()]
+}
+
+provides Logger = ConsoleLogger {
+	fn info(message: String) -> Effect[()] { Effect.pure(()) }
+}
+
+provides Store = LoggingStore given Logger {
+	fn put(key: String, value: String) -> Effect[()] {
+		let _ <- Logger.info("put")
+		Effect.pure(())
+	}
+
+	fn get(key: String) -> Effect[Option[String]] { Effect.pure(None) }
+
+	fn delete(key: String) -> Effect[()] { Effect.pure(()) }
+}
+
+provides Store = StampedStore given platform.time.Clock {
+	fn put(key: String, value: String) -> Effect[()] {
+		let _ <- platform.time.Clock.now()
+		Effect.pure(())
+	}
+
+	fn get(key: String) -> Effect[Option[String]] { Effect.pure(None) }
+
+	fn delete(key: String) -> Effect[()] { Effect.pure(()) }
+}

@@ -1,0 +1,7 @@
+context api
+
+type UserId = String where NonEmpty
+
+actor Public    { auth = None }
+actor   Worker  { auth = Internal }
+actor User { auth = Bearer(secret = "AUTH_JWT_SECRET"), identity = UserId }

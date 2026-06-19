@@ -1,0 +1,19 @@
+commons refinements {
+  type OrderId = String where Matches("ORD-[0-9]+")
+
+type Percent = Int where InRange(0, 100)
+
+   type Ratio = Float where InRange(0.0, 1.0)
+
+  type Password = String  where  MinLength(8)
+type Tweet = String where MaxLength(280)
+
+   type Username = String where MinLength(3) and MaxLength(20) and Matches("[a-z0-9_]+")
+
+type Reps = Int where Positive
+  type Metres = Int where NonNegative
+type Subject = String where NonEmpty
+
+type Id = opaque String
+  type AuthId = opaque String where Matches("AUTH-[0-9]{8}")
+}
