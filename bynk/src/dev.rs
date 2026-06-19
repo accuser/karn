@@ -18,7 +18,7 @@ use std::path::Path;
 use std::process::{Command, ExitCode};
 
 use crate::compiler::Compiler;
-use crate::doctor::{self, Capability, Context, DoctorOptions};
+use crate::doctor::{self, Capability, Context, DoctorOptions, Report};
 use crate::probe::{self, DetectOpts, Provenance, Toolbox};
 use crate::report::{self, Format};
 
@@ -57,8 +57,7 @@ pub fn run(
     };
     let report = doctor::diagnose(tb, compiler, &ctx, &preflight_opts);
     if report.exit_nonzero(&preflight_opts) {
-        eprintln!("bynk: environment not ready for `dev` — see below.\n");
-        eprint!("{}", report::render(&report, Format::Human));
+        eprint!("{}", preflight_failure_message(&report));
         return ExitCode::FAILURE;
     }
     // The compile floor is guaranteed resolved past the gate above.
@@ -146,6 +145,17 @@ pub fn run(
             ExitCode::FAILURE
         }
     }
+}
+
+/// The text `bynk dev` prints when the deploy pre-flight fails: a lead line plus
+/// doctor's own human report, so the remedy lines are identical to `bynk
+/// doctor`. Pure (no I/O) so this deterministic surface is pinned by a golden
+/// (§5), unlike the non-deterministic `wrangler dev` stream.
+pub fn preflight_failure_message(report: &Report) -> String {
+    format!(
+        "bynk: environment not ready for `dev` — see below.\n\n{}",
+        report::render(report, Format::Human)
+    )
 }
 
 /// Ensure `.bynk/` is gitignored on first build (cargo's `target/.gitignore`
