@@ -25,7 +25,15 @@ refinement, `Signature`), and the outbound-`Fetch` + JSON-codec + caching story.
 
 ## The shared workflow
 
-Every example uses the same three commands. From an example directory:
+From any example directory, one command builds and serves it locally:
+
+```sh
+bynk dev          # compile + serve on http://localhost:8787 (local mode)
+```
+
+That's the compile-and-run recipe in one step — it runs `wrangler dev` in local
+mode, so KV / Durable Objects / queues are simulated and there's nothing to
+provision. The manual equivalent it runs under the hood:
 
 ```sh
 bynkc check src                                   # type-check, no output

@@ -68,7 +68,7 @@ project you can check, test, compile, and deploy:
 cd examples/hello-world
 bynkc check src      # type-check without emitting
 bynkc test .         # compile and run the `test` blocks (needs node + tsc)
-bynkc compile src --output out --target workers   # emit a Cloudflare Worker
+bynk dev             # compile and serve it locally on http://localhost:8787
 ```
 
 A new program needs only a `bynk.toml` manifest and a `.bynk` file. See

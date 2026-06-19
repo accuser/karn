@@ -96,3 +96,9 @@ editor: note (install bynkc-lsp (or download from releases))
 
 `doctor` only **reports** — it never installs anything. Copy the fix line it
 prints and run it yourself.
+
+## Related
+
+[`bynk dev`](../projects-build-and-deployment/run-locally.md) pre-flights the
+same **deploy** capability (Node + `wrangler`) before it serves, so a green
+`bynk doctor --only deploy` is exactly what `dev` needs to run.

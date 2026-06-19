@@ -1,8 +1,10 @@
 # Appendix B — Version history
 
-This specification defines the language at its **current version, v0.56**
+This specification defines the language at its **current version, v0.57**
 ([§1.1](scope.md)). Bynk is pre-1.0 and developed in small, spec-first
-increments; while it is pre-1.0, an increment may change behaviour.
+increments; while it is pre-1.0, an increment may change behaviour. (v0.57 is
+driver tooling — `bynk dev` — with **no language-surface change**; the language
+is unchanged from v0.55, the last increment that touched it.)
 
 This specification is the **single source of truth** for the shipped language.
 The standalone development instalments that preceded it — the

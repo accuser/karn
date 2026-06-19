@@ -1,0 +1,3 @@
+bynk: this project has several contexts — pass --context to choose one of: api, worker
+bynk: no context `nope` — available: api
+bynk: no workers were built — does the project define any contexts?

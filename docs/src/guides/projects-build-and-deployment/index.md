@@ -8,7 +8,9 @@ Workers.
 
 **Do**
 - [Lay out a project](layout.md)
+- [Run your project locally](run-locally.md)
 - [Target Cloudflare Workers](cloudflare-workers.md)
 
 **See also:** [Reference — `bynk.toml` manifest](../../reference/manifest.md),
-[CLI (`bynkc`)](../../reference/cli.md), [Emission](../../reference/emission.md).
+[CLI (`bynkc`)](../../reference/cli.md), [CLI (`bynk`
+driver)](../../reference/bynk-cli.md), [Emission](../../reference/emission.md).
