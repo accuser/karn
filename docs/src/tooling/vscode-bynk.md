@@ -19,7 +19,7 @@ reference.
   `from cron`, `agent`) and press <kbd>Tab</kbd> to scaffold it, then tab through
   the placeholders.
 - **Scaffolding commands** — **Bynk: New Project** (scaffolds `bynk.toml` +
-  `src/<name>.karn`) and **Bynk: New Context** (adds a `context` file). Both
+  `src/<name>.bynk`) and **Bynk: New Context** (adds a `context` file). Both
   refuse to overwrite an existing file.
 - A **Get Started with Bynk** walkthrough (Welcome page → Help → walkthroughs)
   that sets up a project and a first context.
@@ -27,7 +27,7 @@ reference.
   whole project and routes errors — including in files you haven't opened — into
   the Problems panel via the `$bynkc` problem-matcher.
 
-The extension activates on opening a `.karn` file or any workspace containing a
+The extension activates on opening a `.bynk` file or any workspace containing a
 `bynk.toml`.
 
 ## Build and install

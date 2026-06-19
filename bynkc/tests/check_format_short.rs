@@ -8,8 +8,8 @@ const SRC: &str = "commons demo\n\nfn f() -> Int {\n  \"x\"\n}\n";
 
 #[test]
 fn short_format_lines_match_the_problem_matcher_shape() {
-    let errors = bynkc::compile(SRC, "demo.karn").expect_err("source has a type error");
-    let out = bynkc::render_errors_short(&errors, SRC, "demo.karn");
+    let errors = bynkc::compile(SRC, "demo.bynk").expect_err("source has a type error");
+    let out = bynkc::render_errors_short(&errors, SRC, "demo.bynk");
 
     let lines: Vec<&str> = out.lines().collect();
     assert_eq!(
@@ -21,7 +21,7 @@ fn short_format_lines_match_the_problem_matcher_shape() {
     for line in &lines {
         // path:line:col: severity[category]: message
         let rest = line
-            .strip_prefix("demo.karn:")
+            .strip_prefix("demo.bynk:")
             .unwrap_or_else(|| panic!("no path prefix: {line:?}"));
         let (line_no, after) = rest.split_once(':').expect("line:col");
         let (col_no, after) = after.split_once(": ").expect("col: ");
@@ -43,12 +43,12 @@ fn short_format_lines_match_the_problem_matcher_shape() {
 
 #[test]
 fn short_format_positions_are_one_indexed() {
-    let errors = bynkc::compile(SRC, "demo.karn").expect_err("type error");
-    let out = bynkc::render_errors_short(&errors, SRC, "demo.karn");
+    let errors = bynkc::compile(SRC, "demo.bynk").expect_err("type error");
+    let out = bynkc::render_errors_short(&errors, SRC, "demo.bynk");
     // The bad expression `"x"` is on line 4. The first diagnostic points at it.
     let first = out.lines().next().unwrap();
     assert!(
-        first.starts_with("demo.karn:4:"),
+        first.starts_with("demo.bynk:4:"),
         "expected the line-4 error first, got {first:?}"
     );
 }

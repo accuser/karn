@@ -94,13 +94,13 @@ pub const MAP_UNIT: &str = "bynk.map";
 /// traversal. Order-preserving combinators build with `fold` + `prepend`
 /// and a final `reverse` — O(n) builds, never `append` (which would be
 /// O(n²) over the array lowering).
-pub const BYNK_LIST_SRC: &str = include_str!("firstparty/bynk.list.karn");
+pub const BYNK_LIST_SRC: &str = include_str!("firstparty/bynk.list.bynk");
 
 /// `bynk.map` — combinators over the `Map` kernel (`empty`, `insert`, `get`,
 /// `keys`, `length`). `fromList` is deliberately absent: Bynk has no pair
 /// type to spell a `List[(K, V)]` with, so map construction is `Map.empty()`
 /// + `insert` (revisit with tuples or generic records).
-pub const BYNK_MAP_SRC: &str = include_str!("firstparty/bynk.map.karn");
+pub const BYNK_MAP_SRC: &str = include_str!("firstparty/bynk.map.bynk");
 
 /// Inside the reserved `bynk.*` prefix; injected when `uses`-imported.
 pub const STRING_UNIT: &str = "bynk.string";
@@ -111,12 +111,12 @@ pub const STRING_UNIT: &str = "bynk.string";
 /// live here. `join` folds to `Option[String]` so empty-string *elements*
 /// are joined faithfully (a bare `""` accumulator could not tell "nothing
 /// yet" from "first element was empty").
-pub const BYNK_STRING_SRC: &str = include_str!("firstparty/bynk.string.karn");
+pub const BYNK_STRING_SRC: &str = include_str!("firstparty/bynk.string.bynk");
 
 /// The reserved `bynk` conformance-surface adapter (env-free core). It has no
 /// `binding` clause — the toolchain supplies one per platform (see
 /// [`Platform::bynk_binding_source`]).
-pub const BYNK_ADAPTER_SRC: &str = include_str!("firstparty/bynk.karn");
+pub const BYNK_ADAPTER_SRC: &str = include_str!("firstparty/bynk.bynk");
 
 /// The Cloudflare binding for the `bynk` surface. Implements the canonical
 /// provider symbols against the platform host API. The refined `Uuid` is built
@@ -140,7 +140,7 @@ const BYNK_NODE_BINDING: &str = include_str!("firstparty/bindings/bynk-node.ts")
 /// structured values are v0.22-codec composition, and `Queue` remains its
 /// own future increment. Like the `bynk` surface it has no `binding`
 /// clause — the toolchain supplies the binding.
-pub const CLOUDFLARE_ADAPTER_SRC: &str = include_str!("firstparty/bynk.cloudflare.karn");
+pub const CLOUDFLARE_ADAPTER_SRC: &str = include_str!("firstparty/bynk.cloudflare.bynk");
 
 /// The output path of the Cloudflare platform adapter's binding module,
 /// beside the adapter's emitted `bynk/cloudflare.ts` (distinct from the

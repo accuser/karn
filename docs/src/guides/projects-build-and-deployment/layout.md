@@ -9,11 +9,11 @@ A project is a directory containing a `bynk.toml` manifest plus `src/` and
 my-project/
 ├── bynk.toml
 ├── src/
-│   ├── counters.karn       # context counters
-│   └── quantities.karn     # commons quantities
+│   ├── counters.bynk       # context counters
+│   └── quantities.bynk     # commons quantities
 └── tests/
-    ├── counters.karn       # test counters
-    └── quantities.karn     # test quantities
+    ├── counters.bynk       # test counters
+    └── quantities.bynk     # test quantities
 ```
 
 ## The manifest
@@ -35,11 +35,11 @@ See the [`bynk.toml` reference](../../reference/manifest.md) for every key.
 ## Path identity
 
 A unit's path must match its qualified name. A file declaring `context counters`
-must be `src/counters.karn`; one declaring `context commerce.orders` must be
-`src/commerce/orders.karn`. A test file mirrors the name of the unit it tests
-under `tests/`, so `test counters` lives in `tests/counters.karn` — or, with the
-optional self-identifying suffix, `tests/counters.test.karn`. Both forms are
-accepted (the `.test.karn` suffix is what single-tree layouts use, and is handy
+must be `src/counters.bynk`; one declaring `context commerce.orders` must be
+`src/commerce/orders.bynk`. A test file mirrors the name of the unit it tests
+under `tests/`, so `test counters` lives in `tests/counters.bynk` — or, with the
+optional self-identifying suffix, `tests/counters.test.bynk`. Both forms are
+accepted (the `.test.bynk` suffix is what single-tree layouts use, and is handy
 for grepping); use whichever you prefer.
 
 > Mismatches are reported as `bynk.project.inconsistent_commons_name` (source) or

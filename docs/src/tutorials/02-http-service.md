@@ -17,7 +17,7 @@ mkdir url-shortener
 cd url-shortener
 ```
 
-Inside it, create `shortener.karn` with a single endpoint — looking up a short
+Inside it, create `shortener.bynk` with a single endpoint — looking up a short
 code:
 
 ```bynk
@@ -44,7 +44,7 @@ A few new things:
   `404`.
 
 > The file's name must match the context's name: `context shortener` lives in
-> `shortener.karn`. The compiler uses the source layout to determine each unit's
+> `shortener.bynk`. The compiler uses the source layout to determine each unit's
 > identity.
 
 ## Compile to a Worker
@@ -97,7 +97,7 @@ generated the *how* (the router, the response encoding, the Worker scaffold).
 ## Accept a request body
 
 Now the endpoint that *creates* a short link from a JSON body. First we need a
-type for the request. Update `shortener.karn`:
+type for the request. Update `shortener.bynk`:
 
 ```bynk
 context shortener

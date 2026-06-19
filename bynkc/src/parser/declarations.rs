@@ -95,7 +95,7 @@ impl<'a> Parser<'a> {
                     ),
                 )
                 .with_note(
-                    "every `.karn` file begins with either a `commons`, `context`, or `test` declaration",
+                    "every `.bynk` file begins with either a `commons`, `context`, or `test` declaration",
                 ))
             }
             None => {

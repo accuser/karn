@@ -65,7 +65,7 @@ module.exports = grammar({
     // A source file is normally one or more top-level units. To keep the
     // highlighter from painting every documentation snippet as one big ERROR,
     // we also parse *fragments* — pieces lifted out of their enclosing unit,
-    // which never occur in a real `.karn` file but appear throughout the docs
+    // which never occur in a real `.bynk` file but appear throughout the docs
     // and in editor scratch buffers. The LSP still flags the structural
     // placement error semantically.
     //

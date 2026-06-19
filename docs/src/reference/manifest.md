@@ -38,8 +38,8 @@ diagnostics_mode = "live"
 
 In a project (split-paths) layout, source units live under `src/` and test units
 under `tests/`, each at a path matching its qualified name — `context
-commerce.orders` in `src/commerce/orders.karn`, `test commerce.orders` in
-`tests/commerce/orders.karn`. Mismatches raise
+commerce.orders` in `src/commerce/orders.bynk`, `test commerce.orders` in
+`tests/commerce/orders.bynk`. Mismatches raise
 `bynk.project.inconsistent_commons_name` or
 `bynk.project.inconsistent_test_path`.
 
@@ -62,6 +62,6 @@ Language-server settings (consumed by `bynkc-lsp`):
 
 ## Legacy mode
 
-Without a `bynk.toml`, a single `.karn` file compiles as a standalone unit (the
+Without a `bynk.toml`, a single `.bynk` file compiles as a standalone unit (the
 [first-program](../tutorials/01-first-program.md) flow). Project features —
 a `src`/`tests` split, `bynkc test` — expect the manifest-driven layout above.

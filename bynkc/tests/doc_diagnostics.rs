@@ -1,9 +1,9 @@
 //! Honest diagnostic transcripts.
 //!
-//! Each `docs/diagnostics/<id>.karn` is a deliberately *failing* Bynk program.
+//! Each `docs/diagnostics/<id>.bynk` is a deliberately *failing* Bynk program.
 //! This test compiles it through the same path the doc-example gate uses,
 //! asserts it fails, and renders the real diagnostic — colour-disabled, with a
-//! stable `<id>.karn` filename label — into the committed transcript
+//! stable `<id>.bynk` filename label — into the committed transcript
 //! `docs/diagnostics/<id>.txt`. The docs `{{#include}}` both files, so a page
 //! showing "the compiler refuses this, and here is what it says" cannot drift
 //! from the compiler.
@@ -32,7 +32,7 @@ fn first_line(body: &str) -> &str {
 fn compile_fixture(id: &str, source: &str) -> Result<(), Vec<CompileError>> {
     let first = first_line(source);
     if first.starts_with("commons ") {
-        bynkc::compile(source, &format!("{id}.karn")).map(|_| ())
+        bynkc::compile(source, &format!("{id}.bynk")).map(|_| ())
     } else if first.starts_with("context ") {
         let name = first
             .strip_prefix("context")
@@ -42,7 +42,7 @@ fn compile_fixture(id: &str, source: &str) -> Result<(), Vec<CompileError>> {
             .trim();
         let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("doc-diag-{id}"));
         let _ = fs::remove_dir_all(&root);
-        let rel: PathBuf = name.split('.').collect::<PathBuf>().with_extension("karn");
+        let rel: PathBuf = name.split('.').collect::<PathBuf>().with_extension("bynk");
         let file = root.join(&rel);
         fs::create_dir_all(file.parent().unwrap()).unwrap();
         fs::write(&file, source).unwrap();
@@ -52,7 +52,7 @@ fn compile_fixture(id: &str, source: &str) -> Result<(), Vec<CompileError>> {
         let _ = fs::remove_dir_all(&root);
         result
     } else {
-        panic!("fixture {id}.karn must start with `commons` or `context` (got `{first}`)");
+        panic!("fixture {id}.bynk must start with `commons` or `context` (got `{first}`)");
     }
 }
 
@@ -62,12 +62,12 @@ fn diagnostic_transcripts_are_up_to_date() {
     let mut fixtures: Vec<PathBuf> = fs::read_dir(&dir)
         .expect("read docs/diagnostics")
         .map(|e| e.unwrap().path())
-        .filter(|p| p.extension().is_some_and(|e| e == "karn"))
+        .filter(|p| p.extension().is_some_and(|e| e == "bynk"))
         .collect();
     fixtures.sort();
     assert!(
         !fixtures.is_empty(),
-        "no .karn fixtures under docs/diagnostics"
+        "no .bynk fixtures under docs/diagnostics"
     );
 
     let bless = std::env::var_os("BYNK_BLESS").is_some();
@@ -81,7 +81,7 @@ fn diagnostic_transcripts_are_up_to_date() {
         let errors = match compile_fixture(&id, &source) {
             Ok(()) => {
                 failures.push(format!(
-                    "{id}.karn compiled, but a diagnostics fixture must fail to compile. \
+                    "{id}.bynk compiled, but a diagnostics fixture must fail to compile. \
                      Make it error (or remove it)."
                 ));
                 continue;
@@ -89,7 +89,7 @@ fn diagnostic_transcripts_are_up_to_date() {
             Err(errors) => errors,
         };
 
-        let transcript = bynkc::render_errors_plain(&errors, &source, &format!("{id}.karn"));
+        let transcript = bynkc::render_errors_plain(&errors, &source, &format!("{id}.bynk"));
         let txt = dir.join(format!("{id}.txt"));
 
         if bless {

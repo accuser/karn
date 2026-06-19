@@ -100,7 +100,7 @@ fn compile_context(body: &str, idx: usize) -> Result<(), String> {
     }
     let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("doc-ctx-{idx}"));
     let _ = fs::remove_dir_all(&root);
-    let rel: PathBuf = name.split('.').collect::<PathBuf>().with_extension("karn");
+    let rel: PathBuf = name.split('.').collect::<PathBuf>().with_extension("bynk");
     let file = root.join(&rel);
     fs::create_dir_all(file.parent().unwrap()).unwrap();
     fs::write(&file, body).unwrap();
@@ -136,7 +136,7 @@ fn every_doc_example_compiles() {
         }
         // Display-only blocks: a body that is just `{{#include …}}` directive(s)
         // is rendered by mdBook from a fixture file that lives outside docs/src/
-        // (e.g. docs/diagnostics/*.karn). The fixture's own compile is checked by
+        // (e.g. docs/diagnostics/*.bynk). The fixture's own compile is checked by
         // tests/doc_diagnostics.rs, so don't demand it stand alone here.
         let nonempty: Vec<&str> = b
             .body

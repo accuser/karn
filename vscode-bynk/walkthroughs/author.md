@@ -1,6 +1,6 @@
 ## Write your first context
 
-Inside a `.karn` file, type a snippet prefix and press <kbd>Tab</kbd> to scaffold
+Inside a `.bynk` file, type a snippet prefix and press <kbd>Tab</kbd> to scaffold
 a construct — tab through the highlighted placeholders to fill it in:
 
 - `context` / `commons` — a unit header

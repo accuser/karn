@@ -4,7 +4,7 @@
 Each stage has a module in `bynkc/src/`.
 
 ```text
-  .karn source
+  .bynk source
        │
    lex │  lexer.rs        →  tokens
        ▼
@@ -36,10 +36,10 @@ CLI), and `keywords.rs` (the keyword registry).
 
 **First-party sources** (the `bynk` surface + platform adapters, the Bynk-written
 `bynk.list`/`bynk.map`/`bynk.string` commons, the per-platform TypeScript
-bindings, and the emitted runtime) live as real `.karn`/`.ts` files under
+bindings, and the emitted runtime) live as real `.bynk`/`.ts` files under
 `bynkc/src/firstparty/` and are embedded at compile time via `include_str!`
 (ADR 0086). **Edit the file, not a string literal.** They are checked standalone
-(`tests/firstparty_sources.rs` parses + `bynk-fmt`-checks each `.karn`;
+(`tests/firstparty_sources.rs` parses + `bynk-fmt`-checks each `.bynk`;
 `tsc_verify.rs` type-checks the embedded `runtime.ts`), and vendored into every
 emitted project rather than published.
 
@@ -53,7 +53,7 @@ The library (`lib.rs`) exposes the flows the CLI and LSP build on:
   uses for `commons` blocks.
 - **`compile_project(root)`** / `compile_project_with_target` /
   `compile_project_with_split_paths` — multi-file projects. A two-pass design:
-  first discover and parse every `.karn` file and build a global symbol table;
+  first discover and parse every `.bynk` file and build a global symbol table;
   then resolve, type-check, and emit each unit with visibility of the units it
   `uses`/`consumes`.
 - **`diagnose(source)`** — best-effort, never-fatal compilation with recovery

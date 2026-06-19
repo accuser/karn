@@ -569,23 +569,23 @@ mod tests {
         let k = key("demo.a", SymbolKind::Fn, "helper");
         let index = index_with(vec![(
             k.clone(),
-            site("a.karn", 3, 9),
-            vec![site("a.karn", 27, 33)],
+            site("a.bynk", 3, 9),
+            vec![site("a.bynk", 27, 33)],
         )]);
-        let plan = plan_rename(&index, Path::new("a.karn"), 4, "do_it").unwrap();
-        let edited = apply_edits(text, &plan.edits[Path::new("a.karn")], "do_it");
+        let plan = plan_rename(&index, Path::new("a.bynk"), 4, "do_it").unwrap();
+        let edited = apply_edits(text, &plan.edits[Path::new("a.bynk")], "do_it");
         assert_eq!(edited, "fn do_it(x: Int) -> Int { do_it(x) }");
 
         // Remap maps both old sites onto the new spellings.
         for (old, expected) in [
-            (site("a.karn", 3, 9), "do_it"),
-            (site("a.karn", 27, 33), "do_it"),
+            (site("a.bynk", 3, 9), "do_it"),
+            (site("a.bynk", 27, 33), "do_it"),
         ] {
             let new = remap_site(&old, &plan);
             assert_eq!(&edited[new.span.range()], expected);
         }
         // An unedited later site shifts by the accumulated delta.
-        let unrelated = site("a.karn", 34, 35); // `x` argument
+        let unrelated = site("a.bynk", 34, 35); // `x` argument
         let new = remap_site(&unrelated, &plan);
         assert_eq!(&edited[new.span.range()], "x");
     }
@@ -595,23 +595,23 @@ mod tests {
         let k = key("demo.a", SymbolKind::Type, "Money");
         let index = index_with(vec![(
             k,
-            site("a.karn", 5, 10),
-            vec![site("b.karn", 1, 6), site("a.karn", 20, 25)],
+            site("a.bynk", 5, 10),
+            vec![site("b.bynk", 1, 6), site("a.bynk", 20, 25)],
         )]);
-        let all = sites_for(&index, Path::new("b.karn"), 3, true).unwrap();
+        let all = sites_for(&index, Path::new("b.bynk"), 3, true).unwrap();
         assert_eq!(all.len(), 3);
-        assert_eq!(all[0].path, PathBuf::from("a.karn"));
+        assert_eq!(all[0].path, PathBuf::from("a.bynk"));
         assert_eq!(all[0].span, Span::new(5, 10));
-        let without_decl = sites_for(&index, Path::new("b.karn"), 3, false).unwrap();
+        let without_decl = sites_for(&index, Path::new("b.bynk"), 3, false).unwrap();
         assert_eq!(without_decl.len(), 2);
     }
 
     #[test]
     fn rename_refuses_unindexed_positions_and_same_name() {
         let k = key("demo.a", SymbolKind::Fn, "helper");
-        let index = index_with(vec![(k, site("a.karn", 3, 9), vec![])]);
-        assert!(plan_rename(&index, Path::new("a.karn"), 100, "x").is_err());
-        assert!(plan_rename(&index, Path::new("a.karn"), 4, "helper").is_err());
+        let index = index_with(vec![(k, site("a.bynk", 3, 9), vec![])]);
+        assert!(plan_rename(&index, Path::new("a.bynk"), 100, "x").is_err());
+        assert!(plan_rename(&index, Path::new("a.bynk"), 4, "helper").is_err());
     }
 
     #[test]
@@ -620,19 +620,19 @@ mod tests {
         let helper = key("demo.a", SymbolKind::Fn, "helper");
         let money = key("demo.a", SymbolKind::Type, "Money");
         let pre = index_with(vec![
-            (helper.clone(), site("a.karn", 3, 9), vec![]),
-            (money.clone(), site("a.karn", 50, 55), vec![]),
+            (helper.clone(), site("a.bynk", 3, 9), vec![]),
+            (money.clone(), site("a.bynk", 50, 55), vec![]),
         ]);
-        let plan = plan_rename(&pre, Path::new("a.karn"), 4, "shadow").unwrap();
+        let plan = plan_rename(&pre, Path::new("a.bynk"), 4, "shadow").unwrap();
 
         // Post (honest): def renamed in place, still no refs.
         let honest = index_with(vec![
             (
                 key("demo.a", SymbolKind::Fn, "shadow"),
-                site("a.karn", 3, 9),
+                site("a.bynk", 3, 9),
                 vec![],
             ),
-            (money.clone(), site("a.karn", 50, 55), vec![]),
+            (money.clone(), site("a.bynk", 50, 55), vec![]),
         ]);
         assert!(index_unchanged_modulo_rename(&pre, &honest, &plan));
 
@@ -641,10 +641,10 @@ mod tests {
         let escape = index_with(vec![
             (
                 key("demo.a", SymbolKind::Fn, "shadow"),
-                site("a.karn", 3, 9),
-                vec![site("a.karn", 70, 76)],
+                site("a.bynk", 3, 9),
+                vec![site("a.bynk", 70, 76)],
             ),
-            (money, site("a.karn", 50, 55), vec![]),
+            (money, site("a.bynk", 50, 55), vec![]),
         ]);
         assert!(!index_unchanged_modulo_rename(&pre, &escape, &plan));
     }
@@ -658,30 +658,30 @@ mod tests {
         let bump = key("demo.a", SymbolKind::Method, "Counter.bump");
         let other = key("demo.a", SymbolKind::Type, "Counter");
         let pre = index_with(vec![
-            (other.clone(), site("a.karn", 0, 5), vec![]),
+            (other.clone(), site("a.bynk", 0, 5), vec![]),
             // def `bump` at 11..15, one call at 40..44.
             (
                 bump.clone(),
-                site("a.karn", 11, 15),
-                vec![site("a.karn", 40, 44)],
+                site("a.bynk", 11, 15),
+                vec![site("a.bynk", 40, 44)],
             ),
         ]);
 
         // Cursor on the def segment; rename to a longer name.
-        let plan = plan_rename(&pre, Path::new("a.karn"), 12, "increment").unwrap();
+        let plan = plan_rename(&pre, Path::new("a.bynk"), 12, "increment").unwrap();
         assert_eq!(plan.key.name, "Counter.bump");
         assert_eq!(plan.new_name, "increment");
         // Renaming to the same segment is refused (segment-aware, not key-aware).
-        assert!(plan_rename(&pre, Path::new("a.karn"), 12, "bump").is_err());
+        assert!(plan_rename(&pre, Path::new("a.bynk"), 12, "bump").is_err());
 
         // Honest post: the compound key becomes `Counter.increment`; the def
         // grows in place (11..20) and the call shifts by +5 (45..54).
         let post = index_with(vec![
-            (other, site("a.karn", 0, 5), vec![]),
+            (other, site("a.bynk", 0, 5), vec![]),
             (
                 key("demo.a", SymbolKind::Method, "Counter.increment"),
-                site("a.karn", 11, 20),
-                vec![site("a.karn", 45, 54)],
+                site("a.bynk", 11, 20),
+                vec![site("a.bynk", 45, 54)],
             ),
         ]);
         assert!(
@@ -695,17 +695,17 @@ mod tests {
         let index = index_with(vec![
             (
                 key("demo.a", SymbolKind::Type, "Money"),
-                site("a.karn", 5, 10),
+                site("a.bynk", 5, 10),
                 vec![],
             ),
             (
                 key("demo.b", SymbolKind::Fn, "moneyMaker"),
-                site("b.karn", 3, 13),
+                site("b.bynk", 3, 13),
                 vec![],
             ),
             (
                 key("demo.a", SymbolKind::Fn, "helper"),
-                site("a.karn", 40, 46),
+                site("a.bynk", 40, 46),
                 vec![],
             ),
         ]);
@@ -727,28 +727,28 @@ mod tests {
         let k = key("demo.a", SymbolKind::Type, "Money");
         let index = index_with(vec![(
             k,
-            site("a.karn", 5, 10),
-            vec![site("b.karn", 1, 6), site("a.karn", 20, 25)],
+            site("a.bynk", 5, 10),
+            vec![site("b.bynk", 1, 6), site("a.bynk", 20, 25)],
         )]);
-        // From a.karn: the definition + the in-file reference, not b.karn's.
-        let highlights = document_highlights(&index, Path::new("a.karn"), 7).unwrap();
+        // From a.bynk: the definition + the in-file reference, not b.bynk's.
+        let highlights = document_highlights(&index, Path::new("a.bynk"), 7).unwrap();
         assert_eq!(highlights.len(), 2);
-        assert!(highlights.iter().all(|s| s.path == Path::new("a.karn")));
+        assert!(highlights.iter().all(|s| s.path == Path::new("a.bynk")));
         // No symbol at the cursor → None.
-        assert!(document_highlights(&index, Path::new("a.karn"), 100).is_none());
+        assert!(document_highlights(&index, Path::new("a.bynk"), 100).is_none());
     }
 
     #[test]
     fn diagnostic_budget_allows_removals_refuses_additions() {
         let pre = vec![
-            (PathBuf::from("a.karn"), "bynk.x".to_string()),
-            (PathBuf::from("a.karn"), "bynk.x".to_string()),
+            (PathBuf::from("a.bynk"), "bynk.x".to_string()),
+            (PathBuf::from("a.bynk"), "bynk.x".to_string()),
         ];
         let same = pre.clone();
         assert!(no_new_diagnostics(&pre, &same).is_ok());
         assert!(no_new_diagnostics(&pre, &pre[..1]).is_ok());
         let mut more = pre.clone();
-        more.push((PathBuf::from("b.karn"), "bynk.resolve.duplicate_fn".into()));
+        more.push((PathBuf::from("b.bynk"), "bynk.resolve.duplicate_fn".into()));
         assert!(no_new_diagnostics(&pre, &more).is_err());
     }
 
@@ -786,31 +786,31 @@ mod tests {
     #[test]
     fn code_lenses_count_references_per_definition_in_the_file() {
         let index = index_with(vec![
-            // `foo` defined in a.karn with two references.
+            // `foo` defined in a.bynk with two references.
             (
                 key("u", SymbolKind::Fn, "foo"),
-                site("a.karn", 3, 6),
-                vec![site("a.karn", 20, 23), site("b.karn", 4, 7)],
+                site("a.bynk", 3, 6),
+                vec![site("a.bynk", 20, 23), site("b.bynk", 4, 7)],
             ),
-            // `Bar` defined in a.karn with no references (a 0-ref lens).
+            // `Bar` defined in a.bynk with no references (a 0-ref lens).
             (
                 key("u", SymbolKind::Type, "Bar"),
-                site("a.karn", 40, 43),
+                site("a.bynk", 40, 43),
                 vec![],
             ),
-            // `qux` defined in another file — no lens for a.karn.
+            // `qux` defined in another file — no lens for a.bynk.
             (
                 key("u", SymbolKind::Fn, "qux"),
-                site("b.karn", 0, 3),
+                site("b.bynk", 0, 3),
                 vec![],
             ),
         ]);
-        let lenses = code_lenses(&index, Path::new("a.karn"));
-        assert_eq!(lenses.len(), 2, "two a.karn defs get lenses");
+        let lenses = code_lenses(&index, Path::new("a.bynk"));
+        assert_eq!(lenses.len(), 2, "two a.bynk defs get lenses");
         // Sorted by def position: foo (3..6) before Bar (40..43).
         assert_eq!((lenses[0].0.span.start, lenses[0].1.len()), (3, 2));
         assert_eq!((lenses[1].0.span.start, lenses[1].1.len()), (40, 0));
-        assert!(code_lenses(&index, Path::new("c.karn")).is_empty());
+        assert!(code_lenses(&index, Path::new("c.bynk")).is_empty());
     }
 
     #[test]
@@ -820,22 +820,22 @@ mod tests {
         // groups by caller (a with two sites, b with one), and `a`'s outgoing
         // is the single callee `c`.
         let mut index = index_with(vec![
-            (key("u", SymbolKind::Fn, "a"), site("f.karn", 3, 4), vec![]),
+            (key("u", SymbolKind::Fn, "a"), site("f.bynk", 3, 4), vec![]),
             (
                 key("u", SymbolKind::Fn, "b"),
-                site("f.karn", 40, 41),
+                site("f.bynk", 40, 41),
                 vec![],
             ),
             (
                 key("u", SymbolKind::Fn, "c"),
-                site("f.karn", 80, 81),
+                site("f.bynk", 80, 81),
                 vec![],
             ),
         ]);
         let edge = |caller: &str, cs: usize, ce: usize| CallEdge {
             caller: key("u", SymbolKind::Fn, caller),
             callee: key("u", SymbolKind::Fn, "c"),
-            site: site("f.karn", cs, ce),
+            site: site("f.bynk", cs, ce),
         };
         index.calls = vec![edge("a", 10, 11), edge("a", 20, 21), edge("b", 50, 51)];
 
@@ -870,22 +870,22 @@ mod tests {
         let mut index = index_with(vec![
             (
                 key("u", SymbolKind::Capability, "Cap"),
-                site("a.karn", 10, 13),
+                site("a.bynk", 10, 13),
                 vec![],
             ),
             (
                 key("u", SymbolKind::Provider, "P1"),
-                site("a.karn", 50, 52),
+                site("a.bynk", 50, 52),
                 vec![],
             ),
             (
                 key("u", SymbolKind::Provider, "P2"),
-                site("b.karn", 5, 7),
+                site("b.bynk", 5, 7),
                 vec![],
             ),
             (
                 key("u", SymbolKind::Capability, "Other"),
-                site("a.karn", 80, 85),
+                site("a.bynk", 80, 85),
                 vec![],
             ),
         ]);
@@ -894,18 +894,18 @@ mod tests {
             provider: key("u", SymbolKind::Provider, provider),
             site: site(file, s, e),
         };
-        index.impls = vec![edge("P1", "a.karn", 30, 33), edge("P2", "b.karn", 20, 23)];
+        index.impls = vec![edge("P1", "a.bynk", 30, 33), edge("P2", "b.bynk", 20, 23)];
 
-        // Provider defs, sorted by position: P1 (a.karn:50) before P2 (b.karn:5).
+        // Provider defs, sorted by position: P1 (a.bynk:50) before P2 (b.bynk:5).
         let impls = implementations(&index, &key("u", SymbolKind::Capability, "Cap"));
         assert_eq!(impls.len(), 2);
         assert_eq!(
             (&impls[0].path, impls[0].span.start),
-            (&PathBuf::from("a.karn"), 50)
+            (&PathBuf::from("a.bynk"), 50)
         );
         assert_eq!(
             (&impls[1].path, impls[1].span.start),
-            (&PathBuf::from("b.karn"), 5)
+            (&PathBuf::from("b.bynk"), 5)
         );
 
         // A capability with no providers, and an unknown key, yield nothing.
@@ -919,17 +919,17 @@ mod tests {
         let index = index_with(vec![
             (
                 key("a", SymbolKind::Type, "Order"),
-                site("a.karn", 10, 15),
+                site("a.bynk", 10, 15),
                 vec![],
             ),
             (
                 key("b", SymbolKind::Type, "Order"),
-                site("b.karn", 4, 9),
+                site("b.bynk", 4, 9),
                 vec![],
             ),
             (
                 key("a", SymbolKind::Fn, "Order"),
-                site("a.karn", 40, 45),
+                site("a.bynk", 40, 45),
                 vec![],
             ),
         ]);
@@ -938,11 +938,11 @@ mod tests {
         assert_eq!(defs.len(), 2);
         assert_eq!(
             (&defs[0].path, defs[0].span.start),
-            (&PathBuf::from("a.karn"), 10)
+            (&PathBuf::from("a.bynk"), 10)
         );
         assert_eq!(
             (&defs[1].path, defs[1].span.start),
-            (&PathBuf::from("b.karn"), 4)
+            (&PathBuf::from("b.bynk"), 4)
         );
         // An unknown type name yields nothing.
         assert!(type_definitions_named(&index, "Nope").is_empty());
@@ -982,8 +982,8 @@ mod tests {
         let text = "type Age = Int\nfn f(a: Age) -> Age {}\n";
         let mut index = index_with(vec![(
             key("shop", SymbolKind::Type, "Age"),
-            site("a.karn", 5, 8),
-            vec![site("a.karn", 23, 26), site("a.karn", 31, 34)],
+            site("a.bynk", 5, 8),
+            vec![site("a.bynk", 23, 26), site("a.bynk", 31, 34)],
         )]);
         index
             .symbols
@@ -993,7 +993,7 @@ mod tests {
             refined: true,
             ..Default::default()
         };
-        let tokens = semantic_tokens(&index, &[], Path::new("a.karn"), text, None);
+        let tokens = semantic_tokens(&index, &[], Path::new("a.bynk"), text, None);
         assert_eq!(tokens.len(), 3);
         // Def: line 0 char 5, length 3, type `type` (0), declaration|refined.
         assert_eq!(
@@ -1032,7 +1032,7 @@ mod tests {
         let text = "given Kv {\n  Kv.get(k)\n}\n";
         let mut index = ProjectIndex::default();
         index.foreign_refs.push(bynkc::index::ForeignRef {
-            site: site("a.karn", 6, 8),
+            site: site("a.bynk", 6, 8),
             kind: SymbolKind::Capability,
             modifiers: bynkc::index::SymbolModifiers {
                 platform_native: true,
@@ -1040,14 +1040,14 @@ mod tests {
             },
         });
         index.foreign_refs.push(bynkc::index::ForeignRef {
-            site: site("a.karn", 13, 15),
+            site: site("a.bynk", 13, 15),
             kind: SymbolKind::Capability,
             modifiers: bynkc::index::SymbolModifiers {
                 platform_native: true,
                 ..Default::default()
             },
         });
-        let all = semantic_tokens(&index, &[], Path::new("a.karn"), text, None);
+        let all = semantic_tokens(&index, &[], Path::new("a.bynk"), text, None);
         assert_eq!(all.len(), 2);
         assert_eq!(all[0].token_type, 2); // capability
         assert_eq!(all[0].token_modifiers_bitset, 0b1000); // platformNative
@@ -1055,18 +1055,18 @@ mod tests {
         let ranged = semantic_tokens(
             &index,
             &[],
-            Path::new("a.karn"),
+            Path::new("a.bynk"),
             text,
             Some(Span::new(0, 10)),
         );
         assert_eq!(ranged.len(), 1);
         // Other files and empty indexes yield nothing.
-        assert!(semantic_tokens(&index, &[], Path::new("b.karn"), text, None).is_empty());
+        assert!(semantic_tokens(&index, &[], Path::new("b.bynk"), text, None).is_empty());
         assert!(
             semantic_tokens(
                 &ProjectIndex::default(),
                 &[],
-                Path::new("a.karn"),
+                Path::new("a.bynk"),
                 text,
                 None
             )

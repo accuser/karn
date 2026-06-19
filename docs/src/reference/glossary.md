@@ -103,5 +103,5 @@ chosen value. See [Testing](testing.md).
 ### project vs legacy mode {#term-project-vs-legacy-mode}
 
 *Project mode* is a `bynk.toml`-driven directory layout (a `src`/`tests` split,
-`bynkc test`); *legacy mode* compiles a single `.karn` file as a standalone unit,
+`bynkc test`); *legacy mode* compiles a single `.bynk` file as a standalone unit,
 with no manifest. See [`bynk.toml` manifest](manifest.md).

@@ -20,9 +20,9 @@ Ship B-2 across **two slices**:
     `on http`/`on cron`, `agent`. Bodies mirror the worked fixtures so they
     type-check as written; tab-stops walk the names.
   - **Scaffolding commands** (`src/scaffold.ts`, registered eagerly in
-    `activate()`): **`bynk.newContext`** writes a `context <name>.karn` skeleton
+    `activate()`): **`bynk.newContext`** writes a `context <name>.bynk` skeleton
     into `src/` (or the workspace root); **`bynk.newProject`** scaffolds
-    `bynk.toml` + `src/<name>.karn`. Both validate the name, **refuse to
+    `bynk.toml` + `src/<name>.bynk`. Both validate the name, **refuse to
     overwrite**, and open what they create — `workspace.fs` only, no new deps.
   - **Getting-started walkthrough** (`contributes.walkthroughs` + three markdown
     steps under `walkthroughs/`): welcome → create a project (a `New Project`

@@ -7,8 +7,8 @@ Bynk's formatter is built into the compiler as `bynkc fmt`.
 ## Format files in place
 
 ```sh
-bynkc fmt src/counters.karn
-bynkc fmt src/*.karn
+bynkc fmt src/counters.bynk
+bynkc fmt src/*.bynk
 ```
 
 This rewrites the named files to canonical form (tab indentation, normalised
@@ -36,7 +36,7 @@ commons demo {
 Pass `-` to read from stdin and write to stdout — handy for editor integrations:
 
 ```sh
-cat src/counters.karn | bynkc fmt -
+cat src/counters.bynk | bynkc fmt -
 ```
 
 ## Check formatting in CI
@@ -45,7 +45,7 @@ cat src/counters.karn | bynkc fmt -
 not already canonical:
 
 ```sh
-bynkc fmt --check src/*.karn
+bynkc fmt --check src/*.bynk
 ```
 
 ## Related

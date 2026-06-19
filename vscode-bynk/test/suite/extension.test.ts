@@ -38,7 +38,7 @@ describe("Bynk extension", () => {
     const ext = vscode.extensions.getExtension(EXT_ID);
     assert.ok(ext, `extension ${EXT_ID} is installed`);
     await ext.activate();
-    doc = await vscode.workspace.openTextDocument(fixtureUri("src/text.karn"));
+    doc = await vscode.workspace.openTextDocument(fixtureUri("src/text.bynk"));
     await vscode.window.showTextDocument(doc);
   });
 

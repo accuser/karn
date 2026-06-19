@@ -210,7 +210,7 @@ fn multi_actor_sum_resolves_first_wins_and_fails_closed() {
     let _ = fs::remove_dir_all(&tmp);
     let proj = tmp.join("proj");
     fs::create_dir_all(&proj).unwrap();
-    fs::write(proj.join("api.karn"), SOURCE).unwrap();
+    fs::write(proj.join("api.bynk"), SOURCE).unwrap();
 
     let out =
         match bynkc::compile_project(&CompileOptions::single(&proj).target(BuildTarget::Workers)) {

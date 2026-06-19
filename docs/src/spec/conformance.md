@@ -9,7 +9,7 @@ implementation MUST do in terms of that corpus and those gates.
 The corpus is two sets of fixtures:
 
 - the **positive** suite (≈172 fixtures) — programs that MUST compile. Each is
-  either single-file (an `input.karn` compiled against an `expected.ts`) or a
+  either single-file (an `input.bynk` compiled against an `expected.ts`) or a
   project (a `src/` tree compiled against a mirrored `expected/` tree). A
   conforming implementation MUST accept every positive fixture and emit the
   expected TypeScript.

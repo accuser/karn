@@ -1178,7 +1178,7 @@ fn emit_cross_context_namespace_imports(
         // import target. (The composition root lives in the consumed
         // context's directory; any of its files would work as an import
         // target since they're all in the same module namespace, but we
-        // currently emit one file per .karn source so a single import per
+        // currently emit one file per .bynk source so a single import per
         // consumed name suffices for the surface contract.)
         let target_paths = ctx.imported_decl_paths.get(q.as_str());
         let target = target_paths
@@ -1186,20 +1186,20 @@ fn emit_cross_context_namespace_imports(
             .unwrap_or_else(|| {
                 // No imported declaration pins the path (e.g. a capability-only
                 // consumed context, v0.15). Fall back to the unit's own module:
-                // its per-Worker handlers in workers mode, or its <segment>.karn
+                // its per-Worker handlers in workers mode, or its <segment>.bynk
                 // source in bundle mode. v0.17: a consumed *adapter* is not a
                 // Worker — its capability types live in its root module
                 // (`<adapter>.ts`) in both targets.
                 if ctx.consumed_adapters.contains(q.as_str()) {
                     let mut p = EmitProjectCtx::commons_path(q);
-                    p.set_extension("karn");
+                    p.set_extension("bynk");
                     p
                 } else {
                     match ctx.target {
                         BuildTarget::Workers => crate::project::worker_handlers_source_path(q),
                         BuildTarget::Bundle => {
                             let mut p = EmitProjectCtx::commons_path(q);
-                            p.set_extension("karn");
+                            p.set_extension("bynk");
                             p
                         }
                     }
@@ -1272,8 +1272,8 @@ fn emit_project_imports(
     }
 }
 
-/// Compute a relative import specifier from `from_source` (a `.karn` path)
-/// to `to_source` (another `.karn` path), with `.karn` rewritten to `.js`
+/// Compute a relative import specifier from `from_source` (a `.bynk` path)
+/// to `to_source` (another `.bynk` path), with `.bynk` rewritten to `.js`
 /// for compatibility with NodeNext/strict TS resolution.
 fn sibling_import_specifier(from_source: &Path, to_source: &Path) -> String {
     let from_dir = from_source.parent().unwrap_or(Path::new(""));
@@ -1292,7 +1292,7 @@ pub(crate) fn ts_specifier(p: &Path) -> String {
 
 /// Compute a relative import specifier from this file's location to a
 /// specific source file in another commons. `target_source` is the project-
-/// relative path of the target `.karn` file. The result is suitable for
+/// relative path of the target `.bynk` file. The result is suitable for
 /// `import { ... } from "..."` in NodeNext/strict TypeScript.
 fn cross_commons_import_specifier_for_path(from_source: &Path, target_source: &Path) -> String {
     let from_dir = from_source.parent().unwrap_or(Path::new(""));

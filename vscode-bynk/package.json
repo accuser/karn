@@ -1,7 +1,7 @@
 {
   "name": "bynk-vscode",
   "displayName": "Bynk",
-  "description": "Language support for Bynk (.karn) source files.",
+  "description": "Language support for Bynk (.bynk) source files.",
   "version": "0.55.0",
   "publisher": "bynk",
   "license": "MIT OR Apache-2.0",
@@ -32,7 +32,7 @@
           "bynk"
         ],
         "extensions": [
-          ".karn"
+          ".bynk"
         ],
         "configuration": "./language-configuration.json"
       }

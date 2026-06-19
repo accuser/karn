@@ -13,7 +13,7 @@ bynkc --help
 
 ## Write a program
 
-Create a file called `demo.karn` with this content:
+Create a file called `demo.bynk` with this content:
 
 ```bynk
 commons demo {
@@ -30,7 +30,7 @@ named `demo`; inside it we declare one type, `Id`, an alias for the built-in
 Ask `bynkc` to compile the file to TypeScript:
 
 ```sh
-bynkc compile demo.karn --output demo.ts
+bynkc compile demo.bynk --output demo.ts
 ```
 
 If all is well the command prints nothing and exits successfully. Open
@@ -66,7 +66,7 @@ identity, even when they look like plain aliases.
 
 ## Add a function
 
-Let us make the program do something. Replace the contents of `demo.karn` with:
+Let us make the program do something. Replace the contents of `demo.bynk` with:
 
 ```bynk
 commons demo {
@@ -92,7 +92,7 @@ itself an expression, and its value is the function's result — there is no
 Compile again:
 
 ```sh
-bynkc compile demo.karn --output demo.ts
+bynkc compile demo.bynk --output demo.ts
 ```
 
 The new function appears at the bottom of `demo.ts`:
@@ -113,7 +113,7 @@ While editing, you often just want to know whether the program is valid without
 writing any output. That is what `bynkc check` is for:
 
 ```sh
-bynkc check demo.karn
+bynkc check demo.bynk
 ```
 
 It runs the same analysis as `compile` but stops before code generation. It

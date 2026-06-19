@@ -10,7 +10,7 @@ The first-party Bynk surface, the platform adapters, the Bynk-written
 collection/string commons, the per-platform TypeScript bindings, and the emitted
 runtime are all real Bynk and TypeScript programs — but they lived as Rust
 `r#"…"#` string literals (`firstparty.rs`, and `RUNTIME_TS` in `emitter.rs`).
-As literals they sat outside every tool that could check them: the `.karn`
+As literals they sat outside every tool that could check them: the `.bynk`
 sources never reached the lexer/parser/`bynk-fmt`/`bynk-lsp` directly, and the
 `.ts` bindings + runtime escaped `tsc --strict` except transitively when a
 fixture happened to emit them. The drift between the live runtime and a stale
@@ -43,10 +43,10 @@ a missing path is already a hard compile error).
 
 ## Consequences
 
-The first-party stdlib/runtime/bindings gain standing checks: each `.karn` source
+The first-party stdlib/runtime/bindings gain standing checks: each `.bynk` source
 must parse and be `bynk-fmt`-clean, and the embedded `runtime.ts` passes
 `tsc --strict` standalone — closing the "only checked when something uses it"
-gap. Reformatting a `.karn` source changes no emitted TypeScript (formatting is
+gap. Reformatting a `.bynk` source changes no emitted TypeScript (formatting is
 trivia), so this is independent of the byte-identical emitted-output guarantee the
 golden + `tsc_verify` + `runtime_helpers` suites pin. Crucially, it **unblocks
 v0.49**: the now-real `runtime.ts` is a real import target for behavioral

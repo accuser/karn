@@ -26,7 +26,7 @@ npm run package
 code --install-extension bynk-vscode-*.vsix
 ```
 
-The extension activates on `.karn` files and on any workspace containing a
+The extension activates on `.bynk` files and on any workspace containing a
 `bynk.toml`. You then get syntax highlighting, live diagnostics, hover with type
 signatures, go-to-definition, and format-on-save (honouring
 `editor.formatOnSave`).

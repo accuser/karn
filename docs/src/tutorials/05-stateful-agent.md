@@ -7,7 +7,7 @@ URL, and how often each was followed. In Bynk, the unit of state is an
 a named thing, identified by a key, that owns some state and exposes handlers to
 read and change it.
 
-We give the shortener a `Link` agent. Keep editing `shortener.karn`.
+We give the shortener a `Link` agent. Keep editing `shortener.bynk`.
 
 ## Declare an agent
 

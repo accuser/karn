@@ -11,7 +11,7 @@ the right one is most of the work of modelling a domain well:
   with another value of the same underlying shape.
 
 We will model the shortener's requests, responses, and errors, and meet `match`.
-Keep editing `shortener.karn`; we compile it at the end.
+Keep editing `shortener.bynk`; we compile it at the end.
 
 ## Records group fields
 
@@ -145,7 +145,7 @@ job for **refined types**, and it is exactly where we go next.
 
 ## Compile what we have
 
-Here is `shortener.karn` so far — the data model wired into the API:
+Here is `shortener.bynk` so far — the data model wired into the API:
 
 ```bynk
 context shortener

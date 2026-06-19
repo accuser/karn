@@ -44,7 +44,7 @@ fn run_test(input: PathBuf, output: Option<PathBuf>, no_run: bool) -> ExitCode {
     let output_root = output.unwrap_or_else(|| input.join("out"));
     if !input.is_dir() {
         eprintln!(
-            "bynkc test: input `{}` must be a project directory containing `.karn` files",
+            "bynkc test: input `{}` must be a project directory containing `.bynk` files",
             input.display()
         );
         return ExitCode::FAILURE;

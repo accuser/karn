@@ -71,7 +71,7 @@ bynkc test .         # compile and run the `test` blocks (needs node + tsc)
 bynkc compile src --output out --target workers   # emit a Cloudflare Worker
 ```
 
-A new program needs only a `bynk.toml` manifest and a `.karn` file. See
+A new program needs only a `bynk.toml` manifest and a `.bynk` file. See
 [Compile your first program](docs/src/tutorials/01-first-program.md).
 
 ## Repository layout

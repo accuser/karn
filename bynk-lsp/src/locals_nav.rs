@@ -181,15 +181,15 @@ mod tests {
         let file = r
             .files
             .iter()
-            .find(|f| f.source_path.to_string_lossy().ends_with("util.karn"))
-            .expect("util.karn analysed");
+            .find(|f| f.source_path.to_string_lossy().ends_with("util.bynk"))
+            .expect("util.bynk analysed");
         let text = &file.text;
         let locals = r
             .locals
             .iter()
-            .find(|(p, _)| p.to_string_lossy().ends_with("util.karn"))
+            .find(|(p, _)| p.to_string_lossy().ends_with("util.bynk"))
             .map(|(_, l)| l.clone())
-            .expect("util.karn locals");
+            .expect("util.bynk locals");
 
         // `let total = …` then `total` — cursor on the use resolves to def + use.
         let use_off = text.rfind("total").expect("total use");

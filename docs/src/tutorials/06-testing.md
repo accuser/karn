@@ -14,9 +14,9 @@ project like this:
 url-shortener/
 ├── bynk.toml
 ├── src/
-│   └── shortener.karn
+│   └── shortener.bynk
 └── tests/
-    └── shortener.karn
+    └── shortener.bynk
 ```
 
 The manifest names the two trees:
@@ -31,15 +31,15 @@ src = "src"
 tests = "tests"
 ```
 
-Move the `shortener.karn` you built into `src/`. Each test file's path under
-`tests/` mirrors the unit it tests, so `tests/shortener.karn` tests the
+Move the `shortener.bynk` you built into `src/`. Each test file's path under
+`tests/` mirrors the unit it tests, so `tests/shortener.bynk` tests the
 `shortener` context.
 
 ## Write a test and assert
 
 A test file is a `test` block naming its target, containing one or more named
 cases. Inside a case, `assert` checks a condition. Put this in
-`tests/shortener.karn`:
+`tests/shortener.bynk`:
 
 ```bynk,ignore
 test shortener

@@ -342,15 +342,15 @@ This sits with DDD's strict view that bounded contexts are flat. The dotted nami
 ```
 src/
 ├── bynk/
-│   └── time.karn                       -- commons bynk.time
+│   └── time.bynk                       -- commons bynk.time
 ├── commerce/
-│   ├── money.karn                      -- commons commerce.money
-│   ├── inventory.karn                  -- context commerce.inventory
-│   └── payment.karn                    -- context commerce.payment
+│   ├── money.bynk                      -- commons commerce.money
+│   ├── inventory.bynk                  -- context commerce.inventory
+│   └── payment.bynk                    -- context commerce.payment
 └── hotel/
-    ├── identifiers.karn                -- commons hotel.identifiers
-    ├── bookings.karn                   -- context hotel.bookings
-    └── rooms.karn                      -- context hotel.rooms
+    ├── identifiers.bynk                -- commons hotel.identifiers
+    ├── bookings.bynk                   -- context hotel.bookings
+    └── rooms.bynk                      -- context hotel.rooms
 ```
 
 **Relationship to capabilities.** Commons and capabilities are orthogonal axes of reuse:
@@ -560,16 +560,16 @@ A reader can identify everything from the declaration: it's the test context for
 ```
 src/
 ├── commerce/
-│   ├── orders.karn              -- context commerce.orders
-│   ├── orders.test.karn         -- test commerce.orders
-│   ├── inventory.karn           -- context commerce.inventory
-│   └── inventory.test.karn      -- test commerce.inventory
+│   ├── orders.bynk              -- context commerce.orders
+│   ├── orders.test.bynk         -- test commerce.orders
+│   ├── inventory.bynk           -- context commerce.inventory
+│   └── inventory.test.bynk      -- test commerce.inventory
 └── hotel/
-    ├── bookings.karn
-    └── bookings.test.karn
+    ├── bookings.bynk
+    └── bookings.test.bynk
 ```
 
-The `.test.karn` suffix is a discovery convention for the test runner; the actual test-for relationship comes from the `test QualifiedName` declaration inside the file. Test contexts can be multi-file via directory expansion: `commerce/orders.test/place.test.karn` and `commerce/orders.test/cancel.test.karn` both contribute to `test commerce.orders`.
+The `.test.bynk` suffix is a discovery convention for the test runner; the actual test-for relationship comes from the `test QualifiedName` declaration inside the file. Test contexts can be multi-file via directory expansion: `commerce/orders.test/place.test.bynk` and `commerce/orders.test/cancel.test.bynk` both contribute to `test commerce.orders`.
 
 **Test commons.** A test context may want to share fixtures and test-helper functions with other test contexts. The natural construct is `test commons` — a commons declaration with test privileges:
 

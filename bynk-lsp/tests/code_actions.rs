@@ -83,12 +83,12 @@ fn apply_text_edits(text: &str, edits: &[OneOf<TextEdit, AnnotatedTextEdit>]) ->
 
 #[test]
 fn unused_capability_quick_fix_round_trips() {
-    let root = setup_project("unused", &[("billing/charge.karn", UNUSED_CAP)]);
+    let root = setup_project("unused", &[("billing/charge.bynk", UNUSED_CAP)]);
     let result = bynkc::diagnose_project(&root, &HashMap::new());
     let file = result
         .files
         .iter()
-        .find(|f| f.source_path == Path::new("billing/charge.karn"))
+        .find(|f| f.source_path == Path::new("billing/charge.bynk"))
         .expect("context file analysed");
     let diag = file
         .diagnostics
@@ -98,7 +98,7 @@ fn unused_capability_quick_fix_round_trips() {
 
     // The request range sits on the squiggle (the diagnostic's span) — far
     // from where the edit lands (the `given` clause).
-    let uri = Url::from_file_path(root.join("billing/charge.karn")).unwrap();
+    let uri = Url::from_file_path(root.join("billing/charge.bynk")).unwrap();
     let actions = code_actions::quick_fixes(
         &file.text,
         &file.diagnostics,
@@ -126,7 +126,7 @@ fn unused_capability_quick_fix_round_trips() {
     // edited project re-diagnoses clean.
     let fixed = apply_text_edits(&file.text, &doc_edits[0].edits);
     assert_eq!(fixed, UNUSED_CAP.replace(" given Clock", ""));
-    let abs = root.join("billing/charge.karn");
+    let abs = root.join("billing/charge.bynk");
     let canonical = abs.canonicalize().unwrap_or(abs);
     let mut overlay = HashMap::new();
     overlay.insert(canonical, fixed);
@@ -139,14 +139,14 @@ fn unused_capability_quick_fix_round_trips() {
 
 #[test]
 fn range_away_from_the_diagnostic_offers_nothing() {
-    let root = setup_project("away", &[("billing/charge.karn", UNUSED_CAP)]);
+    let root = setup_project("away", &[("billing/charge.bynk", UNUSED_CAP)]);
     let result = bynkc::diagnose_project(&root, &HashMap::new());
     let file = result
         .files
         .iter()
-        .find(|f| f.source_path == Path::new("billing/charge.karn"))
+        .find(|f| f.source_path == Path::new("billing/charge.bynk"))
         .expect("context file analysed");
-    let uri = Url::from_file_path(root.join("billing/charge.karn")).unwrap();
+    let uri = Url::from_file_path(root.join("billing/charge.bynk")).unwrap();
     // A cursor at the top of the file intersects no diagnostic.
     let actions = code_actions::quick_fixes(
         &file.text,

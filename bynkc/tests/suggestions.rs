@@ -133,20 +133,20 @@ const USES_NONE: &str = "    42";
 fn remove_first_capability() {
     let text = handlers_file(" given Alpha, Beta, Gamma", USES_BETA_GAMMA);
     let s = sole_suggestion(
-        &diagnose_with("app/handlers.karn", &text),
+        &diagnose_with("app/handlers.bynk", &text),
         "bynk.given.unused_capability",
     );
     assert_eq!(s.message, "remove `Alpha` from the `given` clause");
     let fixed = apply(&text, &s);
     assert_eq!(fixed, handlers_file(" given Beta, Gamma", USES_BETA_GAMMA));
-    assert_clean("app/handlers.karn", &fixed);
+    assert_clean("app/handlers.bynk", &fixed);
 }
 
 #[test]
 fn remove_middle_capability() {
     let text = handlers_file(" given Alpha, Beta, Gamma", USES_ALPHA_GAMMA);
     let s = sole_suggestion(
-        &diagnose_with("app/handlers.karn", &text),
+        &diagnose_with("app/handlers.bynk", &text),
         "bynk.given.unused_capability",
     );
     let fixed = apply(&text, &s);
@@ -154,31 +154,31 @@ fn remove_middle_capability() {
         fixed,
         handlers_file(" given Alpha, Gamma", USES_ALPHA_GAMMA)
     );
-    assert_clean("app/handlers.karn", &fixed);
+    assert_clean("app/handlers.bynk", &fixed);
 }
 
 #[test]
 fn remove_last_capability() {
     let text = handlers_file(" given Alpha, Beta, Gamma", USES_ALPHA_BETA);
     let s = sole_suggestion(
-        &diagnose_with("app/handlers.karn", &text),
+        &diagnose_with("app/handlers.bynk", &text),
         "bynk.given.unused_capability",
     );
     let fixed = apply(&text, &s);
     assert_eq!(fixed, handlers_file(" given Alpha, Beta", USES_ALPHA_BETA));
-    assert_clean("app/handlers.karn", &fixed);
+    assert_clean("app/handlers.bynk", &fixed);
 }
 
 #[test]
 fn remove_only_capability_drops_the_given_keyword() {
     let text = handlers_file(" given Alpha", USES_NONE);
     let s = sole_suggestion(
-        &diagnose_with("app/handlers.karn", &text),
+        &diagnose_with("app/handlers.bynk", &text),
         "bynk.given.unused_capability",
     );
     let fixed = apply(&text, &s);
     assert_eq!(fixed, handlers_file("", USES_NONE));
-    assert_clean("app/handlers.karn", &fixed);
+    assert_clean("app/handlers.bynk", &fixed);
 }
 
 // -- add capability to `given` --
@@ -187,25 +187,25 @@ fn remove_only_capability_drops_the_given_keyword() {
 fn add_capability_after_existing_entries() {
     let text = handlers_file(" given Alpha", USES_ALPHA_BETA);
     let s = sole_suggestion(
-        &diagnose_with("app/handlers.karn", &text),
+        &diagnose_with("app/handlers.bynk", &text),
         "bynk.given.undeclared_capability",
     );
     assert_eq!(s.message, "add `Beta` to the `given` clause");
     let fixed = apply(&text, &s);
     assert_eq!(fixed, handlers_file(" given Alpha, Beta", USES_ALPHA_BETA));
-    assert_clean("app/handlers.karn", &fixed);
+    assert_clean("app/handlers.bynk", &fixed);
 }
 
 #[test]
 fn add_capability_synthesises_an_absent_clause() {
     let text = handlers_file("", USES_ALPHA);
     let s = sole_suggestion(
-        &diagnose_with("app/handlers.karn", &text),
+        &diagnose_with("app/handlers.bynk", &text),
         "bynk.given.undeclared_capability",
     );
     let fixed = apply(&text, &s);
     assert_eq!(fixed, handlers_file(" given Alpha", USES_ALPHA));
-    assert_clean("app/handlers.karn", &fixed);
+    assert_clean("app/handlers.bynk", &fixed);
 }
 
 // -- cross-context (`B.Cap`) add --
@@ -231,7 +231,7 @@ service crossuse {{
 fn add_cross_context_capability_synthesises_an_absent_clause() {
     let text = crossuse_file("");
     let s = sole_suggestion(
-        &diagnose_with("app/crossuse.karn", &text),
+        &diagnose_with("app/crossuse.bynk", &text),
         "bynk.given.undeclared_capability",
     );
     // The clause entry is the *canonical* context path (the diagnosis site
@@ -240,7 +240,7 @@ fn add_cross_context_capability_synthesises_an_absent_clause() {
     assert_eq!(s.message, "add `platform.time.Clock` to the `given` clause");
     let fixed = apply(&text, &s);
     assert_eq!(fixed, crossuse_file(" given platform.time.Clock"));
-    assert_clean("app/crossuse.karn", &fixed);
+    assert_clean("app/crossuse.bynk", &fixed);
 }
 
 // -- the baseline fixtures themselves are clean --
@@ -266,7 +266,7 @@ fn baseline_fixtures_carry_no_diagnostics() {
 #[test]
 fn inrange_swap_int_quick_fix_swaps_the_bounds() {
     let inverted = "commons app.refine\n\ntype Age = Int where InRange(120, 0)\n";
-    let diags = diagnose_with("app/refine.karn", inverted);
+    let diags = diagnose_with("app/refine.bynk", inverted);
     let s = sole_suggestion(&diags, "bynk.types.inverted_range");
     // Two edits, one per bound.
     assert_eq!(s.edits.len(), 2);
@@ -275,20 +275,20 @@ fn inrange_swap_int_quick_fix_swaps_the_bounds() {
         fixed.contains("InRange(0, 120)"),
         "bounds swapped in place: {fixed:?}"
     );
-    assert_clean("app/refine.karn", &fixed);
+    assert_clean("app/refine.bynk", &fixed);
 }
 
 #[test]
 fn inrange_swap_float_quick_fix_preserves_lexemes() {
     let inverted = "commons app.refine\n\ntype Ratio = Float where InRange(5.2, 1.1)\n";
-    let diags = diagnose_with("app/refine.karn", inverted);
+    let diags = diagnose_with("app/refine.bynk", inverted);
     let s = sole_suggestion(&diags, "bynk.types.inverted_range");
     let fixed = apply(inverted, &s);
     assert!(
         fixed.contains("InRange(1.1, 5.2)"),
         "float bounds swapped, lexemes preserved: {fixed:?}"
     );
-    assert_clean("app/refine.karn", &fixed);
+    assert_clean("app/refine.bynk", &fixed);
 }
 
 // -- #48: field-access-on-refined → "remove `.raw`" quick-fix --
@@ -300,14 +300,14 @@ fn refined_raw_quick_fix_drops_dot_raw() {
     let src = "commons app.refine\n\n\
                type Subject = String where NonEmpty\n\n\
                fn greet(s: Subject) -> String {\n  s.raw\n}\n";
-    let diags = diagnose_with("app/refine.karn", src);
+    let diags = diagnose_with("app/refine.bynk", src);
     let s = sole_suggestion(&diags, "bynk.types.field_access_on_non_record");
     let fixed = apply(src, &s);
     assert!(
         !fixed.contains(".raw") && fixed.contains("  s\n"),
         "`.raw` removed, leaving the bare value: {fixed:?}"
     );
-    assert_clean("app/refine.karn", &fixed);
+    assert_clean("app/refine.bynk", &fixed);
 }
 
 #[test]
@@ -317,7 +317,7 @@ fn refined_field_access_carries_the_widen_note_without_an_autofix() {
     let src = "commons app.refine\n\n\
                type Subject = String where NonEmpty\n\n\
                fn f(s: Subject) -> String {\n  s.size\n}\n";
-    let diags = diagnose_with("app/refine.karn", src);
+    let diags = diagnose_with("app/refine.bynk", src);
     let d = diags
         .iter()
         .find(|d| d.error.category == "bynk.types.field_access_on_non_record")

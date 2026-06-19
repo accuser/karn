@@ -1,9 +1,9 @@
 //! Multi-file project compilation (v0.3 §3.2 and §3.3, v0.4 §3.5).
 //!
-//! A "project" is a directory tree of `.karn` source files. The dotted name
+//! A "project" is a directory tree of `.bynk` source files. The dotted name
 //! of a commons or context (e.g., `bynk.time`, `commerce.orders`) maps to a
-//! path under the project root — either a single file (`bynk/time.karn`) or
-//! a directory of files all sharing the same header (`bynk/time/*.karn`).
+//! path under the project root — either a single file (`bynk/time.bynk`) or
+//! a directory of files all sharing the same header (`bynk/time/*.bynk`).
 //!
 //! v0.4: each file is one of two kinds — commons or context. Both kinds share
 //! the same multi-file directory machinery; they differ in body content
@@ -12,7 +12,7 @@
 //! emission (contexts re-brand types from used commons).
 //!
 //! Compilation proceeds in two passes:
-//!   1. **Discover and parse** every `.karn` file. Group by qualified name
+//!   1. **Discover and parse** every `.bynk` file. Group by qualified name
 //!      and kind. Build a global symbol table where each unit contributes
 //!      its declarations.
 //!   2. **Resolve, type-check, and emit** each unit with full visibility of
@@ -72,7 +72,7 @@ pub struct CompiledFile {
     /// The originating Bynk source file, relative to the project root.
     pub source_path: PathBuf,
     /// Where the TS output should be written, relative to the output root.
-    /// Mirrors the source tree, with `.karn` rewritten to `.ts`.
+    /// Mirrors the source tree, with `.bynk` rewritten to `.ts`.
     pub output_path: PathBuf,
     /// The emitted TypeScript content.
     pub typescript: String,
@@ -359,7 +359,7 @@ fn record_analyse_types(
     exprs.record_file(types);
 }
 
-/// Phase 1: discover the `.karn` files under the source (and, in split mode,
+/// Phase 1: discover the `.bynk` files under the source (and, in split mode,
 /// the tests) root, and run the file-vs-directory conflict checks. Pushes any
 /// discovery errors into `errors` and signals a pipeline bail via `Err(())`
 /// (the caller terminates with `finish`); otherwise returns the discovered
@@ -400,7 +400,7 @@ fn phase_discovery(
             CompileError::new(
                 "bynk.project.no_sources",
                 Span::default(),
-                format!("no `.karn` source files found under {}", src_root.display()),
+                format!("no `.bynk` source files found under {}", src_root.display()),
             ),
         );
         return Err(());
@@ -485,7 +485,7 @@ fn phase_parse(
             .and_then(|toks| parser::parse_unit(&toks, firstparty::BYNK_ADAPTER_SRC))
         {
             Ok(unit) => parsed.push(ParsedFile {
-                source_path: PathBuf::from("bynk.karn"),
+                source_path: PathBuf::from("bynk.bynk"),
                 source: firstparty::BYNK_ADAPTER_SRC.to_string(),
                 unit,
                 kind: UnitKind::Adapter,
@@ -508,7 +508,7 @@ fn phase_parse(
             .and_then(|toks| parser::parse_unit(&toks, firstparty::CLOUDFLARE_ADAPTER_SRC))
         {
             Ok(unit) => parsed.push(ParsedFile {
-                source_path: PathBuf::from("bynk/cloudflare.karn"),
+                source_path: PathBuf::from("bynk/cloudflare.bynk"),
                 source: firstparty::CLOUDFLARE_ADAPTER_SRC.to_string(),
                 unit,
                 kind: UnitKind::Adapter,
@@ -535,7 +535,7 @@ fn phase_parse(
             .and_then(|toks| parser::parse_unit(&toks, firstparty::BYNK_MAP_SRC))
         {
             Ok(unit) => parsed.push(ParsedFile {
-                source_path: PathBuf::from("bynk/map.karn"),
+                source_path: PathBuf::from("bynk/map.bynk"),
                 source: firstparty::BYNK_MAP_SRC.to_string(),
                 unit,
                 kind: UnitKind::Commons,
@@ -550,7 +550,7 @@ fn phase_parse(
             .and_then(|toks| parser::parse_unit(&toks, firstparty::BYNK_LIST_SRC))
         {
             Ok(unit) => parsed.push(ParsedFile {
-                source_path: PathBuf::from("bynk/list.karn"),
+                source_path: PathBuf::from("bynk/list.bynk"),
                 source: firstparty::BYNK_LIST_SRC.to_string(),
                 unit,
                 kind: UnitKind::Commons,
@@ -567,7 +567,7 @@ fn phase_parse(
             .and_then(|toks| parser::parse_unit(&toks, firstparty::BYNK_STRING_SRC))
         {
             Ok(unit) => parsed.push(ParsedFile {
-                source_path: PathBuf::from("bynk/string.karn"),
+                source_path: PathBuf::from("bynk/string.bynk"),
                 source: firstparty::BYNK_STRING_SRC.to_string(),
                 unit,
                 kind: UnitKind::Commons,
@@ -2597,7 +2597,7 @@ fn build_output(
     if !runnable_tests.is_empty() {
         let main_ts = emit_test_main(&runnable_tests);
         compiled.push(CompiledFile {
-            source_path: PathBuf::from("tests/main.test.karn"),
+            source_path: PathBuf::from("tests/main.test.bynk"),
             output_path: PathBuf::from("tests/main.ts"),
             typescript: main_ts,
         });
@@ -2644,7 +2644,7 @@ fn build_output(
                 !context_native.is_empty(),
             ) {
                 compiled.push(CompiledFile {
-                    source_path: PathBuf::from("compose.karn"),
+                    source_path: PathBuf::from("compose.bynk"),
                     output_path: PathBuf::from("compose.ts"),
                     typescript: compose_ts,
                 });
@@ -3359,7 +3359,7 @@ pub struct EmitProjectCtx {
 /// Where a boundary-crossing type was declared.
 #[derive(Debug, Clone)]
 pub enum BoundaryOwner {
-    /// Commons type. Path is project-relative to the `.karn` file declaring it.
+    /// Commons type. Path is project-relative to the `.bynk` file declaring it.
     Commons { source_path: PathBuf },
     /// Context type. Qualified context name (e.g., `commerce.payment`).
     Context { context: String },

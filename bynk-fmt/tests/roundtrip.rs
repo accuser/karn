@@ -1,13 +1,13 @@
 //! Round-trip + idempotency tests against the bynkc positive fixture corpus.
 //!
-//! For every single-file fixture (those with `input.karn`), we:
+//! For every single-file fixture (those with `input.bynk`), we:
 //!  1. Format the source. It must succeed.
 //!  2. Format the result again. It must equal the first format.
 //!  3. Parse the formatted result. It must parse without errors (semantic
 //!     preservation: formatter does not introduce syntax errors).
 //!
 //! Project-shaped fixtures (those with `src/`) are walked recursively and
-//! each `.karn` file is tested the same way.
+//! each `.bynk` file is tested the same way.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -43,7 +43,7 @@ fn collect_bynk_files(root: &Path) -> Vec<PathBuf> {
                 let p = entry.path();
                 if p.is_dir() {
                     stack.push(p);
-                } else if p.extension().and_then(|e| e.to_str()) == Some("karn") {
+                } else if p.extension().and_then(|e| e.to_str()) == Some("bynk") {
                     out.push(p);
                 }
             }
@@ -99,7 +99,7 @@ fn round_trip_positive_corpus() {
     let opts = FormatOptions::default();
     let mut failures = Vec::new();
     for dir in fixture_dirs() {
-        let input = dir.join("input.karn");
+        let input = dir.join("input.bynk");
         let src_dir = dir.join("src");
         if input.exists() {
             if let Err(e) = check_file(&input, &opts) {

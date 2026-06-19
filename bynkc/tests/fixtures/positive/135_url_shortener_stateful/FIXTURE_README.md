@@ -16,14 +16,14 @@ surface. Its purpose as a fixture is twofold:
 ## Placement
 
 Drop the directory in at `tests/fixtures/positive/135_url_shortener_stateful/`,
-alongside `134_url_shortener`. Layout (split-mode, plain `.karn` under both
+alongside `134_url_shortener`. Layout (split-mode, plain `.bynk` under both
 roots per the v0.9.1 convention):
 
 ```
 135_url_shortener_stateful/
 ├── bynk.toml                       [paths] src = "src", tests = "tests"
-├── src/shortener/{core,analytics,links}.karn
-└── tests/shortener/{analytics,links}.karn
+├── src/shortener/{core,analytics,links}.bynk
+└── tests/shortener/{analytics,links}.bynk
 ```
 
 ## What it must satisfy

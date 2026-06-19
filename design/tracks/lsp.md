@@ -123,7 +123,7 @@ context) is the completion-surface contract — see *Foundational ADRs*.
 After `uses bynk.list` / `bynk.map` / `bynk.string`, the combinators (`map`,
 `filter`, `find`, `values`, `getOr`, `join`, …) are never completable, nor are
 user-declared top-level `fn`s in scope. All are enumerable from the firstparty
-`.karn` sources + the project parse. **Decision:** add a free-function candidate
+`.bynk` sources + the project parse. **Decision:** add a free-function candidate
 producer keyed off the in-scope `uses` set and the current unit's `fn` exports.
 
 ### G6 — The clean-file ceiling caps the type-aware features

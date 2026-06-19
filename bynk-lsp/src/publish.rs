@@ -57,35 +57,35 @@ mod tests {
 
     #[test]
     fn publishes_new_and_clears_fixed() {
-        let prev: HashSet<Url> = [uri("a.karn"), uri("b.karn")].into_iter().collect();
+        let prev: HashSet<Url> = [uri("a.bynk"), uri("b.bynk")].into_iter().collect();
         let mut new = HashMap::new();
-        new.insert(uri("a.karn"), vec![diag("still broken")]);
-        new.insert(uri("b.karn"), vec![]); // fixed
-        new.insert(uri("c.karn"), vec![]); // was never dirty — no publish
+        new.insert(uri("a.bynk"), vec![diag("still broken")]);
+        new.insert(uri("b.bynk"), vec![]); // fixed
+        new.insert(uri("c.bynk"), vec![]); // was never dirty — no publish
 
         let (publishes, dirty) = publish_plan(&prev, new);
         let by: HashMap<_, _> = publishes
             .iter()
             .map(|(u, d)| (u.clone(), d.len()))
             .collect();
-        assert_eq!(by.get(&uri("a.karn")), Some(&1), "still-broken republished");
+        assert_eq!(by.get(&uri("a.bynk")), Some(&1), "still-broken republished");
         assert_eq!(
-            by.get(&uri("b.karn")),
+            by.get(&uri("b.bynk")),
             Some(&0),
             "fixed file gets an empty publish"
         );
         assert!(
-            !by.contains_key(&uri("c.karn")),
+            !by.contains_key(&uri("c.bynk")),
             "never-dirty clean file is not published"
         );
-        assert!(dirty.contains(&uri("a.karn")) && !dirty.contains(&uri("b.karn")));
+        assert!(dirty.contains(&uri("a.bynk")) && !dirty.contains(&uri("b.bynk")));
     }
 
     #[test]
     fn vanished_files_clear() {
-        let prev: HashSet<Url> = [uri("gone.karn")].into_iter().collect();
+        let prev: HashSet<Url> = [uri("gone.bynk")].into_iter().collect();
         let (publishes, dirty) = publish_plan(&prev, HashMap::new());
-        assert_eq!(publishes, vec![(uri("gone.karn"), Vec::new())]);
+        assert_eq!(publishes, vec![(uri("gone.bynk"), Vec::new())]);
         assert!(dirty.is_empty());
     }
 
@@ -93,9 +93,9 @@ mod tests {
     fn newly_broken_file_enters_the_dirty_set() {
         let prev = HashSet::new();
         let mut new = HashMap::new();
-        new.insert(uri("a.karn"), vec![diag("boom")]);
+        new.insert(uri("a.bynk"), vec![diag("boom")]);
         let (publishes, dirty) = publish_plan(&prev, new);
         assert_eq!(publishes.len(), 1);
-        assert!(dirty.contains(&uri("a.karn")));
+        assert!(dirty.contains(&uri("a.bynk")));
     }
 }

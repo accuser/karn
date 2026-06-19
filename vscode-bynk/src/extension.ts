@@ -1,6 +1,6 @@
 // Bynk VS Code extension entry point.
 //
-// Activates on .karn files or workspaces containing bynk.toml. Provisions the
+// Activates on .bynk files or workspaces containing bynk.toml. Provisions the
 // bynkc-lsp language server (see server.ts: setting → PATH → cached → download)
 // and connects to it as an LSP client. If no server can be provisioned the
 // failure is loud and actionable (error toast + a status-bar item + commands to
@@ -95,7 +95,7 @@ async function startServer(
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "bynk" }],
     synchronize: {
-      fileEvents: vscode.workspace.createFileSystemWatcher("**/*.karn"),
+      fileEvents: vscode.workspace.createFileSystemWatcher("**/*.bynk"),
       configurationSection: "bynk",
     },
     outputChannel: output,
@@ -305,7 +305,7 @@ async function fileExists(uri: vscode.Uri): Promise<boolean> {
 }
 
 async function findBynkToml(): Promise<vscode.Uri | undefined> {
-  // Walk upward from the active `.karn` file to the nearest `bynk.toml`,
+  // Walk upward from the active `.bynk` file to the nearest `bynk.toml`,
   // mirroring the LSP's `find_project_root` (bynk-lsp/src/main.rs) — so a
   // nested project (a `bynk.toml` below the workspace-folder root) is found,
   // not just one at the root.
@@ -321,7 +321,7 @@ async function findBynkToml(): Promise<vscode.Uri | undefined> {
     }
   }
   // Fall back to the workspace-folder roots (covers a root-level project and
-  // the no-active-`.karn`-file case).
+  // the no-active-`.bynk`-file case).
   for (const folder of vscode.workspace.workspaceFolders ?? []) {
     const candidate = vscode.Uri.joinPath(folder.uri, "bynk.toml");
     if (await fileExists(candidate)) return candidate;

@@ -20,7 +20,7 @@ Bynk is for the part of a backend system that holds the domain, owns state, and 
 
 **Out of scope.** UI, systems-level work, scripting, heavy compute, embedded code, browser-side code, CLI utilities.
 
-The genre is **service-tier application language**: neither domain-specific (too narrow) nor general-purpose (too broad) nor platform-bound (too vendor-specific). Source files use the `.karn` extension.
+The genre is **service-tier application language**: neither domain-specific (too narrow) nor general-purpose (too broad) nor platform-bound (too vendor-specific). Source files use the `.bynk` extension.
 
 ## 2. Principles
 
@@ -1344,52 +1344,52 @@ This matches the experience of frontend development with Vite or backend develop
 A convention rather than a hard language requirement, but the compiler's default resolution and the build tooling assume it. Dotted context names map to directory paths; the last segment names the file:
 
 ```
-commons commerce.money         →  src/commerce/money.karn
-context commerce.inventory     →  src/commerce/inventory.karn
-context hotel.rooms            →  src/hotel/rooms.karn
-context hotel.bookings         →  src/hotel/bookings.karn
+commons commerce.money         →  src/commerce/money.bynk
+context commerce.inventory     →  src/commerce/inventory.bynk
+context hotel.rooms            →  src/hotel/rooms.bynk
+context hotel.bookings         →  src/hotel/bookings.bynk
 ```
 
-Source files use the `.karn` extension. The root (`src/` by default) is configurable in the build configuration for projects with different layouts.
+Source files use the `.bynk` extension. The root (`src/` by default) is configurable in the build configuration for projects with different layouts.
 
-For contexts large enough to warrant splitting across multiple files, directory expansion applies: if `src/hotel/bookings/` exists as a directory, all `.karn` files in it belong to the `hotel.bookings` context. The single file `src/hotel/bookings.karn` is the alternative when one file suffices. Files within a directory can be named freely; their declarations share the context's namespace.
+For contexts large enough to warrant splitting across multiple files, directory expansion applies: if `src/hotel/bookings/` exists as a directory, all `.bynk` files in it belong to the `hotel.bookings` context. The single file `src/hotel/bookings.bynk` is the alternative when one file suffices. Files within a directory can be named freely; their declarations share the context's namespace.
 
 ```
 src/
 ├── hotel/
-│   ├── rooms.karn               -- single-file context
+│   ├── rooms.bynk               -- single-file context
 │   └── bookings/                -- multi-file context
-│       ├── agents.karn
-│       ├── types.karn
-│       └── services.karn
+│       ├── agents.bynk
+│       ├── types.bynk
+│       └── services.bynk
 ```
 
-Tests live adjacent to the source they exercise. A test context — declared with the `test` keyword followed by the target's qualified name — lives in a file matching the same path convention, with a `.test.karn` suffix:
-
-```
-src/commerce/
-├── orders.karn                 -- context commerce.orders
-├── orders.test.karn            -- test commerce.orders (test context for commerce.orders)
-├── money.karn                  -- commons commerce.money
-├── money.test.karn             -- test commerce.money (test context for the commons)
-├── inventory.karn              -- context commerce.inventory
-└── inventory.test.karn         -- test commerce.inventory
-```
-
-The `.test.karn` suffix is a discovery convention for the test runner; the actual test-for relationship comes from the `test QualifiedName` declaration inside the file. Test contexts can be multi-file via directory expansion: `commerce/orders.test/` as a directory contains multiple `.karn` files, all contributing to `test commerce.orders`:
+Tests live adjacent to the source they exercise. A test context — declared with the `test` keyword followed by the target's qualified name — lives in a file matching the same path convention, with a `.test.bynk` suffix:
 
 ```
 src/commerce/
-├── orders.karn                 -- context commerce.orders
+├── orders.bynk                 -- context commerce.orders
+├── orders.test.bynk            -- test commerce.orders (test context for commerce.orders)
+├── money.bynk                  -- commons commerce.money
+├── money.test.bynk             -- test commerce.money (test context for the commons)
+├── inventory.bynk              -- context commerce.inventory
+└── inventory.test.bynk         -- test commerce.inventory
+```
+
+The `.test.bynk` suffix is a discovery convention for the test runner; the actual test-for relationship comes from the `test QualifiedName` declaration inside the file. Test contexts can be multi-file via directory expansion: `commerce/orders.test/` as a directory contains multiple `.bynk` files, all contributing to `test commerce.orders`:
+
+```
+src/commerce/
+├── orders.bynk                 -- context commerce.orders
 └── orders.test/                -- test commerce.orders (multi-file)
-    ├── place.test.karn
-    ├── cancel.test.karn
-    └── property.test.karn
+    ├── place.test.bynk
+    ├── cancel.test.bynk
+    └── property.test.bynk
 ```
 
-The build tooling discovers test contexts by walking for `test`-keyword declarations; the `.test.karn` suffix is the recommended convention but not strictly required. The test runner collects and executes them.
+The build tooling discovers test contexts by walking for `test`-keyword declarations; the `.test.bynk` suffix is the recommended convention but not strictly required. The test runner collects and executes them.
 
-First-party capabilities supplied by the Bynk project itself follow the same naming convention but live under a separate root (`lib/` or `framework/` depending on packaging), making application code visually distinct from project-supplied capabilities. The capability context `bynk.sagas` (Section 18) maps to `lib/bynk/sagas.karn` or `lib/bynk/sagas/` if multi-file.
+First-party capabilities supplied by the Bynk project itself follow the same naming convention but live under a separate root (`lib/` or `framework/` depending on packaging), making application code visually distinct from project-supplied capabilities. The capability context `bynk.sagas` (Section 18) maps to `lib/bynk/sagas.bynk` or `lib/bynk/sagas/` if multi-file.
 
 The convention is enforced as a default by the compiler — context references resolve against the expected paths — but overridable through build configuration. The point is to make the architectural graph visible in the filesystem: a reader navigating `src/` can see the bounded contexts as directories and files without needing to load the source.
 
@@ -1951,7 +1951,7 @@ Resolved (recorded for the historical record):
 - **Test contexts are a third top-level declaration kind, with bounded privileges relative to an explicit target.** Tests are declared as `test QualifiedName { ... }`, naming the context or commons being tested (§2.1.5 of type system spec, Section 14 of this document). The keyword `test` (alongside `context` and `commons`) marks the declaration's kind, signals that the declaration does not deploy with production, and unlocks test-specific facilities (`Mock[T]`, capability substitution via `provides`, assertion vocabulary). The test-for relationship grants three specific privileges: (1) direct construction of the target's types — `Cart { ... }`, `OrderError.PaymentDeclined`, and so on are admitted inside `test commerce.orders` because it is the test for `commerce.orders`; (2) access to the target's private items for white-box testing — private types, internal helpers, agent storage; (3) capability substitution via `provides` for capabilities the target consumes — mock implementations linked at test-build time. These privileges are bounded to the target; for other contexts the test imports, normal cross-context rules apply, and `Mock[T]` is the path for constructing foreign types in test scope. The split is visible at every value: real construction for the context under test; explicit `Mock[T]` for foreign types. `Mock[T]` itself is a language-level construct admitted only in test contexts; it produces a value of T's shape with generated defaults (refinement-respecting; sum-variant defaults to first declared, or accepts an explicit choice; record fields default to nested mocks or accept overrides; opaque types receive synthetic token representations). Test commons (`test commons X { ... }`) provide shared fixtures and helpers across test contexts, with the same mixin semantics as regular commons but admitting `Mock[T]` in their function bodies. The earlier model of `test` declarations as a syntactic category inside ordinary contexts is rejected in favour of test contexts as a distinct kind, which makes the test-for relationship explicit and gives the compiler somewhere to attach the test-specific privileges.
 - **Commons mix in; contexts export. These are different mechanisms for different architectural needs.** A foundational architectural distinction (§2.1.3, §2.1.4 of type system spec, Section 8 of this document). *Mixin* (commons) shares vocabulary into a context's local language: `uses commerce.money` brings declarations into the using context's scope as if locally declared. Commons declarations don't have visibility levels because there is no boundary to cross — the declarations *become* part of the using context's language. *Exports* (context) govern the contract a context offers to callers of its services: opaque exports give callers tokens (no readable structure); transparent exports give callers readable data (inspectable but not constructible); private declarations stay inside. A context typically uses both — mixing in commons for shared vocabulary, exporting selectively for its service-boundary contract. The two questions are different and warrant different mechanisms: "what vocabulary should be part of my context's language?" → mixin; "what types should callers of my services interact with?" → exports.
 - **Commons are the canonical construct for shared vocabulary across bounded contexts; context-owned types are sealed against external construction.** Together these form a two-part commitment about types and boundaries (§2.1.3, §2.1.4 of type system spec, Section 8 of this document). *First*, full encapsulation: a value of a type defined in a context can only be constructed within that context. Export visibility (opaque or transparent) governs the read side — what consumers can see of the type's structure — but never grants construction authority. Opaque export makes a type a token outside its context (holdable but not inspectable); transparent export makes it readable data outside (inspectable but still not constructible). Construction of a context-owned type from outside its defining context is a compile error. The architectural consequence: cross-context interaction is through service operations (handlers in the owning context, invoked by peers) and events (published from inside, received outside as facts). External "factory functions" like `Voucher.of(...)` are also forbidden — they would be construction by another name, smuggling past encapsulation. The idiomatic Anti-Corruption Layer pattern (pattern-match foreign error, construct local error) is fully consistent with the rule and is the *only* shape cross-context error translation can take. *Second*, commons are mixed in rather than imported: when a context says `uses commerce.money`, the commons's declarations are brought into the using context's scope as if locally declared. Each using context has its own nominal type derived from the mixed-in declaration; two contexts mixing in the same commons have structurally identical but nominally distinct types. Construction is admitted in each using context (the type is local). Cross-context value flow goes through structural projection at the boundary: data crosses the wire; the receiving context constructs its own nominal type from that data, applying its local refinements. The commons construct itself has a compiler-enforced constraint set (no agents, services, capabilities, storage, providers, given-clauses-in-functions); a separate import keyword `uses` (distinct from context-to-context `consumes`); permitted cycles among commons (no runtime coupling); a flat, organisational naming hierarchy (a commons named `commerce.money` is not architecturally "for" `commerce.*` contexts); and source-level mixin compilation rather than separate compiled artefacts (commons are project-source code, vendored rather than packaged). The split between commons (compile-time vocabulary, mixin-incorporated, no behaviour) and capabilities (runtime contracts with providers, behavioural) is orthogonal: capabilities answer "how does my code talk to the outside?", commons answer "what does our code talk about?"; a context typically declares both kinds of import at its top. The earlier worked-example convention of putting shared types in a "shared" context (`commerce.shared`) is rejected; the earlier softer encapsulation that permitted transparent construction is also rejected; the earlier model of commons as separately-compiled-and-imported modules is also rejected in favour of source-level mixin.
-- **The language is named Bynk.** Cornish for a cairn — a built-up rocky landmark on the moors. The architectural metaphor maps exactly: applications are bynks, built from small individually-meaningful primitives stacked into coherent structures that endure and orient the traveller across difficult terrain. The name is short, pronounceable, distinctively Cornish, and not heavily branded in software. Source files use the `.karn` extension. Pronounced as English would suggest from the spelling — one syllable, "bynk." *Search-term note*: "Bynk" alone is well-occupied by Magic: The Gathering's Bynk planeswalker character, which has a large and active SEO presence. For discovery purposes the project disambiguates with "bynk-lang" or "Bynk programming language" in titles, repository names, and domain choice; the typical naming-collision workaround that Rust, Go, and Swift have all navigated. Eyes-open trade-off; not a fix to make.
+- **The language is named Bynk.** Cornish for a cairn — a built-up rocky landmark on the moors. The architectural metaphor maps exactly: applications are bynks, built from small individually-meaningful primitives stacked into coherent structures that endure and orient the traveller across difficult terrain. The name is short, pronounceable, distinctively Cornish, and not heavily branded in software. Source files use the `.bynk` extension. Pronounced as English would suggest from the spelling — one syllable, "bynk." *Search-term note*: "Bynk" alone is well-occupied by Magic: The Gathering's Bynk planeswalker character, which has a large and active SEO presence. For discovery purposes the project disambiguates with "bynk-lang" or "Bynk programming language" in titles, repository names, and domain choice; the typical naming-collision workaround that Rust, Go, and Swift have all navigated. Eyes-open trade-off; not a fix to make.
 - **The language core stays minimal; first-party capabilities are the canonical extension surface.** What sits in the language: bounded contexts, services, agents, value types, handlers, storage primitives, capabilities as a mechanism, the query algebra, the failure model, the type system core, the documentation system. What's deliberately *not* in the language and is solved by capabilities instead: durable workflow orchestration, retry policies with backoff, structured rate limiting, schema migration helpers, distributed tracing, batch processing patterns, and similar cross-cutting concerns. *First-party capabilities* are those the Bynk project itself supplies as canonical answers to common architectural concerns; they live in framework contexts (`bynk.sagas`, etc.) that application contexts consume; their implementations are ordinary Bynk code; their surfaces are ordinary `given` clauses; there is no special compiler support and no syntactic distinction between using a first-party capability and using one written by an application team or a third party (Section 18). The benefit: the language stays learnable, the cost surface for harder problems lives in capabilities where they can evolve without language churn, and the extension story is uniform across first-party and third-party. The cost: some problems with elegant language-level solutions are solved through a slightly more verbose capability surface instead. The trade is deliberate.
 - **Durable workflow / saga semantics are framework concerns, integrated through the capability mechanism, not language features.** Compensation in Bynk flows through the `Sagas` capability (Section 13) with provider variants for in-memory (lost on agent runtime crash, right for most handlers) and durable (registrations persist across crashes, right for long-lived workflows) semantics. For richer durable workflows that need explicit forward/undo step pairs as serialisable descriptors rather than closures, the framework can additionally expose a structured `Workflows` capability (Section 20, Example 3) with provider implementations including a Cloudflare-native version, Temporal-backed delegation, and in-memory test mode. Both `Sagas` and `Workflows` flow through the existing capability mechanism, are declared in handler `given` clauses, and can be substituted at the capability surface. This commits Bynk to a deliberate scope: durable workflow orchestration is not in the language and never will be; it's a capability concern, paid for in capability surface area only by handlers that need it. The earlier sketch of a `durable on abort:` language extension is explicitly rejected in favour of this approach.
 - **Refinement lives on type declarations as its primary mode, with the same declaration doing triple duty.** A refined type definition (`type VoucherCode = String where Matches("[A-Z0-9]{8}")`) provides compile-time type identity, runtime validation logic, and external schema specification from a single source — collapsing what conventional ecosystems split across types, validation libraries, and schema generators into one declaration (Section 15). The refinement vocabulary is constrained to *data predicates* that can do all three jobs: statically checkable, runtime-executable, serialisable to external schemas. Initial vocabulary is small (`Matches`, `InRange`, `MaxLength`, `MinLength`, `Length`, `NonNegative`, `Positive`, `NonEmpty`); growth is deliberate and slow. Refinement points: value type declarations (primary), event subscription patterns, agent invariants, actor authorisation invariants (anticipated), capability operation refinements (framework-internal). Use-site refinement on parameters and return types was considered and rejected for verbosity; the discipline is "refine to create types worth naming, reuse the named types everywhere." Function purity, totality, and determinism are compiler-inferred from the function's surface; explicit annotation is reserved for cases where the contract should be committed. **Refinement complements primitive choice rather than substituting for it**: where a sharper primitive would make a constraint structural, choose the primitive (the canonical instance is money-as-integer-minor-units rather than money-as-decimal-with-Scale-predicate). The unification of types, validators, and schemas is the architectural payoff; the constrained vocabulary keeps the compiler bounded and the diagnostic experience consistent.

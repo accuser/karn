@@ -101,7 +101,7 @@ do it first.
 - **Call hierarchy**; **type‑definition / implementation** navigation tuned to Bynk —
   `given Cap` → its provider/adapter; a capability → its providers; a consumed context →
   its source.
-- **File operations** — renaming a `.karn` file updates the unit name and consumers,
+- **File operations** — renaming a `.bynk` file updates the unit name and consumers,
   given the source‑path‑mirrors‑qualified‑name rule.
 - **On‑type formatting**; completion‑resolve (lazy docs).
 

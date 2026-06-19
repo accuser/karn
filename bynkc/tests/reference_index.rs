@@ -111,13 +111,13 @@ fn cross_file_type_and_fn_resolve_to_one_definition() {
         &index,
         &snapshots,
         &money,
-        &["shop/util.karn", "shop/billing.karn"],
+        &["shop/util.bynk", "shop/billing.bynk"],
     );
     // Static-receiver: `Money.of(x)` records the receiver segment, so
-    // util.karn carries both the annotation and the receiver refs.
+    // util.bynk carries both the annotation and the receiver refs.
     assert!(
-        refs_in(&index, &money, "shop/util.karn").len() >= 2,
-        "annotation + static-receiver refs in util.karn"
+        refs_in(&index, &money, "shop/util.bynk").len() >= 2,
+        "annotation + static-receiver refs in util.bynk"
     );
 
     // Qualified variant receiver: `Status.Open` references `Status`.
@@ -125,7 +125,7 @@ fn cross_file_type_and_fn_resolve_to_one_definition() {
         &index,
         &snapshots,
         &key("shop.util", SymbolKind::Type, "Status"),
-        &["shop/util.karn"],
+        &["shop/util.bynk"],
     );
 
     // Fn: called cross-file (billing) and from the test unit.
@@ -134,9 +134,9 @@ fn cross_file_type_and_fn_resolve_to_one_definition() {
         &snapshots,
         &key("shop.util", SymbolKind::Fn, "double"),
         &[
-            "shop/util.karn",
-            "shop/billing.karn",
-            "tests/billing.test.karn",
+            "shop/util.bynk",
+            "shop/billing.bynk",
+            "tests/billing.test.bynk",
         ],
     );
 }
@@ -147,7 +147,7 @@ fn same_named_symbols_in_different_units_are_not_conflated() {
 
     // `other.util` declares its own `Money` and `double`; nothing imports
     // it, so neither carries any reference — and the `shop.util` symbols'
-    // references never land in other/util.karn.
+    // references never land in other/util.bynk.
     let other_money = key("other.util", SymbolKind::Type, "Money");
     let other_double = key("other.util", SymbolKind::Fn, "double");
     assert!(index.symbols[&other_money].refs.is_empty());
@@ -158,7 +158,7 @@ fn same_named_symbols_in_different_units_are_not_conflated() {
         key("shop.util", SymbolKind::Fn, "double"),
     ] {
         assert!(
-            refs_in(&index, &k, "other/util.karn").is_empty(),
+            refs_in(&index, &k, "other/util.bynk").is_empty(),
             "{k:?} must not pick up other.util's same-named declaration sites"
         );
     }
@@ -175,41 +175,41 @@ fn capability_references_cover_every_clause_and_call_form() {
         &index,
         &snapshots,
         &pay,
-        &["shop/billing.karn", "shop/checkout.karn", "ops/audit.karn"],
+        &["shop/billing.bynk", "shop/checkout.bynk", "ops/audit.bynk"],
     );
 
     // Declaring context: `exports capability { Pay }`, `provides Pay`,
     // `given Pay`, `Pay.charge(...)`.
-    assert_eq!(refs_in(&index, &pay, "shop/billing.karn").len(), 4);
+    assert_eq!(refs_in(&index, &pay, "shop/billing.bynk").len(), 4);
     // Flattening consumer: `consumes shop.billing { Pay }` selection,
     // `given Pay` (flattened bare), `Pay.charge(...)`.
-    assert_eq!(refs_in(&index, &pay, "shop/checkout.karn").len(), 3);
+    assert_eq!(refs_in(&index, &pay, "shop/checkout.bynk").len(), 3);
     // Dotted consumer: `given shop.billing.Pay`, `shop.billing.Pay.charge`.
-    assert_eq!(refs_in(&index, &pay, "ops/audit.karn").len(), 2);
+    assert_eq!(refs_in(&index, &pay, "ops/audit.bynk").len(), 2);
 }
 
 #[test]
 fn cross_context_service_call_and_type_export_clause_are_indexed() {
     let (index, snapshots) = analyse(&matrix_root());
 
-    // `shop.billing.bill(3)` in ops/audit.karn references the service, and
+    // `shop.billing.bill(3)` in ops/audit.bynk references the service, and
     // the test body's `bill.call(d)` references it from the test unit.
     assert_sites_spell(
         &index,
         &snapshots,
         &key("shop.billing", SymbolKind::Service, "bill"),
         &[
-            "shop/billing.karn",
-            "ops/audit.karn",
-            "tests/billing.test.karn",
+            "shop/billing.bynk",
+            "ops/audit.bynk",
+            "tests/billing.test.bynk",
         ],
     );
 
     // `exports transparent { Receipt }` is a reference to the type.
     let receipt = key("shop.billing", SymbolKind::Type, "Receipt");
-    assert_sites_spell(&index, &snapshots, &receipt, &["shop/billing.karn"]);
+    assert_sites_spell(&index, &snapshots, &receipt, &["shop/billing.bynk"]);
     assert!(
-        refs_in(&index, &receipt, "shop/billing.karn").len() >= 3,
+        refs_in(&index, &receipt, "shop/billing.bynk").len() >= 3,
         "exports clause + return annotation + construction"
     );
 }
@@ -224,9 +224,9 @@ fn smoke_existing_fixture_indexes_cleanly() {
         &snapshots,
         &key("commerce.payment", SymbolKind::Type, "AuthId"),
         &[
-            "commerce/payment.karn",
-            "commerce/orders.karn",
-            "tests/orders.test.karn",
+            "commerce/payment.bynk",
+            "commerce/orders.bynk",
+            "tests/orders.test.bynk",
         ],
     );
     // The capability declared and provided in the payment context.
@@ -234,6 +234,6 @@ fn smoke_existing_fixture_indexes_cleanly() {
         &index,
         &snapshots,
         &key("commerce.payment", SymbolKind::Capability, "Logger"),
-        &["commerce/payment.karn"],
+        &["commerce/payment.bynk"],
     );
 }

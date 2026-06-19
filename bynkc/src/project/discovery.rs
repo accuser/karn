@@ -14,7 +14,7 @@ pub(crate) fn read_source(
     fs::read_to_string(path)
 }
 
-/// A parsed `.karn` file: its source, AST, and project-relative path.
+/// A parsed `.bynk` file: its source, AST, and project-relative path.
 pub(crate) struct ParsedFile {
     pub(crate) source_path: PathBuf,
     #[allow(dead_code)]
@@ -200,7 +200,7 @@ pub(crate) fn discover_bynk_files(root: &Path) -> Result<Vec<PathBuf>, CompileEr
             let p = entry.path();
             if p.is_dir() {
                 stack.push(p);
-            } else if p.extension().and_then(|e| e.to_str()) == Some("karn") {
+            } else if p.extension().and_then(|e| e.to_str()) == Some("bynk") {
                 out.push(p);
             }
         }
@@ -231,14 +231,14 @@ pub(crate) fn check_file_directory_conflicts(
                     "bynk.project.file_and_directory",
                     Span::default(),
                     format!(
-                        "commons at `{}` is ambiguous: both `{}` and `{}/` exist with `.karn` content",
+                        "commons at `{}` is ambiguous: both `{}` and `{}/` exist with `.bynk` content",
                         f.with_extension("").display(),
                         f.display(),
                         stem.display()
                     ),
                 )
                 .with_note(
-                    "a commons can be a single `.karn` file OR a directory of `.karn` files, not both",
+                    "a commons can be a single `.bynk` file OR a directory of `.bynk` files, not both",
                 ),
             );
         }

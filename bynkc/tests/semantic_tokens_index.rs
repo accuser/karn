@@ -44,14 +44,14 @@ fn type_modifiers_follow_the_declaration() {
 fn first_party_references_land_in_the_side_table() {
     let result = bynkc::diagnose_project(&fixture_root(), &HashMap::new());
 
-    // The `Kv` references in cache/store.karn (`consumes` clause, `given`
+    // The `Kv` references in cache/store.bynk (`consumes` clause, `given`
     // clause, `Kv.get`/`Kv.put` call sites) are dropped from `symbols`
     // (synthetic def — the v0.25 rule) and routed to `foreign_refs`,
     // carrying `platformNative` from the declaring unit.
     let store = result
         .files
         .iter()
-        .find(|f| f.source_path.to_string_lossy().replace('\\', "/") == "cache/store.karn")
+        .find(|f| f.source_path.to_string_lossy().replace('\\', "/") == "cache/store.bynk")
         .expect("context file analysed");
     let kv_refs: Vec<_> = result
         .index

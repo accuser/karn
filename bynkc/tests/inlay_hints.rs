@@ -88,7 +88,7 @@ fn param_hints_for(
 #[test]
 fn parameter_name_hints_show_at_args_and_suppress_matching_identifiers() {
     let result = bynkc::diagnose_project(&fixture_root("params"), &HashMap::new());
-    let (hints, text) = param_hints_for(&result, "demo.karn");
+    let (hints, text) = param_hints_for(&result, "demo.bynk");
 
     let call = text.find("area(w, height)").expect("the call is present");
     // `width:` shows before the `w` argument (w != the param `width`).
@@ -112,7 +112,7 @@ fn parameter_name_hints_show_at_args_and_suppress_matching_identifiers() {
 fn generic_instantiation_hints_show_inferred_args_only_when_omitted() {
     let result = bynkc::diagnose_project(&fixture_root("generics"), &HashMap::new());
     // Generic-instantiation hints are `Type`-kind, anchored on the fn name.
-    let (hints, text) = hints_for(&result, "demo.karn");
+    let (hints, text) = hints_for(&result, "demo.bynk");
 
     // `identity(5)` → the inferred `[Int]` shown after the name.
     assert_eq!(
@@ -129,7 +129,7 @@ fn generic_instantiation_hints_show_inferred_args_only_when_omitted() {
 #[test]
 fn let_bindings_and_lambda_params_get_inferred_type_hints() {
     let result = bynkc::diagnose_project(&fixture_root("clean"), &HashMap::new());
-    let (hints, text) = hints_for(&result, "shop/util.karn");
+    let (hints, text) = hints_for(&result, "shop/util.bynk");
 
     // `let =` with an inferred type — the headline.
     assert_eq!(
@@ -147,7 +147,7 @@ fn let_bindings_and_lambda_params_get_inferred_type_hints() {
 #[test]
 fn labels_read_in_bynk_surface_syntax() {
     let result = bynkc::diagnose_project(&fixture_root("clean"), &HashMap::new());
-    let (hints, text) = hints_for(&result, "shop/util.karn");
+    let (hints, text) = hints_for(&result, "shop/util.bynk");
 
     // Display fidelity: generic source syntax, not an internal rendering.
     assert_eq!(
@@ -168,7 +168,7 @@ fn labels_read_in_bynk_surface_syntax() {
 #[test]
 fn effect_let_hints_show_the_peeled_payload() {
     let result = bynkc::diagnose_project(&fixture_root("clean"), &HashMap::new());
-    let (hints, text) = hints_for(&result, "billing/charge.karn");
+    let (hints, text) = hints_for(&result, "billing/charge.bynk");
 
     // `let stamp <- Clock.now()` binds the Effect payload — `Int`, never
     // `Effect[Int]`.
@@ -181,7 +181,7 @@ fn effect_let_hints_show_the_peeled_payload() {
 #[test]
 fn annotated_and_underscore_bindings_get_no_hint() {
     let result = bynkc::diagnose_project(&fixture_root("clean"), &HashMap::new());
-    let (hints, text) = hints_for(&result, "shop/util.karn");
+    let (hints, text) = hints_for(&result, "shop/util.bynk");
 
     // An explicit annotation needs no hint; `_` binds nothing.
     assert_eq!(label_at(&hints, &text, "let twice: Int = ", "twice"), None);
@@ -211,14 +211,14 @@ fn clean_fixture_has_no_diagnostics() {
 #[test]
 fn hints_survive_a_transient_error_at_reached_sites() {
     let result = bynkc::diagnose_project(&fixture_root("broken"), &HashMap::new());
-    let (hints, text) = hints_for(&result, "billing/charge.karn");
+    let (hints, text) = hints_for(&result, "billing/charge.bynk");
 
     // The file has one fn-body type error (`n + true` in `bad`)...
     assert!(
         result
             .files
             .iter()
-            .find(|f| f.source_path.to_string_lossy().replace('\\', "/") == "billing/charge.karn")
+            .find(|f| f.source_path.to_string_lossy().replace('\\', "/") == "billing/charge.bynk")
             .unwrap()
             .diagnostics
             .iter()

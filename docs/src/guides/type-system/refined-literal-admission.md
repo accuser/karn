@@ -25,7 +25,7 @@ In Bynk, a literal in a refined-type position is checked against the predicate a
 compile time, so the out-of-range value cannot be constructed:
 
 ```bynk,fail
-{{#include ../../../diagnostics/refine_out_of_range.karn}}
+{{#include ../../../diagnostics/refine_out_of_range.bynk}}
 ```
 
 ```text

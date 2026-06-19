@@ -98,7 +98,7 @@ mod tests {
     #[test]
     fn keyed_on_the_diagnostic_span_not_the_edit_span() {
         let text = "-> T given Cap { Used.op() }";
-        let uri = Url::parse("file:///a.karn").unwrap();
+        let uri = Url::parse("file:///a.bynk").unwrap();
         // Cursor on the squiggle (the usage site): the fix is offered even
         // though its edit lands elsewhere.
         let on_diag = quick_fixes(
@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn action_carries_a_versioned_quickfix_edit() {
         let text = "-> T given Cap { Used.op() }";
-        let uri = Url::parse("file:///a.karn").unwrap();
+        let uri = Url::parse("file:///a.bynk").unwrap();
         let actions = quick_fixes(
             text,
             &[diag_with_suggestion()],
@@ -156,7 +156,7 @@ mod tests {
     #[test]
     fn placeholder_suggestions_are_not_offered() {
         let text = "x";
-        let uri = Url::parse("file:///a.karn").unwrap();
+        let uri = Url::parse("file:///a.bynk").unwrap();
         let d = bynkc::Diagnostic {
             severity: bynkc::Severity::Error,
             error: CompileError::new("bynk.test", Span::new(0, 1), "msg").with_suggestion(

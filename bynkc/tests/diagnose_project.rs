@@ -22,10 +22,10 @@ fn context_diagnostic_is_attributed_to_its_file() {
         .map(|f| (f.source_path.to_string_lossy().replace('\\', "/"), f))
         .collect();
     let broken = by_path
-        .get("billing/charge.karn")
+        .get("billing/charge.bynk")
         .expect("context file analysed");
     let clean = by_path
-        .get("shop/util.karn")
+        .get("shop/util.bynk")
         .expect("clean commons analysed");
 
     assert!(
@@ -71,7 +71,7 @@ service charge {
   }
 }
 ";
-    let abs = fixture_root().join("billing/charge.karn");
+    let abs = fixture_root().join("billing/charge.bynk");
     let canonical = abs.canonicalize().unwrap_or(abs);
     let mut overlay = HashMap::new();
     overlay.insert(canonical, fixed.to_string());
@@ -80,7 +80,7 @@ service charge {
     let broken = result
         .files
         .iter()
-        .find(|f| f.source_path.to_string_lossy().replace('\\', "/") == "billing/charge.karn")
+        .find(|f| f.source_path.to_string_lossy().replace('\\', "/") == "billing/charge.bynk")
         .expect("context file analysed");
     assert!(
         broken.diagnostics.is_empty(),
@@ -102,7 +102,7 @@ fn analysis_does_not_bail_at_the_first_failure() {
     // phase's failure; diagnose_project must report both, each attributed.
     let root = fixture_root();
     let mut overlay = HashMap::new();
-    let util = root.join("shop/util.karn");
+    let util = root.join("shop/util.bynk");
     overlay.insert(
         util.canonicalize().unwrap_or(util),
         "commons shop.util\n\nfn broken( -> Int {\n  1\n}\n".to_string(),
@@ -121,12 +121,12 @@ fn analysis_does_not_bail_at_the_first_failure() {
         .collect();
     assert!(
         cats.iter()
-            .any(|(p, c)| p == "shop/util.karn" && c.starts_with("bynk.parse")),
+            .any(|(p, c)| p == "shop/util.bynk" && c.starts_with("bynk.parse")),
         "parse error attributed to the broken commons; got {cats:?}"
     );
     assert!(
         cats.iter()
-            .any(|(p, c)| p == "billing/charge.karn" && *c == "bynk.given.unused_capability"),
+            .any(|(p, c)| p == "billing/charge.bynk" && *c == "bynk.given.unused_capability"),
         "semantic error still produced for the other unit; got {cats:?}"
     );
 }

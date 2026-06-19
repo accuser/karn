@@ -171,7 +171,7 @@ pub fn parse_unit_with_recovery(
                         "unexpected token after top-level declaration",
                     )
                     .with_note(
-                        "a `.karn` file contains exactly one `commons` or `context` declaration",
+                        "a `.bynk` file contains exactly one `commons` or `context` declaration",
                     ),
                 );
             }
@@ -189,7 +189,7 @@ pub fn parse_unit_with_recovery(
 
 /// Parse a token slice into a [`SourceUnit`] — either a commons or a context.
 ///
-/// Each `.karn` file is exactly one declaration of one kind.
+/// Each `.bynk` file is exactly one declaration of one kind.
 pub fn parse_unit(tokens: &[Token], source: &str) -> Result<SourceUnit, Vec<CompileError>> {
     let (filtered, trivia) = split_trivia(tokens, source);
     let mut warnings = Vec::new();
@@ -204,7 +204,7 @@ pub fn parse_unit(tokens: &[Token], source: &str) -> Result<SourceUnit, Vec<Comp
                         "unexpected token after top-level declaration",
                     )
                     .with_note(
-                        "a `.karn` file contains exactly one `commons` or `context` declaration",
+                        "a `.bynk` file contains exactly one `commons` or `context` declaration",
                     ),
                 ])
             } else {

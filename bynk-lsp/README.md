@@ -5,7 +5,7 @@
 
 The **Language Server for the [Bynk](https://github.com/accuser/bynk)
 language**. The crate builds the `bynkc-lsp` binary, which any LSP-capable
-editor can speak to for live diagnostics, navigation, and refactoring of `.karn`
+editor can speak to for live diagnostics, navigation, and refactoring of `.bynk`
 projects.
 
 Built on [`tower-lsp`](https://crates.io/crates/tower-lsp), it shares the
@@ -52,7 +52,7 @@ This produces the **`bynkc-lsp`** binary. Requires a stable Rust toolchain,
 [VS Code extension](https://github.com/accuser/bynk/tree/main/vscode-bynk),
 which bundles and launches it automatically. For other editors, point your LSP
 client at the `bynkc-lsp` binary and associate it with the `bynk` language /
-`.karn` files. See
+`.bynk` files. See
 [Set up editor support](https://github.com/accuser/bynk/blob/main/docs/src/guides/editor-and-tooling/editor-support.md).
 
 The server discovers a project by walking up to the nearest `bynk.toml` (falling

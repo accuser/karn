@@ -41,7 +41,7 @@ fn names_at(locals: &[LocalBinding], offset: usize) -> Vec<String> {
 #[test]
 fn every_binding_kind_is_recorded() {
     let result = bynkc::diagnose_project(&fixture_root("inlay/clean"), &HashMap::new());
-    let (locals, _) = locals_for(&result, "shop/util.karn");
+    let (locals, _) = locals_for(&result, "shop/util.bynk");
     let names: std::collections::HashSet<&str> = locals.iter().map(|b| b.name.as_str()).collect();
     for want in ["n", "xs", "total", "first", "f", "twice", "acc", "x"] {
         assert!(names.contains(want), "binding `{want}` recorded: {names:?}");
@@ -53,7 +53,7 @@ fn every_binding_kind_is_recorded() {
 #[test]
 fn nested_block_bindings_are_scoped_to_their_block() {
     let result = bynkc::diagnose_project(&fixture_root("locals"), &HashMap::new());
-    let (locals, text) = locals_for(&result, "m.karn");
+    let (locals, text) = locals_for(&result, "m.bynk");
 
     // Inside the `if`-then block, `inner` is in scope (with the param `n`).
     let inner_use = text.find("inner\n  }").expect("inner use");
@@ -77,7 +77,7 @@ fn nested_block_bindings_are_scoped_to_their_block() {
 #[test]
 fn shadowing_resolves_to_the_latest_binding() {
     let result = bynkc::diagnose_project(&fixture_root("locals"), &HashMap::new());
-    let (locals, text) = locals_for(&result, "m.karn");
+    let (locals, text) = locals_for(&result, "m.bynk");
 
     // `let x = n` then `let x = x + 1`; at the tail, exactly one `x` is in
     // scope — the second (latest) definition.

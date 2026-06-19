@@ -10,7 +10,7 @@ type-check gate. Both live under `bynkc/tests/`.
 as one fixture. There are two shapes:
 
 **Single-file**
-- `input.karn` — the source (a self-contained `commons`).
+- `input.bynk` — the source (a self-contained `commons`).
 - `expected.ts` — the exact emitted TypeScript (positive), **or**
 - `expected_error.txt` — expected diagnostics (negative).
 

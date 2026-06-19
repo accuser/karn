@@ -39,7 +39,7 @@ fn json_string(s: &str) -> String {
 }
 
 /// Normalise a relative path by resolving `.` and `..` components, so a binding
-/// clause like `./tokens.binding.ts` beside `src/tokens.karn` yields the output
+/// clause like `./tokens.binding.ts` beside `src/tokens.bynk` yields the output
 /// path `tokens.binding.ts`.
 pub(crate) fn normalize_rel(p: &Path) -> PathBuf {
     let mut out: Vec<std::ffi::OsString> = Vec::new();
@@ -145,7 +145,7 @@ pub fn worker_dir_name(context: &str) -> String {
 /// machinery resolves correctly against the workers layout.
 pub fn worker_handlers_source_path(context: &str) -> PathBuf {
     PathBuf::from(format!(
-        "workers/{}/handlers.karn",
+        "workers/{}/handlers.bynk",
         worker_dir_name(context)
     ))
 }
@@ -157,18 +157,18 @@ pub fn worker_handlers_output_path(context: &str) -> PathBuf {
 
 /// Does a file's relative path match a qualified name? Two arrangements are
 /// valid:
-/// - **Single-file**: `a/b/c.karn` declaring `a.b.c`.
-/// - **Multi-file**: `a/b/c/<any>.karn` declaring `a.b.c`.
+/// - **Single-file**: `a/b/c.bynk` declaring `a.b.c`.
+/// - **Multi-file**: `a/b/c/<any>.bynk` declaring `a.b.c`.
 ///
 /// #47: in split-paths mode a test file may use the self-identifying
-/// `<target-path>.test.karn` form as well as the bare `<target-path>.karn`
+/// `<target-path>.test.bynk` form as well as the bare `<target-path>.bynk`
 /// (single-tree mode already uses the suffixed form). Normalise the former to
 /// the latter so the two conventions are unified for path-alignment matching.
 pub(crate) fn strip_test_infix(rel_path: &Path) -> PathBuf {
     if let Some(name) = rel_path.file_name().and_then(|n| n.to_str())
-        && let Some(base) = name.strip_suffix(".test.karn")
+        && let Some(base) = name.strip_suffix(".test.bynk")
     {
-        return rel_path.with_file_name(format!("{base}.karn"));
+        return rel_path.with_file_name(format!("{base}.bynk"));
     }
     rel_path.to_path_buf()
 }
@@ -262,11 +262,11 @@ mod tests {
     #[test]
     fn ts_output_path_sets_ts_extension() {
         assert_eq!(
-            ts_output_path(Path::new("foo.karn")),
+            ts_output_path(Path::new("foo.bynk")),
             PathBuf::from("foo.ts")
         );
         assert_eq!(
-            ts_output_path(Path::new("a/b.karn")),
+            ts_output_path(Path::new("a/b.bynk")),
             PathBuf::from("a/b.ts")
         );
         assert_eq!(ts_output_path(Path::new("foo")), PathBuf::from("foo.ts"));
@@ -279,7 +279,7 @@ mod tests {
         assert_eq!(worker_dir_name("plain"), "plain");
         assert_eq!(
             worker_handlers_source_path("commerce.payment"),
-            PathBuf::from("workers/commerce-payment/handlers.karn")
+            PathBuf::from("workers/commerce-payment/handlers.bynk")
         );
         assert_eq!(
             worker_handlers_output_path("commerce.payment"),
@@ -290,52 +290,52 @@ mod tests {
     // -- unit_path_matches ----------------------------------------------------
     #[test]
     fn unit_path_matches_single_file_layout() {
-        assert!(unit_path_matches(Path::new("a/b/c.karn"), "a.b.c"));
-        assert!(unit_path_matches(Path::new("foo.karn"), "foo"));
+        assert!(unit_path_matches(Path::new("a/b/c.bynk"), "a.b.c"));
+        assert!(unit_path_matches(Path::new("foo.bynk"), "foo"));
     }
 
     #[test]
     fn unit_path_matches_multi_file_layout() {
-        // `a/b/c/<any>.karn` declaring `a.b.c` (the directory is the unit).
-        assert!(unit_path_matches(Path::new("a/b/c/handlers.karn"), "a.b.c"));
-        assert!(unit_path_matches(Path::new("a/b/c/anything.karn"), "a.b.c"));
+        // `a/b/c/<any>.bynk` declaring `a.b.c` (the directory is the unit).
+        assert!(unit_path_matches(Path::new("a/b/c/handlers.bynk"), "a.b.c"));
+        assert!(unit_path_matches(Path::new("a/b/c/anything.bynk"), "a.b.c"));
     }
 
     #[test]
     fn unit_path_matches_rejects_misalignment() {
-        assert!(!unit_path_matches(Path::new("a/b.karn"), "a.b.c"));
-        assert!(!unit_path_matches(Path::new("x/y/z.karn"), "a.b.c"));
+        assert!(!unit_path_matches(Path::new("a/b.bynk"), "a.b.c"));
+        assert!(!unit_path_matches(Path::new("x/y/z.bynk"), "a.b.c"));
     }
 
     #[test]
     fn strip_test_infix_normalises_the_dot_test_suffix() {
-        // `<path>.test.karn` → `<path>.karn`; the bare form is untouched.
+        // `<path>.test.bynk` → `<path>.bynk`; the bare form is untouched.
         assert_eq!(
-            strip_test_infix(Path::new("a/b/c.test.karn")),
-            PathBuf::from("a/b/c.karn")
+            strip_test_infix(Path::new("a/b/c.test.bynk")),
+            PathBuf::from("a/b/c.bynk")
         );
         assert_eq!(
-            strip_test_infix(Path::new("demo.test.karn")),
-            PathBuf::from("demo.karn")
+            strip_test_infix(Path::new("demo.test.bynk")),
+            PathBuf::from("demo.bynk")
         );
         assert_eq!(
-            strip_test_infix(Path::new("a/b/c.karn")),
-            PathBuf::from("a/b/c.karn")
+            strip_test_infix(Path::new("a/b/c.bynk")),
+            PathBuf::from("a/b/c.bynk")
         );
     }
 
     #[test]
     fn test_path_alignment_accepts_either_form_after_normalisation() {
-        // #47: both the bare and `.test.karn` forms align for the same target.
-        for p in ["a/b.karn", "a/b.test.karn", "a/b/x.karn", "a/b/x.test.karn"] {
+        // #47: both the bare and `.test.bynk` forms align for the same target.
+        for p in ["a/b.bynk", "a/b.test.bynk", "a/b/x.bynk", "a/b/x.test.bynk"] {
             assert!(
                 unit_path_matches(&strip_test_infix(Path::new(p)), "a.b"),
                 "{p} should align with `a.b`"
             );
         }
-        // A genuinely misaligned `.test.karn` is still rejected.
+        // A genuinely misaligned `.test.bynk` is still rejected.
         assert!(!unit_path_matches(
-            &strip_test_infix(Path::new("a/z.test.karn")),
+            &strip_test_infix(Path::new("a/z.test.bynk")),
             "a.b"
         ));
     }

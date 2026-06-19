@@ -127,30 +127,30 @@ fn fee(m: Money) -> Int {
 
 #[test]
 fn happy_path_rename_edits_def_and_all_references() {
-    let root = setup_project("happy", &[("demo/util.karn", UTIL), ("demo/app.karn", APP)]);
+    let root = setup_project("happy", &[("demo/util.bynk", UTIL), ("demo/app.bynk", APP)]);
     let pre = analyse(&root, &HashMap::new());
     assert!(pre.diags.is_empty(), "fixture clean: {:?}", pre.diags);
 
-    // Rename `Money` from its *reference* in app.karn.
-    let at = offset_of(&pre.snapshots, "demo/app.karn", "Money", 0);
-    let edited = try_rename(&root, &pre, ("demo/app.karn", at), "Cash").expect("rename succeeds");
-    assert!(edited[Path::new("demo/util.karn")].contains("type Cash = Int"));
-    assert!(edited[Path::new("demo/app.karn")].contains("fn fee(m: Cash)"));
-    assert!(!edited[Path::new("demo/util.karn")].contains("Money"));
-    assert!(!edited[Path::new("demo/app.karn")].contains("Money"));
+    // Rename `Money` from its *reference* in app.bynk.
+    let at = offset_of(&pre.snapshots, "demo/app.bynk", "Money", 0);
+    let edited = try_rename(&root, &pre, ("demo/app.bynk", at), "Cash").expect("rename succeeds");
+    assert!(edited[Path::new("demo/util.bynk")].contains("type Cash = Int"));
+    assert!(edited[Path::new("demo/app.bynk")].contains("fn fee(m: Cash)"));
+    assert!(!edited[Path::new("demo/util.bynk")].contains("Money"));
+    assert!(!edited[Path::new("demo/app.bynk")].contains("Money"));
 }
 
 #[test]
 fn colliding_rename_is_refused_by_reanalysis() {
     let root = setup_project(
         "collide",
-        &[("demo/util.karn", UTIL), ("demo/app.karn", APP)],
+        &[("demo/util.bynk", UTIL), ("demo/app.bynk", APP)],
     );
     let pre = analyse(&root, &HashMap::new());
 
     // `helper` → `Money` collides with the type declared in the same unit.
-    let at = offset_of(&pre.snapshots, "demo/util.karn", "helper", 0);
-    let err = try_rename(&root, &pre, ("demo/util.karn", at), "Money")
+    let at = offset_of(&pre.snapshots, "demo/util.bynk", "helper", 0);
+    let err = try_rename(&root, &pre, ("demo/util.bynk", at), "Money")
         .expect_err("collision must refuse");
     assert!(
         err.contains("bynk.resolve.name_conflict") || err.contains("would introduce"),
@@ -175,13 +175,13 @@ fn use_local(shadow: Int -> Int, y: Int) -> Int {
   shadow(y)
 }
 ";
-    let root = setup_project("capture", &[("demo/cap.karn", cap)]);
+    let root = setup_project("capture", &[("demo/cap.bynk", cap)]);
     let pre = analyse(&root, &HashMap::new());
     assert!(pre.diags.is_empty(), "fixture clean: {:?}", pre.diags);
 
-    let at = offset_of(&pre.snapshots, "demo/cap.karn", "helper", 0);
+    let at = offset_of(&pre.snapshots, "demo/cap.bynk", "helper", 0);
     let err =
-        try_rename(&root, &pre, ("demo/cap.karn", at), "shadow").expect_err("capture must refuse");
+        try_rename(&root, &pre, ("demo/cap.bynk", at), "shadow").expect_err("capture must refuse");
     assert!(
         err.contains("capture/escape"),
         "refusal comes from the index-equality validator: {err}"
@@ -190,18 +190,18 @@ fn use_local(shadow: Int -> Int, y: Int) -> Int {
 
 #[test]
 fn prepare_rename_refuses_locals_and_invalid_names_refuse() {
-    let root = setup_project("locals", &[("demo/util.karn", UTIL)]);
+    let root = setup_project("locals", &[("demo/util.bynk", UTIL)]);
     let pre = analyse(&root, &HashMap::new());
 
     // The parameter `x` is a local binding — not in the index, refused.
-    let at = offset_of(&pre.snapshots, "demo/util.karn", "x: Int", 0);
-    assert!(index_queries::prepare_rename(&pre.index, Path::new("demo/util.karn"), at).is_none());
+    let at = offset_of(&pre.snapshots, "demo/util.bynk", "x: Int", 0);
+    assert!(index_queries::prepare_rename(&pre.index, Path::new("demo/util.bynk"), at).is_none());
 
     // Keyword / non-identifier new names refuse at planning.
-    let at_money = offset_of(&pre.snapshots, "demo/util.karn", "Money", 0);
+    let at_money = offset_of(&pre.snapshots, "demo/util.bynk", "Money", 0);
     for bad in ["fn", "two words", "a.b", ""] {
         assert!(
-            index_queries::plan_rename(&pre.index, Path::new("demo/util.karn"), at_money, bad)
+            index_queries::plan_rename(&pre.index, Path::new("demo/util.bynk"), at_money, bad)
                 .is_err(),
             "{bad:?} must refuse"
         );

@@ -75,7 +75,7 @@ In Bynk, every state field must have a zero value, so the type with no honest
 zero does not build:
 
 ```bynk,fail
-{{#include ../../../diagnostics/agents_non_zeroable.karn}}
+{{#include ../../../diagnostics/agents_non_zeroable.bynk}}
 ```
 
 and the compiler says so — verbatim, captured from `bynkc`:

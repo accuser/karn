@@ -30,7 +30,7 @@
 //!
 //! Context detection is lexical (it must work mid-edit, when the buffer rarely
 //! parses); candidates are semantic. Unit/type/capability/member enumeration
-//! parses the project's `.karn` files (and the embedded `bynk` surface) with
+//! parses the project's `.bynk` files (and the embedded `bynk` surface) with
 //! recovery, so it works even while the file the cursor sits in is mid-edit.
 //! Built-ins, keywords, and constructors come from the static `bynkc` registries
 //! (`keywords`/`builtin_names`/`firstparty`/`ast`), never the index — first-party

@@ -47,7 +47,7 @@ This is the first tooling increment for Bynk — a pause from language developme
 
 ### 2.1 Project discovery
 
-A Bynk project is a directory containing `bynk.toml` at its root. The LSP discovers the project root by walking upward from any open `.karn` file until it finds `bynk.toml`. If none is found before the filesystem root, the LSP treats the file as a single-file project (no workspace features) and shows a warning.
+A Bynk project is a directory containing `bynk.toml` at its root. The LSP discovers the project root by walking upward from any open `.bynk` file until it finds `bynk.toml`. If none is found before the filesystem root, the LSP treats the file as a single-file project (no workspace features) and shows a warning.
 
 ### 2.2 `bynk.toml` schema
 
@@ -84,7 +84,7 @@ Future configuration alternatives (`.yaml`, `.json`) are not supported in this i
 
 ### 2.3 Workspace discovery
 
-Once the project root is found, the LSP discovers all `.karn` files under the configured `src` directory (recursive). These files form the project's source corpus. The LSP loads, parses, resolves, and type-checks them all on startup.
+Once the project root is found, the LSP discovers all `.bynk` files under the configured `src` directory (recursive). These files form the project's source corpus. The LSP loads, parses, resolves, and type-checks them all on startup.
 
 File watching is enabled for the `src` directory. Changes (file added, removed, modified externally) trigger re-discovery and re-resolution of affected files.
 
@@ -220,7 +220,7 @@ Hover content stays compact — typically under twenty lines. For declarations t
 - Service operation names → the service's `on call` handler (the `on` keyword's location).
 - Agent names → the `agent` declaration.
 
-**Cross-file (required).** Definitions in other files within the same project must be resolved. The returned location points to the correct file and source range. This is a hard requirement — the language explicitly supports multi-file commons (v0.3) and context consumes graphs (v0.4); navigation that doesn't cross file boundaries is unusable for any non-trivial project. The LSP's project module (which loads all `.karn` files at startup) already has the symbol tables needed; the definition lookup walks those tables, not just the open file's local tables.
+**Cross-file (required).** Definitions in other files within the same project must be resolved. The returned location points to the correct file and source range. This is a hard requirement — the language explicitly supports multi-file commons (v0.3) and context consumes graphs (v0.4); navigation that doesn't cross file boundaries is unusable for any non-trivial project. The LSP's project module (which loads all `.bynk` files at startup) already has the symbol tables needed; the definition lookup walks those tables, not just the open file's local tables.
 
 **Binding-correct via the index (v0.25, ADR 0053).** Definition (and hover) resolve through the project **binding index** first — the use→def edges recorded at the compiler's own resolution sites — so duplicate names in different units navigate to the *bound* declaration, not the first name match. The legacy name-matching walk remains only as a fallback for the few kinds the index still defers (match-arm / `is`-narrowing bindings).
 
@@ -274,7 +274,7 @@ The VS Code extension shows two status-bar items when a Bynk file is open:
 
 If `bynk.toml` is missing, the project-name slot shows "no project" (clicking suggests creating one).
 
-The status bar items only appear when the active editor has a `.karn` file open.
+The status bar items only appear when the active editor has a `.bynk` file open.
 
 ### 3.7 Document symbols
 
@@ -620,14 +620,14 @@ These are targets, not requirements. If real-world performance falls short, the 
 
 The extension activates when:
 - A workspace folder contains a `bynk.toml` file, OR
-- A `.karn` file is opened.
+- A `.bynk` file is opened.
 
 On activation:
 1. Locate the `bynkc-lsp` binary (bundled with the extension or installed separately — for first cut, bundled).
 2. Start the LSP server as a child process.
 3. Connect via stdio.
-4. Register file watchers on `**/*.karn` and `bynk.toml`.
-5. Register the tree-sitter grammar for `.karn` files.
+4. Register file watchers on `**/*.bynk` and `bynk.toml`.
+5. Register the tree-sitter grammar for `.bynk` files.
 6. Show status-bar items.
 
 ### 5.2 Configuration

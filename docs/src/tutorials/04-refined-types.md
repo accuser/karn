@@ -7,7 +7,7 @@ character set. A target is not just any string — it must look like a URL. With
 refined types we push those rules into the type itself, so an invalid value
 cannot be constructed.
 
-Keep editing `shortener.karn`.
+Keep editing `shortener.bynk`.
 
 ## Declare a refined type
 

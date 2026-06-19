@@ -1648,7 +1648,7 @@ impl LanguageServer for Backend {
     }
 
     async fn did_change_watched_files(&self, params: DidChangeWatchedFilesParams) {
-        // For every changed `.karn` file we have open, refresh diagnostics.
+        // For every changed `.bynk` file we have open, refresh diagnostics.
         let mut uris_to_refresh = Vec::new();
         {
             let state = self.state.read().await;

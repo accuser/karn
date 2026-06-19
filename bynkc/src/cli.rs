@@ -70,11 +70,11 @@ impl From<CliPlatform> for crate::Platform {
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
-    /// Compile a `.karn` file (single-file commons) to a TypeScript file,
+    /// Compile a `.bynk` file (single-file commons) to a TypeScript file,
     /// or a directory project to a tree of TypeScript files mirroring the
     /// source layout.
     Compile {
-        /// Input `.karn` file, or directory project root.
+        /// Input `.bynk` file, or directory project root.
         input: PathBuf,
         /// Output `.ts` file (for single-file input) or output root
         /// directory (for project input).
@@ -90,9 +90,9 @@ pub enum Command {
         #[arg(long, value_enum, default_value = "cloudflare")]
         platform: CliPlatform,
     },
-    /// Type-check a `.karn` file or project without writing output.
+    /// Type-check a `.bynk` file or project without writing output.
     Check {
-        /// Input `.karn` file or project root.
+        /// Input `.bynk` file or project root.
         input: PathBuf,
         /// Diagnostic output format. `rich` (default) is the ariadne
         /// source-context rendering; `short` emits one terse
@@ -101,7 +101,7 @@ pub enum Command {
         #[arg(long, value_enum, default_value = "rich")]
         format: DiagFormat,
     },
-    /// Format `.karn` source files in place. Passing `-` reads from stdin
+    /// Format `.bynk` source files in place. Passing `-` reads from stdin
     /// and writes to stdout.
     Fmt {
         /// Files to format. Use `-` for stdin → stdout.

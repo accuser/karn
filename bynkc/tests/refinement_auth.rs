@@ -188,7 +188,7 @@ fn refinement_actor_enforces_401_403_allow_trichotomy() {
     let _ = fs::remove_dir_all(&tmp);
     let proj = tmp.join("proj");
     fs::create_dir_all(&proj).unwrap();
-    fs::write(proj.join("api.karn"), SOURCE).unwrap();
+    fs::write(proj.join("api.bynk"), SOURCE).unwrap();
 
     let out =
         match bynkc::compile_project(&CompileOptions::single(&proj).target(BuildTarget::Workers)) {

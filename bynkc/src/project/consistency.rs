@@ -75,8 +75,8 @@ pub(crate) fn check_directory_kind_consistency(
 
 /// Each file's relative path must match its declared qualified name. Two
 /// arrangements are valid:
-/// - **Single-file**: `a/b/c.karn` declaring `a.b.c`.
-/// - **Multi-file**: `a/b/c/<any>.karn` declaring `a.b.c`.
+/// - **Single-file**: `a/b/c.bynk` declaring `a.b.c`.
+/// - **Multi-file**: `a/b/c/<any>.bynk` declaring `a.b.c`.
 pub(crate) fn check_path_name_alignment(parsed: &[ParsedFile]) -> Result<(), Vec<CompileError>> {
     let mut errors: Vec<CompileError> = Vec::new();
     for pf in parsed {
@@ -93,7 +93,7 @@ pub(crate) fn check_path_name_alignment(parsed: &[ParsedFile]) -> Result<(), Vec
                     "bynk.project.inconsistent_commons_name",
                     pf.unit.span(),
                     format!(
-                        "file `{}` declares `{name}`, but its path doesn't match — expected either `{}.karn` (single-file) or `{}/...karn` (multi-file)",
+                        "file `{}` declares `{name}`, but its path doesn't match — expected either `{}.bynk` (single-file) or `{}/...bynk` (multi-file)",
                         rel.display(),
                         name_parts.join("/"),
                         name_parts.join("/"),
@@ -126,8 +126,8 @@ pub(crate) fn check_test_path_alignment(parsed: &[ParsedFile]) -> Result<(), Vec
         let target_name = test_decl.target.joined();
         let target_parts: Vec<&str> = target_name.split('.').collect();
         let rel = &pf.source_path;
-        // #47: accept the self-identifying `<target>.test.karn` form too — a
-        // test file at `<path>.test.karn` aligns exactly as `<path>.karn` does.
+        // #47: accept the self-identifying `<target>.test.bynk` form too — a
+        // test file at `<path>.test.bynk` aligns exactly as `<path>.bynk` does.
         if !unit_path_matches(&strip_test_infix(rel), &target_name) {
             let p = target_parts.join("/");
             errors.push(
@@ -135,12 +135,12 @@ pub(crate) fn check_test_path_alignment(parsed: &[ParsedFile]) -> Result<(), Vec
                     "bynk.project.inconsistent_test_path",
                     pf.unit.span(),
                     format!(
-                        "test file `{}` targets `{target_name}`, but its path doesn't match — expected `{p}.karn` / `{p}.test.karn` (single-file) or `{p}/...karn` (multi-file)",
+                        "test file `{}` targets `{target_name}`, but its path doesn't match — expected `{p}.bynk` / `{p}.test.bynk` (single-file) or `{p}/...bynk` (multi-file)",
                         rel.display(),
                     ),
                 )
                 .with_note(
-                    "in split-paths mode (configured via `bynk.toml`'s `[paths]`), each test file's path under the `tests` directory must match its target's qualified name; a `.test.karn` suffix is allowed",
+                    "in split-paths mode (configured via `bynk.toml`'s `[paths]`), each test file's path under the `tests` directory must match its target's qualified name; a `.test.bynk` suffix is allowed",
                 ),
             );
         }

@@ -56,7 +56,7 @@ export async function newContext(): Promise<void> {
   if (!name) return; // cancelled
   const trimmed = name.trim();
 
-  const file = vscode.Uri.joinPath(dir, `${lastSegment(trimmed)}.karn`);
+  const file = vscode.Uri.joinPath(dir, `${lastSegment(trimmed)}.bynk`);
   if (await exists(file)) {
     void vscode.window.showErrorMessage(
       `Bynk: ${vscode.workspace.asRelativePath(file)} already exists.`,
@@ -69,7 +69,7 @@ export async function newContext(): Promise<void> {
   await vscode.window.showTextDocument(doc);
 }
 
-/** Bynk: New Project — scaffold `bynk.toml` + `src/<name>.karn` with a starter
+/** Bynk: New Project — scaffold `bynk.toml` + `src/<name>.bynk` with a starter
  *  context, in a chosen folder. */
 export async function newProject(): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
@@ -105,7 +105,7 @@ export async function newProject(): Promise<void> {
     toml,
     `[project]\nname = "${project}"\nversion = "0.1.0"\n\n[paths]\nsrc = "src"\ntests = "tests"\nout = "out"\n`,
   );
-  const context = vscode.Uri.joinPath(folder.uri, "src", `${unit}.karn`);
+  const context = vscode.Uri.joinPath(folder.uri, "src", `${unit}.bynk`);
   await writeUtf8(context, `context ${unit}\n\n`);
 
   const doc = await vscode.workspace.openTextDocument(context);

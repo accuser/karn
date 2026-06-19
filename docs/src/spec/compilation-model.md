@@ -27,15 +27,15 @@ Bynk compiles in one of two modes.
 and test units under `[paths].tests`. This is the mode that supports a
 `src`/`tests` split and `bynkc test`.
 
-**Legacy mode** — no manifest. A single `.karn` file compiles as one standalone
+**Legacy mode** — no manifest. A single `.bynk` file compiles as one standalone
 unit. The project-only features — the `src`/`tests` split and `bynkc test` —
 require project mode.
 
 ## §8.3 Source layout
 
 In project mode a unit's file path MUST mirror its qualified name. A
-`context commerce.orders` MUST live at `src/commerce/orders.karn`, and a
-`test commerce.orders` at `tests/commerce/orders.karn`. A path that does not match
+`context commerce.orders` MUST live at `src/commerce/orders.bynk`, and a
+`test commerce.orders` at `tests/commerce/orders.bynk`. A path that does not match
 the declared name is rejected (`bynk.project.inconsistent_commons_name`,
 `bynk.project.inconsistent_test_path`), as is a name declared as both a `commons`
 and a `context` (`bynk.project.kind_conflict`). The source tree therefore mirrors

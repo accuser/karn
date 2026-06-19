@@ -3,15 +3,15 @@
 //! Each subdirectory under `tests/fixtures/positive/` is one fixture. There
 //! are two supported shapes:
 //!
-//! - **Single-file**: `input.karn` + `expected.ts`. The compiler runs in
+//! - **Single-file**: `input.bynk` + `expected.ts`. The compiler runs in
 //!   single-file mode and the output is compared against `expected.ts`.
 //! - **Project**: a `src/` directory and an `expected/` directory mirroring
-//!   the same source tree, with `.karn` files rewritten to `.ts`. The
+//!   the same source tree, with `.bynk` files rewritten to `.ts`. The
 //!   compiler runs in project mode (`compile_project`) and every generated
 //!   file is compared against its counterpart under `expected/`.
 //!
 //! Each subdirectory under `tests/fixtures/negative/` contains either an
-//! `input.karn` (single-file) or a `src/` (project) input plus an
+//! `input.bynk` (single-file) or a `src/` (project) input plus an
 //! `expected_error.txt` listing category strings the diagnostics must
 //! contain.
 
@@ -127,7 +127,7 @@ fn positive_fixtures() {
     assert!(!dirs.is_empty(), "no positive fixtures found");
     let mut failures = Vec::new();
     for dir in dirs {
-        let input = dir.join("input.karn");
+        let input = dir.join("input.bynk");
         let src_dir = dir.join("src");
         if input.exists() {
             let expected = dir.join("expected.ts");
@@ -236,7 +236,7 @@ fn positive_fixtures() {
             }
         } else {
             failures.push(format!(
-                "\n=== {} ===\nfixture has neither `input.karn` nor `src/`",
+                "\n=== {} ===\nfixture has neither `input.bynk` nor `src/`",
                 dir.display()
             ));
         }
@@ -306,7 +306,7 @@ fn no_unknown_placeholder_in_emitted_output() {
     let hit = |s: &str| MARKERS.iter().any(|m| s.contains(m));
     let mut offenders = Vec::new();
     for dir in fixture_dirs("positive") {
-        let input = dir.join("input.karn");
+        let input = dir.join("input.bynk");
         let src_dir = dir.join("src");
         if input.exists() {
             let source = read(&input);
@@ -339,7 +339,7 @@ fn negative_fixtures() {
     assert!(!dirs.is_empty(), "no negative fixtures found");
     let mut failures = Vec::new();
     for dir in dirs {
-        let input = dir.join("input.karn");
+        let input = dir.join("input.bynk");
         let src_dir = dir.join("src");
         let expected = dir.join("expected_error.txt");
         let want = read(&expected);
@@ -407,7 +407,7 @@ fn negative_fixtures() {
             }
         } else {
             failures.push(format!(
-                "\n=== {} ===\nfixture has neither `input.karn` nor `src/`",
+                "\n=== {} ===\nfixture has neither `input.bynk` nor `src/`",
                 dir.display()
             ));
         }

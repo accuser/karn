@@ -3,12 +3,12 @@
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
 Language support for the **[Bynk](https://github.com/accuser/bynk) language**
-(`.karn` files) in Visual Studio Code: syntax highlighting plus full language
+(`.bynk` files) in Visual Studio Code: syntax highlighting plus full language
 features backed by the bundled
 [`bynkc-lsp`](https://github.com/accuser/bynk/tree/main/bynk-lsp) language
 server.
 
-The extension activates on any `.karn` file, or on any workspace containing a
+The extension activates on any `.bynk` file, or on any workspace containing a
 `bynk.toml`.
 
 ## Features

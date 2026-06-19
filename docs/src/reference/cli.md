@@ -10,7 +10,7 @@ Run `bynkc <command> --help` for the authoritative help text.
 
 ## `bynkc check`
 
-Type-check a `.karn` file or project without writing output
+Type-check a `.bynk` file or project without writing output
 
 ```text
 bynkc check <INPUT> [--format <FORMAT>]
@@ -18,12 +18,12 @@ bynkc check <INPUT> [--format <FORMAT>]
 
 | Argument | Required | Default | Description |
 |---|---|---|---|
-| `INPUT` | yes | — | Input `.karn` file or project root |
+| `INPUT` | yes | — | Input `.bynk` file or project root |
 | `--format` | no | `rich` | Diagnostic output format. `rich` (default) is the ariadne source-context rendering; `short` emits one terse `path:line:col: severity[category]: message` line per diagnostic, for tooling (the VS Code problem-matcher, CI, scripts) (one of: rich, short) |
 
 ## `bynkc compile`
 
-Compile a `.karn` file (single-file commons) to a TypeScript file, or a directory project to a tree of TypeScript files mirroring the source layout
+Compile a `.bynk` file (single-file commons) to a TypeScript file, or a directory project to a tree of TypeScript files mirroring the source layout
 
 ```text
 bynkc compile <INPUT> --output <OUTPUT> [--target <TARGET>] [--platform <PLATFORM>]
@@ -31,14 +31,14 @@ bynkc compile <INPUT> --output <OUTPUT> [--target <TARGET>] [--platform <PLATFOR
 
 | Argument | Required | Default | Description |
 |---|---|---|---|
-| `INPUT` | yes | — | Input `.karn` file, or directory project root |
+| `INPUT` | yes | — | Input `.bynk` file, or directory project root |
 | `--output` (`-o`) | yes | — | Output `.ts` file (for single-file input) or output root directory (for project input) |
 | `--target` | no | `bundle` | Build target. `bundle` (default) produces a single deployment unit; `workers` produces one Cloudflare Worker per context with Service Binding plumbing (v0.8) (one of: bundle, workers) |
 | `--platform` | no | `cloudflare` | Deploy platform selecting the `bynk` surface binding (v0.17). A new axis, distinct from `--target`. The MVP supports `cloudflare` only (one of: cloudflare, node) |
 
 ## `bynkc fmt`
 
-Format `.karn` source files in place. Passing `-` reads from stdin and writes to stdout
+Format `.bynk` source files in place. Passing `-` reads from stdin and writes to stdout
 
 ```text
 bynkc fmt [INPUTS] [--check]

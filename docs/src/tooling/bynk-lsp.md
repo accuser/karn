@@ -16,7 +16,7 @@ over **stdio**. Editors talk to it; most users reach it through the
 | Rename | Project-wide with `prepareRename`; validated by re-analysis + index equality, versioned edits (v0.25). |
 | Formatting | Whole-document and range formatting, via the shared [`bynk-fmt`](bynk-fmt.md). |
 | Document symbols | An outline of the file for the editor's symbol view. |
-| File watching | Re-checks diagnostics when `.karn` files change on disk. |
+| File watching | Re-checks diagnostics when `.bynk` files change on disk. |
 
 Text is synced in full (`TextDocumentSyncKind::FULL`). When a project root with a
 `bynk.toml` is found, the server enables cross-file lookups; otherwise it works in

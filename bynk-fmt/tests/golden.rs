@@ -1,11 +1,11 @@
 //! Golden-output tests for the Bynk formatter.
 //!
 //! Each fixture under `tests/fixtures/<case>/` pairs a deliberately
-//! mis-formatted `input.karn` with the canonical `expected.karn` the formatter
+//! mis-formatted `input.bynk` with the canonical `expected.bynk` the formatter
 //! must produce. Unlike the round-trip suite (which only checks idempotency and
 //! re-parsing — and so is blind to formatting that is *wrong but stable*), this
 //! suite pins the exact canonical rendering of every construct. A formatting
-//! change shows up as a reviewable diff in `expected.karn` rather than silently
+//! change shows up as a reviewable diff in `expected.bynk` rather than silently
 //! passing.
 //!
 //! For each fixture we assert:
@@ -13,7 +13,7 @@
 //!  2. `format(expected) == expected` — `expected` is itself canonical (idempotent).
 //!  3. `expected` tokenises and parses — formatting introduces no syntax errors.
 //!
-//! Regenerate the `expected.karn` files after an intentional formatter change:
+//! Regenerate the `expected.bynk` files after an intentional formatter change:
 //!
 //!     BYNK_BLESS=1 cargo test -p bynk-fmt --test golden
 //!
@@ -36,7 +36,7 @@ fn fixture_dirs() -> Vec<PathBuf> {
     if let Ok(rd) = fs::read_dir(&root) {
         for entry in rd.flatten() {
             let p = entry.path();
-            if p.is_dir() && p.join("input.karn").is_file() {
+            if p.is_dir() && p.join("input.bynk").is_file() {
                 out.push(p);
             }
         }
@@ -92,13 +92,13 @@ fn golden_fixtures_format_canonically() {
 
     for dir in &dirs {
         let name = case_name(dir);
-        let input_path = dir.join("input.karn");
-        let expected_path = dir.join("expected.karn");
+        let input_path = dir.join("input.bynk");
+        let expected_path = dir.join("expected.bynk");
 
         let input = match fs::read_to_string(&input_path) {
             Ok(s) => s,
             Err(e) => {
-                failures.push(format!("{name}: cannot read input.karn: {e}"));
+                failures.push(format!("{name}: cannot read input.bynk: {e}"));
                 continue;
             }
         };
@@ -107,7 +107,7 @@ fn golden_fixtures_format_canonically() {
             Ok(s) => s,
             Err(e) => {
                 failures.push(format!(
-                    "{name}: formatting input.karn failed with {} error(s)",
+                    "{name}: formatting input.bynk failed with {} error(s)",
                     e.errors.len()
                 ));
                 continue;
@@ -116,7 +116,7 @@ fn golden_fixtures_format_canonically() {
 
         if bless {
             if let Err(e) = fs::write(&expected_path, &got) {
-                failures.push(format!("{name}: cannot write expected.karn: {e}"));
+                failures.push(format!("{name}: cannot write expected.bynk: {e}"));
             } else {
                 blessed += 1;
             }
@@ -127,7 +127,7 @@ fn golden_fixtures_format_canonically() {
             Ok(s) => s,
             Err(e) => {
                 failures.push(format!(
-                    "{name}: cannot read expected.karn ({e}) — \
+                    "{name}: cannot read expected.bynk ({e}) — \
                      regenerate with BYNK_BLESS=1 cargo test -p bynk-fmt --test golden"
                 ));
                 continue;
@@ -147,11 +147,11 @@ fn golden_fixtures_format_canonically() {
         match format_source(&expected, &opts) {
             Ok(reformatted) if reformatted == expected => {}
             Ok(reformatted) => failures.push(format!(
-                "{name}: expected.karn is not canonical (format(expected) != expected)\n{}",
+                "{name}: expected.bynk is not canonical (format(expected) != expected)\n{}",
                 first_difference(&expected, &reformatted)
             )),
             Err(e) => failures.push(format!(
-                "{name}: formatting expected.karn failed with {} error(s)",
+                "{name}: formatting expected.bynk failed with {} error(s)",
                 e.errors.len()
             )),
         }
@@ -161,14 +161,14 @@ fn golden_fixtures_format_canonically() {
             Ok(tokens) => {
                 if let Err(errs) = parse_unit(&tokens, &expected) {
                     failures.push(format!(
-                        "{name}: expected.karn does not parse ({} error(s); first: {})",
+                        "{name}: expected.bynk does not parse ({} error(s); first: {})",
                         errs.len(),
                         errs.first().map(|e| e.message.as_str()).unwrap_or("?")
                     ));
                 }
             }
             Err(e) => failures.push(format!(
-                "{name}: expected.karn does not tokenise: {}",
+                "{name}: expected.bynk does not tokenise: {}",
                 e.message
             )),
         }

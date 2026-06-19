@@ -23,15 +23,15 @@ hello-world/
 ├── bynk.toml               # project manifest ([paths])
 ├── src/
 │   └── hello/
-│       ├── text.karn       # commons hello.text — Subject + greeting
-│       └── web.karn        # context hello.web — the HTTP service
+│       ├── text.bynk       # commons hello.text — Subject + greeting
+│       └── web.bynk        # context hello.web — the HTTP service
 └── tests/
     └── hello/
-        └── text.karn       # tests targeting hello.text
+        └── text.bynk       # tests targeting hello.text
 ```
 
 A unit's dotted name mirrors its path: `commons hello.text` lives at
-`src/hello/text.karn`. The `context` is the unit of deployment — it
+`src/hello/text.bynk`. The `context` is the unit of deployment — it
 becomes one Cloudflare Worker.
 
 ## Prerequisites

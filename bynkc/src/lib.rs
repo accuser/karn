@@ -1,12 +1,12 @@
 //! Bynk v0.3 compiler library.
 //!
-//! Compiles `.karn` commons source into TypeScript modules.
+//! Compiles `.bynk` commons source into TypeScript modules.
 //!
 //! Pipeline: lex → parse → resolve → check → emit.
 //!
 //! v0.3 introduces multi-file commons and the `uses` mechanism. A "project"
 //! is a directory containing one or more commons; a commons is either a
-//! single `.karn` file or a directory of `.karn` files that share a
+//! single `.bynk` file or a directory of `.bynk` files that share a
 //! `commons name` header. See [`compile_project`].
 //!
 //! The single-string entrypoint [`compile`] remains for v0–v0.2 fixtures

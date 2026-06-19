@@ -94,14 +94,14 @@ To show what the compiler actually says when it refuses a program — verbatim, 
 paraphrased — add a deliberately failing fixture and `{{#include}}` both it and
 its captured transcript:
 
-1. Write a standalone failing program at `docs/diagnostics/<id>.karn` (a
+1. Write a standalone failing program at `docs/diagnostics/<id>.bynk` (a
    `commons` or `context` block, like a doc example, but one that must error).
 2. Run `BYNK_BLESS=1 cargo test -p bynkc --test doc_diagnostics`. This compiles
    the fixture, asserts it fails, and writes the real diagnostic — colour-free,
-   with a stable `<id>.karn` label — to `docs/diagnostics/<id>.txt`.
+   with a stable `<id>.bynk` label — to `docs/diagnostics/<id>.txt`.
 3. On the page, show the source in a `bynk,fail` fence and the transcript in a
    `text` fence, each holding a single mdBook `#include` line pointing at
-   `docs/diagnostics/<id>.karn` and `docs/diagnostics/<id>.txt` (the path is
+   `docs/diagnostics/<id>.bynk` and `docs/diagnostics/<id>.txt` (the path is
    relative to the page). See [the agent model](../guides/agents-and-state/the-agent-model.md)
    for a live example to copy.
 

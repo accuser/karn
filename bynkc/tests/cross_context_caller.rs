@@ -163,8 +163,8 @@ fn cross_context_caller_reads_live_id_and_fails_closed() {
     let _ = fs::remove_dir_all(&tmp);
     let proj = tmp.join("proj/app");
     fs::create_dir_all(&proj).unwrap();
-    fs::write(proj.join("a.karn"), SOURCE_A).unwrap();
-    fs::write(proj.join("b.karn"), SOURCE_B).unwrap();
+    fs::write(proj.join("a.bynk"), SOURCE_A).unwrap();
+    fs::write(proj.join("b.bynk"), SOURCE_B).unwrap();
 
     let out = match bynkc::compile_project(
         &CompileOptions::single(tmp.join("proj")).target(BuildTarget::Workers),

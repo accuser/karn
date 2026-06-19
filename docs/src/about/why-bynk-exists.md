@@ -55,7 +55,7 @@ const age: number = 240; // compiles — 240 is a perfectly good `number`
 In Bynk, it does not:
 
 ```bynk,fail
-{{#include ../../diagnostics/refine_out_of_range.karn}}
+{{#include ../../diagnostics/refine_out_of_range.bynk}}
 ```
 
 ```text

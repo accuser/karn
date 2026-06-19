@@ -1,7 +1,7 @@
 //! Symbol lookups for hover and go-to-definition.
 //!
 //! Single-file lookups walk the parsed AST. Cross-file lookups (v1.1; LSP
-//! spec §3.4 cross-file requirement) iterate the project's `.karn` sources
+//! spec §3.4 cross-file requirement) iterate the project's `.bynk` sources
 //! to find a declaration in any unit the user might be referencing — used
 //! when the open file lacks the symbol the user clicked on (typically
 //! because the name was imported via `uses` or made available via
@@ -243,7 +243,7 @@ pub struct CrossFileSymbol {
 }
 
 /// Find `name`'s declaration in any project file other than `current_uri`.
-/// Walks `src_root` recursively, parses each `.karn` file with recovery,
+/// Walks `src_root` recursively, parses each `.bynk` file with recovery,
 /// and returns the first hit. Returns `None` if the name is not found
 /// anywhere in the project.
 ///
@@ -297,7 +297,7 @@ pub fn describe_symbol_cross_file(
     None
 }
 
-/// Recursively collect every `.karn` file under `root`. Returns an empty
+/// Recursively collect every `.bynk` file under `root`. Returns an empty
 /// vector if the root is missing or unreadable.
 pub(crate) fn walk_bynk_files(root: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
@@ -310,7 +310,7 @@ pub(crate) fn walk_bynk_files(root: &Path) -> Vec<PathBuf> {
             let p = entry.path();
             if p.is_dir() {
                 stack.push(p);
-            } else if p.extension().and_then(|e| e.to_str()) == Some("karn") {
+            } else if p.extension().and_then(|e| e.to_str()) == Some("bynk") {
                 out.push(p);
             }
         }
@@ -386,19 +386,19 @@ mod tests {
             "cross_file_definition",
             &[
                 (
-                    "a.karn",
+                    "a.bynk",
                     "commons demo.a\n\ntype Foo = Int where Positive\n",
                 ),
                 (
-                    "b.karn",
+                    "b.bynk",
                     "commons demo.b\n\nuses demo.a\n\ntype Bar = Int where NonNegative\n",
                 ),
             ],
         );
-        let current = Url::from_file_path(root.join("b.karn")).unwrap();
+        let current = Url::from_file_path(root.join("b.bynk")).unwrap();
         let found = find_declaration_cross_file(&root, &current, "Foo")
-            .expect("Foo should resolve into a.karn");
-        let expected = Url::from_file_path(root.join("a.karn")).unwrap();
+            .expect("Foo should resolve into a.bynk");
+        let expected = Url::from_file_path(root.join("a.bynk")).unwrap();
         assert_eq!(found.uri, expected);
         assert!(
             found.source.contains("type Foo = Int where Positive"),
@@ -411,11 +411,11 @@ mod tests {
         let root = setup_project(
             "cross_file_skip_current",
             &[(
-                "only.karn",
+                "only.bynk",
                 "commons demo.only\n\ntype Foo = Int where Positive\n",
             )],
         );
-        let current = Url::from_file_path(root.join("only.karn")).unwrap();
+        let current = Url::from_file_path(root.join("only.bynk")).unwrap();
         // The only file containing Foo is current; cross-file must skip it.
         assert!(find_declaration_cross_file(&root, &current, "Foo").is_none());
     }
@@ -426,7 +426,7 @@ mod tests {
             "cross_file_hover",
             &[
                 (
-                    "money.karn",
+                    "money.bynk",
                     "commons demo.money\n\n\
                      ---\n\
                      Amount in minor units of currency.\n\
@@ -434,17 +434,17 @@ mod tests {
                      type Money = Int where NonNegative\n",
                 ),
                 (
-                    "orders.karn",
+                    "orders.bynk",
                     "commons demo.orders\n\nuses demo.money\n\ntype OrderId = Int where Positive\n",
                 ),
             ],
         );
-        let current = Url::from_file_path(root.join("orders.karn")).unwrap();
+        let current = Url::from_file_path(root.join("orders.bynk")).unwrap();
         let (other_uri, desc) = describe_symbol_cross_file(&root, &current, "Money")
             .expect("Money should produce hover content");
         assert_eq!(
             other_uri,
-            Url::from_file_path(root.join("money.karn")).unwrap()
+            Url::from_file_path(root.join("money.bynk")).unwrap()
         );
         assert!(desc.contains("type Money"));
         assert!(
@@ -458,11 +458,11 @@ mod tests {
         let root = setup_project(
             "cross_file_none",
             &[(
-                "a.karn",
+                "a.bynk",
                 "commons demo.a\n\ntype Foo = Int where Positive\n",
             )],
         );
-        let current = Url::from_file_path(root.join("a.karn")).unwrap();
+        let current = Url::from_file_path(root.join("a.bynk")).unwrap();
         assert!(find_declaration_cross_file(&root, &current, "DoesNotExist").is_none());
         assert!(describe_symbol_cross_file(&root, &current, "DoesNotExist").is_none());
     }

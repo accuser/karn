@@ -61,10 +61,10 @@ fn offset_of(text: &str, needle: &str, n: usize) -> usize {
 
 #[test]
 fn go_to_definition_reaches_into_a_hole() {
-    let root = setup_project("def", &[("demo/text.karn", SRC)]);
+    let root = setup_project("def", &[("demo/text.bynk", SRC)]);
     let result = bynkc::diagnose_project(&root, &HashMap::new());
     let index = &result.index;
-    let path = PathBuf::from("demo/text.karn");
+    let path = PathBuf::from("demo/text.bynk");
 
     // The `shout` call is the 2nd occurrence of "shout" (1st is the fn def).
     let call_off = offset_of(SRC, "shout", 1) + 1; // mid-identifier
@@ -81,10 +81,10 @@ fn go_to_definition_reaches_into_a_hole() {
 
 #[test]
 fn references_include_the_hole_call_site() {
-    let root = setup_project("refs", &[("demo/text.karn", SRC)]);
+    let root = setup_project("refs", &[("demo/text.bynk", SRC)]);
     let result = bynkc::diagnose_project(&root, &HashMap::new());
     let index = &result.index;
-    let path = PathBuf::from("demo/text.karn");
+    let path = PathBuf::from("demo/text.bynk");
 
     // From the `shout` definition, references must include the in-hole call.
     let def_off = offset_of(SRC, "shout", 0);
@@ -105,9 +105,9 @@ fn hover_type_is_recorded_for_a_hole_expression() {
     // Hover-of-value reads `expr_types`, populated by the checker as it types
     // each hole's expression (slice 1). The `name` use inside `\(shout(name))`
     // must carry its `String` type.
-    let root = setup_project("hover", &[("demo/text.karn", SRC)]);
+    let root = setup_project("hover", &[("demo/text.bynk", SRC)]);
     let result = bynkc::diagnose_project(&root, &HashMap::new());
-    let rel = PathBuf::from("demo/text.karn");
+    let rel = PathBuf::from("demo/text.bynk");
     let (_p, entries) = result
         .expr_types
         .iter()
@@ -125,10 +125,10 @@ fn hover_type_is_recorded_for_a_hole_expression() {
 
 #[test]
 fn semantic_tokens_cover_a_hole_symbol() {
-    let root = setup_project("sem", &[("demo/text.karn", SRC)]);
+    let root = setup_project("sem", &[("demo/text.bynk", SRC)]);
     let result = bynkc::diagnose_project(&root, &HashMap::new());
     let index = &result.index;
-    let path = PathBuf::from("demo/text.karn");
+    let path = PathBuf::from("demo/text.bynk");
 
     let tokens = index_queries::semantic_tokens(index, &[], &path, SRC, None);
     assert!(

@@ -44,7 +44,7 @@ refund(order); // compiles — OrderId and CustomerId are both `string`
 In Bynk, the opaque types are distinct, so the same swap does not build:
 
 ```bynk,fail
-{{#include ../../../diagnostics/types_opaque_swap.karn}}
+{{#include ../../../diagnostics/types_opaque_swap.bynk}}
 ```
 
 ```text
@@ -84,7 +84,7 @@ Bynk has no special "must use the `Result`" rule — it does not need one. A
 move on:
 
 ```bynk,fail
-{{#include ../../../diagnostics/types_unhandled_result.karn}}
+{{#include ../../../diagnostics/types_unhandled_result.bynk}}
 ```
 
 ```text

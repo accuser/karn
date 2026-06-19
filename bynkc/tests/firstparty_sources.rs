@@ -7,7 +7,7 @@
 //!     transitively, when a fixture happened to `uses` it).
 //!  2. **Each source is `bynk-fmt`-clean** — formatting is a no-op, so the
 //!     first-party sources obey the project's own formatting rules. (Reformatting
-//!     a `.karn` source never changes emitted TypeScript — formatting is
+//!     a `.bynk` source never changes emitted TypeScript — formatting is
 //!     whitespace/trivia only — so this is independent of the byte-identical
 //!     emitted-output guarantee, which the golden + tsc_verify suites pin.)
 //!
@@ -19,7 +19,7 @@ use bynkc::lexer::tokenize;
 use bynkc::parser::parse_unit;
 
 /// The first-party Bynk sources, by display name. All are `pub const` in
-/// `bynkc::firstparty`, each now an `include_str!` of a real `.karn` file.
+/// `bynkc::firstparty`, each now an `include_str!` of a real `.bynk` file.
 fn sources() -> Vec<(&'static str, &'static str)> {
     vec![
         ("bynk.list", bynkc::firstparty::BYNK_LIST_SRC),
@@ -67,7 +67,7 @@ fn every_first_party_source_is_fmt_clean() {
     }
     assert!(
         failures.is_empty(),
-        "first-party .karn sources must be bynk-fmt-clean:\n{}",
+        "first-party .bynk sources must be bynk-fmt-clean:\n{}",
         failures.join("\n")
     );
 }

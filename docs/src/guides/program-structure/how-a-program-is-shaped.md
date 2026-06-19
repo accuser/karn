@@ -98,7 +98,7 @@ Compilation is a fixed pipeline:
 
 ```mermaid
 flowchart LR
-  src["source (.karn)"] --> lex[lex] --> parse[parse] --> resolve[resolve] --> check[check] --> emit[emit] --> ts["TypeScript"] --> tsc{"tsc --strict"}
+  src["source (.bynk)"] --> lex[lex] --> parse[parse] --> resolve[resolve] --> check[check] --> emit[emit] --> ts["TypeScript"] --> tsc{"tsc --strict"}
 ```
 
 *The compile pipeline.* Source is lexed, parsed, name-resolved, and

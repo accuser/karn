@@ -28,7 +28,7 @@ Each phase lives in its own module under `src/`:
 - `checker.rs` — type-checks every declaration and expression; validates
   refinement predicates and detects contradictory combinations.
 - `emitter.rs` / `emitter/` — walks the typed AST and writes TypeScript.
-- `project.rs` — multi-file projects: a directory of `.karn` units compiled into
+- `project.rs` — multi-file projects: a directory of `.bynk` units compiled into
   a tree of TypeScript mirroring the source layout.
 
 Diagnostics flow through `error.rs` and [`ariadne`](https://crates.io/crates/ariadne).
@@ -59,7 +59,7 @@ bynkc fmt     [inputs...] [--check]           # format in place (or `-` for stdi
 bynkc test    [project] [--no-run]            # compile and run `test` blocks
 ```
 
-`<input>` is either a single-file commons (`foo.karn`) or a project directory
+`<input>` is either a single-file commons (`foo.bynk`) or a project directory
 containing a `bynk.toml`. The `workers` target emits one Cloudflare Worker per
 context, complete with router, dependency wiring, the shared runtime, and a
 `wrangler.toml`. `bynkc test` needs `node` and `tsc` on `PATH`.
