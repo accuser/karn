@@ -46,5 +46,5 @@ For everything else, the standard single-increment
   (no language surface): `bynkc` decomposes from a monolith into a layered
   library set (`bynk-syntax`/`-check`/`-emit`/`-ide`/`-render`) with the human
   CLI moving up into the driver; libraries emit structured data and never
-  render. **Phase: 🟡 Draft — direction proposed; foundational ADRs land before
-  the first extraction slice.**
+  render. **Phase: 🟢 Settled — slice 0 done (ADRs 0099–0102); slice 1
+  (`bynk-syntax`) in proposal.**
