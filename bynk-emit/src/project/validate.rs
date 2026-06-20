@@ -1,5 +1,5 @@
 use super::*;
-use crate::builtin_names::methods::{OF, UNSAFE};
+use bynk_check::builtin_names::methods::{OF, UNSAFE};
 
 /// v0.19: the lock violation a deployment unit's native-platform set implies
 /// under the selected `--platform`, if any. Pure — unit-tested below with
@@ -758,7 +758,7 @@ fn check_actor_contracts(
     refs: &mut RefSink,
     errors: &mut Vec<CompileError>,
 ) {
-    use crate::actors::{self, Scheme};
+    use bynk_check::actors::{self, Scheme};
 
     // Pass 1 — actor declaration well-formedness.
     for actor in table.actors.values() {
@@ -990,7 +990,7 @@ fn check_actor_contracts(
                     // fall through to a prelude actor of the same name — only an
                     // unresolved name is. `members` keeps the resolved peers in
                     // declared order for the reachability check below.
-                    let mut members: Vec<(&crate::ast::Ident, actors::Contract)> = Vec::new();
+                    let mut members: Vec<(&bynk_syntax::ast::Ident, actors::Contract)> = Vec::new();
                     for actor_ref in &by.actors {
                         let local = table.actors.get(&actor_ref.name);
                         // A refinement actor (`actor A = B where …`) is never a
@@ -1402,7 +1402,7 @@ fn actor_identity_ty_guarded<'a>(
     resolved: &ResolvedCommons,
     seen: &mut Vec<&'a str>,
 ) -> checker::Ty {
-    use crate::actors::{Identity, prelude_actor};
+    use bynk_check::actors::{Identity, prelude_actor};
     if let Some(local) = table.actors.get(actor_name) {
         // v0.53: a refinement actor (`actor Admin = User where …`) yields its
         // base's identity — refinement elimination, an `Admin` is-a `User`.
@@ -1424,7 +1424,7 @@ fn actor_identity_ty_guarded<'a>(
         };
     }
     match prelude_actor(actor_name).map(|c| c.identity) {
-        Some(Identity::CallerId) => checker::Ty::Base(crate::ast::BaseType::String),
+        Some(Identity::CallerId) => checker::Ty::Base(bynk_syntax::ast::BaseType::String),
         _ => checker::Ty::Unit,
     }
 }
@@ -1964,11 +1964,8 @@ pub(crate) fn check_function_type_boundaries(
 }
 
 /// Item-level body of the boundary confinement, shared with the single-file
-/// (legacy) compile path in `lib.rs`.
-pub(crate) fn check_function_type_boundary_items(
-    items: &[CommonsItem],
-    errors: &mut Vec<CompileError>,
-) {
+/// (legacy) compile path in `bynkc`'s `lib.rs`.
+pub fn check_function_type_boundary_items(items: &[CommonsItem], errors: &mut Vec<CompileError>) {
     {
         for item in items {
             match item {

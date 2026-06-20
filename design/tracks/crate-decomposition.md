@@ -1,9 +1,10 @@
 # Tooling track — Crate decomposition: `bynkc` becomes a library set, the driver becomes the front-end
 
-- **Phase:** **🟢 In progress — slices 0–3 landed** (ADRs 0099–0102;
-  `bynk-syntax` v0.60; `bynk-fmt` v0.61; `bynk-check` v0.62).** `bynkc` is now a
-  thin emit/driver layer over `bynk-syntax → bynk-check`. Slice 4 (extract
-  `bynk-emit`) is next. The load-bearing ADRs
+- **Phase:** **🟢 In progress — slices 0–4 landed** (ADRs 0099–0102;
+  `bynk-syntax` v0.60; `bynk-fmt` v0.61; `bynk-check` v0.62; `bynk-emit` v0.63).**
+  `bynkc`'s lib is now just the CLI surface + thin compile/diagnose glue over
+  `bynk-syntax → bynk-check → bynk-emit`. Slice 5 (extract `bynk-ide`) is next.
+  The load-bearing ADRs
   landed up front per ADR 0076: [0099](../decisions/0099-crate-layering-dependency-direction.md)
   (layering & dependency direction), [0100](../decisions/0100-structured-data-rendering-separation.md)
   (structured-data / rendering split), [0101](../decisions/0101-front-end-links-pipeline-binary-topology.md)
@@ -208,7 +209,14 @@ slices land.
    both halves are in `bynk-check`); `diagnostics_registry` now scans
    `bynk-check/src` too. Boundary fixes were three `pub(crate)`→`pub` promotions
    and moving the emitter's `runtime.ts` shim back beside the emitter.
-4. **Extract `bynk-emit`** (emitter, project, tests_emit) → `bynk-check`.
+4. **Extract `bynk-emit`** ✅ **done (v0.63)** — emitter (+ `emitter/`), project
+   (+ `project/`, incl. `tests_emit`) → over `bynk-syntax` + `bynk-check` (no
+   external crates). `bynkc` is now just the CLI + thin compile/diagnose glue and
+   re-exports the modules. Prereq: `line_col` moved to `bynk-syntax` (the sole
+   lib-glue edge; pre-positions `bynk-render`). `test_json` stayed in `bynkc`
+   (CLI output, not emission). One boundary promotion
+   (`check_function_type_boundary_items` `pub(crate)`→`pub`).
+   `diagnostics_registry` now scans `bynk-emit/src` too.
 5. **Extract `bynk-ide`** (diagnose_project, the `index`/`hints`/`locals`
    **queries**, unit_sources (field)) → `bynk-check`; re-point `bynk-lsp` onto
    `bynk-ide` (+ syntax + fmt), dropping its whole-`bynkc` dependency. Note: the

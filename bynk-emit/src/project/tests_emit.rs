@@ -594,7 +594,7 @@ fn check_integration_case_body(
         trivia: Trivia::default(),
         trailing_comments: Vec::new(),
     };
-    let resolved = crate::resolver::ResolvedCommons {
+    let resolved = bynk_check::resolver::ResolvedCommons {
         commons: synthetic_commons,
         types,
         fns,
@@ -1333,7 +1333,7 @@ fn build_privileged_resolved(
     unit_uses: &HashMap<String, Vec<String>>,
     unit_consumes: &HashMap<String, Vec<String>>,
     unit_consumes_aliases: &HashMap<String, HashMap<String, String>>,
-) -> Option<(crate::resolver::ResolvedCommons, ())> {
+) -> Option<(bynk_check::resolver::ResolvedCommons, ())> {
     let local = unit_tables.get(owning_unit)?;
     let mut types = local.types.clone();
     let mut fns = local.fns.clone();
@@ -1415,7 +1415,7 @@ fn build_privileged_resolved(
         .get(owning_unit)
         .map(|t| t.agents.clone())
         .unwrap_or_default();
-    let resolved = crate::resolver::ResolvedCommons {
+    let resolved = bynk_check::resolver::ResolvedCommons {
         commons: synthetic_commons,
         types,
         fns,
@@ -1776,7 +1776,7 @@ fn emit_mock_op_body(
             None,
         );
     }
-    let cross = crate::resolver::CrossContextInfo::default();
+    let cross = bynk_check::resolver::CrossContextInfo::default();
     emitter::lower_block_to_async_body(&op.body, &op.return_type, &mut typed, &cross)
 }
 
@@ -2039,7 +2039,7 @@ fn emit_test_case_function(
         }
     }
     let mut typed = synthetic_typed_commons_for_target(target_name, unit_tables, unit_uses);
-    let cross = crate::resolver::CrossContextInfo::default();
+    let cross = bynk_check::resolver::CrossContextInfo::default();
     let test_services: HashSet<String> = unit_tables
         .get(target_name)
         .map(|t| t.services.keys().cloned().collect())
@@ -2181,7 +2181,7 @@ fn sanitise_case_name(name: &str, index: &mut usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{BaseType, Ident, TypeRef};
+    use bynk_syntax::ast::{BaseType, Ident, TypeRef};
     use std::collections::HashSet;
 
     // -- sanitise_suite / sanitise_case_name ----------------------------------

@@ -9,8 +9,8 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
-use crate::checker::TypedCommons;
 use crate::project::EmitProjectCtx;
+use bynk_check::checker::TypedCommons;
 
 use super::*;
 
@@ -366,7 +366,7 @@ fn emit_method(
         ret = ts_type_ref(&f.return_type),
     )
     .unwrap();
-    let empty = crate::resolver::CrossContextInfo::default();
+    let empty = bynk_check::resolver::CrossContextInfo::default();
     let mut cx = LowerCtx::new(commons, &empty);
     // Methods are emitted as plain (non-async) members on an object literal;
     // any `Effect.pure(...)` in tail position must still wrap as
@@ -413,7 +413,7 @@ pub(crate) fn emit_free_fn(out: &mut String, f: &FnDecl, commons: &TypedCommons)
         ret = ts_type_ref(&f.return_type),
     )
     .unwrap();
-    let empty = crate::resolver::CrossContextInfo::default();
+    let empty = bynk_check::resolver::CrossContextInfo::default();
     let mut cx = LowerCtx::new(commons, &empty);
     let async_tail = is_effectful_return(&f.return_type);
     emit_block_as_function_body(out, &f.body, &mut cx, INDENT_STEP, async_tail);
@@ -681,13 +681,13 @@ pub(crate) fn emit_service(
         // `deps.who`; the binder ident lowers to it so the body can `match`. A
         // sum supersedes the single-actor Bearer identity path (the per-arm
         // identity comes from the match, not a single `deps.identity`).
-        let sum_members = crate::actors::sum_members_for(handler, &ctx.actors);
+        let sum_members = bynk_check::actors::sum_members_for(handler, &ctx.actors);
         // v0.47: a single Bearer handler's identity is threaded through `deps`;
         // tell the body lowering so `<binder>.identity` reads `deps.identity`.
         let bearer_seam = if sum_members.is_some() {
             None
         } else {
-            crate::actors::bearer_seam_for(handler, &ctx.actors)
+            bynk_check::actors::bearer_seam_for(handler, &ctx.actors)
         };
         cx.deps_identity_binder = bearer_seam.as_ref().and_then(|s| s.binder.clone());
         if sum_members.is_some()
@@ -700,7 +700,7 @@ pub(crate) fn emit_service(
         // `CallerId` (the calling context's name) threaded through
         // `deps.identity`, exactly like the Bearer identity. Only when it binds.
         let caller_binder = if bearer_seam.is_none() && sum_members.is_none() {
-            crate::actors::caller_binder_for(handler, &ctx.actors)
+            bynk_check::actors::caller_binder_for(handler, &ctx.actors)
         } else {
             None
         };
@@ -791,7 +791,7 @@ pub(crate) fn emit_service(
 /// A local capability uses its bare interface name; a cross-context one is
 /// qualified with the providing context's import namespace
 /// (`platform_time.Clock`).
-fn cap_ref_ty(c: &CapRef, info: &crate::resolver::CrossContextInfo) -> String {
+fn cap_ref_ty(c: &CapRef, info: &bynk_check::resolver::CrossContextInfo) -> String {
     match c.prefix().and_then(|p| info.resolve_prefix(&p)) {
         Some(consumed) => format!("{}.{}", qualified_to_ns(&consumed), c.key()),
         // v0.17: a bare flattened capability (`consumes U { Cap }`) keeps its
@@ -811,7 +811,7 @@ fn cap_ref_ty(c: &CapRef, info: &crate::resolver::CrossContextInfo) -> String {
 /// instead, so they are excluded here.
 pub(crate) fn cross_context_caps_used(
     commons: &TypedCommons,
-    info: &crate::resolver::CrossContextInfo,
+    info: &bynk_check::resolver::CrossContextInfo,
 ) -> Vec<(String, String)> {
     let mut seen: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
     for item in &commons.commons.items {
@@ -842,7 +842,7 @@ pub(crate) fn cross_context_caps_used(
 /// imported for the capability interface types.
 pub(crate) fn cross_context_cap_namespaces(
     commons: &TypedCommons,
-    info: &crate::resolver::CrossContextInfo,
+    info: &bynk_check::resolver::CrossContextInfo,
 ) -> std::collections::BTreeSet<String> {
     let mut out = std::collections::BTreeSet::new();
     let mut collect = |given: &[CapRef]| {
@@ -874,7 +874,7 @@ pub(crate) fn cross_context_cap_namespaces(
 fn build_deps_object_ty_with_surface(
     given: &[CapRef],
     cx: &LowerCtx<'_>,
-    cross_context: &crate::resolver::CrossContextInfo,
+    cross_context: &bynk_check::resolver::CrossContextInfo,
     target: BuildTarget,
 ) -> String {
     let mut parts: Vec<String> = given
@@ -927,7 +927,10 @@ fn sorted_local_agents(cx: &LowerCtx<'_>) -> Vec<String> {
 
 /// Workers-mode deps.env shape: one Service Binding per consumed context and
 /// one Durable Object namespace per local agent.
-fn workers_env_ty(cross_context: &crate::resolver::CrossContextInfo, agents: &[String]) -> String {
+fn workers_env_ty(
+    cross_context: &bynk_check::resolver::CrossContextInfo,
+    agents: &[String],
+) -> String {
     let mut consumed_sorted = cross_context.consumed_contexts.clone();
     consumed_sorted.sort();
     let mut entries: Vec<String> = consumed_sorted
@@ -951,7 +954,7 @@ fn workers_env_ty(cross_context: &crate::resolver::CrossContextInfo, agents: &[S
 /// v0.15: true when at least one consumed context exposes services (and thus
 /// a `makeSurface`). A context may now consume another purely for its
 /// capabilities, in which case there is no surface to thread.
-fn has_consumed_service(cross_context: &crate::resolver::CrossContextInfo) -> bool {
+fn has_consumed_service(cross_context: &bynk_check::resolver::CrossContextInfo) -> bool {
     cross_context
         .consumed_services
         .values()
@@ -962,7 +965,7 @@ fn has_consumed_service(cross_context: &crate::resolver::CrossContextInfo) -> bo
 /// context by its surface key plus the consumed context's makeSurface type.
 /// Only service-bearing consumed contexts contribute (a capability-only
 /// consumed context has no `makeSurface`).
-fn surface_ty(cross_context: &crate::resolver::CrossContextInfo) -> String {
+fn surface_ty(cross_context: &bynk_check::resolver::CrossContextInfo) -> String {
     let mut entries: Vec<(String, String)> = Vec::new();
     // Use alias if present, else the last segment of the qualified name.
     // Order: stable (sorted) so the diff is deterministic.
@@ -1305,7 +1308,7 @@ pub(crate) fn flatten_emit_ident_chain(e: &Expr) -> Option<String> {
 /// bynk layer guarantees the cast is sound.
 pub(crate) fn param_cast(
     consumed: &str,
-    info: &crate::resolver::CrossContextInfo,
+    info: &bynk_check::resolver::CrossContextInfo,
     method: &Ident,
     idx: usize,
     arg: String,
@@ -1401,8 +1404,12 @@ pub(crate) fn emit_agent(
                     format!("({}, {expr})", stmts.join(", "))
                 }
             } else {
-                crate::checker::zero_value_ts(&f.type_ref, f.refinement.as_ref(), &commons.types)
-                    .unwrap_or_else(|| "undefined as never".to_string())
+                bynk_check::checker::zero_value_ts(
+                    &f.type_ref,
+                    f.refinement.as_ref(),
+                    &commons.types,
+                )
+                .unwrap_or_else(|| "undefined as never".to_string())
             };
             parts.push(format!("{}: {val}", f.name.name));
         }

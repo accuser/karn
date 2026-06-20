@@ -14,8 +14,6 @@
 //! commons.
 
 pub mod cli;
-pub mod emitter;
-pub mod project;
 pub mod test_json;
 
 // The syntax foundation now lives in the `bynk-syntax` leaf crate (slice 1 of
@@ -34,6 +32,12 @@ pub use bynk_check::{
     actors, builtin_names, checker, expr_types, firstparty, hints, index, kernel_methods, locals,
     resolver,
 };
+
+// Build orchestration + TS emission moved down into the `bynk-emit` crate
+// (slice 4). Re-export its modules at the crate root so `bynkc`'s public API and
+// every internal `crate::emitter` / `crate::project` path is preserved — the CLI
+// and compile/diagnose glue see no change.
+pub use bynk_emit::{emitter, project};
 
 // The formatter moved down into the `bynk-fmt` leaf (slice 2). Re-export it as
 // `bynkc::fmt` so the `bynkc fmt` command and existing `bynkc::fmt::…` consumers
@@ -327,7 +331,7 @@ pub fn project_failure_short_lines(failure: &project::ProjectFailure) -> Vec<Str
 }
 
 fn short_line(filename: &str, source: &str, err: &CompileError) -> String {
-    let (line, col) = line_col(source, err.span.start);
+    let (line, col) = bynk_syntax::span::line_col(source, err.span.start);
     format!(
         "{filename}:{line}:{col}: {}[{}]: {}",
         severity_word(err),
@@ -341,25 +345,6 @@ fn severity_word(err: &CompileError) -> &'static str {
         Severity::Error => "error",
         Severity::Warning => "warning",
     }
-}
-
-/// 1-indexed (line, column) of a byte offset in `source`. Columns count
-/// characters, not bytes.
-pub(crate) fn line_col(source: &str, offset: usize) -> (usize, usize) {
-    let mut line = 1;
-    let mut col = 1;
-    for (i, ch) in source.char_indices() {
-        if i >= offset {
-            break;
-        }
-        if ch == '\n' {
-            line += 1;
-            col = 1;
-        } else {
-            col += 1;
-        }
-    }
-    (line, col)
 }
 
 /// Render project-level errors to a string (for test assertion).

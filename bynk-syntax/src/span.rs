@@ -33,3 +33,24 @@ impl From<std::ops::Range<usize>> for Span {
         }
     }
 }
+
+/// 1-indexed (line, column) of a byte offset in `source`. Columns count
+/// characters, not bytes. Lives in the syntax leaf so every layer that maps a
+/// span to a position — the emitter's assertion locations, `bynkc`'s `short`
+/// rendering, and (slice 6) `bynk-render` — shares one implementation.
+pub fn line_col(source: &str, offset: usize) -> (usize, usize) {
+    let mut line = 1;
+    let mut col = 1;
+    for (i, ch) in source.char_indices() {
+        if i >= offset {
+            break;
+        }
+        if ch == '\n' {
+            line += 1;
+            col = 1;
+        } else {
+            col += 1;
+        }
+    }
+    (line, col)
+}

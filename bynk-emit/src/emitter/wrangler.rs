@@ -42,7 +42,11 @@ pub fn emit_wrangler_toml(
 
     if needs_kv {
         let _ = writeln!(out, "[[kv_namespaces]]");
-        let _ = writeln!(out, "binding = \"{}\"", crate::firstparty::KV_BINDING_NAME);
+        let _ = writeln!(
+            out,
+            "binding = \"{}\"",
+            bynk_check::firstparty::KV_BINDING_NAME
+        );
         let _ = writeln!(out, "id = \"<KV_NAMESPACE_ID>\" # set at deploy time");
         writeln!(out).unwrap();
     }
@@ -70,7 +74,7 @@ pub fn emit_wrangler_toml(
     let mut crons: Vec<&String> = Vec::new();
     for service in table.services.values() {
         for handler in &service.handlers {
-            if let crate::ast::HandlerKind::Cron { expr } = &handler.kind {
+            if let bynk_syntax::ast::HandlerKind::Cron { expr } = &handler.kind {
                 crons.push(expr);
             }
         }
@@ -89,7 +93,7 @@ pub fn emit_wrangler_toml(
     let mut queues: Vec<&String> = Vec::new();
     for service in table.services.values() {
         // v0.44: one queue binding per service, on the `from queue("name")` header.
-        if let crate::ast::ServiceProtocol::Queue { name } = &service.protocol {
+        if let bynk_syntax::ast::ServiceProtocol::Queue { name } = &service.protocol {
             queues.push(name);
         }
     }
