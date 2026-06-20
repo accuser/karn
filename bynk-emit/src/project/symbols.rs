@@ -188,16 +188,19 @@ pub(crate) fn assemble_index(
 /// is `Refined { refinement: None }`, a plain alias, and carries neither;
 /// `opaque` is orthogonal (an `opaque … where` type carries both).
 /// `platform_native` when the declaring unit is a platform adapter.
-fn symbol_modifiers(unit: &str, type_decl: Option<&TypeDecl>) -> crate::index::SymbolModifiers {
+fn symbol_modifiers(
+    unit: &str,
+    type_decl: Option<&TypeDecl>,
+) -> bynk_check::index::SymbolModifiers {
     let (refined, opaque) = match type_decl.map(|t| &t.body) {
         Some(TypeBody::Refined { refinement, .. }) => (refinement.is_some(), false),
         Some(TypeBody::Opaque { refinement, .. }) => (refinement.is_some(), true),
         _ => (false, false),
     };
-    crate::index::SymbolModifiers {
+    bynk_check::index::SymbolModifiers {
         refined,
         opaque,
-        platform_native: crate::firstparty::platform_of(unit).is_some(),
+        platform_native: bynk_check::firstparty::platform_of(unit).is_some(),
     }
 }
 

@@ -8,9 +8,9 @@
 
 use std::fmt::Write as _;
 
-use crate::ast::*;
 use crate::emitter::http_handler_method_name;
 use crate::project::UnitTable;
+use bynk_syntax::ast::*;
 
 pub fn emit_worker_entry(context: &str, table: &UnitTable) -> String {
     let mut out = String::new();
@@ -34,12 +34,12 @@ pub fn emit_worker_entry(context: &str, table: &UnitTable) -> String {
                     handler: h.clone(),
                     // v0.47: a Bearer handler's surface wrapper runs the
                     // verification seam and needs the request passed in.
-                    bearer: crate::actors::bearer_seam_for(h, &table.actors).is_some(),
-                    signature: crate::actors::signature_seam_for(h, &table.actors),
+                    bearer: bynk_check::actors::bearer_seam_for(h, &table.actors).is_some(),
+                    signature: bynk_check::actors::signature_seam_for(h, &table.actors),
                     // v0.52: a multi-actor sum handler's wrapper owns the whole
                     // boundary (raw read, first-wins resolution, body parse), so
                     // the entry just passes `request` and skips the body parse.
-                    sum: crate::actors::sum_members_for(h, &table.actors).is_some(),
+                    sum: bynk_check::actors::sum_members_for(h, &table.actors).is_some(),
                 });
             }
         }
@@ -335,7 +335,7 @@ struct HttpRoute {
     /// v0.51: the handler's `by` clause names a Signature actor — the entry
     /// dispatch reads the raw body, verifies the HMAC, and parses the body from
     /// those same bytes.
-    signature: Option<crate::actors::SignatureSeam>,
+    signature: Option<bynk_check::actors::SignatureSeam>,
     /// v0.52: the handler's `by` clause names a multi-actor sum — its wrapper
     /// owns the boundary, so the entry passes `request` (+ path params) and does
     /// not read or parse the body itself.
@@ -527,13 +527,13 @@ fn emit_call_handler_dispatch(
     out: &mut String,
     sname: &str,
     h: &Handler,
-    actors: &std::collections::HashMap<String, crate::ast::ActorDecl>,
+    actors: &std::collections::HashMap<String, bynk_syntax::ast::ActorDecl>,
 ) {
     // v0.54: a `by c: Caller` handler reads the caller's context name from the
     // `X-Bynk-Caller` header (stamped by `callService`) and threads it into the
     // surface call. The internal channel is trusted, but a missing caller means
     // a malformed / non-Bynk call — fail-closed (the `Internal` 401-analogue).
-    let caller_args = if crate::actors::caller_binder_for(h, actors).is_some() {
+    let caller_args = if bynk_check::actors::caller_binder_for(h, actors).is_some() {
         let _ = writeln!(
             out,
             "            const __caller = request.headers.get(\"X-Bynk-Caller\");"

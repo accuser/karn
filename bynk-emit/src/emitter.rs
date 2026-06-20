@@ -19,11 +19,11 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use crate::ast::*;
-use crate::builtin_names::methods::{FOLD_EFF, RAW};
-use crate::builtin_names::types::*;
-use crate::checker::{NamedKind, Ty, TypedCommons};
 use crate::project::{BuildTarget, EmitProjectCtx, UnitKind};
+use bynk_check::builtin_names::methods::{FOLD_EFF, RAW};
+use bynk_check::builtin_names::types::*;
+use bynk_check::checker::{NamedKind, Ty, TypedCommons};
+use bynk_syntax::ast::*;
 
 pub mod serialisation;
 pub mod workers;
@@ -158,7 +158,7 @@ fn single_file_ctx() -> EmitProjectCtx {
         exports_local: HashMap::new(),
         exports_for_consumed: HashMap::new(),
         consumed_types: HashMap::new(),
-        cross_context: crate::resolver::CrossContextInfo::default(),
+        cross_context: bynk_check::resolver::CrossContextInfo::default(),
         is_consumed_by_others: false,
         target: BuildTarget::Bundle,
         boundary_type_owners: HashMap::new(),
@@ -410,7 +410,7 @@ fn file_mentions_json_error(commons: &TypedCommons) -> bool {
 /// machinery (which is `TypeRef`-driven). `None` for types the codec
 /// rejects anyway (functions, effects, type variables).
 fn ty_to_type_ref(t: &Ty) -> Option<TypeRef> {
-    let sp = crate::span::Span::new(0, 0);
+    let sp = bynk_syntax::span::Span::new(0, 0);
     Some(match t {
         Ty::Base(b) => TypeRef::Base(*b, sp),
         Ty::Named { name, .. } => TypeRef::Named(Ident {
@@ -1098,7 +1098,7 @@ fn collect_refs_in_expr(
 /// `ExprKind::Ident` arm of `lower_expr`).
 fn sum_owner_of_variant(
     name: &str,
-    span: crate::span::Span,
+    span: bynk_syntax::span::Span,
     commons: &TypedCommons,
 ) -> Option<String> {
     if let Some(Ty::Named {
@@ -1479,7 +1479,7 @@ pub(crate) struct LowerCtx<'a> {
     /// The name of the agent's `key id` field (so `self.<id>` resolves).
     agent_key_field: Option<String>,
     /// Cross-context info for v0.6 cross-context call lowering.
-    cross_context: &'a crate::resolver::CrossContextInfo,
+    cross_context: &'a bynk_check::resolver::CrossContextInfo,
     /// True if the current handler made at least one cross-context call
     /// (drives whether `deps` gets a `surface` field type).
     cross_context_used: bool,
@@ -1516,7 +1516,7 @@ pub(crate) struct LowerCtx<'a> {
     /// `.tag` check and every pattern binding reference the *same* single
     /// evaluation. Simple receivers (idents / field chains) are never cached
     /// and continue to be rendered inline as before.
-    is_receiver_temps: HashMap<crate::span::Span, String>,
+    is_receiver_temps: HashMap<bynk_syntax::span::Span, String>,
     /// v0.12: the receiver expression a capability call resolves against —
     /// `deps` in a handler body, `this.deps` in a composed provider body.
     cap_deps_expr: String,
@@ -1549,7 +1549,7 @@ pub(crate) struct AssertLoc {
 impl<'a> LowerCtx<'a> {
     fn new(
         commons: &'a TypedCommons,
-        cross_context: &'a crate::resolver::CrossContextInfo,
+        cross_context: &'a bynk_check::resolver::CrossContextInfo,
     ) -> Self {
         Self {
             next_tmp: 0,

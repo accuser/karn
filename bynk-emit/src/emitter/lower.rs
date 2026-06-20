@@ -5,7 +5,7 @@
 
 use std::collections::HashSet;
 
-use crate::checker::{NamedKind, Ty, TypedCommons};
+use bynk_check::checker::{NamedKind, Ty, TypedCommons};
 
 use super::*;
 
@@ -15,7 +15,7 @@ pub fn lower_block_to_async_body(
     block: &Block,
     return_type: &TypeRef,
     typed: &mut TypedCommons,
-    cross_context: &crate::resolver::CrossContextInfo,
+    cross_context: &bynk_check::resolver::CrossContextInfo,
 ) -> String {
     let mut out = String::new();
     let mut cx = LowerCtx::new(typed, cross_context);
@@ -31,7 +31,7 @@ pub fn lower_block_to_async_body(
 pub fn lower_test_case_body(
     block: &Block,
     typed: &mut TypedCommons,
-    cross_context: &crate::resolver::CrossContextInfo,
+    cross_context: &bynk_check::resolver::CrossContextInfo,
     test_services: HashSet<String>,
     test_agents: HashSet<String>,
     source: &str,
@@ -71,7 +71,7 @@ pub fn lower_test_case_body(
 pub fn lower_integration_case_body(
     block: &Block,
     typed: &mut TypedCommons,
-    cross_context: &crate::resolver::CrossContextInfo,
+    cross_context: &bynk_check::resolver::CrossContextInfo,
     source: &str,
     rel_path: &str,
 ) -> String {
@@ -279,7 +279,7 @@ fn emit_statement(out: &mut String, stmt: &Statement, cx: &mut LowerCtx, indent:
 fn assert_location(cx: &LowerCtx, offset: usize) -> String {
     match &cx.assert_loc {
         Some(loc) => {
-            let (line, col) = crate::line_col(&loc.source, offset);
+            let (line, col) = bynk_syntax::span::line_col(&loc.source, offset);
             // Normalise to forward slashes so the location is identical on
             // Windows (where `PathBuf` joins with `\`) — matching the
             // diagnostic path rendering and the committed goldens.
@@ -611,9 +611,12 @@ fn mock_value(ty: &Ty, cx: &LowerCtx, depth: u32) -> String {
                             .payload
                             .iter()
                             .map(|f| {
-                                crate::checker::resolve_type_ref(&f.type_ref, &cx.commons.types)
-                                    .map(|t| mock_value(&t, cx, depth - 1))
-                                    .unwrap_or_else(|| "undefined".to_string())
+                                bynk_check::checker::resolve_type_ref(
+                                    &f.type_ref,
+                                    &cx.commons.types,
+                                )
+                                .map(|t| mock_value(&t, cx, depth - 1))
+                                .unwrap_or_else(|| "undefined".to_string())
                             })
                             .collect();
                         format!("{name}.{}({})", v.name.name, args.join(", "))
@@ -624,10 +627,12 @@ fn mock_value(ty: &Ty, cx: &LowerCtx, depth: u32) -> String {
                         .fields
                         .iter()
                         .map(|f| {
-                            let fv =
-                                crate::checker::resolve_type_ref(&f.type_ref, &cx.commons.types)
-                                    .map(|t| mock_value(&t, cx, depth - 1))
-                                    .unwrap_or_else(|| "undefined".to_string());
+                            let fv = bynk_check::checker::resolve_type_ref(
+                                &f.type_ref,
+                                &cx.commons.types,
+                            )
+                            .map(|t| mock_value(&t, cx, depth - 1))
+                            .unwrap_or_else(|| "undefined".to_string());
                             format!("{}: {}", f.name.name, fv)
                         })
                         .collect();
@@ -962,7 +967,7 @@ fn lower_mock(
     // checker's `expr_types` side-table — the static type table is always
     // populated, whereas a test body's per-expression types may not be visible
     // to the emitter.
-    let ty = match crate::checker::resolve_type_ref(type_ref, &cx.commons.types) {
+    let ty = match bynk_check::checker::resolve_type_ref(type_ref, &cx.commons.types) {
         Some(t) => t,
         None => return "undefined /* mock: unresolved type */".to_string(),
     };
@@ -1639,7 +1644,7 @@ fn lower_ident(e: &Expr, id: &Ident, cx: &mut LowerCtx) -> String {
     }
     // v0.44: a nullary QueueResult variant (`Ack`) constructs `QueueResult.Ack`.
     if matches!(cx.commons.expr_types.get(&e.span), Some(Ty::QueueResult))
-        && crate::ast::queue_variant(&id.name).is_some()
+        && bynk_syntax::ast::queue_variant(&id.name).is_some()
     {
         return format!("QueueResult.{}", id.name);
     }
@@ -1685,7 +1690,7 @@ fn lower_call(
     }
     // v0.44: a QueueResult variant call (`Retry(reason)`) → `QueueResult.Retry(...)`.
     if matches!(cx.commons.expr_types.get(&e.span), Some(Ty::QueueResult))
-        && crate::ast::queue_variant(&name.name).is_some()
+        && bynk_syntax::ast::queue_variant(&name.name).is_some()
     {
         return format!("QueueResult.{}({})", name.name, args_lowered.join(", "));
     }
@@ -1867,7 +1872,7 @@ fn lower_field_access(
 fn lower_lambda(e: &Expr, lambda: &LambdaExpr, cx: &mut LowerCtx) -> String {
     let is_async = matches!(
         cx.commons.expr_types.get(&e.span),
-        Some(crate::checker::Ty::Fn { ret, .. }) if ret.is_effect()
+        Some(bynk_check::checker::Ty::Fn { ret, .. }) if ret.is_effect()
     );
     let prefix = if is_async { "async " } else { "" };
     let params: Vec<String> = lambda

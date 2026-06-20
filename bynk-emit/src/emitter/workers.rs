@@ -8,10 +8,10 @@
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write as _;
 
-use crate::ast::*;
 use crate::emitter::http_handler_method_name;
 use crate::emitter::wrangler::{agent_binding_name, consumed_binding_name};
 use crate::project::UnitTable;
+use bynk_syntax::ast::*;
 
 #[allow(clippy::too_many_arguments)]
 pub fn emit_worker_compose(
@@ -69,17 +69,17 @@ pub fn emit_worker_compose(
     // member — imports the JWT verifier; a sum with a Signature member imports
     // the HMAC verifier. Any verifying wrapper returns `HttpResult` (the 401/400
     // shaping the entry maps).
-    let sum_handlers: Vec<Vec<crate::actors::SumMember>> = table
+    let sum_handlers: Vec<Vec<bynk_check::actors::SumMember>> = table
         .services
         .values()
         .flat_map(|s| s.handlers.iter())
-        .filter_map(|h| crate::actors::sum_members_for(h, &table.actors))
+        .filter_map(|h| bynk_check::actors::sum_members_for(h, &table.actors))
         .collect();
-    use crate::actors::SumMemberSeam;
+    use bynk_check::actors::SumMemberSeam;
     let has_bearer = table.services.values().any(|s| {
         s.handlers
             .iter()
-            .any(|h| crate::actors::bearer_seam_for(h, &table.actors).is_some())
+            .any(|h| bynk_check::actors::bearer_seam_for(h, &table.actors).is_some())
     }) || sum_handlers
         .iter()
         .flatten()
@@ -96,7 +96,7 @@ pub fn emit_worker_compose(
             .values()
             .flat_map(|s| s.handlers.iter())
             .any(|h| {
-                crate::actors::sum_members_for(h, &table.actors).is_some()
+                bynk_check::actors::sum_members_for(h, &table.actors).is_some()
                     && h.params.iter().any(|p| p.name.name == "body")
             });
     let mut runtime_imports: Vec<&str> = Vec::new();
@@ -159,7 +159,7 @@ pub fn emit_worker_compose(
         let _ = writeln!(
             out,
             "  {}: KVNamespace;",
-            crate::firstparty::KV_BINDING_NAME
+            bynk_check::firstparty::KV_BINDING_NAME
         );
     }
     let mut agent_names: Vec<&String> = table.agents.keys().collect();
@@ -245,10 +245,10 @@ pub fn emit_worker_compose(
                 HandlerKind::Http { method, path } => {
                     // v0.52: a multi-actor sum handler gets the first-wins
                     // resolution wrapper; otherwise the single-actor path.
-                    if let Some(members) = crate::actors::sum_members_for(h, &table.actors) {
+                    if let Some(members) = bynk_check::actors::sum_members_for(h, &table.actors) {
                         emit_http_sum_wrapper(&mut out, sname, h, *method, path, &members);
                     } else {
-                        let seam = crate::actors::bearer_seam_for(h, &table.actors);
+                        let seam = bynk_check::actors::bearer_seam_for(h, &table.actors);
                         emit_http_wrapper(&mut out, sname, h, *method, path, seam.as_ref());
                     }
                 }
@@ -336,7 +336,7 @@ fn emit_call_wrapper(
     // v0.54: a `by c: Caller` handler's wrapper takes the caller's context name
     // (read from the header in the entry dispatch) and threads it into `deps`
     // as the `CallerId` identity — mirroring the Bearer identity threading.
-    let deps_expr = if crate::actors::caller_binder_for(h, actors).is_some() {
+    let deps_expr = if bynk_check::actors::caller_binder_for(h, actors).is_some() {
         param_decls.insert(0, "__caller: string".to_string());
         "{ ...deps, identity: __caller }"
     } else {
@@ -397,7 +397,7 @@ fn emit_http_wrapper(
     h: &Handler,
     method: HttpMethod,
     path: &str,
-    seam: Option<&crate::actors::BearerSeam>,
+    seam: Option<&bynk_check::actors::BearerSeam>,
 ) {
     let method_key = http_handler_method_name(method, path);
     let param_args: Vec<String> = h.params.iter().map(|p| p.name.name.clone()).collect();
@@ -443,7 +443,7 @@ fn emit_http_wrapper(
         // 401. Checked against the *verified* claims, before the identity mints
         // or the body runs.
         if let Some(pred) = &seam.authorization {
-            let js = crate::actors::claim_predicate_to_js(pred, "__claims.value.claims");
+            let js = bynk_check::actors::claim_predicate_to_js(pred, "__claims.value.claims");
             let _ = writeln!(out, "      if (!({js})) return HttpResult.Forbidden;");
         }
         if seam.binder.is_some() {
@@ -517,9 +517,9 @@ fn emit_http_sum_wrapper(
     h: &Handler,
     method: HttpMethod,
     path: &str,
-    members: &[crate::actors::SumMember],
+    members: &[bynk_check::actors::SumMember],
 ) {
-    use crate::actors::SumMemberSeam;
+    use bynk_check::actors::SumMemberSeam;
     let method_key = http_handler_method_name(method, path);
     // The wrapper takes the request first (it reads the body / headers), then
     // the path params (parsed in the entry and passed through); the `body`

@@ -24,20 +24,20 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-use crate::ast::*;
-use crate::checker;
-use crate::checker::{CapabilityInfo, CapabilityOpInfo, Ty};
 use crate::emitter;
-use crate::error::CompileError;
-use crate::expr_types::{ExprTypeSink, FileExprTypes};
-use crate::firstparty::{self, Platform};
-use crate::hints::{FileHints, HintSink};
-use crate::index::{IndexBuilder, ProjectIndex, RefSink, SiteRef, SymbolKind};
-use crate::lexer;
-use crate::locals::{FileLocals, LocalsSink};
-use crate::parser;
-use crate::resolver::{self, MethodTable as ResolverMethodTable, ResolvedCommons};
-use crate::span::Span;
+use bynk_check::checker;
+use bynk_check::checker::{CapabilityInfo, CapabilityOpInfo, Ty};
+use bynk_check::expr_types::{ExprTypeSink, FileExprTypes};
+use bynk_check::firstparty::{self, Platform};
+use bynk_check::hints::{FileHints, HintSink};
+use bynk_check::index::{IndexBuilder, ProjectIndex, RefSink, SiteRef, SymbolKind};
+use bynk_check::locals::{FileLocals, LocalsSink};
+use bynk_check::resolver::{self, MethodTable as ResolverMethodTable, ResolvedCommons};
+use bynk_syntax::ast::*;
+use bynk_syntax::error::CompileError;
+use bynk_syntax::lexer;
+use bynk_syntax::parser;
+use bynk_syntax::span::Span;
 
 mod consistency;
 mod diagnostics;
@@ -65,7 +65,7 @@ pub use paths::{
     worker_handlers_source_path,
 };
 pub use symbols::{FileDeclIndex, UnitTable};
-pub(crate) use validate::check_function_type_boundary_items;
+pub use validate::check_function_type_boundary_items;
 
 /// One generated TypeScript file.
 pub struct CompiledFile {
@@ -2887,7 +2887,7 @@ fn native_platforms_of_context(
     }
     let mut out = std::collections::BTreeMap::new();
     for unit in referenced {
-        if let Some(p) = crate::firstparty::platform_of(&unit) {
+        if let Some(p) = bynk_check::firstparty::platform_of(&unit) {
             out.entry(p).or_insert(unit);
         }
     }
@@ -2982,7 +2982,7 @@ pub(crate) fn instantiate_provider_expr(
     // SecretsProvider; bynk.cloudflare's WorkersKv) receive the Worker `env`
     // explicitly — decisions 0021/0025. Keyed by (unit, class).
     if provider.external
-        && crate::firstparty::provider_takes_env(provider_ctx, &provider.provider_name.name)
+        && bynk_check::firstparty::provider_takes_env(provider_ctx, &provider.provider_name.name)
         && let Some(env) = env_ident
     {
         args.push(env.to_string());
@@ -3367,7 +3367,7 @@ pub struct EmitProjectCtx {
     /// v0.47: the context's actor declarations (merged across files), keyed by
     /// name. Used to resolve a handler's Bearer verification seam in `emit.rs`
     /// regardless of which file declares the actor.
-    pub actors: HashMap<String, crate::ast::ActorDecl>,
+    pub actors: HashMap<String, bynk_syntax::ast::ActorDecl>,
     /// v0.17: consumed unit names that are adapters. An adapter is not a Worker,
     /// so in workers mode its capability types are imported from its root module
     /// (`<adapter>.ts`), not from a per-Worker `handlers.ts`.

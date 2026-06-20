@@ -12,7 +12,7 @@
 
 use std::fmt::Write as _;
 
-use crate::ast::*;
+use bynk_syntax::ast::*;
 
 /// Compute the set of type names (transitively reachable) that need
 /// serialise/deserialise helpers for this context: any type used in the

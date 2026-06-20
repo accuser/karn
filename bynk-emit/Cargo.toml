@@ -1,0 +1,18 @@
+[package]
+name = "bynk-emit"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Bynk's build orchestration and TypeScript emission: project discovery, the dependency graph, validation, and the emitter that lowers checked Bynk to TypeScript."
+keywords = ["compiler", "dsl", "typescript", "codegen", "language"]
+categories = ["compilers"]
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# The layers this orchestrates: syntax (AST/spans) and the checked program.
+bynk-syntax.workspace = true
+bynk-check.workspace = true
