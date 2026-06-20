@@ -1,9 +1,13 @@
 # Tooling track — Crate decomposition: `bynkc` becomes a library set, the driver becomes the front-end
 
-- **Phase:** **🟡 Draft — direction proposed; no ADRs landed, no slices cut.**
-  This doc settles *direction* only. The load-bearing ADRs (layering, the
-  structured-data/rendering split, the binary topology) must land up front per
-  ADR 0076 before the first extraction slice.
+- **Phase:** **🟢 Settled — slice 0 done; the four foundational ADRs (0099–0102)
+  are accepted. No extraction slice cut yet.** Direction is fixed; the first
+  extraction slice (`bynk-syntax`) is now unblocked. The load-bearing ADRs
+  landed up front per ADR 0076: [0099](../decisions/0099-crate-layering-dependency-direction.md)
+  (layering & dependency direction), [0100](../decisions/0100-structured-data-rendering-separation.md)
+  (structured-data / rendering split), [0101](../decisions/0101-front-end-links-pipeline-binary-topology.md)
+  (binary topology), [0102](../decisions/0102-foundation-types-boundary.md)
+  (foundation-types boundary).
 - **Realises:** the standing "keep `bynkc` focused on the compilation pipeline"
   concern — `bynkc` today is compiler + formatter + IDE engine + test-emitter +
   CLI, and it only grows as language features land. Sharpens
@@ -171,8 +175,11 @@ Leaf-first, validate-before-proceeding. Each slice is an ordinary
 `vX.Y-<slug>.md` proposal citing this doc and the ADRs; status tracked here as
 slices land.
 
-0. **Land the ADRs** (below) — layering, D1, D2, foundation boundary. Direction
-   only; no code.
+0. **Land the ADRs** ✅ **done (2026-06-20)** — [0099](../decisions/0099-crate-layering-dependency-direction.md)
+   layering, [0100](../decisions/0100-structured-data-rendering-separation.md) D1,
+   [0101](../decisions/0101-front-end-links-pipeline-binary-topology.md) D2,
+   [0102](../decisions/0102-foundation-types-boundary.md) foundation boundary.
+   Direction only; no code.
 1. **Extract `bynk-syntax`** (lexer, parser, ast, span, keywords, error) as a
    leaf; `bynkc` depends on it. Largest mechanical move, lowest conceptual risk —
    nothing else should change behaviour. The validation gate for the whole track.
@@ -199,39 +206,48 @@ slices land.
 Slices 1–2 are shippable and valuable on their own (fmt stops over-linking) even
 if the track later stalls — a deliberately low-regret ordering.
 
-## Foundational ADRs to land (up front)
+## Foundational ADRs — landed (slice 0, 2026-06-20)
 
-- **Crate layering & dependency direction** — the graph above; arrows point down;
-  no upward façades introduced to "decompose". **Also settles the publishing
-  story:** are `bynk-syntax`/`-check`/`-emit`/`-ide`/`-render` published crates
-  (lockstep `version.workspace = true`, five new release surfaces) or path-only
-  internal crates? One line decides ongoing release cost.
-- **Structured-data / rendering separation (D1)** — libraries never render;
-  `bynk-render` is the shared presentation layer over `bynk-syntax::CompileError`
-  **only**; the `AttributedError → CompileError` flattening stays above render (no
-  `render → emit` edge); the LSP maps to protocol.
-- **Front-end links the pipeline; binary topology (D2)** — supersedes the "driver
-  does not link the pipeline" note (the driver already links the lib); states
-  whether a thin `bynkc` survives or dissolves into `bynk`.
-- **Foundation-types boundary** — `span`/`error`/source-cache **and the
-  `diagnostics` code registry** live in the lowest leaf (`bynk-syntax`); the rule
-  that keeps the graph acyclic. Also settles where the now-cross-crate drift
-  tests live: `diagnostics_registry` (codes-vs-usage, spans all phases) and
-  `kernel_registry` (registry-vs-dispatch, straddles check↔IDE).
+- **[0099](../decisions/0099-crate-layering-dependency-direction.md) — Crate
+  layering & dependency direction.** The graph above; arrows point down; no
+  upward façades introduced to "decompose". **Publishing story settled: published
+  lockstep** — the five new crates are published to crates.io with
+  `version.workspace = true` (ten crates cut per release instead of five), making
+  `bynk-syntax` and the layers above reusable by third-party tooling.
+- **[0100](../decisions/0100-structured-data-rendering-separation.md) —
+  Structured-data / rendering separation (D1).** Libraries never render;
+  `bynk-render` is **one shared crate** over `bynk-syntax::CompileError`
+  **only**, so both CLIs render identically by construction; the `AttributedError
+  → CompileError` flattening stays above render (no `render → emit` edge); the
+  LSP maps to protocol.
+- **[0101](../decisions/0101-front-end-links-pipeline-binary-topology.md) —
+  Front-end links the pipeline; binary topology (D2).** Amends ADR 0083's "driver
+  does not link the pipeline" note (the driver already links the lib). **A thin
+  `bynkc` survives** (CI/build determinism + `cargo install bynkc`); `bynk`
+  becomes the human front-end.
+- **[0102](../decisions/0102-foundation-types-boundary.md) — Foundation-types
+  boundary.** `span`/`error`/source-cache **and the `diagnostics` code registry**
+  live in the lowest leaf (`bynk-syntax`); the rule that keeps the graph acyclic.
+  Settles the now-cross-crate drift-test homes: `diagnostics_registry` becomes a
+  workspace integration test; `kernel_registry` lands in `bynk-ide` dev-depending
+  on `bynk-check`.
 
 ## Decision log (track-level)
 
-- **Decompose downward, not via façades.** Settled in principle: the goal is to
+- **Decompose downward, not via façades.** Settled — ADR 0099: the goal is to
   slim `bynkc`, and only downward extraction or front-end thinning does that
   (`bynk-fmt` is the cautionary example, `bynk-grammar` the model).
-- **Driver owns human output; libraries own structured data.** Settled in
-  principle (D1); the `bynk-render` form is the recommendation, not yet ratified.
-- **Open:** D2 (keep a thin `bynkc` vs. dissolve into `bynk`); the three-module
-  check↔IDE seam (`expr_types`/`locals`/`kernel_methods`) and where its drift
-  tests live; whether `bynk-render` is one crate or a module each front-end owns;
-  the publishing story (published lockstep vs. path-only). `diagnostics.rs`'s home
-  is **settled-pending-ADR** (`bynk-syntax`); only its now-cross-crate
-  `diagnostics_registry` test shape is open.
+- **Driver owns human output; libraries own structured data.** Settled — ADR
+  0100: `bynk-render` is **one shared crate** (ratified, not just recommended).
+- **Binary topology (D2).** Settled — ADR 0101: **keep a thin `bynkc`**; `bynk`
+  becomes the human front-end and links the leaves.
+- **Publishing story.** Settled — ADR 0099: **published lockstep**
+  (`version.workspace = true`), not path-only internal.
+- **`diagnostics.rs`'s home + the cross-crate drift tests.** Settled — ADR 0102:
+  `diagnostics.rs` → `bynk-syntax`; `diagnostics_registry` → workspace
+  integration test; `kernel_registry` → `bynk-ide` dev-depending on `bynk-check`.
+- **Open (deferred to their extraction slices):** the three-module check↔IDE seam
+  (`expr_types`/`locals`/`kernel_methods` — settled in the `bynk-check` slice, 3).
 
 ## On merge — each slice updates
 
