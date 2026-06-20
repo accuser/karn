@@ -1923,7 +1923,6 @@ fn emit_test_deps(
 }
 
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::too_many_arguments)]
 fn emit_test_case_function(
     runner_name: &str,
     case: &TestCase,
