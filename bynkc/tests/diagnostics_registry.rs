@@ -2,7 +2,11 @@
 //! reference page in lock-step.
 //!
 //! 1. Every `bynk.*` code used as a string literal in the compiler source must
-//!    appear in `bynkc::diagnostics::REGISTRY`, and vice versa.
+//!    appear in `bynkc::diagnostics::REGISTRY`, and vice versa. "Compiler
+//!    source" now spans two crates: `bynkc/src` and the `bynk-syntax/src` leaf
+//!    the syntax foundation (lexer/parser/diagnostics) was extracted into
+//!    (crate-decomposition slice 1) — the registry lives in `bynk-syntax`, but
+//!    emit sites are split across both crates, so both trees are scanned.
 //! 2. `docs/src/reference/diagnostics.md` must match what the registry renders.
 //!
 //! Regenerate the docs page after changing the registry with:
@@ -21,12 +25,16 @@ fn grammar_json() -> String {
 }
 
 /// Collect every `"bynk.x.y"` string literal across the compiler source,
-/// excluding the registry module itself.
+/// excluding the registry module itself. Scans both compiler crates: `bynkc`
+/// (resolver/checker/emitter/project emit sites) and the `bynk-syntax` leaf
+/// (lexer/parser emit sites), since the decomposition split the emit sites
+/// across the crate boundary.
 fn codes_used_in_source() -> BTreeSet<String> {
     let re = regex::Regex::new(r#""(bynk\.[a-z_]+\.[a-z_]+)""#).unwrap();
-    let src = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let mut codes = BTreeSet::new();
-    collect(&src, &re, &mut codes);
+    collect(&manifest.join("src"), &re, &mut codes);
+    collect(&manifest.join("../bynk-syntax/src"), &re, &mut codes);
     codes
 }
 
@@ -79,12 +87,12 @@ fn registry_matches_codes_used_in_source() {
     assert!(
         missing.is_empty(),
         "codes emitted in source but missing from bynkc::diagnostics::REGISTRY: {missing:#?}\n\
-         Add an entry for each in bynkc/src/diagnostics.rs."
+         Add an entry for each in bynk-syntax/src/diagnostics.rs."
     );
     assert!(
         extra.is_empty(),
         "codes in REGISTRY that are no longer used in source: {extra:#?}\n\
-         Remove them from bynkc/src/diagnostics.rs."
+         Remove them from bynk-syntax/src/diagnostics.rs."
     );
 }
 
@@ -103,7 +111,7 @@ fn grammar_symbols_are_embeddable_rules() {
                 embeddable.contains(*sym),
                 "diagnostic `{}` maps to `{sym}`, which is not an embeddable grammar rule \
                  (it needs a `{{#grammar {sym}}}` entry/anchor in grammar.md; a collapsed \
-                 trivial wrapper has none). Fix the grammar_symbol in bynkc/src/diagnostics.rs.",
+                 trivial wrapper has none). Fix the grammar_symbol in bynk-syntax/src/diagnostics.rs.",
                 info.code
             );
         }

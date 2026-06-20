@@ -1,8 +1,8 @@
 # Tooling track — Crate decomposition: `bynkc` becomes a library set, the driver becomes the front-end
 
-- **Phase:** **🟢 Settled — slice 0 done; the four foundational ADRs (0099–0102)
-  are accepted. No extraction slice cut yet.** Direction is fixed; the first
-  extraction slice (`bynk-syntax`) is now unblocked. The load-bearing ADRs
+- **Phase:** **🟢 In progress — slice 0 (ADRs 0099–0102) and slice 1
+  (`bynk-syntax`, v0.60) landed.** The foundation leaf exists; slice 2 (re-point
+  `bynk-fmt`) is next. The load-bearing ADRs
   landed up front per ADR 0076: [0099](../decisions/0099-crate-layering-dependency-direction.md)
   (layering & dependency direction), [0100](../decisions/0100-structured-data-rendering-separation.md)
   (structured-data / rendering split), [0101](../decisions/0101-front-end-links-pipeline-binary-topology.md)
@@ -180,9 +180,13 @@ slices land.
    [0101](../decisions/0101-front-end-links-pipeline-binary-topology.md) D2,
    [0102](../decisions/0102-foundation-types-boundary.md) foundation boundary.
    Direction only; no code.
-1. **Extract `bynk-syntax`** (lexer, parser, ast, span, keywords, error) as a
-   leaf; `bynkc` depends on it. Largest mechanical move, lowest conceptual risk —
-   nothing else should change behaviour. The validation gate for the whole track.
+1. **Extract `bynk-syntax`** ✅ **done (v0.60)** — lexer, parser, ast, span,
+   keywords, error **and diagnostics** moved into the leaf; `bynkc` depends on it
+   and re-exports the modules so its public API is unchanged. Verified the seven
+   modules had zero upward `crate::` edges, so the move was mechanical and
+   behaviour-preserving (the whole suite passed unchanged — the validation gate).
+   `diagnostics.rs` came too (ADR 0102); its `diagnostics_registry` /
+   `doc_diagnostics` pins stay in `bynkc` until the emission sites split out.
 2. **Re-point `bynk-fmt` onto `bynk-syntax`** (D4); move `fmt.rs` down. `bynk-fmt`
    and the LSP's formatting path stop linking the checker/emitter.
 3. **Extract `bynk-check`** (resolver, checker, `expr_types`/`locals` capture
@@ -214,6 +218,17 @@ if the track later stalls — a deliberately low-regret ordering.
   lockstep** — the five new crates are published to crates.io with
   `version.workspace = true` (ten crates cut per release instead of five), making
   `bynk-syntax` and the layers above reusable by third-party tooling.
+  - **Operational — seed each new crate before trusted publishing.** The
+    tag-driven `release.yml` publishes via crates.io **trusted publishing**
+    (OIDC), which a crate name can only use *after* it exists on crates.io. So a
+    brand-new published crate's **first** publish must go through the
+    **`release-bootstrap.yml` seed workflow** (token auth, manual dispatch);
+    trusted publishing is then enabled for it on crates.io, and subsequent
+    releases flow through `release.yml` (its `curl` guard skips the
+    already-seeded version, so there is no double-publish). This applies once per
+    new crate: `bynk-syntax` (slice 1) and the four still to come — `bynk-check`
+    (3), `bynk-emit` (4), `bynk-ide` (5), `bynk-render` (6). Each must be added
+    to **both** publish loops (it already is for `bynk-syntax`, before `bynkc`).
 - **[0100](../decisions/0100-structured-data-rendering-separation.md) —
   Structured-data / rendering separation (D1).** Libraries never render;
   `bynk-render` is **one shared crate** over `bynk-syntax::CompileError`

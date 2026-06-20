@@ -14,9 +14,11 @@ use std::path::PathBuf;
 
 use bynkc::keywords::{KEYWORDS, render_markdown};
 
-/// Alphabetic keyword tokens declared in the lexer via `#[token("…")]`.
+/// Alphabetic keyword tokens declared in the lexer via `#[token("…")]`. The
+/// lexer now lives in the `bynk-syntax` leaf (crate-decomposition slice 1), so
+/// this reads across the crate boundary.
 fn keywords_in_lexer() -> BTreeSet<String> {
-    let lexer = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/lexer.rs");
+    let lexer = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../bynk-syntax/src/lexer.rs");
     let text = fs::read_to_string(&lexer).unwrap();
     let re = regex::Regex::new(r#"#\[token\("([a-zA-Z][a-zA-Z_]*)"\)\]"#).unwrap();
     re.captures_iter(&text).map(|c| c[1].to_string()).collect()

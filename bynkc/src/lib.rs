@@ -14,33 +14,31 @@
 //! commons.
 
 pub mod actors;
-pub mod ast;
 pub mod builtin_names;
 pub mod checker;
 pub mod cli;
-pub mod diagnostics;
 pub mod emitter;
-pub mod error;
 pub mod expr_types;
 pub mod firstparty;
 pub mod fmt;
 pub mod hints;
 pub mod index;
 pub mod kernel_methods;
-pub mod keywords;
-pub mod lexer;
 pub mod locals;
-pub mod parser;
 pub mod project;
 pub mod resolver;
-pub mod span;
 pub mod test_json;
+
+// The syntax foundation now lives in the `bynk-syntax` leaf crate (slice 1 of
+// the crate-decomposition track). Re-export its modules at the crate root so
+// `bynkc`'s public API and every internal `crate::ast` / `crate::lexer` path is
+// preserved — consumers and the rest of the pipeline see no change.
+pub use bynk_syntax::{CompileError, ast, diagnostics, error, keywords, lexer, parser, span};
 
 use std::path::Path;
 
 use ariadne::Source;
 
-pub use error::CompileError;
 pub use firstparty::Platform;
 
 /// Minimum supported Node.js **major** version for the `node` platform binding
