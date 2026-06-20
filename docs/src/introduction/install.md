@@ -69,6 +69,24 @@ This provides the `bynkc-lsp` binary. Most users consume it through the VS Code
 extension rather than invoking it directly — see
 [Set up editor support](../guides/editor-and-tooling/editor-support.md).
 
+## Create your first project
+
+With the driver installed, scaffold a complete, runnable project and serve it —
+no manifest to write, no layout to memorise:
+
+```sh
+bynk new hello
+cd hello
+bynk dev          # serving on http://localhost:8787
+```
+
+`bynk new` only writes files (it needs no toolchain), and the project it writes
+is served by `bynk dev` unmodified. See [Start a new
+project](../guides/projects-build-and-deployment/start-a-project.md).
+
 ## Next steps
 
-- [Compile your first program](../tutorials/01-first-program.md)
+- [Start a new project](../guides/projects-build-and-deployment/start-a-project.md)
+  with `bynk new`.
+- [Compile your first program](../tutorials/01-first-program.md) — what a single
+  Bynk file compiles to, by hand.

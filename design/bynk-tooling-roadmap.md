@@ -185,8 +185,14 @@ orchestration lives in the driver. The arc is **`doctor` → `new` → `dev`**:
   `--strict` exit contract and `--format short|json` (ADRs 0083–0084). Chosen to
   go first because it has no language surface and mutates nothing, so it is the
   safe place to stand the driver up.
-- **`new`** *(intent)* — scaffold a project (`bynk.toml` + layout); overlaps
-  B‑2's "Commands / scaffolding" line, which it supersedes for the CLI path.
+- **`new`** *(shipped v0.58)* — scaffold a **complete, runnable** single-context
+  HTTP service (`bynk.toml` + `.gitignore` + `src/<name>.bynk`) that `dev` serves
+  unmodified, closing the arc; offline, no-toolchain `std::fs` file-writing; an
+  embedded compile-tested template (ADR 0086 precedent); the name validated by
+  the real lexer with a `--name` fix-it (ADR 0097). Supersedes B‑2's "Commands /
+  scaffolding" line for the CLI path. Deferred as named follow-ups: `init`
+  (scaffold in place), `--template` (a second project shape), and in-project
+  generators (`bynk new context …`).
 - **`dev`** *(shipped v0.57)* — build + `wrangler dev` orchestration: locate the
   project, pre-flight the `deploy` capability, compile to a managed `.bynk/dev/`,
   select the context's worker (one served automatically; `--context` to choose),
@@ -197,7 +203,8 @@ orchestration lives in the driver. The arc is **`doctor` → `new` → `dev`**:
   `bynk-status-and-roadmap.md`. Provisioning + remote deploy are `deploy`'s
   problem, the next slice.
 
-`new` is named as *intent*, not a version‑pinned milestone; `deploy` follows.
+With `doctor` (v0.46), `new` (v0.58), and `dev` (v0.57) shipped, the on-ramp arc
+is complete; `deploy` (provisioning + remote) follows.
 
 ## 6. Suggested sequencing
 

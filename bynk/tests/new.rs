@@ -1,0 +1,158 @@
+//! `bynk new` — the deterministic surface (proposal §5).
+//!
+//! Three things are pinned here:
+//!  1. **The output messages** — the success "next steps" and the failure
+//!     messages — as goldens, the way `dev`'s output is goldened.
+//!  2. **The emitted scaffold** — the rendered `bynk.toml`, `.gitignore`, and
+//!     starter `.bynk` — as a golden tree, so an accidental template edit is
+//!     caught.
+//!  3. **The starter actually builds** — rendered with a *non-default* name, it
+//!     compiles (so the scaffold can't rot) and is `bynk-fmt`-clean (the
+//!     ADR 0086 first-party-source guarantee, applied to the template).
+//!
+//! Goldens are blessed with `BYNK_BLESS=1 cargo test -p bynk`.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use bynk::new::{
+    self, cannot_derive_message, clobber_message, invalid_name_message, next_steps_message,
+};
+
+fn bless_or_assert(name: &str, actual: &str) {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/golden")
+        .join(name);
+    if std::env::var_os("BYNK_BLESS").is_some() {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, actual).unwrap();
+        return;
+    }
+    let expected = fs::read_to_string(&path).unwrap_or_else(|_| {
+        panic!(
+            "missing golden {}; regenerate with BYNK_BLESS=1 cargo test -p bynk",
+            path.display()
+        )
+    });
+    assert_eq!(
+        actual, expected,
+        "golden {name} drifted; re-bless with BYNK_BLESS=1 cargo test -p bynk"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Output surface
+// ---------------------------------------------------------------------------
+
+#[test]
+fn golden_next_steps() {
+    bless_or_assert("new-next-steps.txt", &next_steps_message("hello"));
+}
+
+#[test]
+fn golden_errors() {
+    // The three ways `new` refuses, each prefixed `bynk:` and touching nothing.
+    let mut out = String::new();
+    out.push_str(&invalid_name_message("my-app"));
+    out.push_str(&clobber_message("hello"));
+    out.push_str(&cannot_derive_message("."));
+    bless_or_assert("new-errors.txt", &out);
+}
+
+#[test]
+fn golden_scaffold_tree() {
+    // The emitted scaffold, rendered for `hello`, as one pinned tree.
+    let mut out = String::new();
+    for (label, body) in [
+        (
+            "bynk.toml",
+            new::render(include_str!("../src/templates/bynk.toml"), "hello"),
+        ),
+        (
+            ".gitignore",
+            new::render(include_str!("../src/templates/gitignore"), "hello"),
+        ),
+        ("src/hello.bynk", new::starter_source("hello")),
+    ] {
+        out.push_str(&format!("--- {label} ---\n{body}"));
+        if !body.ends_with('\n') {
+            out.push('\n');
+        }
+    }
+    bless_or_assert("new-scaffold.txt", &out);
+}
+
+// ---------------------------------------------------------------------------
+// Name validation — reuses the real lexer, so this table is the contract
+// ---------------------------------------------------------------------------
+
+#[test]
+fn name_validation() {
+    let legal = ["hello", "hello_world", "Hello", "h2", "x", "todo"];
+    let illegal = [
+        "my-app",    // dash
+        "2048",      // leading digit
+        "hello.web", // dotted — not a single segment
+        "",          // empty
+        "has space", // whitespace
+        "service",   // reserved keyword
+        "from",      // reserved keyword
+        "café",      // non-ASCII (the lexer's Ident is ASCII-only)
+    ];
+    for n in legal {
+        assert!(new::is_legal_name(n), "`{n}` should be a legal Bynk name");
+    }
+    for n in illegal {
+        assert!(!new::is_legal_name(n), "`{n}` should be rejected");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The starter builds — rendered with a non-default name (so substitution is
+// exercised), it must compile and be fmt-clean.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn starter_renders_compiles_and_is_fmt_clean() {
+    let name = "demo";
+    let rendered = new::starter_source(name);
+
+    // Substitution is complete: the placeholder is gone, the name is in.
+    assert!(
+        !rendered.contains(new::PLACEHOLDER),
+        "placeholder `{}` survived rendering:\n{rendered}",
+        new::PLACEHOLDER
+    );
+    assert!(
+        rendered.contains(&format!("context {name}")),
+        "rendered starter should declare `context {name}`:\n{rendered}"
+    );
+
+    // Fmt-clean: formatting the rendered source is a no-op (ADR 0086).
+    let formatted = bynkc::fmt::format_source(&rendered, &bynkc::fmt::FormatOptions::default())
+        .expect("rendered starter must format");
+    assert_eq!(
+        formatted, rendered,
+        "rendered starter is not bynk-fmt-clean; re-format bynk/src/templates/starter.bynk"
+    );
+
+    // Compiles: written as `<root>/<name>.bynk`, it builds as a one-file project
+    // (the same in-process path `tests/doc_examples.rs` uses for `context`
+    // blocks). This is the guard against starter rot.
+    let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("new-starter-compile");
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join(format!("{name}.bynk")), &rendered).unwrap();
+
+    let result = bynkc::compile_project(&bynkc::CompileOptions::single(root.clone()))
+        .map(|_| ())
+        .map_err(|f| {
+            bynkc::ProjectFailure::flatten(f)
+                .iter()
+                .map(|e| format!("{}: {}", e.category, e.message))
+                .collect::<Vec<_>>()
+                .join("; ")
+        });
+    let _ = fs::remove_dir_all(&root);
+    result.expect("the scaffolded starter must compile");
+}

@@ -11,6 +11,13 @@ that it is on your path:
 bynkc --help
 ```
 
+> **Starting a real project?** The fastest way from nothing to a *running*
+> service is [`bynk new`](../guides/projects-build-and-deployment/start-a-project.md):
+> `bynk new hello && cd hello && bynk dev` scaffolds and serves a complete
+> project. This tutorial deliberately takes the other path — a single bare file,
+> compiled by hand — to show you what `bynkc` produces and how a Bynk source maps
+> to TypeScript.
+
 ## Write a program
 
 Create a file called `demo.bynk` with this content:

@@ -63,6 +63,23 @@ pub enum Command {
         #[arg(last = true)]
         wrangler_args: Vec<String>,
     },
+    /// Scaffold a new project: a complete, runnable single-context HTTP service
+    /// you can serve immediately with `bynk dev`.
+    ///
+    /// Writes a `bynk.toml`, a `.gitignore`, and `src/<name>.bynk` into a new
+    /// directory. Pure offline file-writing — it shells nothing and needs no
+    /// toolchain, so you can run it before `bynkc`, Node, or `wrangler` are
+    /// installed. The project name defaults to the target directory's final
+    /// component; `--name` overrides it and must be a legal Bynk identifier.
+    New {
+        /// Directory to create for the new project (e.g. `hello` or `./hello`).
+        path: PathBuf,
+        /// Project name / context identifier. Defaults to PATH's final
+        /// component; must be a legal Bynk identifier (a letter followed by
+        /// letters, digits, or underscores).
+        #[arg(long)]
+        name: Option<String>,
+    },
 }
 
 /// `--only` selector. Mirrors [`Capability`] minus the internal distinctions.

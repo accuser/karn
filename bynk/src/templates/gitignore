@@ -1,0 +1,2 @@
+# Build output `bynk dev` writes (compiled workers + local wrangler state).
+/.bynk

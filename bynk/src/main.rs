@@ -7,6 +7,7 @@ use bynk::cli::{Cli, Command};
 use bynk::compiler::{self, Compiler};
 use bynk::dev::{self, DevOptions};
 use bynk::doctor::{self, Context, DoctorOptions};
+use bynk::new::{self, NewOptions};
 use bynk::probe::{SystemToolbox, Toolbox, Version};
 use bynk::report::{self, Format};
 use clap::Parser;
@@ -35,6 +36,7 @@ fn main() -> ExitCode {
                 wrangler_args,
             },
         ),
+        Command::New { path, name } => new::run(&NewOptions { path, name }),
     }
 }
 

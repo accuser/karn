@@ -16,11 +16,14 @@
 //! - [`doctor`] — the capability model, the checks, and the exit-code contract.
 //! - [`report`] — render a [`doctor::Report`] as a human table, `--format
 //!   short`, or `--format json`.
+//! - [`new`] — scaffold a new project (offline file-writing; no toolchain).
+//! - [`dev`] — build a project and serve it locally with `wrangler dev`.
 
 pub mod cli;
 pub mod compiler;
 pub mod dev;
 pub mod doctor;
+pub mod new;
 pub mod probe;
 pub mod report;
 
