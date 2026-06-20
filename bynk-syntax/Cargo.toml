@@ -1,0 +1,20 @@
+[package]
+name = "bynk-syntax"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Bynk's syntax foundation: lexer, parser, AST, spans, the CompileError type, and the diagnostic-code registry — the lowest leaf of the compiler crate set."
+keywords = ["compiler", "dsl", "parser", "lexer", "language"]
+categories = ["compilers", "parser-implementations"]
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# Lexer (logos-derived token kinds), error rendering (ariadne reports), and the
+# diagnostics registry's grammar-semantics.json serialisation.
+logos.workspace = true
+ariadne.workspace = true
+serde_json.workspace = true

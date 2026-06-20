@@ -17,12 +17,13 @@ name = "bynkc"
 path = "src/main.rs"
 
 [dependencies]
+# The syntax foundation (lexer, parser, ast, span, keywords, error, diagnostics)
+# — extracted to its own leaf crate (crate-decomposition slice 1).
+bynk-syntax.workspace = true
 ariadne.workspace = true
-logos.workspace = true
 clap.workspace = true
 regex.workspace = true
-# Serialises the generated grammar-semantics.json (diagnostics.rs) and the
-# `bynkc test --format json` document (test_json.rs).
+# Serialises the `bynkc test --format json` document (test_json.rs).
 serde.workspace = true
 serde_json.workspace = true
 
