@@ -13,7 +13,59 @@ bynk <command> [options]
 | Command | What it does |
 |---|---|
 | [`bynk doctor`](#bynk-doctor) | Check whether your machine is ready to compile, test, and deploy. |
+| [`bynk new`](#bynk-new) | Scaffold a new, runnable project. |
 | [`bynk dev`](#bynk-dev) | Build the project and serve it locally with `wrangler dev`. |
+
+---
+
+## `bynk new`
+
+Scaffold a new project: a complete, runnable single-context HTTP service you can
+serve immediately with [`bynk dev`](#bynk-dev). See the guide [Start a new
+project](../guides/projects-build-and-deployment/start-a-project.md) for a worked
+walkthrough.
+
+```text
+bynk new <PATH> [--name NAME]
+```
+
+| Argument | Default | Meaning |
+|---|---|---|
+| `PATH` | *(required)* | Directory to create for the new project (e.g. `hello` or `./hello`). Parent directories are created. |
+| `--name NAME` | `PATH`'s final component | Project name / context identifier. Must be a legal Bynk identifier (a letter followed by letters, digits, or underscores — no dashes or dots). |
+
+**What it writes**
+
+```text
+<PATH>/
+├── bynk.toml            # [project] name/version + [paths] src/tests
+├── .gitignore           # /.bynk
+└── src/
+    └── <name>.bynk      # context <name> — a GET "/" HTTP service
+```
+
+**Behaviour** — `bynk new` is pure, offline file-writing: it shells nothing,
+compiles nothing, and reads no network, so it works before `bynkc`, Node, or
+`wrangler` are installed.
+
+1. Derive the project name from `PATH`'s final component (or `--name`) and
+   validate it as a legal Bynk identifier — both `[project] name` and the
+   starter's context use it.
+2. Refuse to clobber: if the target exists and is non-empty, fail before writing
+   anything. An empty directory is fine; VCS/OS cruft (`.git`, `.gitignore`,
+   `.DS_Store`, …) doesn't count as non-empty.
+3. Write the scaffold and print next steps (`cd <path> && bynk dev`).
+
+**Exit code** — `0` on a written scaffold. A non-empty target or a name that
+isn't a legal identifier exits non-zero, **touching nothing**.
+
+**Notes**
+
+- `bynk new` never overwrites a file it didn't create, and never runs `git init`
+  or writes outside the project — the scaffold drops cleanly into an existing
+  repository.
+- The `.gitignore` covers only `/.bynk`, the build directory
+  [`bynk dev`](#bynk-dev) writes (compiled workers and local wrangler state).
 
 ---
 

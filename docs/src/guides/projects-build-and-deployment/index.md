@@ -7,6 +7,7 @@ Workers.
 - [Why compile to TypeScript](why-compile-to-typescript.md)
 
 **Do**
+- [Start a new project](start-a-project.md)
 - [Lay out a project](layout.md)
 - [Run your project locally](run-locally.md)
 - [Target Cloudflare Workers](cloudflare-workers.md)

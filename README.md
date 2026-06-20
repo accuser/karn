@@ -54,34 +54,41 @@ source with a recent Rust toolchain (stable, 2024 edition — see
 git clone https://github.com/accuser/bynk.git
 cd bynk
 cargo install --path bynkc      # the `bynkc` compiler
+cargo install --path bynk       # the `bynk` driver (doctor / new / dev)
 cargo install --path bynk-lsp   # optional: the `bynkc-lsp` language server
 ```
 
-`bynkc --help` lists the four commands: `compile`, `check`, `fmt`, and `test`.
+`bynkc --help` lists the four compiler commands (`compile`, `check`, `fmt`,
+`test`); `bynk --help` lists the driver's (`doctor`, `new`, `dev`).
 
 ## Quick start
 
-Try the bundled [`examples/hello-world`](examples/hello-world/) — a complete
-project you can check, test, compile, and deploy:
+Scaffold a complete, runnable project and serve it — three commands from nothing
+to a running service on `http://localhost:8787`:
 
 ```sh
-cd examples/hello-world
-bynkc check src      # type-check without emitting
-bynkc test .         # compile and run the `test` blocks (needs node + tsc)
-bynk dev             # compile and serve it locally on http://localhost:8787
+bynk new hello       # scaffold bynk.toml + src/hello.bynk
+cd hello
+bynk dev             # compile and serve it locally
 ```
 
-A new program needs only a `bynk.toml` manifest and a `.bynk` file. See
-[Compile your first program](docs/src/tutorials/01-first-program.md).
+`bynk new` only writes files (no toolchain needed), and `bynk dev` serves what it
+wrote unmodified. Prefer a worked example? The bundled
+[`examples/hello-world`](examples/hello-world/) is a complete project you can also
+`bynkc check src`, `bynkc test .`, and deploy.
+
+See [Start a new project](docs/src/guides/projects-build-and-deployment/start-a-project.md)
+or [Compile your first program](docs/src/tutorials/01-first-program.md).
 
 ## Repository layout
 
-This is a Cargo workspace. The published crates are `bynkc`, `bynk-fmt`,
+This is a Cargo workspace. The published crates are `bynkc`, `bynk`, `bynk-fmt`,
 `bynk-grammar`, and `bynk-lsp`.
 
 | Path | What it is | Published as |
 | ---- | ---------- | ------------ |
 | [`bynkc/`](bynkc/) | The compiler library and `bynkc` CLI (lex → parse → resolve → check → emit). | [crates.io](https://crates.io/crates/bynkc) |
+| [`bynk/`](bynk/) | The `bynk` driver — a thin orchestrator over `bynkc` and the Node toolchain (`doctor` / `new` / `dev`). | [crates.io](https://crates.io/crates/bynk) |
 | [`bynk-fmt/`](bynk-fmt/) | The Bynk formatter, behind a small public surface. | [crates.io](https://crates.io/crates/bynk-fmt) |
 | [`bynk-grammar/`](bynk-grammar/) | Renders the tree-sitter grammar to EBNF for the book's grammar reference. | [crates.io](https://crates.io/crates/bynk-grammar) |
 | [`bynk-lsp/`](bynk-lsp/) | The `bynkc-lsp` Language Server (diagnostics, hover, go-to-definition, …). | [crates.io](https://crates.io/crates/bynk-lsp) |

@@ -1,0 +1,7 @@
+Created a new Bynk project in `hello`.
+
+Next steps:
+  cd hello
+  bynk dev          # build and serve it locally
+
+New to Bynk? `bynk doctor` checks your toolchain is ready.
