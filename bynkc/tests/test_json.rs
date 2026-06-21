@@ -188,10 +188,16 @@ fn discovery_lists_cases_without_running() {
     let names: Vec<&str> = cases.iter().map(|c| c["name"].as_str().unwrap()).collect();
     assert_eq!(names, ["case one", "case two", "case three"]);
     for c in cases {
-        assert_eq!(c["outcome"], "discovered", "every case is discovered, not run");
+        assert_eq!(
+            c["outcome"], "discovered",
+            "every case is discovered, not run"
+        );
         let loc = &c["location"];
         assert_eq!(loc["path"], "tests/payment.test.bynk");
-        assert!(loc["line"].as_u64().unwrap() >= 1, "carries a 1-indexed line");
+        assert!(
+            loc["line"].as_u64().unwrap() >= 1,
+            "carries a 1-indexed line"
+        );
         assert!(loc["col"].as_u64().unwrap() >= 1, "carries a 1-indexed col");
     }
 
@@ -227,7 +233,10 @@ fn discovery_lists_integration_suites() {
         .iter()
         .find(|s| s["kind"] == "integration")
         .expect("the integration suite is discovered");
-    assert_eq!(integration["name"], "checkout", "the bare suite name, unprefixed");
+    assert_eq!(
+        integration["name"], "checkout",
+        "the bare suite name, unprefixed"
+    );
     let cases = integration["cases"].as_array().unwrap();
     assert_eq!(cases.len(), 2);
     assert!(cases.iter().all(|c| c["outcome"] == "discovered"));
