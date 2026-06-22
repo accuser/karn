@@ -34,7 +34,17 @@ For everything else, the standard single-increment
 
 ## Active tracks
 
-None currently — new tracks are added here as they are drafted.
+- **`semantic-debugging.md`** — make the debugger *speak Bynk*: rewrite the
+  `variables`/`scopes`/`stackTrace` it reports into Bynk's vocabulary on the editor
+  side (workerd-vocabulary values, contexts/actors as scopes, capability-stack
+  legibility, lowered-temp suppression). Continues the debugging track's **Phase 2**
+  for the asks the cheap variable-formatter can't reach (ADR 0104 D1's custom-adapter
+  half). Drafted — slice 0 (settle) next: spike the interposition mechanism, land
+  ADR 0105.
+- **`debugging.md`** — source-mapped step debugging. **Phase 1 complete** (slices
+  0–4, v0.67–v0.72: breakpoints/stepping/stack on `.bynk` under Node + workerd) and
+  **Phase 2 begun** (slice 5, v0.73: value descriptions). Its Phase-2 remainder is
+  carried by `semantic-debugging.md` above; this doc retires once that lands.
 
 ## Retired tracks
 

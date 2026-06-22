@@ -267,11 +267,11 @@ sidecar and starts forwarding the span it already has. That is the whole shape:
    default-on `bynk.debug.semanticValues` toggle. **The spike split the runtimes:** it
    works on Node (`bynkc test --inspect`) and ships there; `workerd` rejects the
    in-debuggee evaluation (it breaks variable reading outright), so the dev path keeps
-   the raw shape. Realises ADR 0104 D1 (the formatter half). **Still open in Phase 2**
-   — and likely a **custom adapter**, hence likely its own track: workerd-vocabulary
-   values, **contexts/actors as scopes**, **capability calls legible in the stack**,
-   and reducing **lowered-temp noise** in the Variables pane. These wait on real use of
-   the value layer.
+   the raw shape. Realises ADR 0104 D1 (the formatter half). **The Phase-2 remainder spun out to its
+   own track — [`semantic-debugging.md`](semantic-debugging.md)** (ADR 0104 D1's
+   custom-adapter half): workerd-vocabulary values, **contexts/actors as scopes**,
+   **capability calls legible in the stack**, and **lowered-temp noise**. This
+   debugging track **retires** once that track lands its remainder.
 
 Each slice except 0 is an ordinary `vX.Y-<slug>.md` proposal citing this doc and
 the foundational ADRs; merging that proposal authorises the build. Status tracked
