@@ -16,8 +16,22 @@ import * as assert from "assert";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
-import { spawn, ChildProcess } from "child_process";
+import { spawn, spawnSync, ChildProcess } from "child_process";
 import * as vscode from "vscode";
+
+/** True when `node` on PATH is ≥ 22.6 — the floor for `--experimental-strip-types`
+ *  (older Node rejects the flag). */
+function nodeStripsTypes(): boolean {
+  try {
+    const v = spawnSync("node", ["--version"], { encoding: "utf8" }).stdout.trim();
+    const m = v.match(/^v(\d+)\.(\d+)/);
+    if (!m) return false;
+    const [maj, min] = [Number(m[1]), Number(m[2])];
+    return maj > 22 || (maj === 22 && min >= 6);
+  } catch {
+    return false;
+  }
+}
 
 // The generator under test is the *shipped* one: read it straight out of
 // src/debugValues.ts (the string the provider injects) so the spike can never
@@ -68,6 +82,7 @@ describe("Bynk debug values (customDescriptionGenerator)", () => {
   });
 
   it("renders Bynk tagged values in constructor syntax; leaves plain objects alone", async function () {
+    if (!nodeStripsTypes()) this.skip(); // needs Node ≥ 22.6 for `--experimental-strip-types`
     this.timeout(40_000);
     const verbose = process.env.BYNK_DEBUG_SPIKE === "verbose";
 
