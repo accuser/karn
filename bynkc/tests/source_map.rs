@@ -118,9 +118,12 @@ const FIXTURE: &str = "commons reps {
 fn map_is_valid_v3_with_embedded_source() {
     let (_ts, map) = compile_reps(FIXTURE);
     assert!(map.contains("\"version\":3"), "v3 header: {map}");
+    // v0.72: the map `source` is the file's absolute path (forward-slashed), so an
+    // editor breakpoint on the real `.bynk` binds — hence a suffix check, not an
+    // exact relative match.
     assert!(
-        map.contains("\"sources\":[\"reps.bynk\"]"),
-        "sources: {map}"
+        map.contains("/reps.bynk\"]"),
+        "sources ends in /reps.bynk: {map}"
     );
     // sourcesContent embeds the .bynk for dev/test fidelity (ADR 0103 D6). The
     // fixture line has no quotes, so it appears verbatim inside the JSON array.

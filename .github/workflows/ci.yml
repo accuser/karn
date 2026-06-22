@@ -270,11 +270,15 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: dtolnay/rust-toolchain@e081816240890017053eacbb1bdf337761dc5582 # 1.95.0
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-      - name: Build the language server
-        run: cargo build --release -p bynk-lsp
+      - name: Build the language server + compiler
+        # `bynkc-lsp` for the LSP tests; `bynkc` for the debug provider test
+        # (`bynkc test --inspect`) — both land on PATH via runTest.ts (DECISION D).
+        run: cargo build --release -p bynk-lsp -p bynkc
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: "20"
+          # ≥ 22.6 for the debug paths — the emitted `.ts` runs under Node's
+          # TypeScript type-stripping (`--experimental-strip-types`).
+          node-version: "22"
       - name: Install deps
         working-directory: vscode-bynk
         run: npm ci

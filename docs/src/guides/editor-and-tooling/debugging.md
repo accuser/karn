@@ -56,8 +56,8 @@ serve and attach to. `"port"` overrides the inspector port (default `9229`).
 
 ## How it works
 
-Per [ADR 0104](../../decisions/0104-debug-launch-model.md) this is *glue, not a
-Debug Adapter*: the extension contributes a `bynk` debug type whose
+Per ADR 0104 (the debug-launch model) this is *glue, not a Debug Adapter*: the
+extension contributes a `bynk` debug type whose
 configuration provider starts the inspector by shelling the
 [`--inspect` CLIs](../../reference/bynk-cli.md) and hands off to VS Code's
 JavaScript debugger (`pwa-node`). The source maps — `.bynk` files referenced by

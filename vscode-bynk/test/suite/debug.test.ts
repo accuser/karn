@@ -13,8 +13,22 @@ import * as assert from "assert";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
-import { spawn, ChildProcess } from "child_process";
+import { spawn, spawnSync, ChildProcess } from "child_process";
 import * as vscode from "vscode";
+
+/** True when `node` on PATH is ≥ 22.6 — the floor for running emitted `.ts`
+ *  directly via `--experimental-strip-types` (older Node rejects the flag). */
+function nodeStripsTypes(): boolean {
+  try {
+    const v = spawnSync("node", ["--version"], { encoding: "utf8" }).stdout.trim();
+    const m = v.match(/^v(\d+)\.(\d+)/);
+    if (!m) return false;
+    const [maj, min] = [Number(m[1]), Number(m[2])];
+    return maj > 22 || (maj === 22 && min >= 6);
+  } catch {
+    return false;
+  }
+}
 
 // Minimal base64-VLQ encoder for a source-map v3 `mappings` string.
 const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -91,6 +105,7 @@ describe("Bynk debug attach", () => {
   });
 
   it("a breakpoint in .bynk binds and pauses under a pwa-node attach", async function () {
+    if (!nodeStripsTypes()) this.skip(); // needs Node ≥ 22.6 for `--experimental-strip-types`
     this.timeout(40_000);
 
     // Launch the emitted TS under the inspector (type-stripping; Node >= 22.6).

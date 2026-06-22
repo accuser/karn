@@ -26,6 +26,20 @@ function have(tool: string): boolean {
   }
 }
 
+/** True when `node` on PATH is ≥ 22.6 — the floor for `bynkc test --inspect`,
+ *  which runs the emitted `.ts` under `--experimental-strip-types`. */
+function nodeStripsTypes(): boolean {
+  try {
+    const v = spawnSync("node", ["--version"], { encoding: "utf8" }).stdout.trim();
+    const m = v.match(/^v(\d+)\.(\d+)/);
+    if (!m) return false;
+    const [maj, min] = [Number(m[1]), Number(m[2])];
+    return maj > 22 || (maj === 22 && min >= 6);
+  } catch {
+    return false;
+  }
+}
+
 describe("Bynk debug provider (test mode)", () => {
   let dir: string;
 
@@ -40,7 +54,7 @@ describe("Bynk debug provider (test mode)", () => {
   });
 
   it("startDebugging({type:'bynk', mode:'test'}) pauses at a .bynk breakpoint", async function () {
-    if (!have("bynkc") || !have("node")) this.skip();
+    if (!have("bynkc") || !have("node") || !nodeStripsTypes()) this.skip();
     this.timeout(90_000);
 
     const workspace = path.resolve(__dirname, "../../../test/fixtures/workspace");
