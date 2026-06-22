@@ -20,10 +20,10 @@ type PreviewValue =
 // Slice 2: regroup a handler frame's Local scope into Bynk structure. The emitter
 // gives capabilities and agent state fixed local names, so we recognise them by name
 // and relabel them into Bynk vocabulary — `deps` → a `Capabilities` group, an agent's
-// loaded `currentState` → a `State` group — and float them to the top. Everything else
+// loaded `currentState` → a `State` group — and float them to the top; and (slice 4)
+// drop the compiler temporaries the lowering spills (`__r0`, `__d`, …). Everything else
 // (user bindings, request params) is left exactly as js-debug reported it. (The `by`
-// actor isn't dependably a local and is the deferred debug-metadata slice; compiler
-// temps are slice 4.)
+// actor isn't dependably a local and is the deferred debug-metadata follow-on.)
 const BYNK_LOCAL_LABELS: Readonly<Record<string, string>> = {
   deps: "Capabilities",
   currentState: "State",
@@ -36,14 +36,24 @@ interface DapVariable {
   [k: string]: unknown;
 }
 
-/** Relabel the recognised emitted locals into Bynk groups and float them to the top,
- *  preserving each variable's `variablesReference` (so the group still expands) and
- *  every unrecognised local untouched. Returns a new, reordered array. Total. */
+/** True for a compiler temporary the lowering spills. Bynk's lexer reserves the `__`
+ *  prefix (a user `let __x` is a parse error — `_` is the discard token), so a local
+ *  named `__…` is *exclusively* compiler-generated: safe to drop with no false
+ *  positives. */
+function isBynkTemp(name: unknown): boolean {
+  return typeof name === "string" && name.startsWith("__");
+}
+
+/** Regroup a handler frame's Local scope into Bynk structure: relabel the recognised
+ *  emitted locals into Bynk groups and float them to the top (references preserved, so
+ *  they still expand), **drop the compiler temporaries** (slice 4), and leave every
+ *  user binding untouched. Returns a new, reordered array. Total. */
 export function relabelBynkLocals<T extends DapVariable>(variables: T[]): T[] {
   if (!Array.isArray(variables)) return variables;
   const labeled: T[] = [];
   const rest: T[] = [];
   for (const v of variables) {
+    if (isBynkTemp(v?.name)) continue; // slice 4: suppress the lowering's spill bindings
     const label = v && typeof v.name === "string" ? BYNK_LOCAL_LABELS[v.name] : undefined;
     if (label !== undefined) {
       v.name = label;
