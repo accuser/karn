@@ -17,7 +17,7 @@ import * as vscode from "vscode";
 
 import { compilerPath } from "./tasks";
 import { BYNK_DESCRIPTION_GENERATOR } from "./debugValues";
-import { renderBynkValue } from "./semanticValues";
+import { renderBynkValue, relabelBynkLocals } from "./semanticValues";
 
 const BYNK_TYPE = "bynk";
 
@@ -97,8 +97,10 @@ export function registerDebug(context: vscode.ExtensionContext): void {
             if (m?.type !== "response" || !m.body || !semanticValuesEnabled()) return;
             if (m.command === "variables" && Array.isArray(m.body.variables)) {
               for (const v of m.body.variables) {
-                if (typeof v?.value === "string") v.value = renderBynkValue(v.value);
+                if (typeof v?.value === "string") v.value = renderBynkValue(v.value); // slice 1
               }
+              // Slice 2: regroup the frame into Bynk structure (capabilities, state).
+              m.body.variables = relabelBynkLocals(m.body.variables);
             } else if (m.command === "evaluate" && typeof m.body.result === "string") {
               m.body.result = renderBynkValue(m.body.result);
             }
