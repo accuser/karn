@@ -6,7 +6,7 @@
 
 import * as assert from "assert";
 
-import { renderBynkValue } from "../../src/semanticValues";
+import { renderBynkValue, relabelBynkLocals } from "../../src/semanticValues";
 
 describe("renderBynkValue (preview parser)", () => {
   const cases: [string, string][] = [
@@ -44,5 +44,41 @@ describe("renderBynkValue (preview parser)", () => {
     for (const junk of ["{tag: 'X'", "{{{{", "{tag: }", "{,,,}", "{tag: '\\'}", "{…", "[}"]) {
       assert.doesNotThrow(() => renderBynkValue(junk));
     }
+  });
+});
+
+describe("relabelBynkLocals (frame structure)", () => {
+  it("relabels deps → Capabilities and currentState → State, floated to the top", () => {
+    const out = relabelBynkLocals([
+      { name: "next", value: "6" },
+      { name: "deps", value: "{…}", variablesReference: 11 },
+      { name: "currentState", value: "{…}", variablesReference: 12 },
+    ]);
+    assert.deepStrictEqual(
+      out.map((v) => v.name),
+      ["Capabilities", "State", "next"],
+    );
+    // The reference is preserved, so the relabeled group still expands.
+    assert.strictEqual(out[0].variablesReference, 11);
+    assert.strictEqual(out[1].variablesReference, 12);
+  });
+
+  it("leaves frames with no recognised locals untouched (order preserved)", () => {
+    const input = [
+      { name: "id", value: "7" },
+      { name: "body", value: "{…}" },
+    ];
+    assert.deepStrictEqual(relabelBynkLocals(input).map((v) => v.name), ["id", "body"]);
+  });
+
+  it("only relabels exact emitted names (no false positives)", () => {
+    // `state` (the DO storage on `this`) is not the agent's `currentState` local.
+    const out = relabelBynkLocals([{ name: "state" }, { name: "myDeps" }]);
+    assert.deepStrictEqual(out.map((v) => v.name), ["state", "myDeps"]);
+  });
+
+  it("is total on odd input", () => {
+    assert.deepStrictEqual(relabelBynkLocals([]), []);
+    assert.doesNotThrow(() => relabelBynkLocals([{}, { name: 42 as unknown as string }]));
   });
 });

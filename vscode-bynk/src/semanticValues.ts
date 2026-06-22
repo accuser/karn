@@ -17,6 +17,45 @@ type PreviewValue =
   | { kind: "str"; value: string }
   | { kind: "raw"; text: string };
 
+// Slice 2: regroup a handler frame's Local scope into Bynk structure. The emitter
+// gives capabilities and agent state fixed local names, so we recognise them by name
+// and relabel them into Bynk vocabulary — `deps` → a `Capabilities` group, an agent's
+// loaded `currentState` → a `State` group — and float them to the top. Everything else
+// (user bindings, request params) is left exactly as js-debug reported it. (The `by`
+// actor isn't dependably a local and is the deferred debug-metadata slice; compiler
+// temps are slice 4.)
+const BYNK_LOCAL_LABELS: Readonly<Record<string, string>> = {
+  deps: "Capabilities",
+  currentState: "State",
+};
+const LABEL_ORDER = ["Capabilities", "State"];
+
+/** A DAP `Variable` — only the fields we touch. */
+interface DapVariable {
+  name?: unknown;
+  [k: string]: unknown;
+}
+
+/** Relabel the recognised emitted locals into Bynk groups and float them to the top,
+ *  preserving each variable's `variablesReference` (so the group still expands) and
+ *  every unrecognised local untouched. Returns a new, reordered array. Total. */
+export function relabelBynkLocals<T extends DapVariable>(variables: T[]): T[] {
+  if (!Array.isArray(variables)) return variables;
+  const labeled: T[] = [];
+  const rest: T[] = [];
+  for (const v of variables) {
+    const label = v && typeof v.name === "string" ? BYNK_LOCAL_LABELS[v.name] : undefined;
+    if (label !== undefined) {
+      v.name = label;
+      labeled.push(v);
+    } else {
+      rest.push(v);
+    }
+  }
+  labeled.sort((a, b) => LABEL_ORDER.indexOf(a.name as string) - LABEL_ORDER.indexOf(b.name as string));
+  return [...labeled, ...rest];
+}
+
 /** Render js-debug's preview of a value into Bynk constructor syntax when it is a
  *  tagged ADT (`{tag: '…', …}`); otherwise return the preview unchanged. Never
  *  throws. */

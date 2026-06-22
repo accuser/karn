@@ -75,6 +75,17 @@ This applies to hovers, the Variables pane, and Watch. Turn it off with
 > expand away (it renders in Bynk vocabulary too when you open it). The **test**
 > path renders nesting fully inline.
 
+## The handler frame in Bynk
+
+Stopped inside a handler, the **Variables** pane groups the frame in Bynk's terms
+rather than as a flat list of emitted locals: the capabilities a handler consumes
+appear together under **`Capabilities`**, and an agent's state under **`State`** — both
+sorted to the top, still expandable, with your own bindings and request parameters
+listed below. Same toggle (`bynk.debug.semanticValues`).
+
+> Surfacing the `by` actor as part of the frame is a planned addition. Compiler
+> temporaries (the spill bindings from lowering `?`/`match`) are still listed for now.
+
 ## How it works
 
 Per ADR 0104 (the debug-launch model) this is *glue, not a Debug Adapter*: the

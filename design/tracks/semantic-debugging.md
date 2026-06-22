@@ -118,11 +118,16 @@ in **ADR 0106** if the spike shows it needs pinning.
    generator is therefore **kept for the Node test path** (full inline nesting) and the
    interposer covers workerd — they compose (the rewrite is idempotent). Structural
    recognition, no emitter change.
-2. **Contexts/actors as scopes.** Reshape `scopes`/`variables` so a handler's frame
-   reads in Bynk structure — capability handles (the `deps` object) as a
-   *capabilities* group, the `by` actor/visitor surfaced, agent state as its own
-   scope — instead of a flat JS local list. First candidate to need emitter
-   debug-metadata; inference-first, metadata only where shape won't tell.
+2. ✅ **Contexts/capabilities as Bynk structure (v0.75).** The interposer relabels
+   the Local-scope `variables` response — `deps` → a **`Capabilities`** group, an
+   agent's `currentState` → a **`State`** group, floated to the top, still expandable,
+   user bindings untouched — so a handler frame reads in Bynk structure, not a flat JS
+   local list. **Inference-only, no emitter change** (recognised by the emitter's fixed
+   names). Relabelling within the Local scope, not true synthetic Scopes-pane rows (the
+   synchronous rewrite can't synthesise a scope's `variablesReference` cheaply).
+   **Deferred (the D5 line):** the `by` actor (not dependably a local) and the **emitter
+   debug-metadata sidecar** it needs — the named follow-on; compiler-temp suppression is
+   slice 4.
 3. **Capability calls legible in the stack.** Reshape `stackTrace`: a frame that is a
    capability invocation reads as the Bynk operation; toolchain/glue frames collapse
    (the semantic complement to Phase 1's `skipFiles`, which hides *files* but not the
@@ -185,6 +190,17 @@ ADR 0105; merging it authorises the build. Status tracked here as slices land.
 
 _A dated entry per slice with its ADR link and the one-line decision._
 
+- **2026-06-22 — slice 2 (v0.75).** *Contexts/capabilities as Bynk structure.*
+  Implements ADR [0105](../decisions/0105-semantic-debug-interposition.md) D4 (rewrite
+  structure, not just values): the interposer relabels the Local-scope `variables`
+  response — `deps` → `Capabilities`, an agent's `currentState` → `State`, floated up,
+  references preserved so they still expand. **The D5 line, drawn:** capabilities + state
+  ship by **name-inference, no emitter change**; the **`by` actor is deferred** — it
+  isn't dependably a local, so it's the case that earns the emitter **debug-metadata
+  sidecar** (its own follow-on slice). **DECISION C held:** relabel within Local, not
+  true synthetic Scopes-pane rows — the synchronous rewrite can't cheaply synthesise a
+  scope reference. Runtime-agnostic by construction (same path slice 1 proved on
+  workerd); `relabelBynkLocals` is pure + unit-tested.
 - **2026-06-22 — slice 1 (v0.74).** *Values through the interposer — both runtimes.*
   Implements ADR [0105](../decisions/0105-semantic-debug-interposition.md): a
   `DebugAdapterTracker` (bound to Bynk sessions and their js-debug child sessions)
