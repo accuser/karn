@@ -88,8 +88,11 @@ operation** — `GET "/"`, `bump(amount)` — rather than the emitted function (
 while toolchain and runtime frames stay greyed out (skip-stepped). Clicking a frame
 still navigates to its `.bynk` line.
 
-> Surfacing the `by` actor as part of the frame is a planned addition. Compiler
-> temporaries (the spill bindings from lowering `?`/`match`) are still listed for now.
+The **compiler temporaries** the lowering spills (`__`-prefixed bindings from `?`/`match`)
+are filtered out, so stepping shows your bindings rather than the lowering's. Turn the
+whole thing off (`bynk.debug.semanticValues: false`) to see them and the raw shapes.
+
+> Surfacing the `by` actor as part of the frame is a planned addition.
 
 ## How it works
 

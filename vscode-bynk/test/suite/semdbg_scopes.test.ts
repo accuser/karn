@@ -37,8 +37,9 @@ describe("Semantic debugging — frame structure (Node)", () => {
       "function tick() {",
       '  const deps = { Logger: { name: "log" }, Kv: { name: "kv" } };',
       '  const currentState = { count: 5 };',
+      "  const __r0 = { spilled: true };", // a compiler temp (slice 4 suppresses it)
       "  const next = 6;",
-      "  return [deps, currentState, next];", // breakpoint (line 5)
+      "  return [deps, currentState, __r0, next];", // breakpoint (line 6)
       "}",
       "setInterval(tick, 100);",
       "",
@@ -76,7 +77,7 @@ describe("Semantic debugging — frame structure (Node)", () => {
       });
     });
 
-    const bpLine = 5;
+    const bpLine = 6;
     let vars: any[] | undefined;
     const reader = vscode.debug.registerDebugAdapterTrackerFactory("*", {
       createDebugAdapterTracker(s: vscode.DebugSession) {
@@ -143,6 +144,8 @@ describe("Semantic debugging — frame structure (Node)", () => {
       assert.strictEqual(names[1], "State", `State second, got ${names}`);
       assert.ok(names.includes("next"), "user binding preserved");
       assert.ok(!names.includes("deps") && !names.includes("currentState"), "emitted names relabeled");
+      // Slice 4: the compiler temporary is suppressed.
+      assert.ok(!names.includes("__r0"), `__-temp suppressed, got ${names}`);
       // The relabeled group still expands (reference preserved).
       const caps = vars!.find((v) => v.name === "Capabilities");
       assert.ok(caps.variablesReference > 0, "Capabilities is still expandable");

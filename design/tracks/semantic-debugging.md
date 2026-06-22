@@ -136,10 +136,14 @@ in **ADR 0106** if the spike shows it needs pinning.
    and rewrites the `stackTrace` response. Glue-frame collapse was already free (Phase
    1's `skipFiles` → `deemphasize`), confirmed by a stack capture. The actor still rides
    the sidecar as a follow-on.
-4. **Quiet the lowered-temp noise.** Hide or group the compiler temporaries
-   (`__r0`, `__d`, the `?`/`match` spill bindings) in the Variables pane, so stepping
-   shows the user's bindings, not the lowering's. Partly an **emitter** slice —
-   formalise the temp-naming convention the interposer keys on.
+4. ✅ **Quiet the lowered-temp noise (v0.77).** The Local-scope `variables` rewrite now
+   drops the compiler temporaries (`__r0`, `__d`, the `?`/`match` spill bindings), so
+   stepping shows the user's bindings, not the lowering's. **Inference-only — no emitter
+   change** (the track expected an emitter slice; the grounding refuted it: Bynk's lexer
+   already reserves `__`, so a `__`-named local is exclusively a compiler temp). Removal
+   (toggle-restorable) over `visibility: "internal"` — no evidence VS Code acts on the
+   latter. **Phase 2's planned reshapes are complete.** The `by` actor (riding the
+   slice-3 sidecar) is the remaining follow-on.
 
 Each slice (except 0) is an ordinary `vX.Y-<slug>.md` proposal citing this doc and
 ADR 0105; merging it authorises the build. Status tracked here as slices land.
@@ -194,6 +198,16 @@ ADR 0105; merging it authorises the build. Status tracked here as slices land.
 
 _A dated entry per slice with its ADR link and the one-line decision._
 
+- **2026-06-22 — slice 4 (v0.77). Phase 2's planned reshapes are complete.** *Quiet the
+  lowered-temp noise.* Implements ADR [0105](../decisions/0105-semantic-debug-interposition.md):
+  the Local-scope `variables` rewrite (slice 2's pass) now drops `__`-prefixed compiler
+  temporaries. **Inference-only, no emitter change** — the track expected an emitter slice,
+  but the grounding overturned it: Bynk's lexer reserves `__` (a user `let __x` is a parse
+  error, `_` being the discard), so a `__`-named local is exclusively compiler-generated —
+  zero false positives. Removal over `visibility: "internal"` (no evidence VS Code
+  deemphasises the latter); toggle-restorable. **The track's reshape slices (1–4) are done**
+  — values, frame variables, call stack, and noise all read in Bynk. The `by` actor, now
+  riding the slice-3 debug-metadata sidecar, is the one named follow-on.
 - **2026-06-22 — slice 3 (v0.76).** *Capability calls legible in the stack.* Implements
   ADR [0105](../decisions/0105-semantic-debug-interposition.md), and **introduces the
   emitter debug-metadata sidecar** the track anticipated. A stack capture showed Phase 1

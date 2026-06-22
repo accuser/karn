@@ -81,4 +81,25 @@ describe("relabelBynkLocals (frame structure)", () => {
     assert.deepStrictEqual(relabelBynkLocals([]), []);
     assert.doesNotThrow(() => relabelBynkLocals([{}, { name: 42 as unknown as string }]));
   });
+
+  it("drops compiler temporaries (the `__`-prefixed spill bindings) — slice 4", () => {
+    const out = relabelBynkLocals([
+      { name: "deps", variablesReference: 1 },
+      { name: "__r0", value: "{…}" }, // effect-let result
+      { name: "r", value: "Some(1)" }, // user binding
+      { name: "__d", value: "{…}" }, // match discriminant
+    ]);
+    assert.deepStrictEqual(out.map((v) => v.name), ["Capabilities", "r"]);
+    // The user binding survives; the temps are gone.
+    assert.ok(out.some((v) => v.name === "r"));
+    assert.ok(!out.some((v) => typeof v.name === "string" && v.name.startsWith("__")));
+  });
+
+  it("keeps a single-underscore discard (only `__` is a temp)", () => {
+    // `_` is Bynk's discard; only the compiler's `__` prefix is suppressed.
+    assert.deepStrictEqual(relabelBynkLocals([{ name: "_" }, { name: "x" }]).map((v) => v.name), [
+      "_",
+      "x",
+    ]);
+  });
 });
