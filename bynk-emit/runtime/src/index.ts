@@ -1,0 +1,11 @@
+// The @bynk/runtime public surface. This barrel is the single source of truth
+// for what the bundled runtime.ts exports; the bundle script concatenates the
+// modules below (in this dependency order) into one flat file.
+export * from "./result.ts";
+export * from "./errors.ts";
+export * from "./storage.ts";
+export * from "./boundary.ts";
+export * from "./http.ts";
+export * from "./queue.ts";
+export * from "./agent.ts";
+export * from "./auth.ts";
