@@ -76,6 +76,18 @@ export function makeTestState(name: string): DurableObjectState {
   };
 }
 
+export interface KVNamespace {
+  get(key: string): Promise<string | null>;
+  put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
+  delete(key: string): Promise<void>;
+  // v0.23: the page shape WorkersKv's drain consumes (0050).
+  list(options?: { prefix?: string; cursor?: string }): Promise<{
+    keys: { name: string }[];
+    list_complete: boolean;
+    cursor?: string;
+  }>;
+}
+
 // v0.8: cross-Worker boundary protocol — JSON wire format and error types.
 
 export type JsonValue =
@@ -109,18 +121,6 @@ export function boundaryError(error: BoundaryError): Error {
 
 export interface ServiceBinding {
   fetch(request: Request): Promise<Response>;
-}
-
-export interface KVNamespace {
-  get(key: string): Promise<string | null>;
-  put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
-  delete(key: string): Promise<void>;
-  // v0.23: the page shape WorkersKv's drain consumes (0050).
-  list(options?: { prefix?: string; cursor?: string }): Promise<{
-    keys: { name: string }[];
-    list_complete: boolean;
-    cursor?: string;
-  }>;
 }
 
 export async function callService<T, E>(
@@ -188,17 +188,6 @@ export const HttpResult = {
     message,
   }),
   ServerError: (message: string): HttpResult<never> => ({ tag: "ServerError", message }),
-};
-
-// v0.44: QueueResult — the built-in queue verdict sum (non-generic). `Ack`
-// confirms the message; `Retry` redelivers it, carrying a reason for the log.
-export type QueueResult =
-  | { readonly tag: "Ack" }
-  | { readonly tag: "Retry"; readonly reason: string };
-
-export const QueueResult = {
-  Ack: { tag: "Ack" } as QueueResult,
-  Retry: (reason: string): QueueResult => ({ tag: "Retry", reason }),
 };
 
 // Match a path pattern (e.g., "/orders/:id") against a request path.
@@ -269,6 +258,17 @@ export function httpResultToResponse<T>(
       });
   }
 }
+
+// v0.44: QueueResult — the built-in queue verdict sum (non-generic). `Ack`
+// confirms the message; `Retry` redelivers it, carrying a reason for the log.
+export type QueueResult =
+  | { readonly tag: "Ack" }
+  | { readonly tag: "Retry"; readonly reason: string };
+
+export const QueueResult = {
+  Ack: { tag: "Ack" } as QueueResult,
+  Retry: (reason: string): QueueResult => ({ tag: "Retry", reason }),
+};
 
 // v0.9.2: agent instantiation + per-key state lifecycle.
 //
