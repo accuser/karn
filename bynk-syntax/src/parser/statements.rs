@@ -115,7 +115,10 @@ impl<'a> Parser<'a> {
         loop {
             let leading = self.take_leading_trivia();
             match self.peek_kind() {
-                Some(TokenKind::Let) | Some(TokenKind::Commit) | Some(TokenKind::Assert) => {
+                Some(TokenKind::Let)
+                | Some(TokenKind::Commit)
+                | Some(TokenKind::Assert)
+                | Some(TokenKind::TildeArrow) => {
                     let mut stmt = self.parse_statement()?;
                     let trailing = self.take_trailing_trivia();
                     match &mut stmt {
@@ -130,6 +133,10 @@ impl<'a> Parser<'a> {
                         Statement::Assert(a) => {
                             a.trivia.leading = leading;
                             a.trivia.trailing = trailing;
+                        }
+                        Statement::Send(s) => {
+                            s.trivia.leading = leading;
+                            s.trivia.trailing = trailing;
                         }
                     }
                     statements.push(stmt);
@@ -183,6 +190,16 @@ impl<'a> Parser<'a> {
             let value = self.parse_expr()?;
             let span = kw.span.merge(value.span);
             return Ok(Statement::Assert(AssertStmt {
+                value,
+                span,
+                trivia: Trivia::default(),
+            }));
+        }
+        if self.peek_kind() == Some(TokenKind::TildeArrow) {
+            let kw = self.expect(TokenKind::TildeArrow, "to start an async send statement")?;
+            let value = self.parse_expr()?;
+            let span = kw.span.merge(value.span);
+            return Ok(Statement::Send(SendStmt {
                 value,
                 span,
                 trivia: Trivia::default(),

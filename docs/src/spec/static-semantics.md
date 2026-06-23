@@ -307,6 +307,16 @@ effectful position and MUST be applied to an `Effect`
 capability call or a cross-context call MUST NOT occur in a pure context
 (`bynk.effect.capability_in_pure_context`, `bynk.effect.cross_context_in_pure_context`).
 
+An **asynchronous send** (`~>`, §4.8.5) MUST likewise occur in an effectful
+position (`bynk.send.in_pure_context`) and MUST be applied to an `Effect`
+(`bynk.send.non_effect`). Because a send does not await its reply and binds
+nothing, its reply MUST be `Effect[()]` — the **error gate**: a send whose
+operation returns a non-unit `Effect[T]` is rejected (`bynk.send.requires_unit`),
+since the value or error `T` would be silently discarded. "No value" and "no
+need to wait" are independent: to *await* a unit-returning effect (a durable
+write that must join the commit) keep the `<-` bind; to await and discard a
+**valued** reply, write `let _ <- e`. A send is a statement, never an expression.
+
 A capability MUST be declared inside a context or an adapter
 (`bynk.capability.outside_context`); a bodied provider MUST implement exactly its
 capability's operations — no missing, no extra, signatures matching

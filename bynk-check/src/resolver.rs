@@ -740,6 +740,19 @@ fn check_block_references(
                     errors,
                 );
             }
+            Statement::Send(s) => {
+                check_expr_references(
+                    &s.value,
+                    params,
+                    in_method,
+                    scopes,
+                    types,
+                    type_params,
+                    fns,
+                    methods,
+                    errors,
+                );
+            }
         }
     }
     check_expr_references(

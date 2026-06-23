@@ -1095,6 +1095,9 @@ pub enum Statement {
     /// `assert expr` — verify a Bool expression at test runtime (v0.7).
     /// Only valid inside test case bodies.
     Assert(AssertStmt),
+    /// `~> expr` — an asynchronous fire-and-forget send (v0.79). The caller does
+    /// not await the reply; legal only when the reply is `Effect[()]`. No binder.
+    Send(SendStmt),
 }
 
 impl Statement {
@@ -1103,6 +1106,7 @@ impl Statement {
             Statement::Let(l) | Statement::EffectLet(l) => l.span,
             Statement::Commit(c) => c.span,
             Statement::Assert(a) => a.span,
+            Statement::Send(s) => s.span,
         }
     }
 }
@@ -1125,6 +1129,14 @@ pub struct LetStmt {
 
 #[derive(Debug, Clone)]
 pub struct CommitStmt {
+    pub value: Expr,
+    pub span: Span,
+    pub trivia: Trivia,
+}
+
+#[derive(Debug, Clone)]
+pub struct SendStmt {
+    /// The send target — a recipient call, e.g. `Logger.info(msg)`.
     pub value: Expr,
     pub span: Span,
     pub trivia: Trivia,

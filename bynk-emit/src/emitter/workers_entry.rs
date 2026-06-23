@@ -18,6 +18,25 @@ pub fn emit_worker_entry(context: &str, table: &UnitTable) -> String {
     let _ = writeln!(out, "// Worker entry point for context `{context}`.");
     writeln!(out).unwrap();
 
+    // v0.79: if any handler uses `~>`, each entry point captures the runtime's
+    // execution context and threads it into `compose`, so a fire-and-forget send
+    // can hand its promise to `waitUntil`. Otherwise the signatures are unchanged.
+    let ctx_uses_send = table.services.values().any(|s| {
+        s.handlers
+            .iter()
+            .any(|h| crate::emitter::block_uses_send(&h.body))
+    });
+    let exec_param = if ctx_uses_send {
+        ", ctx: { waitUntil(promise: Promise<unknown>): void }"
+    } else {
+        ""
+    };
+    let compose_call = if ctx_uses_send {
+        "compose(env, ctx)"
+    } else {
+        "compose(env)"
+    };
+
     // Collect HTTP routes across all services, sorted so literal-segment
     // routes precede parameter-segment routes that share the same prefix.
     let mut http_routes: Vec<HttpRoute> = Vec::new();
@@ -147,12 +166,12 @@ pub fn emit_worker_entry(context: &str, table: &UnitTable) -> String {
     let _ = writeln!(out, "export default {{");
     let _ = writeln!(
         out,
-        "  async fetch(request: Request, env: Env): Promise<Response> {{"
+        "  async fetch(request: Request, env: Env{exec_param}): Promise<Response> {{"
     );
     let _ = writeln!(out, "    const url = new URL(request.url);");
     let _ = writeln!(out, "    const path = url.pathname;");
     let _ = writeln!(out, "    const method = request.method;");
-    let _ = writeln!(out, "    const surface = compose(env);");
+    let _ = writeln!(out, "    const surface = {compose_call};");
     let _ = writeln!(out, "    try {{");
 
     // 1. Internal Service Binding dispatch.
@@ -210,14 +229,14 @@ pub fn emit_worker_entry(context: &str, table: &UnitTable) -> String {
     // failing run has no retry channel, so an `Err` is logged and the run
     // completes (v0.10 §5.1, [DECISION 3]).
     if !cron_routes.is_empty() {
-        emit_scheduled_handler(&mut out, &cron_routes);
+        emit_scheduled_handler(&mut out, &cron_routes, exec_param, compose_call);
     }
 
     // v0.10b: queue (consumer) entry point. Dispatches on `batch.queue`,
     // deserialises each message, invokes the handler, and acks on `Ok` /
     // retries on `Err` (a deserialisation failure also retries).
     if !queue_routes.is_empty() {
-        emit_queue_handler(&mut out, &queue_routes);
+        emit_queue_handler(&mut out, &queue_routes, exec_param, compose_call);
     }
 
     let _ = writeln!(out, "}};");
@@ -229,12 +248,17 @@ pub fn emit_worker_entry(context: &str, table: &UnitTable) -> String {
 /// the context. `event` is typed structurally (`{ cron: string }`) to avoid a
 /// dependency on `@cloudflare/workers-types`, matching how the rest of the
 /// emitter hand-declares the minimal ambient shapes it needs.
-fn emit_scheduled_handler(out: &mut String, cron_routes: &[CronRoute]) {
+fn emit_scheduled_handler(
+    out: &mut String,
+    cron_routes: &[CronRoute],
+    exec_param: &str,
+    compose_call: &str,
+) {
     let _ = writeln!(
         out,
-        "  async scheduled(event: {{ readonly cron: string; readonly scheduledTime: number }}, env: Env): Promise<void> {{"
+        "  async scheduled(event: {{ readonly cron: string; readonly scheduledTime: number }}, env: Env{exec_param}): Promise<void> {{"
     );
-    let _ = writeln!(out, "    const surface = compose(env);");
+    let _ = writeln!(out, "    const surface = {compose_call};");
     let _ = writeln!(out, "    switch (event.cron) {{");
     for route in cron_routes {
         let method_key = crate::emitter::cron_handler_method_name(&route.service, route.index);
@@ -268,12 +292,17 @@ fn emit_scheduled_handler(out: &mut String, cron_routes: &[CronRoute]) {
 /// body (v0.8 wire-format), invokes the handler, and acks on `Ok` / retries on
 /// `Err`. A deserialisation failure or a thrown error also retries. `batch` is
 /// typed structurally to avoid a `@cloudflare/workers-types` dependency.
-fn emit_queue_handler(out: &mut String, queue_routes: &[QueueRoute]) {
+fn emit_queue_handler(
+    out: &mut String,
+    queue_routes: &[QueueRoute],
+    exec_param: &str,
+    compose_call: &str,
+) {
     let _ = writeln!(
         out,
-        "  async queue(batch: {{ readonly queue: string; readonly messages: ReadonlyArray<{{ readonly body: unknown; ack(): void; retry(): void }}> }}, env: Env): Promise<void> {{"
+        "  async queue(batch: {{ readonly queue: string; readonly messages: ReadonlyArray<{{ readonly body: unknown; ack(): void; retry(): void }}> }}, env: Env{exec_param}): Promise<void> {{"
     );
-    let _ = writeln!(out, "    const surface = compose(env);");
+    let _ = writeln!(out, "    const surface = {compose_call};");
     let _ = writeln!(out, "    switch (batch.queue) {{");
     for route in queue_routes {
         let method_key = crate::emitter::queue_handler_method_name(&route.service, route.index);

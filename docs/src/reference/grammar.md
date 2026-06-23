@@ -1213,6 +1213,18 @@ Binds the result of an effect: `let name <- effect`.
 **Static semantics.**
 {{#grammar-semantics effect_let_stmt}}
 
+### effect_send_stmt {#rule-effect_send_stmt}
+
+{{#grammar effect_send_stmt}}
+
+Sends an effect asynchronously without awaiting its reply: `~> effect`. The
+caller does not wait and binds nothing; legal only when the reply is `Effect[()]`
+(see the error gate below). Contrast `let _ <- effect`, which awaits the reply
+and discards it.
+
+**Static semantics.**
+{{#grammar-semantics effect_send_stmt}}
+
 ### commit_stmt {#rule-commit_stmt}
 
 {{#grammar commit_stmt}}

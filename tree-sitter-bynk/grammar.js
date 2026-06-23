@@ -730,7 +730,13 @@ module.exports = grammar({
     // `assert` is an expression (v0.9.1) but also appears in statement
     // position within a test body (an expression-statement of type `()`).
     _statement: ($) =>
-      choice($.let_stmt, $.effect_let_stmt, $.commit_stmt, prec(1, $.assert_expr)),
+      choice(
+        $.let_stmt,
+        $.effect_let_stmt,
+        $.effect_send_stmt,
+        $.commit_stmt,
+        prec(1, $.assert_expr),
+      ),
 
     let_stmt: ($) =>
       seq(
@@ -748,6 +754,8 @@ module.exports = grammar({
         "<-",
         field("value", $._expression),
       ),
+    // v0.79: `~> expr` — an asynchronous fire-and-forget send (no binder).
+    effect_send_stmt: ($) => seq("~>", field("value", $._expression)),
     commit_stmt: ($) => seq("commit", field("value", $._expression)),
 
     // A let/effect-let may bind the discard name `_`.

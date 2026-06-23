@@ -260,6 +260,20 @@
       "summary": "An `<-` bind was applied to a non-`Effect` value."
     }
   ],
+  "effect_send_stmt": [
+    {
+      "code": "bynk.send.in_pure_context",
+      "summary": "A `~>` send was used in a pure (non-effectful) context."
+    },
+    {
+      "code": "bynk.send.non_effect",
+      "summary": "A `~>` send was applied to a non-`Effect` value."
+    },
+    {
+      "code": "bynk.send.requires_unit",
+      "summary": "A `~>` send targets an operation whose reply is not `Effect[()]`."
+    }
+  ],
   "err_expr": [
     {
       "code": "bynk.types.err_value_mismatch",

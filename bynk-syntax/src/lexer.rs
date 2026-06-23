@@ -159,6 +159,11 @@ pub enum TokenKind {
     /// `<-` — Effect bind operator (v0.5).
     #[token("<-")]
     LArrow,
+    /// `~>` — asynchronous fire-and-forget send marker (v0.79). A leading
+    /// statement marker, never on the RHS of a `let`; distinct from `<-` so the
+    /// call site shows whether the caller waits.
+    #[token("~>")]
+    TildeArrow,
 
     /// A documentation block: `---` line ... `---` line. The token's span
     /// covers the full block including both `---` markers. The body content
@@ -331,6 +336,7 @@ impl TokenKind {
             By => "`by`",
             DotDotDot => "`...`",
             LArrow => "`<-`",
+            TildeArrow => "`~>`",
             DocBlock => "documentation block",
             Comment => "line comment",
             Ident => "identifier",

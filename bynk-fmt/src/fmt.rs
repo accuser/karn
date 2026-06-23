@@ -1306,6 +1306,10 @@ impl<'a> Formatter<'a> {
                 self.push("assert ");
                 self.format_expr(&a.value);
             }
+            Statement::Send(s) => {
+                self.push("~> ");
+                self.format_expr(&s.value);
+            }
         }
     }
 
@@ -1361,6 +1365,7 @@ fn statement_trivia(s: &Statement) -> &Trivia {
         Statement::Let(l) | Statement::EffectLet(l) => &l.trivia,
         Statement::Commit(c) => &c.trivia,
         Statement::Assert(a) => &a.trivia,
+        Statement::Send(s) => &s.trivia,
     }
 }
 
@@ -1756,6 +1761,7 @@ fn stmt_to_string(s: &Statement) -> String {
         }
         Statement::Commit(c) => format!("commit {}", expr_with_prec(&c.value, 0)),
         Statement::Assert(a) => format!("assert {}", expr_with_prec(&a.value, 0)),
+        Statement::Send(s) => format!("~> {}", expr_with_prec(&s.value, 0)),
     }
 }
 

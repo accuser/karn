@@ -288,6 +288,23 @@ fn emit_statement(out: &mut String, stmt: &Statement, cx: &mut LowerCtx, indent:
                 ),
             );
         }
+        Statement::Send(s) => {
+            // v0.79: `~> expr` — fire-and-forget. The reply is `Effect[()]` and is
+            // never awaited. On the Workers target the immediate tier hands the
+            // promise to the execution context's `waitUntil`, so it settles after
+            // the handler returns rather than being killed with the response. The
+            // execution context rides in `deps.__exec` (threaded by `compose`).
+            let mut stmts = Vec::new();
+            let value = lower_expr(&s.value, &mut stmts, cx);
+            for st in &stmts {
+                write_line(out, indent, st);
+            }
+            write_line(
+                out,
+                indent,
+                &format!("{deps}.__exec.waitUntil({value});", deps = cx.cap_deps_expr),
+            );
+        }
     }
 }
 

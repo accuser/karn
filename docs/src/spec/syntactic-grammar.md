@@ -785,7 +785,8 @@ which is the block's value.
 
 {{#grammar _statement}}
 
-A statement: a `let`, an effectful `let`, a `commit`, or an assertion.
+A statement: a `let`, an effectful `let`, an asynchronous send (`~>`), a
+`commit`, or an assertion.
 
 ### §4.8.3 let_stmt
 
@@ -801,20 +802,29 @@ Well-formedness: §5.
 `let`, a binding name, an optional type annotation, `<-`, and an effect
 expression. Well-formedness: §5.
 
-### §4.8.5 commit_stmt
+### §4.8.5 effect_send_stmt
+
+{{#grammar effect_send_stmt}}
+
+`~>` and an effect expression — an **asynchronous send**. Unlike an
+`effect_let_stmt` it carries **no binder**: the reply is not awaited and nothing
+is bound. Well-formedness — including the requirement that the reply be
+`Effect[()]` (the error gate): §5.
+
+### §4.8.6 commit_stmt
 
 {{#grammar commit_stmt}}
 
 `commit` and an expression. Well-formedness — including that it is valid only in
 an agent handler: §5.
 
-### §4.8.6 assert_expr
+### §4.8.7 assert_expr
 
 {{#grammar assert_expr}}
 
 `assert` and a condition. Well-formedness: §5.
 
-### §4.8.7 binding_name
+### §4.8.8 binding_name
 
 {{#grammar _binding_name}}
 

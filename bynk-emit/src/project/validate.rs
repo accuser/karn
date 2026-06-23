@@ -188,6 +188,9 @@ fn walk_block_for_constraints(
             Statement::Assert(a) => {
                 walk_expr_for_constraints(&a.value, typed, consumed, local, errors);
             }
+            Statement::Send(s) => {
+                walk_expr_for_constraints(&s.value, typed, consumed, local, errors);
+            }
         }
     }
     walk_expr_for_constraints(&block.tail, typed, consumed, local, errors);

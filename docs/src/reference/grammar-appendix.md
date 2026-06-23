@@ -79,9 +79,10 @@ by_clause ::= "by" (identifier ":")? identifier ("|" identifier)*
 mocks_decl ::= "mocks" identifier "=" identifier "{" provider_op* "}"
 test_case ::= "test" string_literal block
 block ::= "{" statement* expression? "}"
-statement ::= let_stmt | effect_let_stmt | commit_stmt | assert_expr
+statement ::= let_stmt | effect_let_stmt | effect_send_stmt | commit_stmt | assert_expr
 let_stmt ::= "let" binding_name (":" type_ref)? "=" expression
 effect_let_stmt ::= "let" binding_name (":" type_ref)? "<-" expression
+effect_send_stmt ::= "~>" expression
 commit_stmt ::= "commit" expression
 binding_name ::= identifier | "_"
 expression ::= if_expr | match_expr | is_expr | assert_expr | binary_expr | unary_expr | primary

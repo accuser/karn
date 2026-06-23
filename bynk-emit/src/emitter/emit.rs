@@ -859,6 +859,20 @@ pub(crate) fn emit_service(
                 )
             };
         }
+        // v0.79: a handler whose body uses `~>` receives the execution context
+        // (`__exec`) in its deps, so the fire-and-forget send can hand its promise
+        // to `waitUntil`. Gated on the body so non-sending handlers are unchanged.
+        if crate::emitter::block_uses_send(&handler.body) {
+            let field = "__exec: { waitUntil(promise: Promise<unknown>): void }";
+            deps_ty = if deps_ty == "{}" {
+                format!("{{ {field} }}")
+            } else {
+                format!(
+                    "{}; {field} }}",
+                    deps_ty.trim_end().trim_end_matches('}').trim_end()
+                )
+            };
+        }
         params.push(format!("deps: {deps_ty}"));
         let ret = ts_type_ref(&handler.return_type);
         let async_kw = if is_effectful_return(&handler.return_type) {
