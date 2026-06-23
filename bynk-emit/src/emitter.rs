@@ -62,6 +62,12 @@ pub fn emit_runtime_module() -> String {
     RUNTIME_TS.to_string()
 }
 
+/// The embedded runtime. This is a BUILD OUTPUT, not a hand-edited file: it is
+/// bundled from the focused TypeScript modules in `bynk-emit/runtime/src` by
+/// that package's `scripts/bundle.mjs`. Edit the modules there and run
+/// `npm run bundle` (CI's `runtime` job guards against drift); never edit this
+/// file by hand. Keeping it a committed artifact means `cargo build` stays
+/// Node-free and the emitter stays lockstep with the runtime it embeds.
 const RUNTIME_TS: &str = include_str!("emitter/runtime.ts");
 
 /// Emit the contents of `out/tsconfig.json`. The CLI uses `tsc -p` against

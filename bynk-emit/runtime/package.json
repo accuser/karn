@@ -1,0 +1,18 @@
+{
+  "name": "@bynk/runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The bynk runtime: shared types and helpers embedded verbatim into every emitted project. Authored as focused modules here, bundled to a single src/emitter/runtime.ts that bynk-emit include_str!s.",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "bundle": "node scripts/bundle.mjs",
+    "check": "node scripts/bundle.mjs --check",
+    "verify": "npm run typecheck && npm run test && npm run check"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3",
+    "@types/node": "22.7.5"
+  }
+}
