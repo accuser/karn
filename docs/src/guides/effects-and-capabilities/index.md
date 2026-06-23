@@ -5,6 +5,7 @@ Effects are explicit and capability-gated: a handler declares what it needs via
 
 **Understand**
 - [Understand the capability model](understand-the-capability-model.md)
+- [Synchronous and asynchronous sends](synchronous-and-asynchronous-sends.md)
 
 **Do**
 - [Compose a provider from other capabilities](compose-a-provider.md)

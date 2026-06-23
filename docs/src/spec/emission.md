@@ -104,11 +104,23 @@ includes a `Number.isInteger` check; a refined `Float`'s `.of` includes
 | numeric kernel | `i.toFloat()` → the receiver (erased identity); `f.round()`/`floor`/`ceil`/`truncate` → `Math.round(f)` / `Math.floor(f)` / `Math.ceil(f)` / `Math.trunc(f)`; `x.toString()` → `String(x)` (host number→string, ADR 0074) |
 | `?` | a check-and-early-return on `Err` |
 | `<-` | `await` |
+| `~>` | `ctx.__exec.waitUntil(<effect>)` — dispatched, not awaited |
 
 An `Effect[T]` is realised as a `Promise<T>`; it has no runtime constructor.
 `Effect.pure(x)` lowers to `x` directly where an `async` context absorbs it, and
 to `Promise.resolve(x)` in a synchronous or tail position. The `<-` bind is
 therefore `await` and needs no runtime support.
+
+An **asynchronous send** (`~>`, §4.8.5) lowers on the Workers target to
+`deps.__exec.waitUntil(<effect>)`: the effect's `Promise` is handed to the
+execution context's `waitUntil` rather than awaited, so it settles *after* the
+handler returns its response instead of being cancelled with it. The execution
+context is threaded from the entry point (`fetch`/`scheduled`/`queue`'s third
+argument) through `compose(env, ctx)` into the handler's `deps.__exec` — but
+**only for contexts that contain a send**, so a context that never uses `~>`
+emits byte-for-byte as before. This is the *immediate* delivery tier; a
+buffered/at-commit tier is reserved for the events channel and is not yet
+emitted.
 
 ### §7.3.3 Agents
 

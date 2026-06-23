@@ -179,7 +179,19 @@ pub fn emit_worker_compose(
         writeln!(out).unwrap();
     }
 
-    let _ = writeln!(out, "export function compose(env: Env) {{");
+    // v0.79: if any handler in this context uses `~>`, `compose` also takes the
+    // request's execution context and threads its `waitUntil` into `deps.__exec`.
+    let ctx_uses_send = table.services.values().any(|s| {
+        s.handlers
+            .iter()
+            .any(|h| crate::emitter::block_uses_send(&h.body))
+    });
+    let compose_sig = if ctx_uses_send {
+        "export function compose(env: Env, exec: { waitUntil(promise: Promise<unknown>): void }) {"
+    } else {
+        "export function compose(env: Env) {"
+    };
+    let _ = writeln!(out, "{compose_sig}");
 
     // v0.15: instantiate consumed-unit capability providers locally first, so
     // local providers (and handlers) can depend on them by their deps key.
@@ -225,6 +237,10 @@ pub fn emit_worker_compose(
     // and agent instantiations (Durable Object namespaces) can reach it.
     if !sorted_consumes.is_empty() || !table.agents.is_empty() {
         deps_entries.push("env".to_string());
+    }
+    // v0.79: the execution context rides in `deps.__exec` for `~>` sends.
+    if ctx_uses_send {
+        deps_entries.push("__exec: exec".to_string());
     }
     let _ = writeln!(out, "  const deps = {{ {} }};", deps_entries.join(", "));
 

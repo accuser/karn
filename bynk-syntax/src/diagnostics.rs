@@ -990,6 +990,21 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "Referenced a type that does not exist.",
     ),
     dg(
+        "bynk.send.in_pure_context",
+        "A `~>` send was used in a pure (non-effectful) context.",
+        &["effect_send_stmt"],
+    ),
+    dg(
+        "bynk.send.non_effect",
+        "A `~>` send was applied to a non-`Effect` value.",
+        &["effect_send_stmt"],
+    ),
+    dg(
+        "bynk.send.requires_unit",
+        "A `~>` send targets an operation whose reply is not `Effect[()]`.",
+        &["effect_send_stmt"],
+    ),
+    dg(
         "bynk.service.missing_from",
         "A `from`-less service has a handler other than `on call`.",
         &["service_decl"],

@@ -37,6 +37,7 @@
     - [Consume another context's services](guides/program-structure/consume-services.md)
   - [Effects & capabilities](guides/effects-and-capabilities/index.md)
     - [Understand the capability model](guides/effects-and-capabilities/understand-the-capability-model.md)
+    - [Synchronous and asynchronous sends](guides/effects-and-capabilities/synchronous-and-asynchronous-sends.md)
     - [Compose a provider from other capabilities](guides/effects-and-capabilities/compose-a-provider.md)
     - [Share a capability across contexts](guides/effects-and-capabilities/share-across-contexts.md)
     - [Wrap a library as an adapter](guides/effects-and-capabilities/wrap-a-library.md)

@@ -1073,6 +1073,64 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                     ));
                 }
             }
+            Statement::Send(s) => {
+                // v0.79: `~> e` — fire-and-forget. Effectful context only, like
+                // `<-`; the reply is never awaited, so nothing is bound.
+                if !ctx.effectful {
+                    ctx.errors.push(
+                        CompileError::new(
+                            "bynk.send.in_pure_context",
+                            s.span,
+                            "the `~>` send can only be used inside an effectful body (one returning `Effect[T]`)",
+                        )
+                        .with_label(
+                            ctx.return_ty_span,
+                            format!("enclosing return type is `{}`", ctx.return_ty.display()),
+                        )
+                        .with_note(
+                            "change the enclosing function/handler's return type to `Effect[...]`",
+                        ),
+                    );
+                }
+                // The reply must be `Effect[()]`. A real payload (value or error)
+                // would be silently dropped by a fire-and-forget send — the error
+                // gate ([DECISION C/D]). `let _ <- e` is the honest spelling for
+                // "await and discard".
+                let expected = Ty::Effect(Box::new(Ty::Unit));
+                let rhs_ty = type_of(&s.value, Some(&expected), ctx);
+                match rhs_ty {
+                    Some(Ty::Effect(inner)) if matches!(*inner, Ty::Unit) => {}
+                    Some(Ty::Effect(inner)) => {
+                        ctx.errors.push(
+                            CompileError::new(
+                                "bynk.send.requires_unit",
+                                s.value.span,
+                                format!(
+                                    "`~>` requires an `Effect[()]` reply, but this send returns `Effect[{}]` — its result would be silently dropped",
+                                    inner.display()
+                                ),
+                            )
+                            .with_note(
+                                "a `~>` send never awaits a reply, so it is reserved for empty replies; to await and discard a real result, write `let _ <- ...` instead",
+                            ),
+                        );
+                    }
+                    Some(other) => {
+                        ctx.errors.push(
+                            CompileError::new(
+                                "bynk.send.non_effect",
+                                s.value.span,
+                                format!(
+                                    "the `~>` send requires an `Effect[()]` value, but got `{}`",
+                                    other.display()
+                                ),
+                            )
+                            .with_note("`~>` sends an effectful call; the target must be a call returning `Effect[()]`"),
+                        );
+                    }
+                    None => {}
+                }
+            }
         }
     }
     let ty = type_of(&block.tail, expected, ctx);

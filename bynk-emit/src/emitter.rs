@@ -409,12 +409,47 @@ fn walk_exprs(e: &Expr, f: &mut impl FnMut(&Expr)) {
     }
 }
 
+/// v0.79: does this block contain a `~>` send anywhere — including nested
+/// branches, match arms, and lambdas? Gates execution-context threading
+/// (`deps.__exec`) so a context that never sends keeps byte-identical output.
+pub(crate) fn block_uses_send(b: &Block) -> bool {
+    fn stmt(s: &Statement) -> bool {
+        match s {
+            Statement::Send(_) => true,
+            Statement::Let(l) | Statement::EffectLet(l) => expr(&l.value),
+            Statement::Commit(c) => expr(&c.value),
+            Statement::Assert(a) => expr(&a.value),
+        }
+    }
+    fn expr(e: &Expr) -> bool {
+        match &e.kind {
+            ExprKind::Block(b) => block_uses_send(b),
+            ExprKind::If {
+                cond,
+                then_block,
+                else_block,
+            } => expr(cond) || block_uses_send(then_block) || block_uses_send(else_block),
+            ExprKind::Match { discriminant, arms } => {
+                expr(discriminant)
+                    || arms.iter().any(|a| match &a.body {
+                        MatchBody::Expr(e) => expr(e),
+                        MatchBody::Block(b) => block_uses_send(b),
+                    })
+            }
+            ExprKind::Lambda(l) => expr(&l.body),
+            _ => false,
+        }
+    }
+    b.statements.iter().any(stmt) || expr(&b.tail)
+}
+
 fn walk_block_exprs(b: &Block, f: &mut impl FnMut(&Expr)) {
     for s in &b.statements {
         match s {
             Statement::Let(l) | Statement::EffectLet(l) => walk_exprs(&l.value, f),
             Statement::Commit(c) => walk_exprs(&c.value, f),
             Statement::Assert(a) => walk_exprs(&a.value, f),
+            Statement::Send(s) => walk_exprs(&s.value, f),
         }
     }
     walk_exprs(&b.tail, f);
@@ -966,6 +1001,9 @@ fn collect_refs_in_block(
             }
             Statement::Assert(a) => {
                 collect_refs_in_expr(&a.value, local_to_file, commons, ctx, out);
+            }
+            Statement::Send(s) => {
+                collect_refs_in_expr(&s.value, local_to_file, commons, ctx, out);
             }
         }
     }
