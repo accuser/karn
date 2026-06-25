@@ -670,6 +670,7 @@ fn check_provider_decls(
                 None,
                 false,
                 None,
+                HashMap::new(),
             );
         }
     }
@@ -1340,6 +1341,7 @@ fn check_service_decls(
                 Some(handler.return_type.span()),
                 true,
                 actor_binding,
+                HashMap::new(),
             );
         }
     }
@@ -1440,6 +1442,74 @@ fn actor_identity_ty_guarded<'a>(
 /// `given` clause and body (with the synthetic `self` and state types in
 /// scope).
 #[allow(clippy::too_many_arguments)]
+/// The closed storage-kind catalogue (design notes §10). Only `Cell` is
+/// functional in this slice; the others parse and validate as known kinds but
+/// are gated (`bynk.store.kind_unsupported`).
+const STORAGE_KINDS: &[&str] = &["Cell", "Map", "Set", "Log", "Queue", "Cache"];
+
+/// v0.81 (checker slice): validate an agent's `store`-field kinds and build the
+/// `Cell` bare-read scope — field name → element type. A `Cell[T]` exposes `T`
+/// for bare reads (implicit deref) and for the `:=` write form. Non-`Cell` kinds
+/// are recognised but gated; unknown heads and bad arity are diagnosed.
+fn store_cell_scope(
+    agent: &AgentDecl,
+    types: &HashMap<String, TypeDecl>,
+    no_vars: &HashSet<String>,
+    refs: &mut RefSink,
+    errors: &mut Vec<CompileError>,
+) -> HashMap<String, Ty> {
+    let mut cells: HashMap<String, Ty> = HashMap::new();
+    for f in &agent.store_fields {
+        let head = f.kind.head.name.as_str();
+        if !STORAGE_KINDS.contains(&head) {
+            errors.push(
+                CompileError::new(
+                    "bynk.store.unknown_kind",
+                    f.kind.head.span,
+                    format!(
+                        "unknown storage kind `{head}` — expected one of {}",
+                        STORAGE_KINDS.join(", ")
+                    ),
+                )
+                .with_note("a `store` field's type is a storage kind, not an ordinary type"),
+            );
+            continue;
+        }
+        if head != "Cell" {
+            errors.push(
+                CompileError::new(
+                    "bynk.store.kind_unsupported",
+                    f.kind.head.span,
+                    format!(
+                        "storage kind `{head}` is not yet supported — only `Cell` lands in this \
+                         storage-track slice"
+                    ),
+                )
+                .with_note("the remaining kinds (`Map`/`Set`/`Log`/`Queue`/`Cache`) follow in later slices"),
+            );
+            continue;
+        }
+        if f.kind.args.len() != 1 {
+            errors.push(CompileError::new(
+                "bynk.store.kind_arity",
+                f.kind.span,
+                format!(
+                    "`Cell` takes exactly one type argument (`Cell[T]`), found {}",
+                    f.kind.args.len()
+                ),
+            ));
+            continue;
+        }
+        let elem = &f.kind.args[0];
+        checker::record_type_refs(elem, types, no_vars, refs);
+        if let Some(ty) = checker::resolve_type_ref(elem, types) {
+            cells.insert(f.name.name.clone(), ty);
+        }
+    }
+    cells
+}
+
+#[allow(clippy::too_many_arguments)]
 fn check_agent_decls(
     typed: &mut checker::TypedCommons,
     table: &UnitTable,
@@ -1453,23 +1523,33 @@ fn check_agent_decls(
 ) {
     for agent in table.agents.values() {
         refs.set_owner(&agent.name.name);
-        // v0.81 (storage track, slice 1): `store` fields parse and format, but
-        // kind-aware checking and the staged-commit lowering land in the next
-        // slices (ADR 0108/0109). Gate a `store`-bearing agent honestly with a
-        // single diagnostic and skip its body, rather than emitting a cascade of
-        // unresolved-name errors for bare store-field reads.
-        if let Some(first) = agent.store_fields.first() {
-            errors.push(
-                CompileError::new(
-                    "bynk.store.unsupported",
-                    first.span,
-                    "agent `store` fields are not yet supported — storage kinds land in a \
-                     later storage-track slice",
-                )
-                .with_note("use a `state { }` block for now"),
-            );
-            continue;
-        }
+        // v0.81 (storage track, checker slice): `store` fields are now checked
+        // for real — kind validity, bare `Cell` reads, the `:=` write form, and
+        // invariant resolution onto `store` cells — so misuse gets precise
+        // diagnostics. The feature stays **gated from emission** until the
+        // staged-commit slice (ADR 0109), so a `store`-bearing agent also reports
+        // `bynk.store.unsupported` (check == compile; valid code is gated, not
+        // broken). `store_cells` maps each `Cell` field to its element type, for
+        // bare reads and the `:=`/invariant checks below.
+        let store_cells: HashMap<String, Ty> = if agent.store_fields.is_empty() {
+            HashMap::new()
+        } else {
+            if let Some(first) = agent.store_fields.first() {
+                errors.push(
+                    CompileError::new(
+                        "bynk.store.unsupported",
+                        first.span,
+                        "agent `store` fields type-check but are not yet emitted — storage \
+                         kinds become functional in a later storage-track slice",
+                    )
+                    .with_note(
+                        "the syntax and types are checked; code generation lands with the \
+                         staged-commit slice (ADR 0109)",
+                    ),
+                );
+            }
+            store_cell_scope(agent, &typed.types, no_vars, refs, errors)
+        };
         // v0.25: the agent's key type and state field types reference types.
         checker::record_type_refs(&agent.key_type, &typed.types, no_vars, refs);
         for field in &agent.state_fields {
@@ -1615,13 +1695,21 @@ fn check_agent_decls(
                 kind: checker::NamedKind::Record,
             },
         );
+        // v0.81: each `Cell` store field is a bare local of its element type
+        // (implicit deref in read position); the `:=` write form is checked
+        // separately against `store_cells`.
+        for (name, ty) in &store_cells {
+            self_scope.insert(name.clone(), ty.clone());
+        }
         let _ = key_ty;
 
-        // v0.80: invariant well-formedness — predicates are pure `Bool`
-        // expressions over the agent's state fields (§14).
+        // v0.80/v0.81: invariant well-formedness — predicates are pure `Bool`
+        // expressions over the agent's state fields and/or `store` cells (§14,
+        // ADR 0108 D5).
         checker::check_invariants(
             &agent.invariants,
             &agent.state_fields,
+            &store_cells,
             &agent.name.name,
             &resolved_for_handler,
             &mut typed.expr_types,
@@ -1670,6 +1758,7 @@ fn check_agent_decls(
                 Some(handler.return_type.span()),
                 true,
                 None,
+                store_cells.clone(),
             );
         }
     }

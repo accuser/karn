@@ -643,6 +643,7 @@ fn check_integration_case_body(
         in_test_body: true,
         test_services: HashSet::new(),
         type_vars: std::collections::HashSet::new(),
+        store_cells: std::collections::HashMap::new(),
     };
     let _ = checker::type_of_block(&case.body, Some(&return_ty), &mut ctx);
 }
@@ -1275,6 +1276,7 @@ fn check_op_body_with_privileged_view(
         None,
         false,
         None,
+        HashMap::new(),
     );
     let _ = in_test_body; // Mock op bodies are not test bodies; assert is not valid here.
 }
@@ -1385,6 +1387,7 @@ fn check_test_case_body(
             .map(|t| t.services.keys().cloned().collect())
             .unwrap_or_default(),
         type_vars: std::collections::HashSet::new(),
+        store_cells: std::collections::HashMap::new(),
     };
     let _ = checker::type_of_block(&case.body, Some(&return_ty), &mut ctx);
     // Don't enforce return-type equality; the test runner discards the
@@ -1892,6 +1895,7 @@ fn emit_mock_op_body(
             None,
             false,
             None,
+            HashMap::new(),
         );
     }
     let cross = bynk_check::resolver::CrossContextInfo::default();
