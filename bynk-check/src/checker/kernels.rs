@@ -246,7 +246,8 @@ pub(crate) fn check_list_kernel_method(
             if !arity(1, ctx) {
                 return None;
             }
-            let ret = check_kernel_fn_arg(&args[0], vec![elem.clone()], "the `List.map` function", ctx)?;
+            let ret =
+                check_kernel_fn_arg(&args[0], vec![elem.clone()], "the `List.map` function", ctx)?;
             Some(Ty::List(Box::new(ret)))
         }
         "filter" => {
@@ -370,8 +371,7 @@ pub(crate) fn check_list_kernel_method(
             if !arity(1, ctx) {
                 return None;
             }
-            let key =
-                check_kernel_fn_arg(&args[0], vec![elem.clone()], "the `List.sum` key", ctx)?;
+            let key = check_kernel_fn_arg(&args[0], vec![elem.clone()], "the `List.sum` key", ctx)?;
             require_numeric(&key, "List.sum", args[0].span, ctx);
             Some(key)
         }
