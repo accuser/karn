@@ -163,10 +163,10 @@ It also has a **language-primitive dependency the storage track did not need: an
 absolute-instant type.** The `Log` time-window builders (`since`/`before`/
 `between`) take an absolute time, and the common `Map` query compares a stored
 instant field against one (the §3 example). Today an instant is bare `Int`
-milliseconds — the `Clock` unit, per **ADR 0112 D4**, which *deferred* the
-question of a nominal `Instant`/`Timestamp` to its own ADR. That question now
-becomes load-bearing here (Q4): it re-types the time-window builders and any
-instant-valued field. Like `Duration` (sequenced as a prerequisite slice before
+milliseconds — the `Clock` unit, per **ADR 0112 D4**, which **rejected a nominal
+`Instant`/`Timestamp` for now**, keeping it a forward-compatible future
+refinement. That refinement now becomes load-bearing here (Q4): it re-types the
+time-window builders and any instant-valued field. Like `Duration` (sequenced as a prerequisite slice before
 `Cache`), an `Instant` primitive — if adopted — is a prerequisite for the `Log`
 slice and should be settled in slice 0.
 
@@ -234,9 +234,9 @@ may collapse into slice 1 depending on the `bynk.list` reconciliation.
 4. **An absolute-instant type** (slice 0; prerequisite for `Log`). The `Log`
    time-window builders (`since`/`before`/`between`) and instant-valued `Map`
    fields (the §3 example) need an absolute time. Today that is bare `Int`
-   milliseconds (the `Clock` unit); **ADR 0112 D4 deferred** whether a nominal
-   `Instant`/`Timestamp` type should exist — and this is where that question
-   becomes load-bearing. Decide: stay `Int` (no type distinction between a count
+   milliseconds (the `Clock` unit); **ADR 0112 D4 rejected** a nominal
+   `Instant`/`Timestamp` for now, holding it as a forward-compatible future
+   refinement — and this is where that refinement becomes load-bearing. Decide: stay `Int` (no type distinction between a count
    and an instant — the very confusion `Duration` was introduced to remove), or
    introduce `Instant` as a prerequisite slice (mirroring how `Duration` preceded
    `Cache`). The choice re-types the time-window builders and the §3 example, so
