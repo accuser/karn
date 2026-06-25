@@ -4,9 +4,11 @@ Persistent design doc for the **query algebra** of `design/bynk-design-notes.md`
 §11, the feature-track artefact of
 [ADR 0076](../decisions/0076-feature-track-posture.md). It realises and sharpens
 §11; the design notes stay the north star. It is the **sibling track** the
-storage track (`design/tracks/storage.md`) sequences *before* its `Set`/`Log`
-slices — `Log`'s time-window reads and `Map`'s deferred `@indexed` both live
-here, and storage's lazy read surfaces produce the `Query[T]` this track defines.
+storage track (`design/tracks/storage.md`) sequences *before* its `Log` slice
+(`Set` shipped at v0.84 with only entry ops — `add`/`remove`/`contains`/`size` —
+and needed no query surface). `Log`'s time-window reads and `Map`'s deferred
+`@indexed` both live here, and storage's lazy read surfaces produce the
+`Query[T]` this track defines.
 
 **Trigger (ADR 0076):** multi-increment ✔ (the `Query[T]` type, the builder and
 terminal vocabularies, the `@indexed` indexing model, joins/grouping, the
@@ -72,26 +74,38 @@ plus indexing, which the `Map` slice explicitly deferred here.
 ## 3. Concrete surface
 
 ```
--- pure construction (returns a Query, no effect)
-fn pendingExpiringBefore(t: Duration)
+-- pure construction (returns a Query, no effect). `now` and `expiresAt` are
+-- absolute instants — `Int` milliseconds today (the `Clock` unit, ADR 0112 D4);
+-- a nominal `Instant`/`Timestamp` is an open dependency (§5; Q4).
+fn pendingExpiredAt(now: Int)
     -> Query[Reservation] given Reservations: Map[ReservationId, Reservation] {
   Reservations
     .filter(r => r.status == Pending)
-    .filter(r => r.expiresAt < t)
+    .filter(r => r.expiresAt < now)     -- expiresAt: Int — an absolute instant
 }
 
--- effectful execution, inside a handler (terminal returns Effect[T])
-on call sweep() -> Effect[Int] {
-  let stale <- pendingExpiringBefore(deadline).collect
+-- effectful execution, inside a handler (terminal returns Effect[T]). The instant
+-- comes from the Clock, exactly as a timestamp is minted everywhere else.
+on call sweep() -> Effect[Int] given Clock {
+  let now <- Clock.now()
+  let stale <- pendingExpiredAt(now).collect
   Effect.pure(stale.length)
 }
 
--- time-window on a Log, composing with the general builders
-events.since(start).filter(e => e.kind == Order).map(e => e.payload).collect
+-- time-window on a Log, composing with the general builders. `since` takes an
+-- absolute instant (`Int` millis today; see §5 / Q4).
+events.since(dayStart).filter(e => e.kind == Order).map(e => e.payload).collect
 
 -- secondary index declaration drives compiler routing
 store reservations: Map[ReservationId, Reservation] @indexed(by: orderId, by: expiresAt)
 ```
+
+(The instant arithmetic uses ADR 0112 D4's sanctioned `Int + Duration -> Int` —
+e.g. a caller computes a horizon `now + 1.hours`. Whether instants gain a nominal
+`Instant`/`Timestamp` type, rather than staying bare `Int` millis, is the open
+dependency below — it re-types `now`, `expiresAt`, and the `Log` time-window
+builders' arguments, so it must be settled before slice 2's `Map` lowering and
+the `Log` slice are specced against this example.)
 
 **Builders** (return `Query[T]` on storage, the same collection eagerly
 in-memory): `filter`, `map`, `flatMap`, `sortBy`, `take`, `skip`, `distinct`,
@@ -122,7 +136,11 @@ time-window builders — the handler/`store`/`given` forms are untouched.
   terminals → `T`). The builder/terminal signature tables (generic in the element
   and key types); the `Ordering`/orderable-key rule for `sortBy`/`min`/`max`; the
   storage-read effect folding into the agent's storage capability (no new
-  `given`); `Query[T]` non-storable/non-boundary enforcement.
+  `given`); `Query[T]` non-storable/non-boundary enforcement. **`flatMap` is the
+  one builder whose lambda return type flips with the root** — `T -> Query[U]`
+  storage-rooted, `T -> List[U]` in-memory — so the checker must dispatch its
+  argument type, not just its result, by provenance (Q9 covers the lowering; this
+  is the signature-level duality).
 - **`bynk-emit`:** lower a **lazy storage query** to a Durable-Object read — a
   **scan** by default, an **index lookup** when the predicate matches a declared
   `@indexed` key; lower **eager in-memory** chains to TS array/object operations.
@@ -140,6 +158,17 @@ This track depends on the **storage track**: `Map`/`Set`/`Cache` shipped
 the atomic-commit machinery (ADR 0109) is the seam index maintenance hooks into.
 `Log` (storage slice 4) depends on **this** track for its read surface, and the
 `Map` `@indexed` follow-on is realised **here**.
+
+It also has a **language-primitive dependency the storage track did not need: an
+absolute-instant type.** The `Log` time-window builders (`since`/`before`/
+`between`) take an absolute time, and the common `Map` query compares a stored
+instant field against one (the §3 example). Today an instant is bare `Int`
+milliseconds — the `Clock` unit, per **ADR 0112 D4**, which *deferred* the
+question of a nominal `Instant`/`Timestamp` to its own ADR. That question now
+becomes load-bearing here (Q4): it re-types the time-window builders and any
+instant-valued field. Like `Duration` (sequenced as a prerequisite slice before
+`Cache`), an `Instant` primitive — if adopted — is a prerequisite for the `Log`
+slice and should be settled in slice 0.
 
 Front-loaded, hard-to-reverse ADRs to write in the settling phase (roughly in
 slice order):
@@ -167,13 +196,15 @@ systems (§11 defers reactive queries to them).
 
 ## 6. Ordered slice decomposition
 
-> **Track status: not started** (drafted 2026-06-25, pending review). Sequenced
-> after storage slice 3c (`Cache`, shipped v0.87); unblocks storage slice 4
-> (`Log`) and the `Map` `@indexed` follow-on.
+> **Track status: not started — direction reviewed; settling phase next**
+> (drafted and reviewed 2026-06-25). Sequenced after storage slice 3c (`Cache`,
+> shipped v0.87); unblocks storage slice 4 (`Log`) and the `Map` `@indexed`
+> follow-on. Slice 0 lands the foundational ADRs (§5), resolving the open
+> questions (§7) — starting with the absolute-instant dependency (Q4).
 
 | # | Slice | Depends on | Status |
 |---|---|---|---|
-| 0 | Settling — `Query[T]` model + dispatch ADR; vocabulary + `Ordering` ADR; indexing-model ADR | — | not started |
+| 0 | Settling — `Query[T]` model + dispatch ADR; vocabulary + `Ordering` ADR; indexing-model ADR; the **absolute-instant** decision (Q4 — `Int` vs a nominal `Instant`, a `Log` prerequisite) | — | not started |
 | 1 | **Eager in-memory vocabulary** on `List` (method-chain `filter`/`map`/`flatMap`/`sortBy`/`take`/`skip`/`distinct`/`distinctBy` + terminals `fold`/`count`/`any`/`all`/`first`/`sum`/`min`/`max`/`average`) — no storage, no laziness; reconcile with the `bynk.list` free functions | 0 | not started |
 | 2 | **Lazy `Query[T]` over storage `Map`** — the builder/terminal split, `Query[T]` type, **scan** execution (no index yet); pure-build/effectful-terminate | 1, storage `Map` | not started |
 | 3 | **`@indexed`** — secondary indexes maintained in the commit; compiler routing + the missing/unused/ambiguous **hygiene diagnostics** | 2 | not started |
@@ -200,30 +231,44 @@ may collapse into slice 1 depending on the `bynk.list` reconciliation.
    not value-comparable — like `Effect`/`Fn` (ADRs 0031/0030); returnable from a
    pure helper and passable as an argument (§11). Confirm the exact rule set and
    its diagnostics.
-4. **`Ordering` for `sortBy`/`min`/`max`/`sum`/`average`** (slice 1). The
+4. **An absolute-instant type** (slice 0; prerequisite for `Log`). The `Log`
+   time-window builders (`since`/`before`/`between`) and instant-valued `Map`
+   fields (the §3 example) need an absolute time. Today that is bare `Int`
+   milliseconds (the `Clock` unit); **ADR 0112 D4 deferred** whether a nominal
+   `Instant`/`Timestamp` type should exist — and this is where that question
+   becomes load-bearing. Decide: stay `Int` (no type distinction between a count
+   and an instant — the very confusion `Duration` was introduced to remove), or
+   introduce `Instant` as a prerequisite slice (mirroring how `Duration` preceded
+   `Cache`). The choice re-types the time-window builders and the §3 example, so
+   it must precede slice 2.
+5. **`Ordering` for `sortBy`/`min`/`max`/`sum`/`average`** (slice 1). The
    language has no `Ordering` concept. Options: a closed **orderable base set**
    (`Int`/`Float`/`String`/`Duration`, with refined types widening) keyed by
    `sortBy`'s `T -> K`; or a first `Ordering`/typeclass mechanism. The smaller
    choice (orderable base set) likely suffices for v1.
-5. **The `bynk.list` reconciliation** (slice 1). The eager combinators exist as
+6. **The `bynk.list` reconciliation** (slice 1). The eager combinators exist as
    free functions (`bynk.list.map`/`filter`/…). Do they become **methods**
    (migration + a `bynk-fmt` codemod, deprecating the free functions), or do
    method and free-function forms coexist (ADR 0037's call-surface question)?
-6. **`@indexed` hygiene: warnings vs errors** (slice 3). §11 says the compiler
+7. **`@indexed` hygiene: warnings vs errors** (slice 3). §11 says the compiler
    *warns* on a missing/unused/ambiguous index. Bynk's diagnostic model can do
    warning-category — confirm these are warnings (not hard errors), and settle the
    selectivity heuristic and the ambiguity tie-break (most-selective + note).
-7. **The storage-read effect surface** (slice 2). §11 says queries fold into the
+8. **The storage-read effect surface** (slice 2). §11 says queries fold into the
    storage capability that "comes with" the agent's `store` fields — no new
    `given`. Confirm a storage terminal is `Effect`-typed (awaited with `<-`) like
    the existing entry ops, needing no extra capability (contrast `Cache`'s
    `given Clock`, which is eviction-specific, ADR 0113).
-8. **`flatMap` returning `Query[U]` on storage** (slice 2/4). Nested storage
+9. **`flatMap` returning `Query[U]` on storage** (slice 2/4). Nested storage
    queries — feasibility of the bind and its lowering (a correlated scan vs a
-   join rewrite).
-9. **Cross-shape joins** (slice 4). `Map × Log` joins using each side's index
-   (the Log time index + the Map key); the lowering and the index-routing across
-   shapes.
-10. **Numeric/aggregate terminals** (slice 1/2). `average -> Float` (so `Int`
+   join rewrite). The signature-level duality (lambda returns `Query[U]` vs
+   `List[U]` by root) is a §4 checker concern; this is the lowering.
+10. **Cross-shape joins** (slice 4). `Map × Log` joins using each side's index
+    (the Log time index + the Map key); the lowering and the index-routing across
+    shapes.
+11. **Numeric/aggregate terminals** (slice 1/2). `average -> Float` (so `Int`
     averages don't truncate); `sum`/`min`/`max` result types; empty-collection
     behaviour (`min`/`max`/`average` of nothing → `Option`? fault? default?).
+    **Settle in slice 1's vocabulary ADR, before slice 2 reuses these terminals
+    over storage** — the storage path executes to learn emptiness, so the
+    Option-vs-fault-vs-default choice cannot be deferred to the storage slice.
