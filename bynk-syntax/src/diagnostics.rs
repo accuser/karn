@@ -1082,12 +1082,20 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "A known storage annotation (`@ttl`/`@retain`/`@indexed`/`@bounded`) is used before the slice that supports it.",
     ),
     d(
+        "bynk.store.cache_needs_clock",
+        "A handler performs a `Cache` operation (TTL expiry reads the clock) without declaring `given Clock`.",
+    ),
+    d(
+        "bynk.store.cache_ttl_required",
+        "A `Cache` field is missing its required `@ttl(<duration>)` annotation (a keyed store with no expiry is a `Map`).",
+    ),
+    d(
         "bynk.store.kind_arity",
         "A storage kind was applied to the wrong number of type arguments (e.g. `Cell[A, B]`).",
     ),
     d(
         "bynk.store.kind_unsupported",
-        "A known storage kind (`Log`/`Queue`/`Cache`) is used before the slice that supports it.",
+        "A known storage kind (`Log`/`Queue`) is used before the slice that supports it.",
     ),
     d(
         "bynk.store.unknown_annotation",

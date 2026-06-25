@@ -6,7 +6,7 @@
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../troubleshooting/index.md).
 
-There are **298** codes in total.
+There are **300** codes in total.
 
 ## Agents
 
@@ -209,8 +209,10 @@ There are **298** codes in total.
 | `bynk.send.requires_unit` | A `~>` send targets an operation whose reply is not `Effect[()]`. | [`effect_send_stmt`](grammar.md#rule-effect_send_stmt) |
 | `bynk.store.annotation_kind_mismatch` | A storage annotation is used on a kind it does not apply to (e.g. `@ttl` on a `Map`). |  |
 | `bynk.store.annotation_unsupported` | A known storage annotation (`@ttl`/`@retain`/`@indexed`/`@bounded`) is used before the slice that supports it. |  |
+| `bynk.store.cache_needs_clock` | A handler performs a `Cache` operation (TTL expiry reads the clock) without declaring `given Clock`. |  |
+| `bynk.store.cache_ttl_required` | A `Cache` field is missing its required `@ttl(<duration>)` annotation (a keyed store with no expiry is a `Map`). |  |
 | `bynk.store.kind_arity` | A storage kind was applied to the wrong number of type arguments (e.g. `Cell[A, B]`). |  |
-| `bynk.store.kind_unsupported` | A known storage kind (`Log`/`Queue`/`Cache`) is used before the slice that supports it. |  |
+| `bynk.store.kind_unsupported` | A known storage kind (`Log`/`Queue`) is used before the slice that supports it. |  |
 | `bynk.store.unknown_annotation` | A `store` field carries an annotation outside the closed `@indexed`/`@ttl`/`@retain`/`@bounded` set. |  |
 | `bynk.store.unknown_kind` | A `store` field's type is not a known storage kind. |  |
 | `bynk.store.unknown_op` | A storage-`Map`/`Set` operation is not a recognised entry/membership method. |  |

@@ -674,6 +674,7 @@ fn check_provider_decls(
                 HashMap::new(),
                 HashMap::new(),
                 HashMap::new(),
+                HashMap::new(),
             );
         }
     }
@@ -1347,6 +1348,7 @@ fn check_service_decls(
                 HashMap::new(),
                 HashMap::new(),
                 HashMap::new(),
+                HashMap::new(),
             );
         }
     }
@@ -1464,7 +1466,7 @@ const ANNOTATIONS: &[AnnotationSpec] = &[
         name: "ttl",
         kinds: &["Cache"],
         slice: "the Cache slice",
-        functional: false,
+        functional: true,
     },
     AnnotationSpec {
         name: "retain",
@@ -1560,10 +1562,12 @@ fn store_field_scopes(
     HashMap<String, Ty>,
     HashMap<String, (Ty, Ty)>,
     HashMap<String, Ty>,
+    HashMap<String, (Ty, Ty, i64)>,
 ) {
     let mut cells: HashMap<String, Ty> = HashMap::new();
     let mut maps: HashMap<String, (Ty, Ty)> = HashMap::new();
     let mut sets: HashMap<String, Ty> = HashMap::new();
+    let mut caches: HashMap<String, (Ty, Ty, i64)> = HashMap::new();
     let arity_err = |f: &StoreField, kind: &str, want: usize, errors: &mut Vec<CompileError>| {
         errors.push(CompileError::new(
             "bynk.store.kind_arity",
@@ -1629,24 +1633,65 @@ fn store_field_scopes(
                     sets.insert(f.name.name.clone(), ty);
                 }
             }
+            // v0.87 (ADR 0113): `Cache[K, V]` — a `Map` with per-entry TTL.
+            "Cache" => {
+                if f.kind.args.len() != 2 {
+                    arity_err(f, "Cache", 2, errors);
+                    continue;
+                }
+                checker::record_type_refs(&f.kind.args[0], types, no_vars, refs);
+                checker::record_type_refs(&f.kind.args[1], types, no_vars, refs);
+                // A `Cache` requires `@ttl(<Duration>)`; its millisecond value is
+                // the entry lifetime. Absent → steer the author to a `Map`.
+                let ttl = cache_ttl_millis(f, errors);
+                if let (Some(k), Some(v), Some(ttl)) = (
+                    checker::resolve_type_ref(&f.kind.args[0], types),
+                    checker::resolve_type_ref(&f.kind.args[1], types),
+                    ttl,
+                ) {
+                    caches.insert(f.name.name.clone(), (k, v, ttl));
+                }
+            }
             other => {
                 errors.push(
                     CompileError::new(
                         "bynk.store.kind_unsupported",
                         f.kind.head.span,
                         format!(
-                            "storage kind `{other}` is not yet supported — `Cell`, `Map`, and \
-                             `Set` are functional in this storage-track slice"
+                            "storage kind `{other}` is not yet supported — `Cell`, `Map`, \
+                             `Set`, and `Cache` are functional in this storage-track slice"
                         ),
                     )
-                    .with_note(
-                        "the remaining kinds (`Log`/`Queue`/`Cache`) follow in later slices",
-                    ),
+                    .with_note("the remaining kinds (`Log`/`Queue`) follow in later slices"),
                 );
             }
         }
     }
-    (cells, maps, sets)
+    (cells, maps, sets, caches)
+}
+
+/// v0.87 (ADR 0113 D2): a `Cache` field must carry `@ttl(<Duration literal>)`;
+/// return its value in milliseconds. A missing `@ttl` is
+/// `bynk.store.cache_ttl_required` (steering to a `Map`); a non-`Duration`
+/// argument is caught by the annotation-argument checker, so here a malformed
+/// `@ttl` simply yields `None`.
+fn cache_ttl_millis(f: &StoreField, errors: &mut Vec<CompileError>) -> Option<i64> {
+    let ttl = f.annotations.iter().find(|a| a.name.name == "ttl");
+    let Some(ttl) = ttl else {
+        errors.push(
+            CompileError::new(
+                "bynk.store.cache_ttl_required",
+                f.kind.span,
+                "a `Cache` field requires a `@ttl(<duration>)` annotation — its entry lifetime",
+            )
+            .with_note("a keyed store with no expiry is a `Map`, not a `Cache`"),
+        );
+        return None;
+    };
+    match ttl.args.first().map(|a| &a.value.kind) {
+        Some(ExprKind::DurationLit { millis, .. }) => Some(*millis),
+        _ => None,
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1670,12 +1715,18 @@ fn check_agent_decls(
         // end. `store_cells` maps each `Cell` field to its element type, for the
         // bare-read scope and the `:=`/invariant checks below.
         #[allow(clippy::type_complexity)]
-        let (store_cells, store_maps, store_sets): (
+        let (store_cells, store_maps, store_sets, store_caches): (
             HashMap<String, Ty>,
             HashMap<String, (Ty, Ty)>,
             HashMap<String, Ty>,
+            HashMap<String, (Ty, Ty, i64)>,
         ) = if agent.store_fields.is_empty() {
-            (HashMap::new(), HashMap::new(), HashMap::new())
+            (
+                HashMap::new(),
+                HashMap::new(),
+                HashMap::new(),
+                HashMap::new(),
+            )
         } else {
             store_field_scopes(agent, &typed.types, no_vars, refs, errors)
         };
@@ -1928,6 +1979,7 @@ fn check_agent_decls(
                 store_cells.clone(),
                 store_maps.clone(),
                 store_sets.clone(),
+                store_caches.clone(),
             );
         }
     }

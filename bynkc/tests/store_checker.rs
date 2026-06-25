@@ -103,8 +103,8 @@ fn assign_to_non_cell_target_is_rejected() {
 
 #[test]
 fn unsupported_kind_is_gated() {
-    // `Cache` is a known kind but not yet functional.
-    let cs = codes("cache", &agent_with("store c: Cache[String, Int]", ""));
+    // `Log` is a known kind but not yet functional.
+    let cs = codes("log", &agent_with("store l: Log[Int]", ""));
     assert!(
         cs.contains(&"bynk.store.kind_unsupported".to_string()),
         "{cs:?}"
@@ -253,20 +253,105 @@ fn annotation_on_wrong_kind_is_rejected() {
 }
 
 #[test]
-fn annotation_duration_literal_arg_parses() {
-    // `5.minutes` is parsed as an ordinary expression argument (the `Duration`
-    // literal lands in slice 3b); the grammar must accept it without a parse
-    // error — the field gates on `@ttl`/`Cache` being unsupported, nothing more.
+fn ttl_on_cache_field_compiles_clean() {
+    // v0.87: `@ttl` is functional on a `Cache`. A `Cache` field with a valid
+    // `@ttl(<duration>)` and no cache-op body compiles with no diagnostics.
     let cs = codes(
-        "anndur",
+        "ttlok",
         &agent_with("store c: Cache[String, Int] @ttl(5.minutes)", ""),
     );
-    assert!(
-        !cs.iter().any(|c| c.starts_with("bynk.parse")),
-        "the duration-literal argument must parse: {cs:?}"
+    assert_eq!(
+        cs,
+        Vec::<String>::new(),
+        "a Cache field with @ttl must compile clean: {cs:?}"
+    );
+}
+
+// -- v0.87 storage Cache (ADR 0113) --
+
+/// A `context shop` with a `Clock` capability and an agent whose single handler
+/// (`given Clock` unless `given` is empty) runs `body` against a `Cache` field.
+fn cache_agent(field: &str, given: &str, body: &str) -> String {
+    format!(
+        "context shop\n\n\
+         capability Clock {{ fn now() -> Effect[Int] }}\n\
+         provides Clock = C {{ fn now() -> Effect[Int] {{ 0 }} }}\n\n\
+         agent A {{\n  key id: String\n  {field}\n  \
+         on call f(k: String, p: Int) -> Effect[()]{given} {{ {body}\n    Effect.pure(()) }}\n}}\n"
+    )
+}
+
+#[test]
+fn valid_cache_agent_compiles_cleanly() {
+    let cs = codes(
+        "cacheok",
+        &cache_agent(
+            "store c: Cache[String, Int] @ttl(1.minutes)",
+            " given Clock",
+            "let _ <- c.put(k, p)",
+        ),
+    );
+    assert_eq!(cs, Vec::<String>::new(), "{cs:?}");
+}
+
+#[test]
+fn cache_without_ttl_is_rejected() {
+    let cs = codes(
+        "cachettl",
+        &cache_agent(
+            "store c: Cache[String, Int]",
+            " given Clock",
+            "let _ <- c.put(k, p)",
+        ),
     );
     assert!(
-        cs.contains(&"bynk.store.annotation_unsupported".to_string()),
+        cs.contains(&"bynk.store.cache_ttl_required".to_string()),
         "{cs:?}"
     );
+}
+
+#[test]
+fn cache_op_without_given_clock_is_rejected() {
+    let cs = codes(
+        "cacheclock",
+        &cache_agent(
+            "store c: Cache[String, Int] @ttl(1.minutes)",
+            "",
+            "let _ <- c.put(k, p)",
+        ),
+    );
+    assert!(
+        cs.contains(&"bynk.store.cache_needs_clock".to_string()),
+        "{cs:?}"
+    );
+}
+
+#[test]
+fn cache_remove_needs_no_clock() {
+    // `remove` is the one op that does not read the clock.
+    let cs = codes(
+        "cacherm",
+        &cache_agent(
+            "store c: Cache[String, Int] @ttl(1.minutes)",
+            "",
+            "let _ <- c.remove(k)",
+        ),
+    );
+    assert!(
+        !cs.contains(&"bynk.store.cache_needs_clock".to_string()),
+        "remove must not require `given Clock`: {cs:?}"
+    );
+}
+
+#[test]
+fn cache_unknown_op_is_rejected() {
+    let cs = codes(
+        "cacheop",
+        &cache_agent(
+            "store c: Cache[String, Int] @ttl(1.minutes)",
+            " given Clock",
+            "let _ <- c.frobnicate(k)",
+        ),
+    );
+    assert!(cs.contains(&"bynk.store.unknown_op".to_string()), "{cs:?}");
 }

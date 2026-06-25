@@ -299,6 +299,89 @@ assert((await c.count({})) === 1, "size after remove");
 console.log("ALL OK");
 "#;
 
+const CACHE_SOURCE: &str = "context shop\n\
+\n\
+capability Clock {\n\
+\x20 fn now() -> Effect[Int]\n\
+}\n\
+\n\
+provides Clock = SystemClock {\n\
+\x20 fn now() -> Effect[Int] {\n\
+\x20   0\n\
+\x20 }\n\
+}\n\
+\n\
+agent Sessions {\n\
+\x20 key id: String\n\
+\x20 store live: Cache[String, Int] @ttl(1.minutes)\n\
+\n\
+\x20 on call put(k: String, n: Int) -> Effect[()] given Clock {\n\
+\x20   let _ <- live.put(k, n)\n\
+\x20   Effect.pure(())\n\
+\x20 }\n\
+\x20 on call fetch(k: String) -> Effect[Option[Int]] given Clock {\n\
+\x20   let r <- live.get(k)\n\
+\x20   Effect.pure(r)\n\
+\x20 }\n\
+\x20 on call has(k: String) -> Effect[Bool] given Clock {\n\
+\x20   let b <- live.contains(k)\n\
+\x20   Effect.pure(b)\n\
+\x20 }\n\
+\x20 on call count() -> Effect[Int] given Clock {\n\
+\x20   let n <- live.size()\n\
+\x20   Effect.pure(n)\n\
+\x20 }\n\
+}\n";
+
+const CACHE_DRIVER_TS: &str = r#"
+import { Sessions } from "./shop.js";
+
+function assert(cond: boolean, msg: string): void {
+  if (!cond) {
+    throw new Error(`assertion failed: ${msg}`);
+  }
+}
+
+function fakeState() {
+  const m = new Map<string, unknown>();
+  return {
+    storage: {
+      async get(key: string): Promise<unknown> { return m.get(key); },
+      async put(key: string, value: unknown): Promise<void> { m.set(key, value); },
+    },
+  };
+}
+
+// A controllable mock clock — the testability the `given Clock` design buys
+// (ADR 0113 D4). `nowMs` is advanced by the driver to drive TTL expiry.
+let nowMs = 1_000_000;
+const clock = { now: async (): Promise<number> => nowMs };
+const deps = { Clock: clock };
+
+const c = new Sessions(fakeState() as never);
+
+// put + get within the TTL window
+await c.put("a", 5, deps);
+let r = await c.fetch("a", deps);
+assert(r.tag === "Some" && r.value === 5, "live entry reads back");
+assert((await c.has("a", deps)) === true, "contains is true while live");
+assert((await c.count(deps)) === 1, "size counts the live entry");
+
+// advance past the 1-minute TTL — the entry expires (lazy, check-on-read)
+nowMs += 60_001;
+r = await c.fetch("a", deps);
+assert(r.tag === "None", "an entry past its TTL reads as None");
+assert((await c.has("a", deps)) === false, "contains is false once expired");
+assert((await c.count(deps)) === 0, "size drops the expired entry");
+
+// a fresh put resets the lifetime
+await c.put("a", 9, deps);
+r = await c.fetch("a", deps);
+assert(r.tag === "Some" && r.value === 9, "put resets the entry's TTL");
+
+console.log("ALL OK");
+"#;
+
 const TSCONFIG_JSON: &str = r#"{
   "compilerOptions": {
     "module": "Node16",
@@ -390,4 +473,9 @@ fn store_map_agent_runtime_semantics() {
 #[test]
 fn store_set_agent_runtime_semantics() {
     verify("set", SET_SOURCE, SET_DRIVER_TS);
+}
+
+#[test]
+fn store_cache_agent_runtime_semantics() {
+    verify("cache", CACHE_SOURCE, CACHE_DRIVER_TS);
 }
