@@ -779,6 +779,51 @@ fn lower_method_call(
             other => format!("(/* unsupported Set op {other} */ undefined)"),
         };
     }
+    // v0.87 (ADR 0113): a storage-`Cache` operation — `<cache>.<op>(…)` on a
+    // `store Cache[K, V]` field. Lowers to an entry op over `__state.<cache>` (a
+    // `Record<string, { v, exp }>`) that applies TTL expiry against the injected
+    // `Clock`: every op but `remove` reads `now()` (an awaited `Effect`), so the
+    // op is an async IIFE. `put`/`update`/`upsert` stamp `exp = now() + ttl`;
+    // `get`/`contains`/`size` treat an entry past `exp` as absent.
+    if let ExprKind::Ident(id) = &receiver.kind
+        && let Some(ttl) = cx.agent_store_caches.get(&id.name).copied()
+    {
+        let var = cx
+            .agent_store_state
+            .as_ref()
+            .map(|(v, _)| v.clone())
+            .unwrap_or_else(|| "__state".to_string());
+        let c = format!("{var}.{}", id.name);
+        let now = format!("await {}.Clock.now()", cx.cap_deps_expr);
+        let a: Vec<String> = args.iter().map(|x| lower_expr(x, stmts, cx)).collect();
+        return match method.name.as_str() {
+            "remove" => format!("((delete {c}[{}]), undefined)", a[0]),
+            "put" => format!(
+                "(async () => {{ const __now = {now}; {c}[{0}] = {{ v: {1}, exp: __now + {ttl} }}; return undefined; }})()",
+                a[0], a[1]
+            ),
+            "get" => format!(
+                "(async () => {{ const __now = {now}; const __k = {0}; return ((__k in {c}) && {c}[__k].exp > __now) ? Some({c}[__k].v) : None; }})()",
+                a[0]
+            ),
+            "contains" => format!(
+                "(async () => {{ const __now = {now}; const __k = {0}; return (__k in {c}) && {c}[__k].exp > __now; }})()",
+                a[0]
+            ),
+            "size" => format!(
+                "(async () => {{ const __now = {now}; return Object.values({c}).filter((__e) => __e.exp > __now).length; }})()"
+            ),
+            "update" => format!(
+                "(async () => {{ const __now = {now}; const __k = {0}; if (!((__k in {c}) && {c}[__k].exp > __now)) {{ throw new Error(\"Cache.update: key absent\"); }} {c}[__k] = {{ v: ({1})({c}[__k].v), exp: __now + {ttl} }}; return undefined; }})()",
+                a[0], a[1]
+            ),
+            "upsert" => format!(
+                "(async () => {{ const __now = {now}; const __k = {0}; const __cur = ((__k in {c}) && {c}[__k].exp > __now) ? {c}[__k].v : ({1}); {c}[__k] = {{ v: ({2})(__cur), exp: __now + {ttl} }}; return undefined; }})()",
+                a[0], a[1], a[2]
+            ),
+            other => format!("(/* unsupported Cache op {other} */ undefined)"),
+        };
+    }
     // v0.9: explicit `HttpResult.Variant(args)` construction. The
     // checker has already recorded the expression's type — emit it
     // directly through the runtime's HttpResult namespace.

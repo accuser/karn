@@ -295,6 +295,10 @@ pub fn check_handler_body(
     // v0.83: the agent's `store` `Set` fields (name → element). `<set>.add/remove/
     // contains/size` resolve to the effectful storage-set ops.
     store_sets: HashMap<String, Ty>,
+    // v0.87 (ADR 0113): the agent's `store` `Cache` fields (name → (key, value,
+    // ttl millis)). `<cache>.put/get/update/upsert/remove/contains/size` resolve
+    // to the effectful cache ops, which additionally require `given Clock`.
+    store_caches: HashMap<String, (Ty, Ty, i64)>,
 ) {
     let Some(return_ty) = resolve_type_ref(return_type, &input.types) else {
         return;
@@ -355,6 +359,7 @@ pub fn check_handler_body(
         store_cells,
         store_maps,
         store_sets,
+        store_caches,
     };
     // Check the body and validate it matches the return type.
     let Some(body_ty) = type_of_block(body, Some(&return_ty), &mut ctx) else {
@@ -542,6 +547,7 @@ pub fn check_invariants(
             store_cells: HashMap::new(),
             store_maps: HashMap::new(),
             store_sets: HashMap::new(),
+            store_caches: HashMap::new(),
         };
         let pred_ty = type_of(&inv.predicate, Some(&bool_ty), &mut ctx);
         if let Some(t) = pred_ty
@@ -775,6 +781,10 @@ pub struct Ctx<'a> {
     /// v0.83: the agent's `store` `Set` fields (name → element). A `<set>.<op>(…)`
     /// call resolves against the storage-set op set here, by receiver provenance.
     pub store_sets: HashMap<String, Ty>,
+    /// v0.87 (ADR 0113): the agent's `store` `Cache` fields (name → (key, value,
+    /// ttl millis)). A `<cache>.<op>(…)` resolves against the cache op set and
+    /// requires `given Clock`.
+    pub store_caches: HashMap<String, (Ty, Ty, i64)>,
 }
 
 /// Per-capability info for checker dispatch within a handler body.
@@ -1778,6 +1788,13 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
                 && let Some(t) = ctx.store_sets.get(&id.name).cloned()
             {
                 check_store_set_op(method, args, &t, expr.span, ctx)
+            }
+            // v0.87 (ADR 0113): `<cache>.<op>(…)` on a `store Cache[K, V]` field —
+            // the storage-map ops plus a `given Clock` requirement (eviction).
+            else if let ExprKind::Ident(id) = &receiver.kind
+                && let Some((k, v, _ttl)) = ctx.store_caches.get(&id.name).cloned()
+            {
+                check_store_cache_op(method, args, &k, &v, expr.span, ctx)
             }
             // v0.9: `HttpResult.Variant(args)` — explicit HttpResult construction.
             else if let ExprKind::Ident(id) = &receiver.kind

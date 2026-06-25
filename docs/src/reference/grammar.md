@@ -885,14 +885,16 @@ A `store` field (storage track): `store <name>: <Kind>[…] [@annotations] [= <i
 keyword (also a valid identifier elsewhere). Coexists with the `state` block
 during the storage track (ADR 0108).
 
-> **`Cell`, `Map`, and `Set` are functional.** A `Cell[T]` (v0.82) reads by bare
-> name (implicit deref) and writes with `:=`; a `Map[K, V]` (v0.83, ADR 0110) is a
-> storage map with effectful entry methods (`put`/`get`/`update`/`upsert`/
-> `remove`/`contains`/`size`); a `Set[T]` (v0.84, ADR 0110) is a storage set with
-> effectful membership methods (`add`/`remove`/`contains`/`size`) — all awaited
-> with `<-`. All commit atomically at handler end with the invariant gate
-> (ADR 0109). The remaining kinds (`Log`/`Queue`/`Cache`) parse but are not yet
-> supported (`bynk.store.kind_unsupported`) — they land in later storage-track
+> **`Cell`, `Map`, `Set`, and `Cache` are functional.** A `Cell[T]` (v0.82) reads
+> by bare name (implicit deref) and writes with `:=`; a `Map[K, V]` (v0.83,
+> ADR 0110) is a storage map with effectful entry methods (`put`/`get`/`update`/
+> `upsert`/`remove`/`contains`/`size`); a `Set[T]` (v0.84, ADR 0110) is a storage
+> set with effectful membership methods (`add`/`remove`/`contains`/`size`); a
+> `Cache[K, V]` (v0.87, ADR 0113) is a `Map` with per-entry TTL expiry, requiring
+> `@ttl(<duration>)` and `given Clock` on its handlers (eviction reads the clock).
+> All are awaited with `<-` and commit atomically at handler end with the
+> invariant gate (ADR 0109). The remaining kinds (`Log`/`Queue`) parse but are not
+> yet supported (`bynk.store.kind_unsupported`) — they land in later storage-track
 > slices.
 
 ### store_kind {#rule-store_kind}

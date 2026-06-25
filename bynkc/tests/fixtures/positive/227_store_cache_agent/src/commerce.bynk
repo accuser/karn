@@ -1,0 +1,29 @@
+context commerce
+
+capability Clock {
+  fn now() -> Effect[Int]
+}
+
+provides Clock = SystemClock {
+  fn now() -> Effect[Int] {
+    0
+  }
+}
+
+agent Sessions {
+  key id: String
+  store live: Cache[String, Int] @ttl(5.minutes)
+
+  on call put(token: String, userId: Int) -> Effect[()] given Clock {
+    let _ <- live.put(token, userId)
+    Effect.pure(())
+  }
+  on call lookup(token: String) -> Effect[Option[Int]] given Clock {
+    let found <- live.get(token)
+    Effect.pure(found)
+  }
+  on call active() -> Effect[Int] given Clock {
+    let n <- live.size()
+    Effect.pure(n)
+  }
+}

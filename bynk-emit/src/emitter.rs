@@ -445,20 +445,26 @@ pub(crate) fn block_uses_send(b: &Block) -> bool {
     b.statements.iter().any(stmt) || expr(&b.tail)
 }
 
-/// v0.81–v0.83: does this block write durable state — a `:=` `Cell` write, a
-/// mutating storage-`Map` op (`put`/`remove`/`update`/`upsert`) on a `store` map,
-/// or a mutating `Set` op (`add`/`remove`) on a `store` set — anywhere, including
+/// v0.81–v0.87: does this block write durable state — a `:=` `Cell` write, a
+/// mutating storage-`Map`/`Cache` op (`put`/`remove`/`update`/`upsert`), or a
+/// mutating `Set` op (`add`/`remove`) on a `store` field — anywhere, including
 /// nested `if`/`match`/block expressions? Drives whether a store-agent handler
 /// needs the implicit-commit wrapper (read-only handlers skip it). `m` is
-/// `(maps, sets)`; both empty for `Cell`-only agents.
-pub(crate) fn block_writes_state(b: &Block, m: (&HashSet<String>, &HashSet<String>)) -> bool {
-    fn mutating_op(e: &Expr, (maps, sets): (&HashSet<String>, &HashSet<String>)) -> bool {
+/// `(maps, sets, caches)`; all empty for `Cell`-only agents.
+pub(crate) fn block_writes_state(
+    b: &Block,
+    m: (&HashSet<String>, &HashSet<String>, &HashSet<String>),
+) -> bool {
+    fn mutating_op(
+        e: &Expr,
+        (maps, sets, caches): (&HashSet<String>, &HashSet<String>, &HashSet<String>),
+    ) -> bool {
         if let ExprKind::MethodCall {
             receiver, method, ..
         } = &e.kind
             && let ExprKind::Ident(id) = &receiver.kind
         {
-            if maps.contains(&id.name)
+            if (maps.contains(&id.name) || caches.contains(&id.name))
                 && matches!(method.name.as_str(), "put" | "remove" | "update" | "upsert")
             {
                 return true;
@@ -469,7 +475,7 @@ pub(crate) fn block_writes_state(b: &Block, m: (&HashSet<String>, &HashSet<Strin
         }
         false
     }
-    fn stmt(s: &Statement, m: (&HashSet<String>, &HashSet<String>)) -> bool {
+    fn stmt(s: &Statement, m: (&HashSet<String>, &HashSet<String>, &HashSet<String>)) -> bool {
         match s {
             Statement::Assign(_) => true,
             Statement::Let(l) | Statement::EffectLet(l) => expr(&l.value, m),
@@ -478,7 +484,7 @@ pub(crate) fn block_writes_state(b: &Block, m: (&HashSet<String>, &HashSet<Strin
             Statement::Send(s) => expr(&s.value, m),
         }
     }
-    fn expr(e: &Expr, m: (&HashSet<String>, &HashSet<String>)) -> bool {
+    fn expr(e: &Expr, m: (&HashSet<String>, &HashSet<String>, &HashSet<String>)) -> bool {
         if mutating_op(e, m) {
             return true;
         }
@@ -1680,6 +1686,11 @@ pub(crate) struct LowerCtx<'a> {
     /// is one lowers to an entry operation over `__state.<set>` (a
     /// `Record<string, boolean>`), staged in the working record.
     agent_store_sets: HashSet<String>,
+    /// v0.87 (ADR 0113): the agent's `store` `Cache` fields (name → ttl millis).
+    /// A method call whose receiver is one lowers to an entry op over
+    /// `__state.<cache>` (a `Record<string, { v, exp }>`), applying TTL expiry
+    /// against the injected `Clock`.
+    agent_store_caches: HashMap<String, i64>,
     /// Cross-context info for v0.6 cross-context call lowering.
     cross_context: &'a bynk_check::resolver::CrossContextInfo,
     /// True if the current handler made at least one cross-context call
@@ -1770,6 +1781,7 @@ impl<'a> LowerCtx<'a> {
             agent_store_state: None,
             agent_store_maps: HashSet::new(),
             agent_store_sets: HashSet::new(),
+            agent_store_caches: HashMap::new(),
             cross_context,
             cross_context_used: false,
             test_services: HashSet::new(),

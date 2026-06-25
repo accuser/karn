@@ -98,6 +98,7 @@ pub(crate) fn check_fn(
         store_cells: HashMap::new(),
         store_maps: HashMap::new(),
         store_sets: HashMap::new(),
+        store_caches: HashMap::new(),
     };
     let Some(body_ty) = type_of_block(&f.body, Some(&return_ty), &mut ctx) else {
         return;
@@ -161,6 +162,7 @@ pub fn check_state_initialiser(
             store_cells: HashMap::new(),
             store_maps: HashMap::new(),
             store_sets: HashMap::new(),
+            store_caches: HashMap::new(),
         };
         type_of(init, Some(&field_ty), &mut ctx)
     };
@@ -1028,6 +1030,102 @@ pub(crate) fn check_store_map_op(
             span,
             format!(
                 "`Map.{}` takes {} argument(s), found {}",
+                method.name,
+                expected.len(),
+                args.len()
+            ),
+        ));
+        for a in args {
+            type_of(a, None, ctx);
+        }
+        return Some(effect);
+    }
+    for (a, exp) in args.iter().zip(expected.iter()) {
+        if let Some(at) = type_of(a, Some(exp), ctx)
+            && !compatible(&at, exp)
+        {
+            ctx.errors.push(CompileError::new(
+                "bynk.types.argument_mismatch",
+                a.span,
+                format!("expected `{}`, found `{}`", exp.display(), at.display()),
+            ));
+        }
+    }
+    Some(effect)
+}
+
+/// v0.87 (ADR 0113 D4): a `Cache` op consults the clock (expiry on read,
+/// `now() + ttl` on write), so the handler must declare `given Clock`. Mark it
+/// used (so it is not flagged unused) or diagnose its absence.
+fn require_clock(span: Span, ctx: &mut Ctx) {
+    const CLOCK: &str = "Clock";
+    if ctx.caps.capabilities.contains_key(CLOCK) {
+        ctx.caps.given_used.insert(CLOCK.to_string());
+        return;
+    }
+    ctx.errors.push(
+        CompileError::new(
+            "bynk.store.cache_needs_clock",
+            span,
+            "a `Cache` operation applies TTL expiry, which reads the clock — the handler must declare `given Clock`",
+        )
+        .with_note("add `Clock` to the handler's `given` clause"),
+    );
+}
+
+/// v0.87 (ADR 0113): resolve a storage-`Cache` operation `<cache>.<op>(args)` on
+/// a `store Cache[K, V]` field. The op set is the storage `Map`'s
+/// (`put`/`get`/`update`/`upsert`/`remove`/`contains`/`size`); every op but
+/// `remove` additionally requires `given Clock` (eviction reads the clock).
+pub(crate) fn check_store_cache_op(
+    method: &Ident,
+    args: &[Expr],
+    k: &Ty,
+    v: &Ty,
+    span: Span,
+    ctx: &mut Ctx,
+) -> Option<Ty> {
+    let vfn = || Ty::Fn {
+        params: vec![v.clone()],
+        ret: Box::new(v.clone()),
+    };
+    let (expected, result): (Vec<Ty>, Ty) = match method.name.as_str() {
+        "put" => (vec![k.clone(), v.clone()], Ty::Unit),
+        "get" => (vec![k.clone()], Ty::Option(Box::new(v.clone()))),
+        "remove" => (vec![k.clone()], Ty::Unit),
+        "contains" => (vec![k.clone()], Ty::Base(BaseType::Bool)),
+        "size" => (vec![], Ty::Base(BaseType::Int)),
+        "update" => (vec![k.clone(), vfn()], Ty::Unit),
+        "upsert" => (vec![k.clone(), v.clone(), vfn()], Ty::Unit),
+        other => {
+            ctx.errors.push(
+                CompileError::new(
+                    "bynk.store.unknown_op",
+                    method.span,
+                    format!(
+                        "a `Cache` store field has no operation `{other}` — expected `put`, \
+                         `get`, `update`, `upsert`, `remove`, `contains`, or `size`"
+                    ),
+                )
+                .with_note("storage-cache ops are entry-level and effectful (await with `<-`)"),
+            );
+            for a in args {
+                type_of(a, None, ctx);
+            }
+            return None;
+        }
+    };
+    // D4: every op but `remove` reads the clock for TTL expiry.
+    if method.name != "remove" {
+        require_clock(method.span, ctx);
+    }
+    let effect = Ty::Effect(Box::new(result));
+    if args.len() != expected.len() {
+        ctx.errors.push(CompileError::new(
+            "bynk.types.call_arity",
+            span,
+            format!(
+                "`Cache.{}` takes {} argument(s), found {}",
                 method.name,
                 expected.len(),
                 args.len()

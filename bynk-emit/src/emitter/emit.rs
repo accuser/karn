@@ -1536,6 +1536,33 @@ pub(crate) fn emit_agent(
         .iter()
         .map(|(n, _)| n.name.clone())
         .collect();
+    // v0.87 (ADR 0113): `store Cache[K, V] @ttl(d)` fields — a value record plus
+    // a per-entry expiry instant. `(name, V, ttl-millis)`; the ttl is the field's
+    // `@ttl` Duration literal (validated by the checker).
+    let store_cache_fields: Vec<(&Ident, &TypeRef, i64)> = if is_store_agent {
+        a.store_fields
+            .iter()
+            .filter(|f| f.kind.head.name == "Cache" && f.kind.args.len() == 2)
+            .filter_map(|f| {
+                let ttl = f
+                    .annotations
+                    .iter()
+                    .find(|an| an.name.name == "ttl")
+                    .and_then(|an| match an.args.first().map(|arg| &arg.value.kind) {
+                        Some(ExprKind::DurationLit { millis, .. }) => Some(*millis),
+                        _ => None,
+                    })?;
+                Some((&f.name, &f.kind.args[1], ttl))
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let cache_ttls: HashMap<String, i64> = store_cache_fields
+        .iter()
+        .map(|(n, _, ttl)| (n.name.clone(), *ttl))
+        .collect();
+    let cache_names: HashSet<String> = cache_ttls.keys().cloned().collect();
     // 1) State record type.
     writeln!(out, "export interface {state_ty} {{").unwrap();
     for f in &effective_fields {
@@ -1561,6 +1588,15 @@ pub(crate) fn emit_agent(
             out,
             "  readonly {name}: Record<string, boolean>;",
             name = name.name,
+        )
+        .unwrap();
+    }
+    for (name, v, _) in &store_cache_fields {
+        writeln!(
+            out,
+            "  readonly {name}: Record<string, {{ v: {v}; exp: number }}>;",
+            name = name.name,
+            v = ts_type_ref(v),
         )
         .unwrap();
     }
@@ -1601,11 +1637,14 @@ pub(crate) fn emit_agent(
             };
             parts.push(format!("{}: {val}", f.name.name));
         }
-        // A fresh `store Map`/`store Set` is the empty record.
+        // A fresh `store Map`/`store Set`/`store Cache` is the empty record.
         for (name, _) in &store_map_fields {
             parts.push(format!("{}: {{}}", name.name));
         }
         for (name, _) in &store_set_fields {
+            parts.push(format!("{}: {{}}", name.name));
+        }
+        for (name, _, _) in &store_cache_fields {
             parts.push(format!("{}: {{}}", name.name));
         }
         if parts.is_empty() {
@@ -1704,11 +1743,13 @@ pub(crate) fn emit_agent(
         // record `__state`; a state-record handler uses `currentState`/`self.state`.
         // A store handler that performs any `:=` wraps its body in a closure so an
         // implicit commit runs at handler end on every (success) return path.
-        let writes_state = is_store_agent && block_writes_state(&h.body, (&map_names, &set_names));
+        let writes_state =
+            is_store_agent && block_writes_state(&h.body, (&map_names, &set_names, &cache_names));
         if is_store_agent {
             cx.agent_store_state = Some(("__state".to_string(), cell_names.clone()));
             cx.agent_store_maps = map_names.clone();
             cx.agent_store_sets = set_names.clone();
+            cx.agent_store_caches = cache_ttls.clone();
         } else {
             cx.agent_state_var = Some("currentState".to_string());
         }
