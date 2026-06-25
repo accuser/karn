@@ -166,9 +166,9 @@ instant field against one (the §3 example). Today an instant is bare `Int`
 milliseconds — the `Clock` unit, per **ADR 0112 D4**, which **rejected a nominal
 `Instant`/`Timestamp` for now**, keeping it a forward-compatible future
 refinement. That refinement now becomes load-bearing here (Q4): it re-types the
-time-window builders and any instant-valued field. Like `Duration` (sequenced as a prerequisite slice before
-`Cache`), an `Instant` primitive — if adopted — is a prerequisite for the `Log`
-slice and should be settled in slice 0.
+time-window builders and any instant-valued field. Like `Duration` (sequenced
+as a prerequisite slice before `Cache`), an `Instant` primitive — if adopted —
+is a prerequisite for the `Log` slice and should be settled in slice 0.
 
 Front-loaded, hard-to-reverse ADRs to write in the settling phase (roughly in
 slice order):
