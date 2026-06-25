@@ -168,8 +168,11 @@ External dependencies (not in this track):
 | 1 | `store` substrate + `Cell` + write forms + `state{}` removal + codemod | 0, ADR 0108 | not started |
 | 2 | Storage `Map` (`put`/`get`/`update`/`upsert`/`remove`) + `@indexed` basics | 1 | not started |
 | — | *Query-algebra sibling track lands here (before Set/Log)* | 2 | external |
-| 3 | `Set` (+ structural equality) and `Cache` (+ `@ttl`) | 2; query algebra *(Set read surface only — `add`/`remove`/`contains` don't need it)* | not started |
-| 4 | `Log` (implicit timestamp, time-window reads, `@retain`) | query algebra | not started |
+| 3 | `Set` (`add`/`remove`/`contains`/`size`) | 2 | **shipped (v0.84, ADR 0110)** |
+| 3a | Annotation surface — `@` token, AST, closed registry, per-kind/per-slice gating (ADR 0111 D1–D3) | 2 | not started |
+| 3b | `Duration` literal (`5.minutes`) + type, lowering to `Int` millis (ADR 0111 D5) | — | not started |
+| 3c | `Cache` (`Map` ops + `@ttl`, lazy check-on-read eviction; ADR 0111 D6) | 3a, 3b | not started |
+| 4 | `Log` (implicit timestamp, time-window reads, `@retain`) | query algebra, 3a, 3b | not started |
 | 5 | `Queue` (durable async stream) | held-resources/delivery | not started |
 
 `Ref[A]` and `Held[T]`/`Connection[F]` are **out of this track** — they ride the
@@ -190,7 +193,14 @@ Events → Sagas order where those foundations are concerned — a call to confi
    Intra-agent only — cross-agent atomicity is out of scope (sagas, §13).
 2. `Map`/`Set`: one spelling for value-and-storage, disambiguated by receiver, or
    split names (§5).
-3. Annotation grammar and the closed annotation set; which are v1.
+3. ~~Annotation grammar and the closed annotation set; which are v1.~~
+   **Settled — [ADR 0111](../decisions/0111-storage-annotation-surface.md).** A
+   closed `@name(args)` registry (`@ttl`/`@retain`/`@indexed`/`@bounded`) in
+   field-declaration position, each gated to its kind's slice; arguments are
+   compile-time literals; `@ttl`/`@retain` take a new **`Duration`** primitive
+   (`5.minutes`, lowering to `Int` millis) sequenced as a prerequisite slice
+   (3b) before Cache (3c). The grammar + registry are v1; `@ttl` is the first
+   functional annotation.
 4. `Set` structural-equality semantics over opaque/transparent element types
    (§10) — the equality story membership and `==` rely on.
 5. `Queue` placement (this track vs held-resources) and its delivery contract.
