@@ -6,7 +6,7 @@
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../troubleshooting/index.md).
 
-There are **289** codes in total.
+There are **294** codes in total.
 
 ## Agents
 
@@ -184,6 +184,8 @@ There are **289** codes in total.
 | `bynk.adapter.duplicate_binding` | An `adapter` declared more than one `binding` clause. | [`binding_decl`](grammar.md#rule-binding_decl) |
 | `bynk.adapter.no_binding` | An `adapter` declares an external provider but no `binding` module to supply it. | [`adapter_decl`](grammar.md#rule-adapter_decl) |
 | `bynk.adapter.provider_has_body` | A provider inside an `adapter` has a Bynk body; adapter providers must be external. | [`provider_decl`](grammar.md#rule-provider_decl) |
+| `bynk.cell.invalid_target` | A `:=` write targets something that is not a `store Cell` field. |  |
+| `bynk.cell.self_reference` | A `:=` right-hand side reads the cell being written (a read-modify-write); use `.update`. |  |
 | `bynk.generics.no_bounds` | A type parameter carries a bound (`[A: …]`); bounded generics are not in v0.20a. | [`fn_decl`](grammar.md#rule-fn_decl) |
 | `bynk.generics.no_generic_types` | A `type` declaration carries a type-parameter list; generic type declarations are not in v0.20a (type parameters belong to functions). | [`type_decl`](grammar.md#rule-type_decl) |
 | `bynk.generics.type_arg_mismatch` | Inferred or explicit type arguments conflict, have the wrong arity, target a non-generic function, or a type parameter shadows a declared type. | [`call`](grammar.md#rule-call) |
@@ -204,6 +206,9 @@ There are **289** codes in total.
 | `bynk.send.in_pure_context` | A `~>` send was used in a pure (non-effectful) context. | [`effect_send_stmt`](grammar.md#rule-effect_send_stmt) |
 | `bynk.send.non_effect` | A `~>` send was applied to a non-`Effect` value. | [`effect_send_stmt`](grammar.md#rule-effect_send_stmt) |
 | `bynk.send.requires_unit` | A `~>` send targets an operation whose reply is not `Effect[()]`. | [`effect_send_stmt`](grammar.md#rule-effect_send_stmt) |
+| `bynk.store.kind_arity` | A storage kind was applied to the wrong number of type arguments (e.g. `Cell[A, B]`). |  |
+| `bynk.store.kind_unsupported` | A known storage kind (`Map`/`Set`/`Log`/`Queue`/`Cache`) is used before the slice that supports it. |  |
+| `bynk.store.unknown_kind` | A `store` field's type is not a known storage kind. |  |
 | `bynk.store.unsupported` | An agent `store` field or `:=` write is used before the storage-track slice that supports it. |  |
 | `bynk.target.vendor_conflict` | One deployment unit's in-process closure uses platform-native capabilities from two mutually-exclusive platforms. | [`consumes_decl`](grammar.md#rule-consumes_decl) |
 | `bynk.target.vendor_required` | A deployment unit uses a platform-native capability but the build selects another `--platform`. | [`consumes_decl`](grammar.md#rule-consumes_decl) |

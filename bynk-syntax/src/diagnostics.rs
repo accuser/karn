@@ -211,6 +211,14 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "Referenced an operation the capability does not declare.",
         &["capability_decl"],
     ),
+    d(
+        "bynk.cell.invalid_target",
+        "A `:=` write targets something that is not a `store Cell` field.",
+    ),
+    d(
+        "bynk.cell.self_reference",
+        "A `:=` right-hand side reads the cell being written (a read-modify-write); use `.update`.",
+    ),
     dg(
         "bynk.commit.outside_agent",
         "`commit` was used outside an agent handler.",
@@ -1060,6 +1068,18 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "bynk.service.unknown_protocol",
         "A `from <protocol>` names an unknown protocol (e.g. a transport like Kafka).",
         &["service_decl"],
+    ),
+    d(
+        "bynk.store.kind_arity",
+        "A storage kind was applied to the wrong number of type arguments (e.g. `Cell[A, B]`).",
+    ),
+    d(
+        "bynk.store.kind_unsupported",
+        "A known storage kind (`Map`/`Set`/`Log`/`Queue`/`Cache`) is used before the slice that supports it.",
+    ),
+    d(
+        "bynk.store.unknown_kind",
+        "A `store` field's type is not a known storage kind.",
     ),
     d(
         "bynk.store.unsupported",

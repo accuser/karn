@@ -95,6 +95,7 @@ pub(crate) fn check_fn(
         in_test_body: false,
         test_services: HashSet::new(),
         type_vars: vars.clone(),
+        store_cells: HashMap::new(),
     };
     let Some(body_ty) = type_of_block(&f.body, Some(&return_ty), &mut ctx) else {
         return;
@@ -155,6 +156,7 @@ pub fn check_state_initialiser(
             in_test_body: false,
             test_services: HashSet::new(),
             type_vars: HashSet::new(),
+            store_cells: HashMap::new(),
         };
         type_of(init, Some(&field_ty), &mut ctx)
     };

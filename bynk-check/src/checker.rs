@@ -284,6 +284,10 @@ pub fn check_handler_body(
     // `binder.identity` type-checks), or `Ty::ActorSum(members)` for a sum (so
     // the body `match`es on it). `None` for handlers without a `by` binder.
     actor_binding: Option<(String, Ty)>,
+    // v0.81 (storage track): the agent's `store` `Cell` fields (name → element
+    // type), so the `:=` write form can resolve its target and type its value.
+    // Empty for service/test bodies and `state { }` agents.
+    store_cells: HashMap<String, Ty>,
 ) {
     let Some(return_ty) = resolve_type_ref(return_type, &input.types) else {
         return;
@@ -341,6 +345,7 @@ pub fn check_handler_body(
         in_test_body: false,
         test_services: HashSet::new(),
         type_vars: HashSet::new(),
+        store_cells,
     };
     // Check the body and validate it matches the return type.
     let Some(body_ty) = type_of_block(body, Some(&return_ty), &mut ctx) else {
@@ -416,6 +421,10 @@ pub fn check_handler_body(
 pub fn check_invariants(
     invariants: &[Invariant],
     state_fields: &[RecordField],
+    // v0.81 (ADR 0108 D5): a `store`-bearing agent's invariants reference its
+    // `Cell` fields by bare name (a pure read of the staged value), so they join
+    // the predicate scope alongside any `state` fields.
+    store_cells: &HashMap<String, Ty>,
     agent_name: &str,
     input: &ResolvedCommons,
     expr_types: &mut HashMap<Span, Ty>,
@@ -442,12 +451,16 @@ pub fn check_invariants(
         }
     }
 
-    // Build the state-field scope once: each field is in scope by bare name.
+    // Build the predicate scope once: each `state` field and each `store` `Cell`
+    // is in scope by bare name (a `Cell` reads as its element type).
     let mut field_scope: HashMap<String, Ty> = HashMap::new();
     for f in state_fields {
         if let Some(t) = resolve_type_ref(&f.type_ref, &input.types) {
             field_scope.insert(f.name.name.clone(), t);
         }
+    }
+    for (name, ty) in store_cells {
+        field_scope.insert(name.clone(), ty.clone());
     }
 
     for inv in invariants {
@@ -517,6 +530,7 @@ pub fn check_invariants(
             in_test_body: false,
             test_services: HashSet::new(),
             type_vars: HashSet::new(),
+            store_cells: HashMap::new(),
         };
         let pred_ty = type_of(&inv.predicate, Some(&bool_ty), &mut ctx);
         if let Some(t) = pred_ty
@@ -577,6 +591,17 @@ fn predicate_impure_construct(e: &Expr) -> Option<Span> {
 /// walks. Patterns, blocks, and lambdas do not appear in well-formed
 /// predicates, but are traversed defensively so a malformed predicate is still
 /// fully scanned.
+/// Whether `e` reads the identifier `name` anywhere — used by the `:=`
+/// read-modify-write rule (a cell write whose RHS reads its own LHS).
+fn expr_reads_ident(e: &Expr, name: &str) -> bool {
+    match &e.kind {
+        ExprKind::Ident(id) => id.name == name,
+        _ => predicate_children(e)
+            .into_iter()
+            .any(|c| expr_reads_ident(c, name)),
+    }
+}
+
 fn predicate_children(e: &Expr) -> Vec<&Expr> {
     match &e.kind {
         ExprKind::BinOp(_, l, r) => vec![l, r],
@@ -728,6 +753,10 @@ pub struct Ctx<'a> {
     /// nested explicit type arguments (`identity[A](x)` inside a generic
     /// body) resolve. Empty outside generic fn bodies.
     pub type_vars: HashSet<String>,
+    /// v0.81 (storage track): the agent's `store` `Cell` fields (name → element
+    /// type). A `:=` write resolves its target here and types its value against
+    /// the element type. Empty outside `store`-bearing agent handlers.
+    pub store_cells: HashMap<String, Ty>,
 }
 
 /// Per-capability info for checker dispatch within a handler body.
@@ -1361,20 +1390,64 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                 }
             }
             Statement::Assign(a) => {
-                // v0.81 (storage track, slice 1): `store` fields and the `:=`
-                // Cell write parse and format, but kind-aware checking and the
-                // staged-commit lowering land in the next slices (ADR 0108/0109).
-                // Gate honestly so `:=` is a clear "not yet supported", not a
-                // cascade of unresolved-name errors.
-                ctx.errors.push(
-                    CompileError::new(
-                        "bynk.store.unsupported",
-                        a.span,
-                        "the `:=` store write is not yet supported — `store` fields and their \
-                         write forms land in a later storage-track slice",
-                    )
-                    .with_note("use a `state { }` block and `commit` for now"),
-                );
+                // v0.81 (storage track): `cell := expr` — the unconditional `Cell`
+                // write. The target must be a `store Cell` field; the value must
+                // match the cell's element type; and (the §10 read-modify-write
+                // rule) the RHS must not read the cell being written.
+                match ctx.store_cells.get(&a.target.name).cloned() {
+                    None => {
+                        ctx.errors.push(
+                            CompileError::new(
+                                "bynk.cell.invalid_target",
+                                a.target.span,
+                                format!(
+                                    "`:=` writes a `Cell` store field, but `{}` is not one",
+                                    a.target.name
+                                ),
+                            )
+                            .with_note(
+                                "the `:=` write form applies only to a `store <name>: Cell[T]` field",
+                            ),
+                        );
+                        type_of(&a.value, None, ctx);
+                    }
+                    Some(elem_ty) => {
+                        // §10: a `:=` whose RHS reads its own LHS is a hidden
+                        // read-modify-write — require `.update(fn)` instead, so the
+                        // dependency is visible (and retry-safe).
+                        if expr_reads_ident(&a.value, &a.target.name) {
+                            ctx.errors.push(
+                                CompileError::new(
+                                    "bynk.cell.self_reference",
+                                    a.span,
+                                    format!(
+                                        "the `:=` right-hand side reads `{0}`, the cell being \
+                                         written — this is a read-modify-write",
+                                        a.target.name
+                                    ),
+                                )
+                                .with_note(
+                                    "use `<cell>.update(fn)` for a read-modify-write so the \
+                                     dependency on the prior value is explicit",
+                                ),
+                            );
+                        }
+                        if let Some(vt) = type_of(&a.value, Some(&elem_ty), ctx)
+                            && !compatible(&vt, &elem_ty)
+                        {
+                            ctx.errors.push(CompileError::new(
+                                "bynk.types.type_mismatch",
+                                a.value.span,
+                                format!(
+                                    "this `:=` writes `{}`, but the cell `{}` holds `{}`",
+                                    vt.display(),
+                                    a.target.name,
+                                    elem_ty.display()
+                                ),
+                            ));
+                        }
+                    }
+                }
             }
         }
     }

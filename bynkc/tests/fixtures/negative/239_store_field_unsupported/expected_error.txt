@@ -1,2 +1,2 @@
 bynk.store.unsupported
-not yet supported
+not yet emitted
