@@ -526,6 +526,49 @@ mod tests {
         assert!(children.iter().any(|c| c.name == "Jwt = JoseJwt"));
     }
 
+    /// Every symbol's `selection_range` must be contained in its `range`, or
+    /// VS Code rejects the whole `documentSymbol` response
+    /// ("selectionRange must be contained in fullRange"). Verify recursively.
+    fn assert_selection_contained(sym: &DocumentSymbol, path: &str) {
+        let here = format!("{path}/{}", sym.name);
+        let outer = sym.range;
+        let inner = sym.selection_range;
+        let pos_le = |a: Position, b: Position| (a.line, a.character) <= (b.line, b.character);
+        assert!(
+            pos_le(outer.start, inner.start) && pos_le(inner.end, outer.end),
+            "selection_range not contained in range for {here}: range={outer:?} sel={inner:?}",
+        );
+        for c in sym.children.iter().flatten() {
+            assert_selection_contained(c, &here);
+        }
+    }
+
+    /// Regression: an `invariant` after a handler is a hard parse error, so
+    /// recovery drops the agent and leaves the fragment-form context with no
+    /// items. The context span must still cover its header (`context demo.a`)
+    /// so the name-span selection range stays contained. (negative fixture 238)
+    #[test]
+    fn fragment_context_with_all_items_dropped_keeps_valid_ranges() {
+        let src = "context demo.a\n\
+                   \n\
+                   agent Counter {\n\
+                   key id: String\n\
+                   store count: Cell[Int]\n\
+                   on call bump() -> Effect[()] {\n\
+                   let cur = count\n\
+                   count := cur + 1\n\
+                   ()\n\
+                   }\n\
+                   invariant bad:\n\
+                   count >= 0\n\
+                   }\n";
+        for sym in &outline(src) {
+            assert_selection_contained(sym, "");
+        }
+    }
+
+    use tower_lsp::lsp_types::Position;
+
     #[test]
     fn doc_block_first_line_appears_as_detail() {
         let src = "commons demo.x {\n\
