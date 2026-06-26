@@ -279,7 +279,10 @@ impl<'a> Parser<'a> {
     ) -> Result<Commons, CompileError> {
         let mut items = Vec::new();
         let mut uses = Vec::new();
-        let mut last_span = start;
+        // Cover the header (`commons <name>`) so the unit span stays valid even
+        // when every item is dropped by error recovery — the document-symbol
+        // selection range (the name span) must remain contained in this span.
+        let mut last_span = start.merge(name.span);
         let mut seen_item = false;
         let trailing_comments: Vec<String>;
         loop {
@@ -670,7 +673,9 @@ impl<'a> Parser<'a> {
         let mut uses = Vec::new();
         let mut mocks = Vec::new();
         let mut cases = Vec::new();
-        let mut last_span = start;
+        // Cover the header (`test <target>`) so the unit span stays valid even
+        // when every item is dropped by error recovery (see commons fragment).
+        let mut last_span = start.merge(target.span);
         let mut seen_non_uses = false;
         let trailing_comments: Vec<String>;
         loop {
@@ -1280,7 +1285,9 @@ impl<'a> Parser<'a> {
         let mut uses = Vec::new();
         let mut consumes = Vec::new();
         let mut exports = Vec::new();
-        let mut last_span = start;
+        // Cover the header (`context <name>`) so the unit span stays valid even
+        // when every item is dropped by error recovery (see commons fragment).
+        let mut last_span = start.merge(name.span);
         let mut seen_item = false;
         let trailing_comments: Vec<String>;
         loop {
@@ -1561,7 +1568,9 @@ impl<'a> Parser<'a> {
         let mut exports = Vec::new();
         let mut consumes = Vec::new();
         let mut binding: Option<BindingDecl> = None;
-        let mut last_span = start;
+        // Cover the header (`adapter <name>`) so the unit span stays valid even
+        // when every item is dropped by error recovery (see commons fragment).
+        let mut last_span = start.merge(name.span);
         let trailing_comments: Vec<String>;
         loop {
             let (mut leading, item_doc) = self.collect_item_lead();
