@@ -150,20 +150,6 @@
       "summary": "Expected a capability operation."
     }
   ],
-  "commit_stmt": [
-    {
-      "code": "bynk.commit.outside_agent",
-      "summary": "`commit` was used outside an agent handler."
-    },
-    {
-      "code": "bynk.commit.two_reachable_commits",
-      "summary": "Two `commit` statements are reachable on the same execution path."
-    },
-    {
-      "code": "bynk.commit.wrong_state_type",
-      "summary": "A `commit` value does not match the agent's state type."
-    }
-  ],
   "consumes_decl": [
     {
       "code": "bynk.adapter.consumes_context",
@@ -878,14 +864,14 @@
       "summary": "A `Some` payload has the wrong type."
     }
   ],
-  "state_decl": [
+  "store_field": [
     {
       "code": "bynk.agents.bad_state_initialiser",
-      "summary": "An agent state-field initialiser is not a static value of the field's type."
+      "summary": "An agent `store` field initialiser is not a static value of the field's type."
     },
     {
       "code": "bynk.agents.non_zeroable_state_field",
-      "summary": "An agent state field has no initialiser and no implicit zero value."
+      "summary": "An agent `store` field has no initialiser and no implicit zero value."
     }
   ],
   "string_literal": [

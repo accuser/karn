@@ -6,7 +6,7 @@
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../troubleshooting/index.md).
 
-There are **312** codes in total.
+There are **308** codes in total.
 
 ## Agents
 
@@ -18,8 +18,8 @@ There are **312** codes in total.
 | `bynk.agent.key_mismatch` | An agent key argument has the wrong type. | [`agent_decl`](grammar.md#rule-agent_decl) |
 | `bynk.agent.outside_context` | An `agent` was declared outside a context. | [`agent_decl`](grammar.md#rule-agent_decl) |
 | `bynk.agent.return_not_effect` | An agent handler's return type is not an `Effect`. | [`agent_decl`](grammar.md#rule-agent_decl) |
-| `bynk.agents.bad_state_initialiser` | An agent state-field initialiser is not a static value of the field's type. | [`state_decl`](grammar.md#rule-state_decl) |
-| `bynk.agents.non_zeroable_state_field` | An agent state field has no initialiser and no implicit zero value. | [`state_decl`](grammar.md#rule-state_decl) |
+| `bynk.agents.bad_state_initialiser` | An agent `store` field initialiser is not a static value of the field's type. | [`store_field`](grammar.md#rule-store_field) |
+| `bynk.agents.non_zeroable_state_field` | An agent `store` field has no initialiser and no implicit zero value. | [`store_field`](grammar.md#rule-store_field) |
 
 ## Assertions
 
@@ -41,14 +41,6 @@ There are **312** codes in total.
 | `bynk.capability.op_arity` | A capability operation was called with the wrong number of arguments. | [`capability_decl`](grammar.md#rule-capability_decl) |
 | `bynk.capability.outside_context` | A `capability` was declared outside a context. | [`capability_decl`](grammar.md#rule-capability_decl) |
 | `bynk.capability.unknown_operation` | Referenced an operation the capability does not declare. | [`capability_decl`](grammar.md#rule-capability_decl) |
-
-## Commit
-
-| Code | Summary | Construct |
-|---|---|---|
-| `bynk.commit.outside_agent` | `commit` was used outside an agent handler. | [`commit_stmt`](grammar.md#rule-commit_stmt) |
-| `bynk.commit.two_reachable_commits` | Two `commit` statements are reachable on the same execution path. | [`commit_stmt`](grammar.md#rule-commit_stmt) |
-| `bynk.commit.wrong_state_type` | A `commit` value does not match the agent's state type. | [`commit_stmt`](grammar.md#rule-commit_stmt) |
 
 ## Consumes
 
@@ -233,7 +225,6 @@ There are **312** codes in total.
 | Code | Summary | Construct |
 |---|---|---|
 | `bynk.parse.consumes_after_decls` | `consumes` appears after other declarations. | [`consumes_decl`](grammar.md#rule-consumes_decl) |
-| `bynk.parse.duplicate_state_block` | An agent declares more than one `state { }` block. |  |
 | `bynk.parse.empty_agent` | An `agent` body is empty. | [`agent_decl`](grammar.md#rule-agent_decl) |
 | `bynk.parse.empty_capability` | A `capability` body is empty. | [`capability_decl`](grammar.md#rule-capability_decl) |
 | `bynk.parse.empty_interpolation` | An interpolation hole `\(…)` contains no expression. |  |
@@ -241,7 +232,7 @@ There are **312** codes in total.
 | `bynk.parse.empty_mock_body` | A `mocks` body is empty. | [`mocks_decl`](grammar.md#rule-mocks_decl) |
 | `bynk.parse.empty_service` | A `service` body is empty. | [`service_decl`](grammar.md#rule-service_decl) |
 | `bynk.parse.expected_agent_key` | Expected a `key` declaration in an agent. | [`agent_decl`](grammar.md#rule-agent_decl) |
-| `bynk.parse.expected_agent_storage` | An agent declares no storage — neither a `state { }` block nor `store` fields. |  |
+| `bynk.parse.expected_agent_storage` | An agent declares no storage — it has no `store` fields. |  |
 | `bynk.parse.expected_base_type` | Expected a base type. | [`base_type`](grammar.md#rule-base_type) |
 | `bynk.parse.expected_capability_op` | Expected a capability operation. | [`capability_op`](grammar.md#rule-capability_op) |
 | `bynk.parse.expected_expression` | Expected an expression. |  |

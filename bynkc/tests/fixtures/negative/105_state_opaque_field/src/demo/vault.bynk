@@ -7,11 +7,9 @@ type Id = String where Matches("[a-z0-9]{1,8}")
 agent Vault {
 	key id: Id
 
-	state {
-		secret: Secret,
-	}
+	store secret: Cell[Secret]
 
 	on call reveal() -> Effect[Secret] {
-		self.state.secret
+		secret
 	}
 }

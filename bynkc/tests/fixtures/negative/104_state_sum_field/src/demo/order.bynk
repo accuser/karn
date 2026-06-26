@@ -10,11 +10,9 @@ type Id = String where Matches("[a-z0-9]{1,8}")
 agent Order {
 	key id: Id
 
-	state {
-		status: Status,
-	}
+	store status: Cell[Status]
 
 	on call current() -> Effect[Status] {
-		self.state.status
+		status
 	}
 }

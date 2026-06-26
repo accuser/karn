@@ -1490,28 +1490,25 @@ pub(crate) fn emit_agent(
 ) {
     emit_doc_block(out, a.documentation.as_deref(), 0);
     let state_ty = format!("{}State", a.name.name);
-    // v0.81 (storage track, ADR 0109): a `store`-agent's `Cell` fields ARE its
-    // state record, so the whole state machinery (interface, zero factory,
-    // load/commit, invariant gate) is reused by deriving the record fields from
-    // the cells. Each `Cell[T]` field becomes a `T`-typed record field carrying
-    // the cell's initialiser. Only the handler bodies lower differently (bare
-    // reads / `:=` over `__state`, with an implicit commit at handler end).
-    let is_store_agent = !a.store_fields.is_empty();
-    let effective_fields: Vec<RecordField> = if is_store_agent {
-        a.store_fields
-            .iter()
-            .filter(|f| f.kind.head.name == "Cell" && f.kind.args.len() == 1)
-            .map(|f| RecordField {
-                name: f.name.clone(),
-                type_ref: f.kind.args[0].clone(),
-                refinement: None,
-                init: f.init.clone(),
-                span: f.span,
-            })
-            .collect()
-    } else {
-        a.state_fields.clone()
-    };
+    // v0.81 (storage track, ADR 0109): an agent's `Cell` fields ARE its state
+    // record, so the whole state machinery (interface, zero factory, load/commit,
+    // invariant gate) derives the record fields from the cells. Each `Cell[T]`
+    // field becomes a `T`-typed record field carrying the cell's initialiser.
+    // Handler bodies lower as bare reads / `:=` over `__state`, with an implicit
+    // commit at handler end.
+    let is_store_agent = true;
+    let effective_fields: Vec<RecordField> = a
+        .store_fields
+        .iter()
+        .filter(|f| f.kind.head.name == "Cell" && f.kind.args.len() == 1)
+        .map(|f| RecordField {
+            name: f.name.clone(),
+            type_ref: f.kind.args[0].clone(),
+            refinement: None,
+            init: f.init.clone(),
+            span: f.span,
+        })
+        .collect();
     // v0.82 (ADR 0110): `store Map[K, V]` fields are also state-record fields, but
     // persisted as a JSON-serialisable `Record<string, V>` (the value `Map` is a
     // JS `Map`, which does not serialise). Collected separately from `Cell` fields

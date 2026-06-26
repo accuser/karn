@@ -65,7 +65,7 @@ fn agent_method_label_carries_params() {
     std::fs::write(dir.join("bynk.toml"), "[project]\nname = \"counter\"\n").unwrap();
     std::fs::write(
         dir.join("src").join("counter.bynk"),
-        "context counter\n\nagent Counter {\n\tkey id: String\n\n\tstate {\n\t\tn: Int,\n\t}\n\n\ton call bump(amount: Int) -> Effect[Result[Int, String]] {\n\t\tlet next = self.state.n + amount\n\t\tcommit { ...self.state, n: next }\n\t\tOk(next)\n\t}\n}\n",
+        "context counter\n\nagent Counter {\n\tkey id: String\n\n\tstore n: Cell[Int]\n\n\ton call bump(amount: Int) -> Effect[Result[Int, String]] {\n\t\tlet cur = n\n\t\tn := cur + amount\n\t\tOk(cur + amount)\n\t}\n}\n",
     )
     .unwrap();
     let meta = debug_meta(&dir, "handlers.ts");

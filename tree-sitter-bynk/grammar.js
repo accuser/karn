@@ -48,7 +48,7 @@ module.exports = grammar({
   word: ($) => $.identifier,
 
   conflicts: ($) => [
-    // `match e { … }` / `if e { … }` / `commit e`: after a bare identifier `e`,
+    // `match e { … }` / `if e { … }`: after a bare identifier `e`,
     // the `{` is ambiguous between opening the match/if body and opening a
     // record construction/spread `e { … }`. Keep all parses alive; the body
     // content (match arms / block statements vs field inits) decides which one
@@ -95,7 +95,7 @@ module.exports = grammar({
       ),
 
     _item_fragment: ($) =>
-      choice($._context_body_item, $.handler, $.state_decl, $.key_decl),
+      choice($._context_body_item, $.handler, $.store_field, $.key_decl),
 
     // The body of a fragment block: statements then an optional tail value,
     // mirroring `block` so multi-statement and bare-expression snippets parse.
@@ -330,7 +330,7 @@ module.exports = grammar({
         field("type", $._type_ref),
         optional(seq("where", field("refinement", $.refinement))),
         // v0.11: an optional initial-value expression. Meaningful on agent
-        // `state` fields; the checker restricts where it applies.
+        // `store` fields; the checker restricts where it applies.
         optional(seq("=", field("init", $._expression))),
       ),
 
@@ -550,16 +550,14 @@ module.exports = grammar({
         field("name", $.identifier),
         "{",
         field("key", $.key_decl),
-        // v0.81 (storage track): the legacy `state { }` block and the successor
-        // `store` fields coexist (ADR 0108 D3), so both are optional/repeatable.
-        optional(field("state", $.state_decl)),
+        // v0.81 (storage track): the agent's `store` fields (ADR 0108).
         repeat($.store_field),
         repeat($.invariant_decl),
         repeat($.handler),
         "}",
       ),
     // v0.80: an agent invariant — `invariant <name>: <predicate>`. Sits between
-    // the state block and the handlers.
+    // the store fields and the handlers.
     invariant_decl: ($) =>
       seq(
         "invariant",
@@ -569,14 +567,6 @@ module.exports = grammar({
       ),
     key_decl: ($) =>
       seq("key", field("name", $.identifier), ":", field("type", $._type_ref)),
-    state_decl: ($) =>
-      seq(
-        "state",
-        "{",
-        optional(sep1($.record_field, ",")),
-        optional(","),
-        "}",
-      ),
     // v0.81 (storage track): `store <name>: <Kind>[…] [= init]`. `store` is a
     // contextual keyword (also a valid identifier — e.g. a `cache.store`
     // context); the `word` directive resolves it by context.
@@ -784,7 +774,6 @@ module.exports = grammar({
         $.let_stmt,
         $.effect_let_stmt,
         $.effect_send_stmt,
-        $.commit_stmt,
         $.assign_stmt,
         prec(1, $.assert_expr),
       ),
@@ -807,7 +796,6 @@ module.exports = grammar({
       ),
     // v0.79: `~> expr` — an asynchronous fire-and-forget send (no binder).
     effect_send_stmt: ($) => seq("~>", field("value", $._expression)),
-    commit_stmt: ($) => seq("commit", field("value", $._expression)),
     // v0.81 (storage track): `name := expr` — a `Cell` store write.
     assign_stmt: ($) =>
       seq(field("target", $.identifier), ":=", field("value", $._expression)),

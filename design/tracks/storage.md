@@ -166,22 +166,21 @@ External dependencies (not in this track):
 
 ## 6. Ordered slice decomposition
 
-> **Track status: kind catalogue complete (v0.95).** All five storage kinds have
-> shipped — `Cell`/`Map` (v0.82–v0.83), `Set` (v0.84), `Cache` (v0.87), `Log`
-> (v0.95) — plus the annotation surface, the `Duration` primitive, and (via the
-> retired query-algebra sibling track, ADRs 0114–0120) the query vocabulary and
-> `@indexed`. **`Queue` is ruled out** of the catalogue as a delivery concern
-> (ADR 0122 / Q5). The track does **not** retire yet: two non-kind items remain —
-> the **parity slice** (`state{}` removal + a one-time in-repo hand migration —
-> no codemod), **settled by
-> [ADR 0123](../decisions/0123-state-block-cutover-and-codemod.md)** (amended) and
-> ready to build; and the **rehydration** questions Q6/Q7 (still open).
+> **Track status: kind catalogue + parity cutover complete (v0.96).** All five
+> storage kinds have shipped — `Cell`/`Map` (v0.82–v0.83), `Set` (v0.84), `Cache`
+> (v0.87), `Log` (v0.95) — plus the annotation surface, the `Duration` primitive,
+> and (via the retired query-algebra sibling track, ADRs 0114–0120) the query
+> vocabulary and `@indexed`. **`Queue` is ruled out** of the catalogue as a
+> delivery concern (ADR 0122 / Q5). The **parity slice** removed `state{}` /
+> `commit` / `self.state` ([ADR 0123](../decisions/0123-state-block-cutover-and-codemod.md),
+> shipped v0.96), making `store` the agent's sole state surface. The track does
+> **not** retire yet: the **rehydration** questions Q6/Q7 remain open.
 
 | # | Slice | Depends on | Status |
 |---|---|---|---|
 | 0 | Handler-atomic commit + effect-release split (ADR 0109) | — | **shipped (v0.82, ADR 0109)** |
 | 1 | `store` substrate + `Cell` + write forms (`store` ships coexisting with `state{}`, ADR 0108 D3) | 0, ADR 0108 | **shipped (v0.82)** |
-| 1p | **Parity cutover** — fully remove `state{}` / `commit` / `self.state`; one-time in-repo hand migration (no codemod); invariant surface finalised (ADR 0123) | 1, all kinds | **settling (ADR 0123, amended)** |
+| 1p | **Parity cutover** — fully remove `state{}` / `commit` / `self.state`; one-time in-repo hand migration (no codemod); invariant surface finalised (ADR 0123) | 1, all kinds | **shipped (v0.96, ADR 0123)** |
 | 2 | Storage `Map` (`put`/`get`/`update`/`upsert`/`remove`) — `@indexed` **deferred** to the query-algebra track | 1 | **shipped (v0.83, ADR 0110)** |
 | — | *Query-algebra sibling track landed here (before Set/Log) — shipped v0.88–v0.94 (ADRs 0114–0120), retired* | 2 | **external, done** |
 | 3 | `Set` (`add`/`remove`/`contains`/`size`) | 2 | **shipped (v0.84, ADR 0110)** |

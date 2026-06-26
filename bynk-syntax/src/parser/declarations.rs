@@ -2383,10 +2383,7 @@ impl<'a> Parser<'a> {
         // single loop collects the lead once and dispatches; ordering guards keep
         // the phases pinned (storage before contracts/behaviour; invariants before
         // handlers).
-        let key_span = key_name.span;
-        let mut state_fields = Vec::new();
         let mut store_fields: Vec<StoreField> = Vec::new();
-        let mut state_span: Option<Span> = None;
         let mut invariants = Vec::new();
         let mut handlers = Vec::new();
         loop {
@@ -2402,39 +2399,6 @@ impl<'a> Parser<'a> {
                         ));
                     }
                     break;
-                }
-                Some(TokenKind::State) => {
-                    if storage_closed {
-                        return Err(self.storage_after_phase_err());
-                    }
-                    if let Some(prev) = state_span {
-                        let t = self.peek().unwrap();
-                        return Err(CompileError::new(
-                            "bynk.parse.duplicate_state_block",
-                            t.span,
-                            "an agent declares at most one `state { }` block",
-                        )
-                        .with_label(prev, "the first `state` block"));
-                    }
-                    if let Some((_, doc_span)) = item_doc {
-                        self.warnings.push(CompileError::new(
-                            "bynk.parse.orphan_doc_block",
-                            doc_span,
-                            "a `state` block takes no documentation block",
-                        ));
-                    }
-                    let state_kw =
-                        self.expect(TokenKind::State, "to open the agent state block")?;
-                    self.expect(TokenKind::LBrace, "to open the agent state block")?;
-                    while self.peek_kind() != Some(TokenKind::RBrace) {
-                        state_fields.push(self.parse_record_field()?);
-                        if self.eat(TokenKind::Comma).is_none() {
-                            break;
-                        }
-                    }
-                    let state_close =
-                        self.expect(TokenKind::RBrace, "to close the agent state block")?;
-                    state_span = Some(state_kw.span.merge(state_close.span));
                 }
                 // `store` is a contextual keyword (like `key`): the literal
                 // identifier `store` in agent-body item position introduces a
@@ -2503,11 +2467,11 @@ impl<'a> Parser<'a> {
             }
         }
         let close = self.expect(TokenKind::RBrace, "to close the agent body")?;
-        if state_span.is_none() && store_fields.is_empty() {
+        if store_fields.is_empty() {
             return Err(CompileError::new(
                 "bynk.parse.expected_agent_storage",
                 kw.span.merge(close.span),
-                "an agent must declare its storage — a `state { }` block or `store` fields",
+                "an agent must declare its storage — it has no `store` fields",
             ));
         }
         if handlers.is_empty() {
@@ -2521,10 +2485,6 @@ impl<'a> Parser<'a> {
             name,
             key_name,
             key_type,
-            state_fields,
-            // The state record's span anchors the synthetic state type and
-            // diagnostics; a `store`-only agent falls back to the key span.
-            state_span: state_span.unwrap_or(key_span),
             store_fields,
             invariants,
             handlers,

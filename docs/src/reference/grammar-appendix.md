@@ -10,7 +10,7 @@ The complete Bynk grammar, generated from the `tree-sitter-bynk` grammar. For th
 
 ```ebnf
 source_file ::= (commons_decl | context_decl | adapter_decl | integration_decl | test_decl)+ | item_fragment+ | expr_fragment
-item_fragment ::= context_body_item | handler | state_decl | key_decl
+item_fragment ::= context_body_item | handler | store_field | key_decl
 expr_fragment ::= statement+ expression? | expression
 commons_decl ::= "commons" qualified_name ("{" commons_body_item* "}" | commons_body_item*)
 context_decl ::= "context" qualified_name ("{" context_body_item* "}" | context_body_item*)
@@ -61,10 +61,9 @@ provider_decl ::= "provides" identifier "=" identifier given_clause? ("{" provid
 provider_op ::= "fn" identifier "(" (param ("," param)*)? ","? ")" "->" type_ref block
 service_decl ::= "service" identifier service_protocol? "{" handler* "}"
 service_protocol ::= "from" ("http" | "cron" | "queue" "(" string_literal ")")
-agent_decl ::= "agent" identifier "{" key_decl state_decl? store_field* invariant_decl* handler* "}"
+agent_decl ::= "agent" identifier "{" key_decl store_field* invariant_decl* handler* "}"
 invariant_decl ::= "invariant" identifier ":" expression
 key_decl ::= "key" identifier ":" type_ref
-state_decl ::= "state" "{" (record_field ("," record_field)*)? ","? "}"
 store_field ::= "store" identifier ":" store_kind store_annotation* ("=" expression)?
 store_kind ::= identifier ("[" type_ref ("," type_ref)* "]")?
 store_annotation ::= "@" identifier ("(" (annotation_arg ("," annotation_arg)*)? ","? ")")?
@@ -84,11 +83,10 @@ by_clause ::= "by" (identifier ":")? identifier ("|" identifier)*
 mocks_decl ::= "mocks" identifier "=" identifier "{" provider_op* "}"
 test_case ::= "test" string_literal block
 block ::= "{" statement* expression? "}"
-statement ::= let_stmt | effect_let_stmt | effect_send_stmt | commit_stmt | assign_stmt | assert_expr
+statement ::= let_stmt | effect_let_stmt | effect_send_stmt | assign_stmt | assert_expr
 let_stmt ::= "let" binding_name (":" type_ref)? "=" expression
 effect_let_stmt ::= "let" binding_name (":" type_ref)? "<-" expression
 effect_send_stmt ::= "~>" expression
-commit_stmt ::= "commit" expression
 assign_stmt ::= identifier ":=" expression
 binding_name ::= identifier | "_"
 expression ::= if_expr | match_expr | is_expr | assert_expr | binary_expr | unary_expr | primary

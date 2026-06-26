@@ -182,9 +182,6 @@ fn walk_block_for_constraints(
             Statement::Let(l) | Statement::EffectLet(l) => {
                 walk_expr_for_constraints(&l.value, typed, consumed, local, errors);
             }
-            Statement::Commit(c) => {
-                walk_expr_for_constraints(&c.value, typed, consumed, local, errors);
-            }
             Statement::Assert(a) => {
                 walk_expr_for_constraints(&a.value, typed, consumed, local, errors);
             }
@@ -1821,7 +1818,6 @@ fn walk_block_for_index_filters(
     for stmt in &block.statements {
         let v = match stmt {
             Statement::Let(l) | Statement::EffectLet(l) => &l.value,
-            Statement::Commit(c) => &c.value,
             Statement::Assert(a) => &a.value,
             Statement::Send(s) => &s.value,
             Statement::Assign(a) => &a.value,
@@ -2127,28 +2123,42 @@ fn check_agent_decls(
         // v0.93 (ADR 0118 D4): index-hygiene warnings cross-reference `@indexed`
         // declarations against the equality filters in the handlers.
         validate_index_hygiene(agent, &typed.types, errors);
-        // v0.25: the agent's key type and state field types reference types.
+        // v0.25: the agent's key type and store field types reference types.
         checker::record_type_refs(&agent.key_type, &typed.types, no_vars, refs);
-        for field in &agent.state_fields {
-            checker::record_type_refs(&field.type_ref, &typed.types, no_vars, refs);
+        for field in &agent.store_fields {
+            for arg in &field.kind.args {
+                checker::record_type_refs(arg, &typed.types, no_vars, refs);
+            }
         }
-        // Build the agent's state type as a synthetic record. We expose it
-        // under the name `<AgentName>State` in the type table so the body
-        // can reference it.
+        // The agent's `Cell` fields form its state record. Expose that record
+        // under the name `<AgentName>State` in the type table so the body and
+        // invariants can be checked against it.
         let agent_state_name = format!("{}State", agent.name.name);
+        let state_record_fields: Vec<RecordField> = agent
+            .store_fields
+            .iter()
+            .filter(|f| f.kind.head.name == "Cell" && f.kind.args.len() == 1)
+            .map(|f| RecordField {
+                name: f.name.clone(),
+                type_ref: f.kind.args[0].clone(),
+                refinement: None,
+                init: f.init.clone(),
+                span: f.span,
+            })
+            .collect();
         // Build a synthetic Record TypeDecl and stuff it into a *clone* of
         // the resolved types so handler bodies see it.
         let synthetic_state = TypeDecl {
             name: Ident {
                 name: agent_state_name.clone(),
-                span: agent.state_span,
+                span: agent.span,
             },
             body: TypeBody::Record(RecordBody {
-                fields: agent.state_fields.clone(),
-                span: agent.state_span,
+                fields: state_record_fields,
+                span: agent.span,
             }),
             documentation: None,
-            span: agent.state_span,
+            span: agent.span,
             trivia: Trivia::default(),
         };
         let mut types_for_handler = typed.types.clone();
@@ -2165,47 +2175,7 @@ fn check_agent_decls(
             agents: table.agents.clone(),
             imported_from: HashMap::new(),
         };
-        // v0.11: every state field must have a defined initial value for a
-        // fresh key — an explicit static initialiser, or (v0.9.2) an implicit
-        // zero. A field with neither is rejected.
-        for field in &agent.state_fields {
-            if let Some(init) = &field.init {
-                checker::check_state_initialiser(
-                    init,
-                    &field.type_ref,
-                    &resolved_for_handler,
-                    &mut typed.expr_types,
-                    errors,
-                    refs,
-                    hints,
-                    locals,
-                );
-            } else if checker::zero_value_ts(
-                &field.type_ref,
-                field.refinement.as_ref(),
-                &typed.types,
-            )
-            .is_none()
-            {
-                errors.push(
-                    CompileError::new(
-                        "bynk.agents.non_zeroable_state_field",
-                        field.span,
-                        format!(
-                            "agent `{}` state field `{}` has no defined zero value, so a \
-                             fresh key cannot be initialised",
-                            agent.name.name, field.name.name
-                        ),
-                    )
-                    .with_note(
-                        "add an initialiser (`field: T = value`) to give a fresh key its \
-                         starting value, or wrap the field in `Option[…]` (None means \
-                         \"never set\")",
-                    ),
-                );
-            }
-        }
-        // v0.81: the same fresh-key rule for `store Cell[T]` fields — an
+        // v0.81: the fresh-key rule for `store Cell[T]` fields — an
         // initialiser is checked against the element type `T` (which also types
         // the init expression so the emitter can qualify variant constructors),
         // and a field with neither an initialiser nor an implicit zero is rejected.
@@ -2249,10 +2219,9 @@ fn check_agent_decls(
         };
         let key_ty = checker::resolve_type_ref(&agent.key_type, &typed.types).unwrap_or(Ty::Unit);
         let mut self_scope: HashMap<String, Ty> = HashMap::new();
-        // `self` is a synthetic record with two fields: the key and `state`.
-        // But the parser treats `self.x` as FieldAccess on Ident("self"), so
-        // we need to give `self` a record type with both. Easiest: a one-off
-        // synthetic record type.
+        // `self` is a synthetic record carrying the agent's key field, so that
+        // `self.<key>` resolves. The parser treats `self.x` as FieldAccess on
+        // Ident("self"), so `self` is given a one-off synthetic record type.
         let agent_self_name = format!("__{}Self", agent.name.name);
         let self_decl = TypeDecl {
             name: Ident {
@@ -2260,31 +2229,16 @@ fn check_agent_decls(
                 span: agent.span,
             },
             body: TypeBody::Record(RecordBody {
-                fields: vec![
-                    RecordField {
-                        name: Ident {
-                            name: agent.key_name.name.clone(),
-                            span: agent.key_name.span,
-                        },
-                        type_ref: agent.key_type.clone(),
-                        refinement: None,
-                        init: None,
+                fields: vec![RecordField {
+                    name: Ident {
+                        name: agent.key_name.name.clone(),
                         span: agent.key_name.span,
                     },
-                    RecordField {
-                        name: Ident {
-                            name: "state".to_string(),
-                            span: agent.state_span,
-                        },
-                        type_ref: TypeRef::Named(Ident {
-                            name: agent_state_name.clone(),
-                            span: agent.state_span,
-                        }),
-                        refinement: None,
-                        init: None,
-                        span: agent.state_span,
-                    },
-                ],
+                    type_ref: agent.key_type.clone(),
+                    refinement: None,
+                    init: None,
+                    span: agent.key_name.span,
+                }],
                 span: agent.span,
             }),
             documentation: None,
@@ -2321,11 +2275,9 @@ fn check_agent_decls(
         let _ = key_ty;
 
         // v0.80/v0.81: invariant well-formedness — predicates are pure `Bool`
-        // expressions over the agent's state fields and/or `store` cells (§14,
-        // ADR 0108 D5).
+        // expressions over the agent's `store` cells (§14, ADR 0108 D5).
         checker::check_invariants(
             &agent.invariants,
-            &agent.state_fields,
             &store_cells,
             &agent.name.name,
             &resolved_for_handler,
@@ -2773,8 +2725,10 @@ pub fn check_function_type_boundary_items(items: &[CommonsItem], errors: &mut Ve
                 }
                 CommonsItem::Agent(a) => {
                     reject_fn_types(&a.key_type, "an agent key", errors);
-                    for f in &a.state_fields {
-                        reject_fn_types(&f.type_ref, "an agent state field", errors);
+                    for f in &a.store_fields {
+                        for arg in &f.kind.args {
+                            reject_fn_types(arg, "an agent store field", errors);
+                        }
                     }
                     for h in &a.handlers {
                         for p in &h.params {

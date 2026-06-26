@@ -174,16 +174,6 @@
             "named": true
           }
         ]
-      },
-      "state": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "state_decl",
-            "named": true
-          }
-        ]
       }
     },
     "children": {
@@ -933,10 +923,6 @@
           "named": true
         },
         {
-          "type": "commit_stmt",
-          "named": true
-        },
-        {
           "type": "effect_let_stmt",
           "named": true
         },
@@ -1316,134 +1302,6 @@
           "named": true
         }
       ]
-    }
-  },
-  {
-    "type": "commit_stmt",
-    "named": true,
-    "fields": {
-      "value": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "assert_expr",
-            "named": true
-          },
-          {
-            "type": "binary_expr",
-            "named": true
-          },
-          {
-            "type": "block",
-            "named": true
-          },
-          {
-            "type": "boolean_literal",
-            "named": true
-          },
-          {
-            "type": "call",
-            "named": true
-          },
-          {
-            "type": "effect_pure_expr",
-            "named": true
-          },
-          {
-            "type": "err_expr",
-            "named": true
-          },
-          {
-            "type": "field_access",
-            "named": true
-          },
-          {
-            "type": "float_literal",
-            "named": true
-          },
-          {
-            "type": "identifier",
-            "named": true
-          },
-          {
-            "type": "if_expr",
-            "named": true
-          },
-          {
-            "type": "is_expr",
-            "named": true
-          },
-          {
-            "type": "lambda_expr",
-            "named": true
-          },
-          {
-            "type": "list_literal",
-            "named": true
-          },
-          {
-            "type": "match_expr",
-            "named": true
-          },
-          {
-            "type": "method_call",
-            "named": true
-          },
-          {
-            "type": "mock_expr",
-            "named": true
-          },
-          {
-            "type": "none_expr",
-            "named": true
-          },
-          {
-            "type": "number_literal",
-            "named": true
-          },
-          {
-            "type": "ok_expr",
-            "named": true
-          },
-          {
-            "type": "paren_expr",
-            "named": true
-          },
-          {
-            "type": "question_expr",
-            "named": true
-          },
-          {
-            "type": "record_construction",
-            "named": true
-          },
-          {
-            "type": "record_spread",
-            "named": true
-          },
-          {
-            "type": "self_expr",
-            "named": true
-          },
-          {
-            "type": "some_expr",
-            "named": true
-          },
-          {
-            "type": "string_literal",
-            "named": true
-          },
-          {
-            "type": "unary_expr",
-            "named": true
-          },
-          {
-            "type": "unit_literal",
-            "named": true
-          }
-        ]
-      }
     }
   },
   {
@@ -6258,10 +6116,6 @@
           "named": true
         },
         {
-          "type": "commit_stmt",
-          "named": true
-        },
-        {
           "type": "commons_decl",
           "named": true
         },
@@ -6314,7 +6168,7 @@
           "named": true
         },
         {
-          "type": "state_decl",
+          "type": "store_field",
           "named": true
         },
         {
@@ -6327,21 +6181,6 @@
         },
         {
           "type": "uses_decl",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "state_decl",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "record_field",
           "named": true
         }
       ]
@@ -7407,10 +7246,6 @@
     "named": false
   },
   {
-    "type": "commit",
-    "named": false
-  },
-  {
     "type": "commons",
     "named": false
   },
@@ -7560,10 +7395,6 @@
   },
   {
     "type": "service",
-    "named": false
-  },
-  {
-    "type": "state",
     "named": false
   },
   {

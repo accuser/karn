@@ -1,5 +1,5 @@
 ================================================================================
-agent state field with sum initialiser
+agent store field with sum initialiser
 ================================================================================
 
 context signal
@@ -7,9 +7,7 @@ context signal
 agent Signal {
   key id: String
 
-  state {
-    colour: Light = Red,
-  }
+  store colour: Cell[Light] = Red
 
   on call peek() -> Effect[Result[(), String]] {
     Ok(())
@@ -27,11 +25,12 @@ agent Signal {
       (key_decl
         (identifier)
         (base_type))
-      (state_decl
-        (record_field
+      (store_field
+        (identifier)
+        (store_kind
           (identifier)
-          (identifier)
-          (identifier)))
+          (identifier))
+        (identifier))
       (handler
         (call_handler
           (identifier)

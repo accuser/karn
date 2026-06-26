@@ -339,8 +339,9 @@ mod tests {
         // service_protocol. v0.45 added: actor_decl, scheme, by_clause. v0.51
         // added: scheme_config, scheme_arg. v0.79 added: effect_send_stmt. v0.80
         // added: invariant_decl. v0.81 added: store_field, store_kind,
-        // assign_stmt. v0.85 added: store_annotation, annotation_arg.
-        assert_eq!(rules.len(), 125);
+        // assign_stmt. v0.85 added: store_annotation, annotation_arg. v0.96
+        // removed: state_decl, commit_stmt (parity cutover, ADR 0123).
+        assert_eq!(rules.len(), 123);
         assert!(rules.iter().any(|r| r == "http_handler"));
         assert!(rules.iter().any(|r| r == "_type_ref"));
         // The two trivial wrappers the display layer collapses are excluded.

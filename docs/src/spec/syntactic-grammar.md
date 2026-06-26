@@ -499,15 +499,15 @@ which keys each scheme admits). Well-formedness: §5.
 
 ## §4.5 Agents
 
-An `agent` is a keyed, stateful entity whose state evolves through handlers that
-`commit` new state.
+An `agent` is a keyed, stateful entity whose state lives in `store` fields that
+handlers read by name and write with `:=`.
 
 ### §4.5.1 agent_decl
 
 {{#grammar agent_decl}}
 
-`agent`, a name, and a body holding a key declaration, a state declaration, zero
-or more invariants, and handlers — in that fixed order. Well-formedness: §5.
+`agent`, a name, and a body holding a key declaration, `store` fields, zero or
+more invariants, and handlers — in that fixed order. Well-formedness: §5.
 
 ### §4.5.2 key_decl
 
@@ -515,23 +515,16 @@ or more invariants, and handlers — in that fixed order. Well-formedness: §5.
 
 `key`, an identifier, `:`, and a type — the agent's identity.
 
-### §4.5.3 state_decl
-
-{{#grammar state_decl}}
-
-`state` and a brace-delimited list of record fields. Well-formedness — including
-field zeroability: §5.
-
-### §4.5.4 invariant_decl (v0.80)
+### §4.5.3 invariant_decl (v0.80)
 
 {{#grammar invariant_decl}}
 
 `invariant`, a name, `:`, and a predicate expression — a universally-quantified
 property that must hold of every committed state. Invariants form a phase between
-the `state` block and the handlers; one after a handler is a parse error
-(`bynk.parse.invariant_after_handler`). The predicate references the agent's state
-fields by bare name. Well-formedness — purity, `Bool` type, agent-locality: §5
-(ADR 0107).
+the `store` fields and the handlers; one after a handler is a parse error
+(`bynk.parse.invariant_after_handler`). The predicate references the agent's
+`store` fields by bare name. Well-formedness — purity, `Bool` type,
+agent-locality: §5 (ADR 0107).
 
 ## §4.6 Expressions
 
@@ -798,8 +791,8 @@ which is the block's value.
 
 {{#grammar _statement}}
 
-A statement: a `let`, an effectful `let`, an asynchronous send (`~>`), a
-`commit`, or an assertion.
+A statement: a `let`, an effectful `let`, an asynchronous send (`~>`), a `:=`
+store write, or an assertion.
 
 ### §4.8.3 let_stmt
 
@@ -824,12 +817,13 @@ expression. Well-formedness: §5.
 is bound. Well-formedness — including the requirement that the reply be
 `Effect[()]` (the error gate): §5.
 
-### §4.8.6 commit_stmt
+### §4.8.6 assign_stmt (v0.81)
 
-{{#grammar commit_stmt}}
+{{#grammar assign_stmt}}
 
-`commit` and an expression. Well-formedness — including that it is valid only in
-an agent handler: §5.
+An identifier, `:=`, and an expression — a `Cell` store write. Well-formedness —
+including that the target is a `store Cell` field and the right-hand side does not
+read it: §5 (ADR 0108).
 
 ### §4.8.7 assert_expr
 

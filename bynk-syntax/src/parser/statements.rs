@@ -109,7 +109,7 @@ impl<'a> Parser<'a> {
         let open = self.expect(TokenKind::LBrace, ctx)?;
         let mut statements = Vec::new();
         // Loop: parse statements until we hit something that's not a statement.
-        // v0.1: `let`. v0.5: `commit` and `let ... <-` are also statements.
+        // v0.1: `let`. v0.5: `let ... <-` is also a statement.
         // v0.7: `assert` is a statement form inside test bodies.
         let tail_leading: Vec<String>;
         loop {
@@ -118,10 +118,7 @@ impl<'a> Parser<'a> {
             // detected by lookahead rather than a leading keyword.
             let is_statement = matches!(
                 self.peek_kind(),
-                Some(TokenKind::Let)
-                    | Some(TokenKind::Commit)
-                    | Some(TokenKind::Assert)
-                    | Some(TokenKind::TildeArrow)
+                Some(TokenKind::Let) | Some(TokenKind::Assert) | Some(TokenKind::TildeArrow)
             ) || self.assign_ahead();
             if is_statement {
                 let mut stmt = self.parse_statement()?;
@@ -130,10 +127,6 @@ impl<'a> Parser<'a> {
                     Statement::Let(l) | Statement::EffectLet(l) => {
                         l.trivia.leading = leading;
                         l.trivia.trailing = trailing;
-                    }
-                    Statement::Commit(c) => {
-                        c.trivia.leading = leading;
-                        c.trivia.trailing = trailing;
                     }
                     Statement::Assert(a) => {
                         a.trivia.leading = leading;
@@ -196,16 +189,6 @@ impl<'a> Parser<'a> {
             let span = target.span.merge(value.span);
             return Ok(Statement::Assign(AssignStmt {
                 target,
-                value,
-                span,
-                trivia: Trivia::default(),
-            }));
-        }
-        if self.peek_kind() == Some(TokenKind::Commit) {
-            let kw = self.expect(TokenKind::Commit, "to start a commit statement")?;
-            let value = self.parse_expr()?;
-            let span = kw.span.merge(value.span);
-            return Ok(Statement::Commit(CommitStmt {
                 value,
                 span,
                 trivia: Trivia::default(),

@@ -724,19 +724,6 @@ fn check_block_references(
                     scopes.last_mut().unwrap().insert(l.name.name.clone(), ());
                 }
             }
-            Statement::Commit(c) => {
-                check_expr_references(
-                    &c.value,
-                    params,
-                    in_method,
-                    scopes,
-                    types,
-                    type_params,
-                    fns,
-                    methods,
-                    errors,
-                );
-            }
             Statement::Assert(a) => {
                 check_expr_references(
                     &a.value,

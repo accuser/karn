@@ -3,9 +3,7 @@ context svc
 agent Worker {
   key id: String
 
-  state {
-    count: Int,
-  }
+  store count: Cell[Int]
 
   on schedule("*/5 * * * *") () -> Effect[Result[(), String]] {
     Ok(())

@@ -1094,24 +1094,7 @@ impl<'a> Formatter<'a> {
             ));
             f.newline();
             f.newline();
-            // storage (v0.81, storage track): the legacy `state { }` block (when
-            // present) then the successor `store` fields, matching the parser's
-            // dual-surface storage phase.
-            if !a.state_fields.is_empty() {
-                f.push("state {");
-                f.newline();
-                f.indented(|f| {
-                    for (i, field) in a.state_fields.iter().enumerate() {
-                        f.format_record_field(field);
-                        if i + 1 < a.state_fields.len() || f.opts.trailing_comma {
-                            f.push(",");
-                        }
-                        f.newline();
-                    }
-                });
-                f.push("}");
-                f.newline();
-            }
+            // storage (v0.81, storage track): the agent's `store` fields.
             for sf in &a.store_fields {
                 f.format_store_field(sf);
                 f.newline();
@@ -1353,10 +1336,6 @@ impl<'a> Formatter<'a> {
                 self.push(" <- ");
                 self.format_expr(&l.value);
             }
-            Statement::Commit(c) => {
-                self.push("commit ");
-                self.format_expr(&c.value);
-            }
             Statement::Assert(a) => {
                 self.push("assert ");
                 self.format_expr(&a.value);
@@ -1458,7 +1437,6 @@ fn annotation_to_string(ann: &Annotation) -> String {
 fn statement_trivia(s: &Statement) -> &Trivia {
     match s {
         Statement::Let(l) | Statement::EffectLet(l) => &l.trivia,
-        Statement::Commit(c) => &c.trivia,
         Statement::Assert(a) => &a.trivia,
         Statement::Send(s) => &s.trivia,
         Statement::Assign(a) => &a.trivia,
@@ -1860,7 +1838,6 @@ fn stmt_to_string(s: &Statement) -> String {
             out.push_str(&format!(" <- {}", expr_with_prec(&l.value, 0)));
             out
         }
-        Statement::Commit(c) => format!("commit {}", expr_with_prec(&c.value, 0)),
         Statement::Assert(a) => format!("assert {}", expr_with_prec(&a.value, 0)),
         Statement::Send(s) => format!("~> {}", expr_with_prec(&s.value, 0)),
         Statement::Assign(a) => format!("{} := {}", a.target.name, expr_with_prec(&a.value, 0)),

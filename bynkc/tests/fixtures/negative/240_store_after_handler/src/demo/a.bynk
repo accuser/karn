@@ -2,9 +2,8 @@ context demo.a
 
 agent Counter {
   key id: String
-  state {
-    count: Int,
-  }
+
+  store count: Cell[Int]
 
   on call bump() -> Effect[()] {
     ()

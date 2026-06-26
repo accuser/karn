@@ -174,13 +174,13 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
     ),
     dg(
         "bynk.agents.bad_state_initialiser",
-        "An agent state-field initialiser is not a static value of the field's type.",
-        &["state_decl"],
+        "An agent `store` field initialiser is not a static value of the field's type.",
+        &["store_field"],
     ),
     dg(
         "bynk.agents.non_zeroable_state_field",
-        "An agent state field has no initialiser and no implicit zero value.",
-        &["state_decl"],
+        "An agent `store` field has no initialiser and no implicit zero value.",
+        &["store_field"],
     ),
     dg(
         "bynk.assert.non_bool",
@@ -218,21 +218,6 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
     d(
         "bynk.cell.self_reference",
         "A `:=` right-hand side reads the cell being written (a read-modify-write); use `.update`.",
-    ),
-    dg(
-        "bynk.commit.outside_agent",
-        "`commit` was used outside an agent handler.",
-        &["commit_stmt"],
-    ),
-    dg(
-        "bynk.commit.two_reachable_commits",
-        "Two `commit` statements are reachable on the same execution path.",
-        &["commit_stmt"],
-    ),
-    dg(
-        "bynk.commit.wrong_state_type",
-        "A `commit` value does not match the agent's state type.",
-        &["commit_stmt"],
     ),
     dg(
         "bynk.consumes.alias_conflict",
@@ -630,10 +615,6 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "`consumes` appears after other declarations.",
         &["consumes_decl"],
     ),
-    d(
-        "bynk.parse.duplicate_state_block",
-        "An agent declares more than one `state { }` block.",
-    ),
     dg(
         "bynk.parse.empty_agent",
         "An `agent` body is empty.",
@@ -670,7 +651,7 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
     ),
     d(
         "bynk.parse.expected_agent_storage",
-        "An agent declares no storage — neither a `state { }` block nor `store` fields.",
+        "An agent declares no storage — it has no `store` fields.",
     ),
     dg(
         "bynk.parse.expected_base_type",
@@ -1517,7 +1498,6 @@ fn category_title(cat: &str) -> &'static str {
         "assert" => "Assertions",
         "boundary" => "Boundaries",
         "capability" => "Capabilities",
-        "commit" => "Commit",
         "consumes" => "Consumes",
         "context" => "Contexts",
         "cron" => "Cron",
