@@ -97,6 +97,18 @@ events.since(dayStart).filter(e => e.kind == Order).map(e => e.payload).collect
 
 -- secondary index declaration drives compiler routing
 store reservations: Map[ReservationId, Reservation] @indexed(by: orderId, by: expiresAt)
+
+-- joins & grouping project each result through `into:` — there is no pair type;
+-- the result is a user-named record (ADR 0120). Multi-way joins chain flatly.
+orders
+  .joinOn(lineItems, left: o => o.id, right: li => li.orderId,
+          into: (o, li) => Priced { order: o, line: li })
+  .filter(p => p.line.qty > 0)
+
+reservations
+  .groupBy(r => r.orderId,
+           into: (oid, rows) => OrderSummary { id: oid, total: rows.sum(r => r.qty) })
+  .collect                              -- List[OrderSummary]
 ```
 
 (The instant arithmetic uses ADR 0114 D3's `Instant + Duration -> Instant` — e.g.
@@ -108,7 +120,8 @@ and the `Log` time-window builders' arguments, and lets ADR 0112 D4's `Int`↔
 **Builders** (return `Query[T]` on storage, the same collection eagerly
 in-memory): `filter`, `map`, `flatMap`, `sortBy`, `take`, `skip`, `distinct`,
 `distinctBy`, plus joining (`join`, `joinOn`, `leftJoin`) and grouping
-(`groupBy`). **Terminals** (return `Effect[T]` on storage, `T` in-memory):
+(`groupBy`) — each taking an `into:` projector that names the result, since bynk
+has no pair type (ADR 0120). **Terminals** (return `Effect[T]` on storage, `T` in-memory):
 `collect`, `first`, `firstOrElse`, `count`, `fold`, `sum`/`min`/`max`/`average`,
 `any`, `all`, `forEach`. **`Log` time-window builders:** `since`/`before`/
 `between`/`recent`/`reversed`. **In-memory effectful iteration** on `List[A]`
@@ -204,7 +217,7 @@ systems (§11 defers reactive queries to them).
 
 ## 6. Ordered slice decomposition
 
-> **Track status: settling complete; slices 1–3 shipped (v0.88–v0.93)**
+> **Track status: slices 1–3 shipped (v0.88–v0.93); slice 4 settling (ADR 0120)**
 > (2026-06-26). All settling ADRs have landed: the foundational batch —
 > [0114](../decisions/0114-instant-primitive.md) (`Instant`, Q4),
 > [0115](../decisions/0115-query-model-lazy-eager-dispatch.md) (`Query[T]`
@@ -218,10 +231,14 @@ systems (§11 defers reactive queries to them).
 > primitive (slice 1b, v0.90), slice 1c (`bynk.list` deprecation, v0.91), slice 2
 > (lazy `Query` over `Map`, v0.92), and slice 3 (`@indexed` — index maintenance in
 > the commit, equality-filter routing, and the missing/unused hygiene warnings,
-> v0.93). **Remaining:** slice 4 (joins/grouping); and within `@indexed`, the
-> `bynk.index.ambiguous` note + the add/remove auto-fixes await compound-predicate
-> routing. Unblocks storage slice 4 (`Log`) and the per-entry-key index I/O
-> follow-on (today the index is a CPU optimisation under wholesale persistence).
+> v0.93). **Remaining:** slice 4 (joins/grouping) — its result-representation gap
+> is now settled by [ADR 0120](../decisions/0120-join-group-combiner-form.md) (the
+> **combiner form**: `joinOn`/`leftJoin`/`join`/`groupBy` take an `into:` projector,
+> no pair type), with the cross-shape `Map × Log` join deferred to the storage `Log`
+> slice; and within `@indexed`, the `bynk.index.ambiguous` note + the add/remove
+> auto-fixes await compound-predicate routing. Unblocks storage slice 4 (`Log`) and
+> the per-entry-key index I/O follow-on (today the index is a CPU optimisation under
+> wholesale persistence).
 
 | # | Slice | Depends on | Status |
 |---|---|---|---|
@@ -231,7 +248,7 @@ systems (§11 defers reactive queries to them).
 | 1b | **`Instant` primitive** (ADR 0114) — sixth base type, `Clock.now() -> Effect[Instant]`, `Instant`/`Duration` arithmetic, orderable; prerequisite for slice 2's instant-field queries and the `Log` slice | — | **shipped (v0.90)** |
 | 2 | **Lazy `Query[T]` over storage `Map`** — the builder/terminal split, `Query[T]` type, **scan** execution (no index yet); pure-build/effectful-terminate (`given Map` pure-helper form deferred) | 1, 1b, storage `Map` | **shipped (v0.92)** |
 | 3 | **`@indexed`** — secondary indexes maintained in the commit; compiler routing of equality filters + the missing/unused **hygiene diagnostics** (the `ambiguous` note + auto-fixes await compound-predicate routing) | 2 | **shipped (v0.93)** |
-| 4 | **Joins & grouping** — `joinOn`/`leftJoin`/`join`, `groupBy`; **cross-shape** (Map×Log) | 3 | not started |
+| 4 | **Joins & grouping** — `joinOn`/`leftJoin`/`join`, `groupBy`, each with an `into:` combiner (ADR 0120, no pair type); `Map`/`Query` same-shape only (**cross-shape** Map×Log deferred with the `Log` slice) | 3 | settling (ADR 0120) |
 | 5 | **In-memory effectful iteration** — `traverse`/`traverseAll`/`parTraverse`/`parTraverseAll` as the uniform method surface (if not already covered by `bynk.list`) | 1 | not started |
 | — | *`Log` time-window builders land with **storage slice 4** (`Log`), consuming this track's `Query[T]` + `since`/`before`/`between`/`recent`* | 2 | external |
 
@@ -302,3 +319,13 @@ may collapse into slice 1 depending on the `bynk.list` reconciliation.
     (v0.91) then landed the `bynk.list` deprecation as a real warning +
     machine-applicable auto-fix on top of it — not the build-breaking removal the
     gap would otherwise have forced.
+13. ~~**Join/group result representation** (slice 4; surfaced starting slice 4).~~
+    **Settled — [ADR 0120](../decisions/0120-join-group-combiner-form.md):** ADRs
+    0116/0119 wrote join/`groupBy` results as `(T, U)` / `(K, List[T])`, but bynk
+    has **no pair/tuple type** and stays **nominal**. So the builders take a
+    trailing **`into:` combiner** that names the result —
+    `joinOn(other, left, right, into: (T, U) -> V)`, `leftJoin(…, into: (T, Option[U]) -> V)`,
+    `join(other, on, into: (T, U) -> V)`, `groupBy(key, into: (K, List[T]) -> V)` —
+    yielding `Query[V]` / `List[V]`. No tuple to name or destructure; multi-way
+    joins compose flatly; ADR 0116's `(T, U)` rows + D7 are superseded. A general
+    n-ary tuple is a named deferral.
