@@ -924,11 +924,6 @@ fn body_performs_effects(e: &Expr, ctx: &Ctx) -> bool {
                         return true;
                     }
                 }
-                Statement::Commit(c) => {
-                    if body_performs_effects(&c.value, ctx) {
-                        return true;
-                    }
-                }
                 Statement::Assert(a) => {
                     if body_performs_effects(&a.value, ctx) {
                         return true;

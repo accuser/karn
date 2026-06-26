@@ -418,7 +418,6 @@ pub(crate) fn block_uses_send(b: &Block) -> bool {
         match s {
             Statement::Send(_) => true,
             Statement::Let(l) | Statement::EffectLet(l) => expr(&l.value),
-            Statement::Commit(c) => expr(&c.value),
             Statement::Assert(a) => expr(&a.value),
             Statement::Assign(a) => expr(&a.value),
         }
@@ -501,7 +500,6 @@ pub(crate) fn block_writes_state(
         match s {
             Statement::Assign(_) => true,
             Statement::Let(l) | Statement::EffectLet(l) => expr(&l.value, m),
-            Statement::Commit(c) => expr(&c.value, m),
             Statement::Assert(a) => expr(&a.value, m),
             Statement::Send(s) => expr(&s.value, m),
         }
@@ -551,7 +549,6 @@ fn walk_block_exprs(b: &Block, f: &mut impl FnMut(&Expr)) {
     for s in &b.statements {
         match s {
             Statement::Let(l) | Statement::EffectLet(l) => walk_exprs(&l.value, f),
-            Statement::Commit(c) => walk_exprs(&c.value, f),
             Statement::Assert(a) => walk_exprs(&a.value, f),
             Statement::Send(s) => walk_exprs(&s.value, f),
             Statement::Assign(a) => walk_exprs(&a.value, f),
@@ -1007,8 +1004,10 @@ fn collect_external_references(commons: &TypedCommons, ctx: &EmitProjectCtx) -> 
             }
             CommonsItem::Agent(a) => {
                 collect_refs_in_typeref(&a.key_type, &local_to_file, ctx, &mut refs);
-                for f in &a.state_fields {
-                    collect_refs_in_typeref(&f.type_ref, &local_to_file, ctx, &mut refs);
+                for f in &a.store_fields {
+                    for arg in &f.kind.args {
+                        collect_refs_in_typeref(arg, &local_to_file, ctx, &mut refs);
+                    }
                 }
                 for h in &a.handlers {
                     for p in &h.params {
@@ -1102,9 +1101,6 @@ fn collect_refs_in_block(
                     collect_refs_in_typeref(t, local_to_file, ctx, out);
                 }
                 collect_refs_in_expr(&l.value, local_to_file, commons, ctx, out);
-            }
-            Statement::Commit(c) => {
-                collect_refs_in_expr(&c.value, local_to_file, commons, ctx, out);
             }
             Statement::Assert(a) => {
                 collect_refs_in_expr(&a.value, local_to_file, commons, ctx, out);

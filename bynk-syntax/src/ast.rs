@@ -510,20 +510,14 @@ pub struct AgentDecl {
     /// `key id: Type` — the identifier-typed value identifying instances.
     pub key_name: Ident,
     pub key_type: TypeRef,
-    /// State fields — a record-shaped declaration of persistent state.
-    ///
-    /// v0.81 (storage track) introduces `store` fields ([`AgentDecl::store_fields`])
-    /// as the successor surface. During the track the two coexist (ADR 0108 D3);
-    /// `state { }` is removed at the parity slice.
-    pub state_fields: Vec<RecordField>,
-    pub state_span: Span,
     /// `store` fields (v0.81, storage track) — each an access-pattern slot of a
-    /// declared storage kind (`Cell`/`Map`/…). Empty for agents still written
-    /// against the `state { }` record. ADR 0108.
+    /// declared storage kind (`Cell`/`Map`/…). The successor to the removed
+    /// `state { }` record (ADR 0108); every agent declares its state this way.
     pub store_fields: Vec<StoreField>,
     /// Invariants (v0.80 §14) — universally-quantified predicates over the
-    /// agent's state record. The phase sits between the `state { }` block and
-    /// the handlers; each is checked against every value passed to `commit`.
+    /// agent's `store` fields. The phase sits between the fields and the
+    /// handlers; each is checked against the state staged by a handler's writes
+    /// before it commits.
     pub invariants: Vec<Invariant>,
     pub handlers: Vec<Handler>,
     pub documentation: Option<String>,
@@ -1247,9 +1241,6 @@ pub enum Statement {
     Let(LetStmt),
     /// `let name (: T)? <- expr` — effectful binding (v0.5).
     EffectLet(LetStmt),
-    /// `commit expr` — within an agent handler, declares the new persistent
-    /// state (v0.5).
-    Commit(CommitStmt),
     /// `assert expr` — verify a Bool expression at test runtime (v0.7).
     /// Only valid inside test case bodies.
     Assert(AssertStmt),
@@ -1266,7 +1257,6 @@ impl Statement {
     pub fn span(&self) -> Span {
         match self {
             Statement::Let(l) | Statement::EffectLet(l) => l.span,
-            Statement::Commit(c) => c.span,
             Statement::Assert(a) => a.span,
             Statement::Send(s) => s.span,
             Statement::Assign(a) => a.span,
@@ -1296,13 +1286,6 @@ pub struct AssignStmt {
 pub struct LetStmt {
     pub name: Ident,
     pub type_annot: Option<TypeRef>,
-    pub value: Expr,
-    pub span: Span,
-    pub trivia: Trivia,
-}
-
-#[derive(Debug, Clone)]
-pub struct CommitStmt {
     pub value: Expr,
     pub span: Span,
     pub trivia: Trivia,

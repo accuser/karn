@@ -39,7 +39,7 @@
       "patterns": [
         {
           "name": "keyword.declaration.bynk",
-          "match": "\\b(commons|context|adapter|binding|test|integration|wires|type|fn|capability|provides|service|agent|actor|state|invariant|exports|uses|consumes|mocks|protocol)\\b"
+          "match": "\\b(commons|context|adapter|binding|test|integration|wires|type|fn|capability|provides|service|agent|actor|invariant|exports|uses|consumes|mocks|protocol)\\b"
         },
         {
           "comment": "`key` and `store` are CONTEXTUAL keywords (like in the parser): they introduce an agent field only in `<kw> <name>:` position, so they stay an ordinary identifier elsewhere (a `store`/`key` function parameter, a `cache.store` context). The look-ahead requires a following `<name>:` (whitespace + identifier + colon), which a parameter `store: Int` (colon adjacent) and a member `cache.store` do not match.",
@@ -48,7 +48,7 @@
         },
         {
           "name": "keyword.control.bynk",
-          "match": "\\b(if|else|let|match|is|commit|on|given|call|by|as|assert|expect|from|http|cron|queue|schedule|message)\\b"
+          "match": "\\b(if|else|let|match|is|on|given|call|by|as|assert|expect|from|http|cron|queue|schedule|message)\\b"
         },
         {
           "name": "variable.language.self.bynk",

@@ -278,8 +278,8 @@ pub fn check_record(
 /// Check a single handler body (used for service and agent handlers).
 ///
 /// `capabilities_in_scope` is the set of capabilities the handler may
-/// reference. `agent_state_ty` is set when checking an agent handler — it
-/// determines the type the `commit` statement must produce.
+/// reference. `agent_state_ty` carries an agent handler's synthetic state-record
+/// type when one is in scope.
 #[allow(clippy::too_many_arguments)]
 pub fn check_handler_body(
     body: &Block,
@@ -454,16 +454,13 @@ pub fn check_handler_body(
 ///   test-only construct (Effect, `?` propagation, `assert`, `Mock`).
 /// - `bynk.invariant.not_bool` — the predicate does not type to `Bool`.
 ///
-/// State fields are placed in scope as the predicate's locals; the synthetic
-/// `<Agent>State` record is *not* used here because invariants read fields
-/// directly, mirroring the design-notes worked examples.
+/// Store `Cell` fields are placed in scope as the predicate's locals; invariants
+/// read fields directly by bare name, mirroring the design-notes worked examples.
 #[allow(clippy::too_many_arguments)]
 pub fn check_invariants(
     invariants: &[Invariant],
-    state_fields: &[RecordField],
-    // v0.81 (ADR 0108 D5): a `store`-bearing agent's invariants reference its
-    // `Cell` fields by bare name (a pure read of the staged value), so they join
-    // the predicate scope alongside any `state` fields.
+    // A `store`-bearing agent's invariants reference its `Cell` fields by bare
+    // name (a pure read of the staged value), so they form the predicate scope.
     store_cells: &HashMap<String, Ty>,
     agent_name: &str,
     input: &ResolvedCommons,
@@ -491,14 +488,9 @@ pub fn check_invariants(
         }
     }
 
-    // Build the predicate scope once: each `state` field and each `store` `Cell`
-    // is in scope by bare name (a `Cell` reads as its element type).
+    // Build the predicate scope once: each `store` `Cell` is in scope by bare
+    // name (a `Cell` reads as its element type).
     let mut field_scope: HashMap<String, Ty> = HashMap::new();
-    for f in state_fields {
-        if let Some(t) = resolve_type_ref(&f.type_ref, &input.types) {
-            field_scope.insert(f.name.name.clone(), t);
-        }
-    }
     for (name, ty) in store_cells {
         field_scope.insert(name.clone(), ty.clone());
     }
@@ -1324,50 +1316,6 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                     );
                     ctx.bind(l.name.name.clone(), final_ty);
                 }
-            }
-            Statement::Commit(c) => {
-                let Some(state_ty) = ctx.agent_state_ty.clone() else {
-                    ctx.errors.push(
-                        CompileError::new(
-                            "bynk.commit.outside_agent",
-                            c.span,
-                            "`commit` is only valid inside an agent handler",
-                        )
-                        .with_note(
-                            "agent handlers update persistent state via `commit newState`; \
-                             services and free functions do not have state",
-                        ),
-                    );
-                    let _ = type_of(&c.value, None, ctx);
-                    continue;
-                };
-                if ctx.commit_seen {
-                    ctx.errors.push(
-                        CompileError::new(
-                            "bynk.commit.two_reachable_commits",
-                            c.span,
-                            "two `commit` statements are reachable on the same execution path",
-                        )
-                        .with_note(
-                            "an agent handler may commit at most once per invocation; use branches to commit different values conditionally",
-                        ),
-                    );
-                }
-                let val_ty = type_of(&c.value, Some(&state_ty), ctx);
-                if let Some(actual) = val_ty
-                    && !compatible(&actual, &state_ty)
-                {
-                    ctx.errors.push(CompileError::new(
-                        "bynk.commit.wrong_state_type",
-                        c.value.span,
-                        format!(
-                            "`commit` expression has type `{}`, but the agent's state type is `{}`",
-                            actual.display(),
-                            state_ty.display()
-                        ),
-                    ));
-                }
-                ctx.commit_seen = true;
             }
             Statement::Assert(a) => {
                 if !ctx.in_test_body {

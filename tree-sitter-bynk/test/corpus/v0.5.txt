@@ -109,19 +109,18 @@ context billing {
               (boolean_literal))))))))
 
 ==========================
-agent with state and commit
+agent with store and assign
 ==========================
 
 context shop {
 	agent Cart {
 		key id: Int
 
-		state {
-			items: Int,
-		}
+		store items: Cell[Int]
 
 		on call addItem(qty: Int) -> Effect[()] {
-			commit { ...self.state, items: self.state.items + qty }
+			let cur = items
+			items := cur + qty
 			Effect.pure(())
 		}
 	}
@@ -138,10 +137,11 @@ context shop {
       key: (key_decl
         name: (identifier)
         type: (base_type))
-      state: (state_decl
-        (record_field
-          name: (identifier)
-          type: (base_type)))
+      (store_field
+        name: (identifier)
+        kind: (store_kind
+          head: (identifier)
+          (base_type)))
       (handler
         (call_handler
           method: (identifier)
@@ -152,19 +152,13 @@ context shop {
             name: (builtin_type)
             arg: (unit_type))
           body: (block
-            (commit_stmt
-              value: (record_spread
-                base: (field_access
-                  receiver: (self_expr)
-                  field: (identifier))
-                (field_init
-                  name: (identifier)
-                  value: (binary_expr
-                    (field_access
-                      receiver: (field_access
-                        receiver: (self_expr)
-                        field: (identifier))
-                      field: (identifier))
-                    (identifier)))))
+            (let_stmt
+              name: (identifier)
+              value: (identifier))
+            (assign_stmt
+              target: (identifier)
+              value: (binary_expr
+                (identifier)
+                (identifier)))
             tail: (effect_pure_expr
               (unit_literal))))))))

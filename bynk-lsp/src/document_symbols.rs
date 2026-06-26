@@ -309,11 +309,11 @@ fn agent_symbol(source: &str, a: &AgentDecl) -> DocumentSymbol {
         span_to_range(source, a.key_name.span),
         Vec::new(),
     ));
-    // State fields.
-    for field in &a.state_fields {
+    // Store fields.
+    for field in &a.store_fields {
         children.push(make_symbol(
             field.name.name.clone(),
-            Some("state".into()),
+            Some("store".into()),
             SymbolKind::PROPERTY,
             span_to_range(source, field.span),
             span_to_range(source, field.name.span),
@@ -469,7 +469,7 @@ mod tests {
                    }\n\
                    agent Counter {\n\
                    key id: Int\n\
-                   state { value: Int }\n\
+                   store value: Cell[Int]\n\
                    on call bump(amount: Int) -> Int { 0 }\n\
                    }\n\
                    }";
@@ -493,7 +493,7 @@ mod tests {
             .find(|c| c.name == "Counter")
             .expect("Counter agent");
         let agent_children = agent.children.as_ref().unwrap();
-        // key + state field + handler = 3 children
+        // key + store field + handler = 3 children
         assert_eq!(agent_children.len(), 3);
         assert!(
             agent_children

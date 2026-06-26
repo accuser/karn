@@ -2,9 +2,8 @@ context demo.a
 
 agent Counter {
   key id: String
-  state {
-    count: Int,
-  }
+
+  store count: Cell[Int]
 
   invariant dup:
     count >= 0
@@ -12,7 +11,8 @@ agent Counter {
     count < 100
 
   on call bump() -> Effect[()] {
-    commit { ...self.state, count: self.state.count + 1 }
+    let cur = count
+    count := cur + 1
     ()
   }
 }

@@ -100,15 +100,13 @@
       "agent ${1:Name} {",
       "  key ${2:id}: ${3:String}",
       "",
-      "  state {",
-      "    ${4:count}: ${5:Int} = ${6:0},",
-      "  }",
+      "  store ${4:count}: Cell[${5:Int}] = ${6:0}",
       "",
       "  on call ${7:peek}(${8}) -> Effect[Result[${9:()}, String]] {",
       "    Ok(${10:()})",
       "  }",
       "}$0"
     ],
-    "description": "A durable agent (keyed state + handlers)."
+    "description": "A durable agent (keyed store fields + handlers)."
   }
 }

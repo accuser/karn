@@ -6,7 +6,7 @@
 
 Every reserved keyword, with a one-line description. Reserved words cannot be used as identifiers.
 
-There are **61** reserved keywords.
+There are **59** reserved keywords.
 
 | Keyword | Meaning |
 |---|---|
@@ -34,7 +34,6 @@ There are **61** reserved keywords.
 | `binding` | Name an adapter's TypeScript binding module (`binding "<module>"`). |
 | `by` | Name the actor a handler consumes (`on … by <name>: <Actor>`). |
 | `capability` | Declare a capability (a dependency interface) in a context. |
-| `commit` | Persist new agent state from within a handler. |
 | `commons` | Declare a pure, stateless module of types and functions. |
 | `consumes` | Declare a dependency on another context's services. |
 | `context` | Declare a deployable context (services, agents, capabilities). |
@@ -63,7 +62,6 @@ There are **61** reserved keywords.
 | `record` | Reserved keyword (records are written `type X = { … }`). |
 | `self` | The current agent instance, inside a handler. |
 | `service` | Declare a service (a group of handlers) in a context. |
-| `state` | Declare an agent's persistent state block. |
 | `test` | Declare a test block or a test case. |
 | `transparent` | Export a type with its structure visible (`exports transparent { … }`). |
 | `true` | The boolean literal `true`. |

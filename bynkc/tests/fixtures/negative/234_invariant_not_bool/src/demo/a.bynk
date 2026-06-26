@@ -2,15 +2,15 @@ context demo.a
 
 agent Counter {
   key id: String
-  state {
-    count: Int,
-  }
+
+  store count: Cell[Int]
 
   invariant bad:
     count
 
   on call bump() -> Effect[()] {
-    commit { ...self.state, count: self.state.count + 1 }
+    let cur = count
+    count := cur + 1
     ()
   }
 }

@@ -205,11 +205,11 @@ fn describe_service(s: &ServiceDecl) -> String {
 
 fn describe_agent(a: &AgentDecl) -> String {
     let mut out = format!(
-        "```bynk\nagent {} {{\n\tkey {}: {}\n\tstate {{ {} field(s) }}\n}}\n```\n",
+        "```bynk\nagent {} {{\n\tkey {}: {}\n\t{} store field(s)\n}}\n```\n",
         a.name.name,
         a.key_name.name,
         type_ref_str(&a.key_type),
-        a.state_fields.len(),
+        a.store_fields.len(),
     );
     if let Some(doc) = &a.documentation {
         out.push('\n');

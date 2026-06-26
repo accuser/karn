@@ -863,26 +863,14 @@ agent Counter {
 
 The agent's identity: a key field whose value names an instance.
 
-### state_decl {#rule-state_decl}
-
-{{#grammar state_decl}}
-
-The agent's state: a record of fields, each with a type and optional default. A
-field with no default must have an implicit zero value.
-
-**Static semantics.**
-{{#grammar-semantics state_decl}}
-
-**See also.** [Model an agent as a state machine](../guides/agents-and-state/state-machine.md).
-
 ### store_field {#rule-store_field}
 
 {{#grammar store_field}}
 
 A `store` field (storage track): `store <name>: <Kind>[…] [@annotations] [= <init>]`
 — an access-pattern slot of a declared storage kind. `store` is a contextual
-keyword (also a valid identifier elsewhere). Coexists with the `state` block
-during the storage track (ADR 0108).
+keyword (also a valid identifier elsewhere). It is the agent's sole state surface
+(ADR 0108); the legacy `state { }` block was removed at the parity slice.
 
 > **`Cell`, `Map`, `Set`, `Cache`, and `Log` are functional.** A `Cell[T]` (v0.82)
 > reads by bare name (implicit deref) and writes with `:=`; a `Map[K, V]` (v0.83,
@@ -1257,7 +1245,8 @@ the block's value.
 
 {{#grammar _statement}}
 
-A statement: a `let`, an effectful `let`, a `commit`, or an assertion.
+A statement: a `let`, an effectful `let`, a `:=` store write, an async send, or
+an assertion.
 
 ### let_stmt {#rule-let_stmt}
 
@@ -1288,15 +1277,6 @@ and discards it.
 
 **Static semantics.**
 {{#grammar-semantics effect_send_stmt}}
-
-### commit_stmt {#rule-commit_stmt}
-
-{{#grammar commit_stmt}}
-
-`commit` — writes new agent state. Valid only in an agent handler.
-
-**Static semantics.**
-{{#grammar-semantics commit_stmt}}
 
 ### assign_stmt {#rule-assign_stmt}
 

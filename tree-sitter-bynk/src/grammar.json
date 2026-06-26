@@ -60,7 +60,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "state_decl"
+          "name": "store_field"
         },
         {
           "type": "SYMBOL",
@@ -2462,22 +2462,6 @@
           }
         },
         {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "FIELD",
-              "name": "state",
-              "content": {
-                "type": "SYMBOL",
-                "name": "state_decl"
-              }
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
-        },
-        {
           "type": "REPEAT",
           "content": {
             "type": "SYMBOL",
@@ -2559,68 +2543,6 @@
             "type": "SYMBOL",
             "name": "_type_ref"
           }
-        }
-      ]
-    },
-    "state_decl": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "STRING",
-          "value": "state"
-        },
-        {
-          "type": "STRING",
-          "value": "{"
-        },
-        {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "SEQ",
-              "members": [
-                {
-                  "type": "SYMBOL",
-                  "name": "record_field"
-                },
-                {
-                  "type": "REPEAT",
-                  "content": {
-                    "type": "SEQ",
-                    "members": [
-                      {
-                        "type": "STRING",
-                        "value": ","
-                      },
-                      {
-                        "type": "SYMBOL",
-                        "name": "record_field"
-                      }
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
-        },
-        {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "STRING",
-              "value": ","
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
-        },
-        {
-          "type": "STRING",
-          "value": "}"
         }
       ]
     },
@@ -3887,10 +3809,6 @@
         },
         {
           "type": "SYMBOL",
-          "name": "commit_stmt"
-        },
-        {
-          "type": "SYMBOL",
           "name": "assign_stmt"
         },
         {
@@ -4017,23 +3935,6 @@
         {
           "type": "STRING",
           "value": "~>"
-        },
-        {
-          "type": "FIELD",
-          "name": "value",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_expression"
-          }
-        }
-      ]
-    },
-    "commit_stmt": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "STRING",
-          "value": "commit"
         },
         {
           "type": "FIELD",

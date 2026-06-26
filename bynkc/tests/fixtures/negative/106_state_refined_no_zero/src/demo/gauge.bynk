@@ -7,11 +7,9 @@ type Id = String where Matches("[a-z0-9]{1,8}")
 agent Gauge {
 	key id: Id
 
-	state {
-		level: Positive,
-	}
+	store level: Cell[Positive]
 
 	on call current() -> Effect[Positive] {
-		self.state.level
+		level
 	}
 }

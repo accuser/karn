@@ -79,9 +79,7 @@ its body: a body that performs an effect operation (an `<-` bind, a
 capability call, a call returning `Effect`) makes the lambda **effectful**,
 wrapping its result in `Effect` — effectfulness is judged by the *presence*
 of effect operations, never by a pre-declared result type, which is what
-dissolves the apparent circularity. A nested lambda's effects are its own. A
-`commit` MUST NOT appear inside a lambda (the existing
-`bynk.commit.outside_agent`).
+dissolves the apparent circularity. A nested lambda's effects are its own.
 
 **Value application** (v0.20a). Applying a function-typed value checks
 arguments against the function type's parameters
@@ -283,25 +281,26 @@ MUST NOT declare `from http`, `from cron`, or `on message` handlers (the
 `bynk.parse.*_in_agent` codes). Each agent handler's return type MUST be an
 `Effect` (`bynk.agent.return_not_effect`).
 
-Every `state` field MUST have a defined initial value: either an **explicit
-initialiser** — a compile-time constant of the field's type, not referencing
-`self`, parameters, or capabilities (`bynk.agents.bad_state_initialiser`) — or an
-**implicit zero** (`Int` → `0`, `Bool` → `false`, `String` → `""`, `Option[T]` →
-`None`, a record of zeroable fields). A field with neither is rejected
-(`bynk.agents.non_zeroable_state_field`).
+Every `store` field MUST have a defined initial value: either an **explicit
+initialiser** — a compile-time constant of the field's (element) type, not
+referencing `self`, parameters, or capabilities (`bynk.agents.bad_state_initialiser`)
+— or an **implicit zero** (`Int` → `0`, `Bool` → `false`, `String` → `""`,
+`Option[T]` → `None`, a record of zeroable fields). A field with neither is
+rejected (`bynk.agents.non_zeroable_state_field`).
 
-A `commit` MUST occur only in an agent handler (`bynk.commit.outside_agent`), its
-value MUST match the agent's state type (`bynk.commit.wrong_state_type`), and at
-most one `commit` may be reachable on any execution path
-(`bynk.commit.two_reachable_commits`). Constructing or calling an agent MUST use
-the right key arity and type and a declared handler (`bynk.agent.construction_arity`,
+A `:=` store write MUST target a `store Cell` field (`bynk.cell.invalid_target`),
+and its right-hand side MUST NOT read the cell being written
+(`bynk.cell.self_reference`) — a read-modify-write reads the old value into a
+`let` first. A handler's writes are staged and committed atomically when it
+returns (ADR 0109). Constructing or calling an agent MUST use the right key arity
+and type and a declared handler (`bynk.agent.construction_arity`,
 `bynk.agent.key_mismatch`, `bynk.agent.handler_arity`, `bynk.agent.handler_not_found`).
 
 ### §5.4.1 Invariants (v0.80)
 
 An **invariant** is a universally-quantified property that MUST hold of every
 committed agent state (`design/bynk-design-notes.md` §14; ADR 0107). Its predicate
-references the agent's state fields by bare name and is a *pure, agent-local
+references the agent's `store` fields by bare name and is a *pure, agent-local
 `Bool` expression*:
 
 - the predicate MUST have type `Bool` (`bynk.invariant.not_bool`);
@@ -315,13 +314,11 @@ references the agent's state fields by bare name and is a *pure, agent-local
 The predicate language is ordinary expressions plus `implies` (logical
 implication, `P implies Q` ≡ `!P || Q`) and `is` (pattern-matching as a `Bool`
 expression). Invariants are **runtime-checked at the commit boundary**: each is
-evaluated against the value passed to `commit`, before the state is persisted. A
-violation is a **fault** (`InvariantViolation`), not an outcome — see §7 and the
-emission model. "Revert" is the **non-persistence of the offending commit**, not
-whole-handler rollback (ADR 0107 D6): effects already performed by the handler,
-and any earlier `commit`, stand.
-
-{{#grammar-semantics state_decl}}
+evaluated against the state staged by the handler's `store` writes, before it is
+persisted. A violation is a **fault** (`InvariantViolation`), not an outcome — see
+§7 and the emission model. "Revert" is the **non-persistence of the staged
+state**, not whole-handler rollback (ADR 0107 D6): effects already performed by
+the handler stand.
 
 ## §5.5 Effects, capabilities & providers
 

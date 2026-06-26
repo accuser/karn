@@ -410,16 +410,15 @@ impl<'a> Parser<'a> {
                     span: t.span,
                 })
             }
-            // v0.5 contextual keywords (`state`, `on`) double as identifiers
-            // in expression / field-access positions so users can name fields
-            // and parameters using them. They retain their keyword meaning
-            // only at agent-decl-level (`state { ... }`) and handler-decl-level
-            // (`on call(...)`).
+            // v0.5 contextual keyword `on` doubles as an identifier in
+            // expression / field-access positions so users can name fields and
+            // parameters using it. It retains its keyword meaning only at
+            // handler-decl-level (`on call(...)`).
             //
             // v0.7: `test` is contextual too — it introduces the test
             // declaration kind at the file top level, but is a perfectly
             // valid commons or context name otherwise.
-            Some(t) if matches!(t.kind, TokenKind::State | TokenKind::On | TokenKind::Test) => {
+            Some(t) if matches!(t.kind, TokenKind::On | TokenKind::Test) => {
                 self.bump();
                 Ok(Ident {
                     name: self.slice(t.span).to_string(),
@@ -570,14 +569,12 @@ fn is_reserved_keyword(kind: TokenKind) -> bool {
             | Agent
             | As
             | Capability
-            | Commit
             | Effect
             | Given
             | On
             | Http
             | Provides
             | Service
-            | State
             | Actor
             | By
             | Assert

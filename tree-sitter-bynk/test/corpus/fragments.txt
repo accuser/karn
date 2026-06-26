@@ -136,18 +136,17 @@ on schedule("0 * * * *") () -> Effect[Result[(), String]] {
           (unit_literal))))))
 
 ================================================================================
-fragment: bare state block
+fragment: bare store field
 ================================================================================
 
-state {
-  count: Int,
-}
+store count: Cell[Int]
 
 --------------------------------------------------------------------------------
 
 (source_file
-  (state_decl
-    (record_field
+  (store_field
+    (identifier)
+    (store_kind
       (identifier)
       (base_type))))
 

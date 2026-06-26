@@ -259,15 +259,6 @@ fn emit_statement(out: &mut String, stmt: &Statement, cx: &mut LowerCtx, indent:
                 None => write_line(out, indent, &format!("const {bind_name} = await {value};")),
             }
         }
-        Statement::Commit(c) => {
-            // Inside an agent handler, `commit expr` → `await this.commitState(expr);`
-            let mut stmts = Vec::new();
-            let value = lower_expr(&c.value, &mut stmts, cx);
-            for s in &stmts {
-                write_line(out, indent, s);
-            }
-            write_line(out, indent, &format!("await this.commitState({value});"));
-        }
         Statement::Assert(a) => {
             // Inside a test case body, `assert expr` lowers to a runtime check
             // that throws an AssertionError so the surrounding test-case
@@ -2622,21 +2613,14 @@ fn lower_field_access(
     {
         return format!("HttpResult.{}", field.name);
     }
-    // Agent-handler `self.state` and `self.<key>` rewrites.
+    // Agent-handler `self.<key>` rewrite.
     if cx.in_agent_handler
         && let ExprKind::Ident(id) = &receiver.kind
         && id.name == "self"
+        && let Some(k) = &cx.agent_key_field
+        && field.name == *k
     {
-        if field.name == "state"
-            && let Some(s) = &cx.agent_state_var
-        {
-            return s.clone();
-        }
-        if let Some(k) = &cx.agent_key_field
-            && field.name == *k
-        {
-            return format!("(this.state.id.toString() as {})", k);
-        }
+        return format!("(this.state.id.toString() as {})", k);
     }
     // v0.45: `<binder>.identity` on a verified actor binding. The binder is not
     // a runtime value; the identity is minted at the verification seam. For the

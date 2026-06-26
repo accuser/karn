@@ -124,8 +124,6 @@ pub enum TokenKind {
     Agent,
     #[token("capability")]
     Capability,
-    #[token("commit")]
-    Commit,
     #[token("Effect")]
     Effect,
     #[token("given")]
@@ -151,8 +149,6 @@ pub enum TokenKind {
     Provides,
     #[token("service")]
     Service,
-    #[token("state")]
-    State,
     // v0.45 keywords: `actor` heads a boundary-contract declaration; `by`
     // heads a handler's actor clause.
     #[token("actor")]
@@ -345,7 +341,6 @@ impl TokenKind {
             Binding => "`binding`",
             Agent => "`agent`",
             Capability => "`capability`",
-            Commit => "`commit`",
             Effect => "`Effect`",
             Given => "`given`",
             On => "`on`",
@@ -356,7 +351,6 @@ impl TokenKind {
             Protocol => "`protocol`",
             Provides => "`provides`",
             Service => "`service`",
-            State => "`state`",
             Actor => "`actor`",
             By => "`by`",
             Invariant => "`invariant`",

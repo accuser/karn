@@ -2,26 +2,25 @@ context demo.a
 
 agent Other {
   key id: String
-  state {
-    n: Int,
-  }
+
+  store n: Cell[Int]
 
   on call get() -> Effect[Int] {
-    self.state.n
+    n
   }
 }
 
 agent Counter {
   key id: String
-  state {
-    count: Int,
-  }
+
+  store count: Cell[Int]
 
   invariant bad:
     Other(id).get() == count
 
   on call bump() -> Effect[()] {
-    commit { ...self.state, count: self.state.count + 1 }
+    let cur = count
+    count := cur + 1
     ()
   }
 }

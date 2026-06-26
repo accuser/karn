@@ -3,9 +3,7 @@ context svc
 agent Worker {
   key id: String
 
-  state {
-    count: Int,
-  }
+  store count: Cell[Int]
 
   on message(message: String) -> Effect[Result[(), String]] {
     Ok(())

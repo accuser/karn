@@ -65,7 +65,6 @@ pub const KEYWORDS: &[KeywordInfo] = &[
         "capability",
         "Declare a capability (a dependency interface) in a context.",
     ),
-    k("commit", "Persist new agent state from within a handler."),
     k(
         "commons",
         "Declare a pure, stateless module of types and functions.",
@@ -148,7 +147,6 @@ pub const KEYWORDS: &[KeywordInfo] = &[
         "service",
         "Declare a service (a group of handlers) in a context.",
     ),
-    k("state", "Declare an agent's persistent state block."),
     k("test", "Declare a test block or a test case."),
     k(
         "transparent",
