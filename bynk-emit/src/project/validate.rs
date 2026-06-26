@@ -1659,6 +1659,7 @@ fn type_ref_is_keyable(t: &TypeRef, types: &HashMap<String, TypeDecl>) -> bool {
 ///     (the lookup scans; an index would route it);
 ///   - `bynk.index.unused` — a declared index no equality `filter` routes through
 ///     (it costs maintenance on every write).
+///
 /// These are perf hints, never compile gates (§11). The selectivity/ambiguity
 /// tie-break (D5) and compound-predicate routing are a named follow-on, so a
 /// single-equality predicate (the only shape routed today) is never ambiguous.

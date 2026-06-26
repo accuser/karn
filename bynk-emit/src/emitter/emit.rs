@@ -68,7 +68,7 @@ pub(crate) fn emit_doc_block(out: &mut String, doc: Option<&str>, indent: usize)
 /// unordered, so emitted state fields would otherwise drift between runs.
 fn sorted_index_fields(indexes: &HashMap<String, Vec<String>>) -> Vec<(&String, &Vec<String>)> {
     let mut entries: Vec<(&String, &Vec<String>)> = indexes.iter().collect();
-    entries.sort_by(|(a, _), (b, _)| a.cmp(b));
+    entries.sort_by_key(|(name, _)| name.to_string());
     entries
 }
 
