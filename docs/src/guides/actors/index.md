@@ -11,7 +11,7 @@ actor User { auth = Bearer(secret = "AUTH_JWT_SECRET"), identity = UserId }
 
 service api from http {
   on GET("/me") by u: User () -> Effect[HttpResult[Profile]] {
-    // runs only for a verified User; u.identity : UserId
+    -- runs only for a verified User; u.identity : UserId
   }
 }
 ```
@@ -50,6 +50,7 @@ things about a party:
 ## Recipes
 
 **Do**
+
 - [Serve public and authenticated routes](public-and-authenticated.md) — `Visitor` and `Bearer`.
 - [Verify an inbound webhook](verify-webhooks.md) — `Signature`, with a replay window.
 - [Serve several kinds of caller from one route](multiple-callers.md) — a multi-actor sum.
