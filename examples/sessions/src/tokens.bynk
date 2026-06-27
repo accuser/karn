@@ -1,0 +1,13 @@
+commons tokens
+
+---
+A session token — an opaque, bounded handle that addresses a cache entry. It is
+non-empty and length-capped, so a malformed token is rejected at the boundary
+before any cache lookup runs.
+---
+type Token = String where NonEmpty and MaxLength(128)
+
+---
+The authenticated user a live token resolves to.
+---
+type UserId = String where NonEmpty

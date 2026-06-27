@@ -1,0 +1,73 @@
+context sessions
+
+uses tokens
+consumes bynk { Clock }
+
+type LoginRequest = {
+  token: Token,
+  user:  UserId,
+}
+
+---
+A shard of live sessions (a Cloudflare Durable Object). State is a `Cache` — a
+`Map` whose entries expire on their own. `@ttl(30.minutes)` sets the lifetime:
+each `put` (re)starts the 30-minute clock, an entry past its TTL reads as `None`,
+and expired entries are reaped at the next commit.
+
+Eviction consults the clock, so every cache op *except* `remove` declares
+`given Clock` — the time dependency is visible in the signature.
+---
+agent Sessions {
+  key shard: String
+
+  store live: Cache[Token, UserId] @ttl(30.minutes)
+
+  -- start or refresh a session; stamps a fresh 30-minute expiry
+  on call login(token: Token, user: UserId) -> Effect[()] given Clock {
+    let _ <- live.put(token, user)
+    Effect.pure(())
+  }
+
+  -- resolve a token to its user, or None if unknown or expired
+  on call whoami(token: Token) -> Effect[Option[UserId]] given Clock {
+    let found <- live.get(token)
+    Effect.pure(found)
+  }
+
+  -- end a session now; `remove` is idempotent and needs no clock
+  on call logout(token: Token) -> Effect[()] {
+    let _ <- live.remove(token)
+    Effect.pure(())
+  }
+
+  -- how many sessions are currently live (expired entries are not counted)
+  on call active() -> Effect[Int] given Clock {
+    let n <- live.size()
+    Effect.pure(n)
+  }
+}
+
+service api from http {
+  on POST("/sessions") by Visitor (body: LoginRequest) -> Effect[HttpResult[String]] {
+    let _ <- Sessions("default").login(body.token, body.user)
+    Created("ok")
+  }
+
+  on GET("/sessions/:token") by Visitor (token: Token) -> Effect[HttpResult[UserId]] {
+    let who <- Sessions("default").whoami(token)
+    match who {
+      Some(user) => Ok(user)
+      None       => NotFound
+    }
+  }
+
+  on POST("/sessions/:token/logout") by Visitor (token: Token) -> Effect[HttpResult[String]] {
+    let _ <- Sessions("default").logout(token)
+    NoContent
+  }
+
+  on GET("/sessions") by Visitor () -> Effect[HttpResult[Int]] {
+    let n <- Sessions("default").active()
+    Ok(n)
+  }
+}
