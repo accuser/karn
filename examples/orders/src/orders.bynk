@@ -1,0 +1,130 @@
+context orders
+
+---
+A storefront's order book. One agent instance per sales `channel`, so every order
+and every line item for that channel lives in the *same* instance — which is what
+lets the report handlers join them in place, with no cross-instance fan-out.
+---
+type Channel = String where NonEmpty
+
+---
+A line item's quantity — always positive, enforced at the boundary so a zero or
+negative quantity can never reach a handler or the store.
+---
+type Qty = Int where Positive
+
+type Order = {
+  id:       String,
+  customer: String,
+}
+
+type Line = {
+  id:      String,
+  orderId: String,
+  sku:     String,
+  qty:     Qty,
+}
+
+-- A join row. Bynk has no anonymous pair type, so a join projects each matched
+-- (line, order) through an `into` combiner into a named record like this one.
+type Sale = {
+  customer: String,
+  sku:      String,
+  qty:      Qty,
+}
+
+-- A grouped row: one per order, with its line quantities summed.
+type OrderTotal = {
+  orderId: String,
+  units:   Int,
+}
+
+---
+The order book for one channel (a Cloudflare Durable Object). Its state is two
+storage `Map`s — orders and their line items — held together so a query can join
+across them. Lines are appended freely (no referential check at write time);
+`lines` is `@indexed(by: orderId)`, so an equality filter on that field routes
+through a posting list rather than scanning every entry, and a left outer join
+later flags any line whose order is missing.
+---
+agent Book {
+  key channel: Channel
+
+  store orders: Map[String, Order]
+  store lines:  Map[String, Line] @indexed(by: orderId)
+
+  on call addOrder(id: String, customer: String) -> Effect[Order] {
+    let order = Order { id: id, customer: customer }
+    let _ <- orders.put(id, order)
+    order
+  }
+
+  on call addLine(line: Line) -> Effect[()] {
+    let _ <- lines.put(line.id, line)
+    Effect.pure(())
+  }
+
+  -- Equi-join lines onto orders; each match is projected into a `Sale`. Served by
+  -- `GET /sales`.
+  on call sales() -> Effect[List[Sale]] {
+    lines.joinOn(orders, (l) => l.orderId, (o) => o.id,
+      (l, o) => Sale { customer: o.customer, sku: l.sku, qty: l.qty }).collect()
+  }
+
+  -- The same equi-join, counted: how many line items have a matching order.
+  on call matchedLines() -> Effect[Int] {
+    lines.joinOn(orders, (l) => l.orderId, (o) => o.id, (l, o) => l.id).count()
+  }
+
+  -- Group lines by their order, summing quantities. Served by `GET /totals`.
+  on call totals() -> Effect[List[OrderTotal]] {
+    lines.groupBy((l) => l.orderId,
+      (oid, rows) => OrderTotal { orderId: oid, units: rows.sum((r) => r.qty) }).collect()
+  }
+
+  -- The total units booked against one order — an equality filter on the indexed
+  -- field, then a sum.
+  on call unitsFor(orderId: String) -> Effect[Int] {
+    lines.filter((l) => l.orderId == orderId).sum((r) => r.qty)
+  }
+
+  -- Lines whose order is missing — a left outer join with the unmatched side
+  -- counted. The combiner emits 1 for a dangling line, 0 otherwise.
+  on call orphans() -> Effect[Int] {
+    lines.leftJoin(orders, (l) => l.orderId, (o) => o.id,
+      (l, mo) => if (mo is None) { 1 } else { 0 }).sum((n) => n)
+  }
+
+  -- Every line for one order — an indexed equality filter. Served by
+  -- `GET /orders/:id/lines`.
+  on call linesFor(orderId: String) -> Effect[List[Line]] {
+    lines.filter((l) => l.orderId == orderId).collect()
+  }
+}
+
+service api from http {
+  on POST("/orders") by Visitor (body: Order) -> Effect[HttpResult[Order]] {
+    let order <- Book("default").addOrder(body.id, body.customer)
+    Created(order)
+  }
+
+  on POST("/lines") by Visitor (body: Line) -> Effect[HttpResult[Line]] {
+    let _ <- Book("default").addLine(body)
+    Created(body)
+  }
+
+  on GET("/orders/:id/lines") by Visitor (id: String) -> Effect[HttpResult[List[Line]]] {
+    let rows <- Book("default").linesFor(id)
+    Ok(rows)
+  }
+
+  on GET("/sales") by Visitor () -> Effect[HttpResult[List[Sale]]] {
+    let rows <- Book("default").sales()
+    Ok(rows)
+  }
+
+  on GET("/totals") by Visitor () -> Effect[HttpResult[List[OrderTotal]]] {
+    let rows <- Book("default").totals()
+    Ok(rows)
+  }
+}
