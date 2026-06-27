@@ -33,9 +33,10 @@ handler runs; an invalid body is rejected with `400` at the boundary.
 ## `HttpResult` variants
 
 The vocabulary tracks the common, modern HTTP status codes (RFC 9110). A
-variant's payload is one of four shapes: the value `T` as JSON (`Value`), a
+variant's payload is one of five shapes: the value `T` as JSON (`Value`), a
 target URL emitted as a `Location` header (`Location`), an explanatory
-`message` as an `{ "error": … }` JSON body (`Message`), or no body at all
+`message` as an `{ "error": … }` JSON body (`Message`), a `Stream[String]`
+emitted as an SSE (`text/event-stream`) body (`Streamed`), or no body at all
 (`None`).
 
 ### 2xx success
@@ -43,6 +44,7 @@ target URL emitted as a `Location` header (`Location`), an explanatory
 | Variant | Status | Payload |
 |---|---|---|
 | `Ok(value)` | 200 | the value, as JSON |
+| `Streaming(stream)` | 200 | a `Stream[String]`, SSE-framed (see [Streamed responses](#streamed-responses)) |
 | `Created(value)` | 201 | the value, as JSON |
 | `Accepted(value)` | 202 | the value, as JSON |
 | `NoContent` | 204 | none |
@@ -94,6 +96,43 @@ body.
 > When `Ok`/`Err` could mean either `Result` or `HttpResult`, qualify the
 > constructor (e.g. `HttpResult.Ok(…)`) to resolve
 > `bynk.types.ambiguous_constructor`.
+
+## Streamed responses
+
+`Streaming(stream)` returns a **200** whose body is a [`Stream[String]`](types.md#stream),
+emitted as Server-Sent Events (`content-type: text/event-stream`). Each stream
+element becomes one SSE event — `data: <element>\n\n` — so a handler can send an
+incremental feed without buffering the whole response:
+
+```bynk
+on GET("/ticks") by v: Visitor () -> Effect[HttpResult[()]] {
+  Streaming(Stream.of(["tick-1", "tick-2", "tick-3"]).take(3))
+}
+```
+
+A streamed handler returns `Effect[HttpResult[()]]` — the JSON body parameter
+`T` is unused, since the body is the stream. **A response commits its status and
+headers before the first chunk**, so streaming is **200-only**: handle a
+pre-stream failure by returning an ordinary variant *instead* of `Streaming`
+(`NotFound`, `Unauthorized(…)`, …), which share `HttpResult[()]` and so sit in
+the same handler with no type conflict:
+
+```bynk
+on GET("/feed/:mode") by v: Visitor (mode: String) -> Effect[HttpResult[()]] {
+  if mode == "live" {
+    Streaming(Stream.of(events).take(100))
+  } else {
+    NotFound
+  }
+}
+```
+
+A producer that can fail mid-stream carries its outcome in-band — build a
+`Stream[Result[String, E]]` and `.map` it to `Stream[String]`, encoding an `Err`
+as an error event — because the HTTP status is already sent once streaming
+begins. A bounded `take` is the language-level guard against an unbounded
+response. A structured event type (named `event`/`id`/`retry` fields) is a
+planned follow-on; v1 streams plain `String` events.
 
 ## Request lifecycle
 

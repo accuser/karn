@@ -51,6 +51,20 @@ test("httpResultToResponse: status codes map per variant", async () => {
   assert.equal(httpResultToResponse(HttpResult.GatewayTimeout("g"), id).status, 504);
 });
 
+test("httpResultToResponse: Streaming frames a Stream as SSE", async () => {
+  async function* events() {
+    yield "tick-1";
+    yield "multi\nline";
+  }
+  const res = httpResultToResponse(HttpResult.Streaming(events()), id);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-type"), "text/event-stream");
+  assert.equal(res.headers.get("cache-control"), "no-cache");
+  // Each element is one SSE event; a multi-line element becomes multiple
+  // `data:` lines, each event terminated by a blank line.
+  assert.equal(await res.text(), "data: tick-1\n\ndata: multi\ndata: line\n\n");
+});
+
 test("httpResultToResponse: redirects carry a Location header and no body", async () => {
   const res = httpResultToResponse(HttpResult.Found("https://bynk.dev/target"), id);
   assert.equal(res.status, 302);

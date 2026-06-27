@@ -1432,6 +1432,39 @@ pub(crate) fn check_http_variant(
             let t_ty = expected_t.unwrap_or(Ty::Unit);
             Some(Ty::HttpResult(Box::new(t_ty)))
         }
+        // v0.101 (real-time track slice 1): `Streaming(s)` carries a
+        // `Stream[String]` body, SSE-framed at the boundary. Like the redirect
+        // and message shapes, the JSON body parameter `T` is irrelevant.
+        HttpVariantPayload::Streamed => {
+            let stream_str = Ty::Stream(Box::new(Ty::Base(BaseType::String)));
+            if args.len() != 1 {
+                ctx.errors.push(CompileError::new(
+                    "bynk.types.variant_arity",
+                    span,
+                    format!(
+                        "`HttpResult.{}` expects 1 `Stream[String]` argument, but {} were given",
+                        variant.name,
+                        args.len(),
+                    ),
+                ));
+                return None;
+            }
+            let arg_ty = type_of(&args[0], Some(&stream_str), ctx)?;
+            if !compatible(&arg_ty, &stream_str) {
+                ctx.errors.push(CompileError::new(
+                    "bynk.types.argument_mismatch",
+                    args[0].span,
+                    format!(
+                        "`HttpResult.{}` expects a `Stream[String]` body, but got `{}`",
+                        variant.name,
+                        arg_ty.display(),
+                    ),
+                ));
+                return None;
+            }
+            let t_ty = expected_t.unwrap_or(Ty::Unit);
+            Some(Ty::HttpResult(Box::new(t_ty)))
+        }
         HttpVariantPayload::None => {
             if !args.is_empty() {
                 ctx.errors.push(CompileError::new(

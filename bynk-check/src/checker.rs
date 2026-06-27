@@ -2323,6 +2323,10 @@ fn variants_of(ty: &Ty, types: &HashMap<String, TypeDecl>) -> Option<Vec<Variant
                         HttpVariantPayload::Location => {
                             vec![("location".to_string(), Ty::Base(BaseType::String))]
                         }
+                        HttpVariantPayload::Streamed => vec![(
+                            "stream".to_string(),
+                            Ty::Stream(Box::new(Ty::Base(BaseType::String))),
+                        )],
                     },
                 })
                 .collect(),

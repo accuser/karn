@@ -805,6 +805,10 @@ pub enum HttpVariantPayload {
     /// Carries a `String` target URL, emitted as a `Location` header — the
     /// redirect variants (`Found`, `SeeOther`, `PermanentRedirect`, …).
     Location,
+    /// Carries a `Stream[String]`, emitted as an SSE (`text/event-stream`)
+    /// streaming body — the `Streaming` (200) variant (v0.101, real-time track
+    /// slice 1).
+    Streamed,
 }
 
 /// One variant of the built-in `HttpResult[T]` sum (v0.9 §3.3).
@@ -825,6 +829,14 @@ pub const HTTP_VARIANTS: &[HttpVariant] = &[
     HttpVariant {
         name: "Ok",
         payload: HttpVariantPayload::Value,
+        status: 200,
+    },
+    // v0.101 (real-time track slice 1): a 200 whose body is a streamed
+    // `Stream[String]`, SSE-framed. Status precedes the body, so streaming is
+    // 200-only — pre-stream failures are ordinary variants returned instead.
+    HttpVariant {
+        name: "Streaming",
+        payload: HttpVariantPayload::Streamed,
         status: 200,
     },
     HttpVariant {

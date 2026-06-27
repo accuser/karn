@@ -46,9 +46,12 @@ The v1 vocabulary is deliberately minimal:
 | `s.collect()` | `Effect[List[T]]` | drain the stream to a list (the terminal) |
 
 Errors ride **in-band** as `Result` elements (`Stream[Result[T, E]]`); a fault in
-the producer aborts the stream as faults abort handlers. A richer combinator
-vocabulary, live runtime sources, and a streaming-HTTP response body are later
-slices of the [real-time track](https://github.com/accuser/bynk/blob/main/design/tracks/websocket.md).
+the producer aborts the stream as faults abort handlers.
+
+A stream's first end-to-end use is a [**streamed HTTP response**](http.md#streamed-responses)
+— `Streaming(stream)` returns an SSE body consuming a `Stream[String]`. A richer
+combinator vocabulary, live runtime sources, and held-`Connection` WebSockets are
+later slices of the [real-time track](https://github.com/accuser/bynk/blob/main/design/tracks/websocket.md).
 
 ## The JSON codec
 

@@ -5,6 +5,8 @@ import type { JsonValue } from "./boundary.ts";
 export type HttpResult<T> =
   // 2xx success — carries the serialised value.
   | { readonly tag: "Ok"; readonly value: T }
+  // 2xx streamed body — SSE-framed (real-time track slice 1).
+  | { readonly tag: "Streaming"; readonly stream: AsyncIterable<string> }
   | { readonly tag: "Created"; readonly value: T }
   | { readonly tag: "Accepted"; readonly value: T }
   | { readonly tag: "NoContent" }
@@ -40,6 +42,8 @@ export type HttpResult<T> =
 export const HttpResult = {
   // 2xx success.
   Ok: <T>(value: T): HttpResult<T> => ({ tag: "Ok", value }),
+  // 2xx streamed body — the argument is a stream of SSE event payloads.
+  Streaming: (stream: AsyncIterable<string>): HttpResult<never> => ({ tag: "Streaming", stream }),
   Created: <T>(value: T): HttpResult<T> => ({ tag: "Created", value }),
   Accepted: <T>(value: T): HttpResult<T> => ({ tag: "Accepted", value }),
   NoContent: { tag: "NoContent" } as HttpResult<never>,
@@ -107,6 +111,7 @@ export function matchPath(
 // HTTP_VARIANTS in bynk-syntax/src/ast.rs (the compiler-side source of truth).
 const HTTP_STATUS: Record<HttpResult<unknown>["tag"], number> = {
   Ok: 200,
+  Streaming: 200,
   Created: 201,
   Accepted: 202,
   NoContent: 204,
@@ -141,6 +146,29 @@ const HTTP_STATUS: Record<HttpResult<unknown>["tag"], number> = {
 // status code; success variants carry the value as JSON, redirects emit a
 // Location header, error variants carry an `{ error }` body, and the remaining
 // statuses are bodyless.
+// Frame a stream of event payloads as an SSE (`text/event-stream`) Response.
+// Each stream element is one SSE event; a multi-line element becomes multiple
+// `data:` lines, terminated by a blank line. The body is a ReadableStream, so
+// this is a Web standard that runs unchanged on Workers and Node.
+function sseResponse(stream: AsyncIterable<string>): Response {
+  const encoder = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      for await (const event of stream) {
+        for (const line of event.split("\n")) {
+          controller.enqueue(encoder.encode(`data: ${line}\n`));
+        }
+        controller.enqueue(encoder.encode("\n"));
+      }
+      controller.close();
+    },
+  });
+  return new Response(body, {
+    status: 200,
+    headers: { "content-type": "text/event-stream", "cache-control": "no-cache" },
+  });
+}
+
 export function httpResultToResponse<T>(
   result: HttpResult<T>,
   serialiseValue: (v: T) => JsonValue,
@@ -155,6 +183,9 @@ export function httpResultToResponse<T>(
         status,
         headers: { "content-type": "application/json" },
       });
+    // 200 with a streamed body — each stream element is one SSE event.
+    case "Streaming":
+      return sseResponse(result.stream);
     // 3xx — bodyless, with the target URL in the Location header.
     case "MovedPermanently":
     case "Found":
