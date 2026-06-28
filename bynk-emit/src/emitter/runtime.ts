@@ -784,7 +784,14 @@ export class TestConnection<F> implements Connection<F> {
 // memory and is lost on eviction; the hibernatable `acceptWebSocket` mapping that
 // survives eviction is a follow-on increment.)
 export class WorkersConnection<F> implements Connection<F> {
-  constructor(private readonly ws: { send(data: string): void; close(): void }) {}
+  // An explicit field + assignment, not a constructor parameter property — Node's
+  // `--experimental-strip-types` (the `--inspect` debug path runs the emitted `.ts`
+  // directly) rejects parameter properties, which are not erasable.
+  private readonly ws: { send(data: string): void; close(): void };
+
+  constructor(ws: { send(data: string): void; close(): void }) {
+    this.ws = ws;
+  }
 
   async send(frame: F): Promise<void> {
     this.ws.send(JSON.stringify(frame));
