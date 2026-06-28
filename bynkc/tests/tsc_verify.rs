@@ -152,14 +152,15 @@ fn write_outputs(out: &bynkc::ProjectOutput, root: &Path) -> std::io::Result<()>
 }
 
 fn run_tsc_in(runner: &TscRunner, project_dir: &Path) -> (bool, String) {
+    run_tsc_with_config(runner, &project_dir.join("tsconfig.json"))
+}
+
+fn run_tsc_with_config(runner: &TscRunner, tsconfig: &Path) -> (bool, String) {
     let mut cmd = base_command(&runner.program);
     for a in &runner.args {
         cmd.arg(a);
     }
-    cmd.arg("--strict")
-        .arg("--noEmit")
-        .arg("-p")
-        .arg(project_dir.join("tsconfig.json"));
+    cmd.arg("--strict").arg("--noEmit").arg("-p").arg(tsconfig);
     let output = match cmd.output() {
         Ok(o) => o,
         Err(e) => return (false, format!("could not launch tsc: {e}")),
@@ -179,6 +180,16 @@ fn run_tsc_in(runner: &TscRunner, project_dir: &Path) -> (bool, String) {
 /// Run `tsc --strict --noEmit` against every project-form positive fixture's
 /// emitted TypeScript. Fixtures that compile but don't type-check are
 /// failures here.
+///
+/// **One `tsc` for all fixtures.** Spawning `tsc` per fixture paid its multi-
+/// second startup (process launch + `lib.*.d.ts` load + program construction)
+/// ~165 times over — the dominant cost, while the actual type-check of each
+/// small fixture is cheap. Instead we stage every fixture into its own subdir
+/// under one temp root and type-check the whole tree in a single `tsc`
+/// invocation, so that startup is paid once. The fixtures stay isolated: every
+/// import in the emitted output is relative (`./`, `../`) so nothing resolves
+/// across subdir boundaries, and the emitted modules declare no `declare
+/// global` / ambient / triple-slash surface that would collide in one program.
 #[test]
 fn emitted_typescript_passes_tsc_strict() {
     let runner = match discover_tsc() {
@@ -203,8 +214,16 @@ fn emitted_typescript_passes_tsc_strict() {
     let dirs = fixture_dirs("positive");
     assert!(!dirs.is_empty(), "no positive fixtures found");
 
+    // One temp root; each fixture is staged into `root/<fixture-name>/…`,
+    // preserving its emitted layout (its own `runtime.ts`, `src/…`, etc.).
+    let root = std::env::temp_dir().join(format!("bynk-tsc-verify-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).expect("create tsc-verify temp root");
+
     let mut failures: Vec<String> = Vec::new();
-    let mut checked = 0usize;
+    // Fixture names successfully staged into the tree — the set the single
+    // `tsc` run actually type-checks.
+    let mut staged: Vec<String> = Vec::new();
     for dir in &dirs {
         let src_dir = dir.join("src");
         // Only project-form fixtures emit a tsconfig.json + runtime.ts; the
@@ -213,6 +232,11 @@ fn emitted_typescript_passes_tsc_strict() {
         if !src_dir.is_dir() {
             continue;
         }
+        let name = dir
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("fixture")
+            .to_string();
         let target = fixture_target(dir);
         let compiled = match compile_fixture(dir, target) {
             Ok(out) => out,
@@ -226,44 +250,66 @@ fn emitted_typescript_passes_tsc_strict() {
                 continue;
             }
         };
-        let tmp = std::env::temp_dir().join(format!(
-            "bynk-tsc-verify-{}-{}",
-            dir.file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or("fixture"),
-            std::process::id()
-        ));
-        let _ = fs::remove_dir_all(&tmp);
-        if let Err(e) = write_outputs(&compiled, &tmp) {
+        let fixture_root = root.join(&name);
+        if let Err(e) = write_outputs(&compiled, &fixture_root) {
             failures.push(format!(
                 "\n=== {} ===\nfailed to write emitted output to {}: {e}",
                 dir.display(),
-                tmp.display(),
+                fixture_root.display(),
             ));
             continue;
         }
-        let (ok, output) = run_tsc_in(&runner, &tmp);
-        if !ok {
-            failures.push(format!(
-                "\n=== {} ===\n--- tsc --strict --noEmit reported errors ---\n{}",
-                dir.display(),
-                output,
-            ));
-        } else {
-            checked += 1;
-        }
-        // Best-effort cleanup; leave on failure for inspection.
-        if ok {
-            let _ = fs::remove_dir_all(&tmp);
-        }
+        staged.push(name);
     }
+
+    // A root `tsconfig.json` whose `include: ["**/*.ts"]` (from
+    // `emit_tsconfig`) sweeps every staged fixture subdir, so one `tsc`
+    // checks them all. The per-fixture `tsconfig.json` files in each subdir
+    // are inert here — `tsc -p` consults only the root config.
+    fs::write(root.join("tsconfig.json"), bynkc::emitter::emit_tsconfig())
+        .expect("write root tsconfig");
+
+    let (ok, output) = run_tsc_in(&runner, &root);
+    if !ok {
+        // Attribute each error to the fixture whose subdir name appears in the
+        // diagnostic path, so a failure still points at the offending fixture
+        // rather than a wall of paths.
+        let mut blamed: Vec<&String> = staged
+            .iter()
+            .filter(|name| {
+                output.contains(&format!("{name}/")) || output.contains(&format!("{name}\\"))
+            })
+            .collect();
+        blamed.sort();
+        let blame_line = if blamed.is_empty() {
+            "(could not attribute errors to a specific fixture — see output)".to_string()
+        } else {
+            format!(
+                "fixtures with errors: {}",
+                blamed
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        };
+        failures.push(format!(
+            "\n=== single-pass tsc --strict --noEmit reported errors ===\n{blame_line}\n{output}",
+        ));
+    } else {
+        // Best-effort cleanup; leave on failure for inspection.
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    let checked = if ok { staged.len() } else { 0 };
     assert!(
-        checked > 0,
-        "no project-form positive fixtures were tsc-checked"
+        !staged.is_empty(),
+        "no project-form positive fixtures were staged for tsc"
     );
     if !failures.is_empty() {
         panic!(
-            "tsc verification failed ({} fixtures clean, {} failed):\n{}",
+            "tsc verification failed ({} fixtures staged, {} clean, {} failure section(s)):\n{}",
+            staged.len(),
             checked,
             failures.len(),
             failures.join("\n"),
