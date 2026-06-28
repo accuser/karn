@@ -1677,29 +1677,30 @@ fn write_header(out: &mut String, commons: &TypedCommons, ctx: &EmitProjectCtx) 
         // v0.96 (ADR 0124): an agent whose load-time validation gate fires imports
         // the `rehydrationViolation` fault helper.
         let has_rehydration_gate = commons.commons.items.iter().any(|i| match i {
-            CommonsItem::Agent(a) => emit::agent_needs_rehydrate(a, &commons.types, workers),
+            CommonsItem::Agent(a) => emit::agent_needs_rehydrate(a, &commons.types),
             _ => false,
         });
         if has_rehydration_gate {
             parts.push("rehydrationViolation");
         }
-        // v0.104 (real-time track slice 3b): on Workers a `store` field holding a
-        // `Connection` (a live socket) cannot be JSON-persisted, so it lives in an
-        // in-memory side-table reached through `heldStore` rather than the durable
-        // state record.
+        // v0.104/v0.105 (real-time track slice 3b): on Workers a `store Map[K,
+        // Connection]` persists the connection id; its entry ops re-resolve the live
+        // socket via `resolveConnection` and read a connection's id via `connIdOf`.
         if workers
             && commons.commons.items.iter().any(|i| match i {
                 CommonsItem::Agent(a) => emit::agent_has_held_storage(a),
                 _ => false,
             })
         {
-            parts.push("heldStore");
+            parts.push("resolveConnection");
+            parts.push("connIdOf");
         }
-        // v0.104 (real-time track slice 3b): on Workers a context hosting a
-        // `from WebSocket` `on open` accepts the socket inside its Durable Object —
-        // it builds a `WorkersConnection`, a `WebSocketPair`, and the `101` upgrade
-        // response. (The service and its hosting agent share the one Worker module,
-        // so these land in the same `handlers.ts`.)
+        // v0.104/v0.105 (real-time track slice 3b): on Workers a context hosting a
+        // `from WebSocket` `on open` accepts the socket inside its Durable Object via
+        // the hibernatable API — `acceptHibernatableConnection` (accept + tag + wrap),
+        // a `WebSocketPair`, and the `101` upgrade response. (The service and its
+        // hosting agent share the one Worker module, so these land in one
+        // `handlers.ts`.)
         let hosts_ws_open = commons.commons.items.iter().any(|i| match i {
             CommonsItem::Service(s) => s
                 .handlers
@@ -1708,7 +1709,7 @@ fn write_header(out: &mut String, commons: &TypedCommons, ctx: &EmitProjectCtx) 
             _ => false,
         });
         if workers && hosts_ws_open {
-            parts.push("WorkersConnection");
+            parts.push("acceptHibernatableConnection");
             parts.push("newWebSocketPair");
             parts.push("webSocketUpgradeResponse");
         }
@@ -1847,11 +1848,13 @@ pub(crate) struct LowerCtx<'a> {
     /// `__make<Agent>(key)` factory — the connection is already in this DO, so it
     /// never crosses an RPC boundary (DECISION A). `None` everywhere else.
     pub ws_self_agent: Option<String>,
-    /// v0.104 (real-time track slice 3b): the agent's held `store Map[K,
-    /// Connection]` fields (name → TS value type, e.g. `Connection<ServerFrame>`).
-    /// On Workers these are not in the durable state record; a method call whose
-    /// receiver is one lowers to a JS `Map` op over the in-memory side-table
-    /// `heldStore<V>(this.state, "<name>")` rather than `__state.<map>`.
+    /// v0.104/v0.105 (real-time track slice 3b): the agent's held `store Map[K,
+    /// Connection]` fields (name → the connection's **frame type** `F`, e.g.
+    /// `ServerFrame`). On Workers these persist `K → connId` in the durable state
+    /// record; a method call whose receiver is one lowers to an entry op over
+    /// `__state.<map>` (the connId record) with `connIdOf`/`resolveConnection<F>` —
+    /// not the plain `Record<string, V>` ops (held maps are excluded from
+    /// `agent_store_maps`).
     pub agent_held_maps: HashMap<String, String>,
     /// Cross-context info for v0.6 cross-context call lowering.
     cross_context: &'a bynk_check::resolver::CrossContextInfo,

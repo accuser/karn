@@ -1523,17 +1523,13 @@ fn is_codecable(t: &TypeRef) -> bool {
 /// Whether an agent emits a rehydration gate (and so imports `rehydrationViolation`).
 /// Mirrors the per-field validation the gate builds, so the header import and the
 /// emitted gate agree exactly (a mismatch is an unused / undefined import).
-pub(crate) fn agent_needs_rehydrate(
-    a: &AgentDecl,
-    types: &HashMap<String, TypeDecl>,
-    is_workers: bool,
-) -> bool {
+pub(crate) fn agent_needs_rehydrate(a: &AgentDecl, types: &HashMap<String, TypeDecl>) -> bool {
+    // v0.105 (slice 3b-ii): a held `Map[K, Connection]` persists `K → connId` and
+    // is rehydrated like any map — no value check (the connId is opaque) but the
+    // textual `K` key is validated. The `Map` arm already counts that via the key,
+    // so held maps need no special handling here.
     a.store_fields
         .iter()
-        // v0.104: on Workers a held `Map[K, Connection]` lives in the in-memory
-        // side-table, not the persisted record, so it contributes no rehydration
-        // check (the gate body, built from the filtered store fields, agrees).
-        .filter(|f| !(is_workers && is_held_map_field(f)))
         .any(|f| match f.kind.head.name.as_str() {
             "Cell" | "Log" => f.kind.args.first().is_some_and(is_codecable),
             "Map" | "Cache" => {
@@ -1552,14 +1548,15 @@ pub(crate) fn agent_needs_rehydrate(
         })
 }
 
-/// v0.104 (real-time track slice 3b): an agent has at least one `store Map[K, V]`
-/// whose value `V` is a held resource (a `Connection`). On Workers these are not
-/// JSON-persisted with the rest of the state — a live socket cannot serialise —
-/// but kept in an in-memory side-table (`heldStore`) keyed by the durable state
-/// object, surviving for the Durable Object's lifetime and lost on eviction (the
-/// non-hibernatable model). Drives both the `heldStore` import and the in-memory
+/// v0.104/v0.105 (real-time track slice 3b): an agent has at least one `store
+/// Map[K, V]` whose value `V` is a held resource (a `Connection`). On Workers a
+/// live socket cannot serialise, so the durable record persists the **connection
+/// id** (`Record<K, connId>`) and each `Connection` is re-resolved from its connId
+/// via the hibernatable-socket API — so a stored connection survives DO eviction
+/// (§2.9.6). Drives the `resolveConnection`/`connIdOf` imports and the held-map
 /// realisation in `emit_agent`. (Bundle keeps held maps in the in-memory test
-/// state record — its current, tested behaviour — so this is Workers-only.)
+/// state record of `TestConnection`s — its tested behaviour — so this is
+/// Workers-only.)
 pub(crate) fn agent_has_held_storage(a: &AgentDecl) -> bool {
     !held_map_fields(a).is_empty()
 }
@@ -1646,14 +1643,18 @@ pub(crate) fn emit_agent(
     // JS `Map`, which does not serialise). Collected separately from `Cell` fields
     // since their TS type and zero differ; the working record is committed by the
     // same flush. `(name, V)`.
-    // v0.104 (real-time track slice 3b): on Workers, a `store Map[K, Connection]`
-    // holds live sockets that cannot be JSON-persisted; those held maps are split
-    // out of the durable state record and realised in an in-memory side-table
-    // (`heldStore`, keyed by the durable state object). `held_map_names` are
-    // excluded from the state interface / zero / rehydrate / load-commit and from
-    // the persisted-`Map` lowering set; their ops lower against the in-memory JS
-    // `Map` instead. (Bundle keeps held maps in the in-memory test state record —
-    // its current tested behaviour — so the split is Workers-only.)
+    // v0.104/v0.105 (real-time track slice 3b): on Workers, a `store Map[K,
+    // Connection]` holds live sockets that cannot themselves be JSON-persisted.
+    // v0.105 (slice 3b-ii) persists the **connection id** instead: the held map is a
+    // durable `Record<string(K), connId>` in the state record, and each `Connection`
+    // is re-resolved from its connId via the platform's hibernatable-socket API, so a
+    // stored connection survives DO eviction (§2.9.6). The held maps are kept *out*
+    // of `store_map_fields` (their value type and entry lowering differ from a plain
+    // `Map[K, V]`) but are emitted into the state interface / zero / rehydration
+    // key-check / load-commit as string records, and they trigger the commit flush
+    // like any other persisted field. (Bundle keeps held maps in the in-memory test
+    // state record of `TestConnection`s — its tested behaviour — so the connId
+    // representation is Workers-only.)
     let is_workers = matches!(ctx.target, BuildTarget::Workers);
     let held_maps: Vec<(&Ident, &TypeRef)> = if is_workers {
         held_map_fields(a)
@@ -1661,9 +1662,17 @@ pub(crate) fn emit_agent(
         Vec::new()
     };
     let held_map_names: HashSet<String> = held_maps.iter().map(|(n, _)| n.name.clone()).collect();
+    // The held map's lowering needs the connection's **frame type** `F` (for
+    // `resolveConnection<F>`), not the `Connection<F>` wrapper — extract it.
     let held_maps_ts: HashMap<String, String> = held_maps
         .iter()
-        .map(|(n, v)| (n.name.clone(), ts_type_ref(v)))
+        .map(|(n, v)| {
+            let f_ts = match v {
+                TypeRef::Connection(inner, _) => ts_type_ref(inner),
+                _ => ts_type_ref(v),
+            };
+            (n.name.clone(), f_ts)
+        })
         .collect();
     let store_map_fields: Vec<(&Ident, &TypeRef)> = if is_store_agent {
         a.store_fields
@@ -1796,6 +1805,15 @@ pub(crate) fn emit_agent(
         )
         .unwrap();
     }
+    // v0.105 (slice 3b-ii): a held `Map[K, Connection]` persists `K → connId`.
+    for (name, _) in &held_maps {
+        writeln!(
+            out,
+            "  readonly {name}: Record<string, string>;",
+            name = name.name,
+        )
+        .unwrap();
+    }
     for (name, _) in &store_set_fields {
         writeln!(
             out,
@@ -1869,6 +1887,10 @@ pub(crate) fn emit_agent(
         }
         // A fresh `store Map`/`store Set`/`store Cache` is the empty record.
         for (name, _) in &store_map_fields {
+            parts.push(format!("{}: {{}}", name.name));
+        }
+        // A fresh held `Map[K, Connection]` (a `K → connId` record) is empty too.
+        for (name, _) in &held_maps {
             parts.push(format!("{}: {{}}", name.name));
         }
         // A fresh `@indexed` posting-list is empty too (v0.93, ADR 0118).
@@ -1958,6 +1980,20 @@ pub(crate) fn emit_agent(
             ));
         }
     }
+    // v0.105 (slice 3b-ii): a held `Map[K, Connection]` persists `K → connId`. The
+    // connId is an opaque platform string (no value check); validate each textual
+    // `K` key, as for a plain map.
+    for (name, _) in &held_maps {
+        if let Some(k) = store_field_key_type(a, &name.name)
+            && type_base_is_string(k, &commons.types)
+        {
+            rehydrate_checks.push(format!(
+                "  for (const __k of Object.keys(s.{n})) {{ const __r = {d}; if (__r.tag === \"Err\") throw rehydrationViolation(\"{agent_name}\", __r.error); }}",
+                n = name.name,
+                d = serialisation::deserialise_expr(k, "(__k as unknown as JsonValue)", &name.name),
+            ));
+        }
+    }
     // `Set[T]` — the elements are the (textual) Record keys; validate when `T`
     // is textual, else defer (structural string key).
     for (name, t) in &store_set_fields {
@@ -1989,7 +2025,7 @@ pub(crate) fn emit_agent(
             ));
         }
     }
-    let has_rehydrate = agent_needs_rehydrate(a, &commons.types, is_workers);
+    let has_rehydrate = agent_needs_rehydrate(a, &commons.types);
     if has_rehydrate {
         writeln!(out, "function {rehydrate_fn}(s: {state_ty}): void {{").unwrap();
         for c in &rehydrate_checks {
@@ -2092,11 +2128,17 @@ pub(crate) fn emit_agent(
         // record `__state`; a state-record handler uses `currentState`/`self.state`.
         // A store handler that performs any `:=` wraps its body in a closure so an
         // implicit commit runs at handler end on every (success) return path.
+        // v0.105 (slice 3b-ii): a held `Map[K, Connection]` is persisted (a connId
+        // record), so writing one (`put`/`remove`) must trigger the commit flush —
+        // include the held maps in the write-detection set. (They are *not* in
+        // `agent_store_maps`: their entry ops use the connId-resolution lowering, not
+        // the plain `Record<string, V>` ops.)
+        let writes_map_names: HashSet<String> = map_names.union(&held_map_names).cloned().collect();
         let writes_state = is_store_agent
             && block_writes_state(
                 &h.body,
                 (
-                    &map_names,
+                    &writes_map_names,
                     &set_names,
                     &cache_names,
                     &log_names,
@@ -2413,10 +2455,12 @@ fn emit_ws_open_fetch_branch(out: &mut String, host: &WsOpenHost<'_>) {
     let method = ws_open_do_method_name(host.service);
     writeln!(out, "    if (url.pathname === \"{path}\") {{").unwrap();
     writeln!(out, "      const __pair = newWebSocketPair();").unwrap();
-    writeln!(out, "      __pair.server.accept();").unwrap();
+    // v0.105 (slice 3b-ii): accept the server socket into the DO *hibernatably*
+    // (tagged with a fresh connId, attached for wake-time recovery) so a stored
+    // connection survives eviction — not `server.accept()`, which is in-memory only.
     writeln!(
         out,
-        "      const connection = new WorkersConnection<{}>(__pair.server);",
+        "      const connection = acceptHibernatableConnection<{}>(this.state, __pair.server);",
         ts_type_ref(host.out_type)
     )
     .unwrap();

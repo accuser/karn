@@ -1098,6 +1098,31 @@ pub(crate) fn check_store_map_op(
         params: vec![v.clone()],
         ret: Box::new(v.clone()),
     };
+    // v0.105 (slice 3b-ii): a held `Map[K, Connection]` stores connection ids and
+    // resolves them by identity; `update`/`upsert` transform the value through a
+    // `(V) -> V` function, which has no meaning for a held resource — you cannot
+    // derive a new connection from an old one. Reject them (the other entry ops —
+    // `put`/`get`/`remove`/`contains`/`size` — are admitted) so the program is a
+    // clean compile error rather than a silent miscompile.
+    if v.is_held() && matches!(method.name.as_str(), "update" | "upsert") {
+        ctx.errors.push(
+            CompileError::new(
+                "bynk.held.unsupported_map_op",
+                method.span,
+                format!(
+                    "a held `Map[K, Connection]` has no `{}` operation — a held resource cannot be transformed by a `(Connection) -> Connection` function",
+                    method.name
+                ),
+            )
+            .with_note(
+                "held connections are stored and resolved by identity; use `put`/`get`/`remove`",
+            ),
+        );
+        for a in args {
+            type_of(a, None, ctx);
+        }
+        return None;
+    }
     let (expected, result): (Vec<Ty>, Ty) = match method.name.as_str() {
         "put" => (vec![k.clone(), v.clone()], Ty::Unit),
         "get" => (vec![k.clone()], Ty::Option(Box::new(v.clone()))),
