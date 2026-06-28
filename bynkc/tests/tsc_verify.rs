@@ -312,3 +312,66 @@ fn embedded_runtime_passes_tsc_strict_standalone() {
         "embedded runtime.ts failed tsc --strict --noEmit:\n{output}"
     );
 }
+
+/// v0.104 (real-time track slice 3b): the embedded runtime must also be
+/// **type-strippable** — Node runs the emitted `.ts` directly under
+/// `--experimental-strip-types` on the `--inspect` debug path (and the bundle
+/// test runner), which is *stricter* than `tsc`: it rejects non-erasable TS such
+/// as constructor **parameter properties**, `enum`, and `namespace`. `tsc`
+/// accepts all of these, so the standalone-tsc check above does not catch them; a
+/// parameter property in the runtime silently broke every `--inspect` debug
+/// session (the module fails to parse before any breakpoint binds). This guards
+/// that class of regression cheaply and deterministically — no debugger, no hang.
+#[test]
+fn embedded_runtime_strips_types_under_node() {
+    // Node gained `--experimental-strip-types` in 22.6; older nodes can't run the
+    // check. Skip (loudly under the CI gate) when node is absent or too old.
+    let node_ok = Command::new("node")
+        .arg("--version")
+        .output()
+        .ok()
+        .and_then(|o| {
+            let v = String::from_utf8_lossy(&o.stdout);
+            let v = v.trim().trim_start_matches('v');
+            let mut it = v.split('.');
+            let major: u32 = it.next()?.parse().ok()?;
+            let minor: u32 = it.next()?.parse().ok()?;
+            Some(major > 22 || (major == 22 && minor >= 6))
+        })
+        .unwrap_or(false);
+    if !node_ok {
+        // Strip-types is a Node *capability* gate, not the `tsc`-presence gate — so
+        // this skips silently on an older Node regardless of `BYNK_REQUIRE_TSC` (CI's
+        // `Test suite` runs Node 20, which predates `--experimental-strip-types`).
+        // The strip-types coverage in CI comes from the Node-22 VS Code integration
+        // job that runs the emitted `.ts`; this test is the fast local backstop.
+        eprintln!(
+            "\n!!! NODE STRIP-TYPES CHECK SKIPPED (runtime) !!!\n\
+             `node` (>= 22.6, for --experimental-strip-types) is not on PATH.\n"
+        );
+        return;
+    }
+    let tmp = std::env::temp_dir().join(format!("bynk-runtime-strip-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&tmp);
+    fs::create_dir_all(&tmp).unwrap();
+    let rt = tmp.join("runtime.ts");
+    fs::write(&rt, bynkc::emitter::emit_runtime_module()).unwrap();
+    let out = Command::new("node")
+        .arg("--experimental-strip-types")
+        .arg("--check")
+        .arg(&rt)
+        .output()
+        .expect("run node --experimental-strip-types --check");
+    let ok = out.status.success();
+    if ok {
+        let _ = fs::remove_dir_all(&tmp);
+    }
+    assert!(
+        ok,
+        "embedded runtime.ts is not type-strippable under node --experimental-strip-types \
+         (a non-erasable construct such as a constructor parameter property, `enum`, or \
+         `namespace` — these break every `--inspect` debug session):\n{}\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr),
+    );
+}
