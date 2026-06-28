@@ -39,15 +39,20 @@ export interface ClientFrame {
 export const ClientFrame = {
 };
 
+export const ChatGateway = {
+};
+
 export interface RoomState {
   readonly conns: Record<string, string>;
+  readonly members: Record<string, boolean>;
 }
 
 const __RoomRegistry = new StateRegistry();
-function __zeroOfRoomState(): RoomState { return { conns: {} }; }
+function __zeroOfRoomState(): RoomState { return { conns: {}, members: {} }; }
 
 function __rehydrateRoomState(s: RoomState): void {
   for (const __k of Object.keys(s.conns)) { const __r = deserialise_UserId((__k as unknown as JsonValue), "conns"); if (__r.tag === "Err") throw rehydrationViolation("Room", __r.error); }
+  for (const __k of Object.keys(s.members)) { const __r = deserialise_UserId((__k as unknown as JsonValue), "members"); if (__r.tag === "Err") throw rehydrationViolation("Room", __r.error); }
 }
 
 export class Room {
@@ -71,7 +76,8 @@ export class Room {
   async join(u: UserId, conn: Connection<ServerFrame>, deps: {}): Promise<void> {
     const __state = { ...(await this.loadState()) };
     const __result = await (async () => {
-      const __r0 = await ((__state.conns[String(u)] = connIdOf(conn)), undefined);
+      const __r0 = await ((__state.members[u] = true), undefined);
+      const __r1 = await ((__state.conns[String(u)] = connIdOf(conn)), undefined);
       return undefined;
     })();
     await this.commitState(__state);
@@ -81,20 +87,28 @@ export class Room {
   async leave(u: UserId, deps: {}): Promise<void> {
     const __state = { ...(await this.loadState()) };
     const __result = await (async () => {
-      const __r0 = await (async () => { const __k = String(u); const __cid = __state.conns[__k]; if (__cid !== undefined) { const __c = resolveConnection<ServerFrame>(this.state, __cid); if (__c.tag === "Some") { await __c.value.close(); } delete __state.conns[__k]; } return undefined; })();
+      const __r0 = await ((delete __state.members[u]), undefined);
+      const __r1 = await (async () => { const __k = String(u); const __cid = __state.conns[__k]; if (__cid !== undefined) { const __c = resolveConnection<ServerFrame>(this.state, __cid); if (__c.tag === "Some") { await __c.value.close(); } delete __state.conns[__k]; } return undefined; })();
       return undefined;
     })();
     await this.commitState(__state);
     return __result;
   }
 
-  async __wsOpen_ChatGateway(connection: Connection<ServerFrame>, roomId: RoomId, deps: { identity: UserId }): Promise<void> {
-    const __r0 = await this.join(deps.identity, connection, deps);
+  async post(sender: UserId, text: string, deps: {}): Promise<void> {
+    const __state = await this.loadState();
+    const __r0 = await (async () => { await Promise.all(Object.values(__state.conns).flatMap((__cid) => { const __c = resolveConnection<ServerFrame>(this.state, __cid); return __c.tag === "Some" ? [__c.value] : []; }).map((__x) => (async (c: Connection<ServerFrame>) => (c).send({ text: text }))(__x))); })();
     return undefined;
   }
 
-  async __wsMessage_ChatGateway(connection: Connection<ServerFrame>, frame: ClientFrame, deps: { identity: UserId }): Promise<void> {
-    const __r0 = await (connection).send({ text: frame.text });
+  async __wsOpen_ChatGateway(connection: Connection<ServerFrame>, roomId: RoomId, deps: { identity: UserId }): Promise<void> {
+    const __r0 = await (connection).send({ text: "welcome" });
+    const __r1 = await this.join(deps.identity, connection, deps);
+    return undefined;
+  }
+
+  async __wsMessage_ChatGateway(connection: Connection<ServerFrame>, roomId: RoomId, frame: ClientFrame, deps: { identity: UserId }): Promise<void> {
+    const __r0 = await this.post(deps.identity, frame.text, deps);
     return undefined;
   }
 
@@ -131,7 +145,7 @@ export class Room {
     try { __json = JSON.parse(__raw) as JsonValue; } catch { ws.close(1003, "malformed frame"); return; }
     const __dec = deserialise_ClientFrame(__json, "frame");
     if (__dec.tag === "Err") { ws.close(1008, "invalid frame"); return; }
-    await this.__wsMessage_ChatGateway(connection, __dec.value, { identity: __att.identity as UserId });
+    await this.__wsMessage_ChatGateway(connection, __att.args[0] as RoomId, __dec.value, { identity: __att.identity as UserId });
   }
 
   async webSocketClose(ws: { deserializeAttachment(): unknown; send(data: string): void; close(code?: number, reason?: string): void }, code: number, reason: string, wasClean: boolean): Promise<void> {
@@ -147,9 +161,6 @@ export class Room {
 export function __makeRoom(key: RoomId, env?: { ROOM?: DurableObjectNamespace }): Room {
   return makeAgent(__RoomRegistry, env?.ROOM, key, (state) => new Room(state));
 }
-
-export const ChatGateway = {
-};
 
 export function __resetAgents(): void {
   __RoomRegistry.reset();

@@ -635,6 +635,7 @@ pub(crate) fn is_query_op(name: &str) -> bool {
             | "max"
             | "average"
             | "forEach"
+            | "parTraverse"
     )
 }
 
@@ -852,7 +853,11 @@ pub(crate) fn check_query_kernel_method(
             };
             Some(eff(Ty::Option(Box::new(result))))
         }
-        "forEach" => {
+        // v0.107 (slice 4): `forEach` runs the effectful function over each element
+        // **in turn**; `parTraverse` runs them **concurrently** (the broadcast form —
+        // a slow/half-dead connection must not head-of-line-block the rest). Same
+        // type; the difference is sequential-vs-parallel lowering.
+        "forEach" | "parTraverse" => {
             if !arity(1, ctx) {
                 return None;
             }
@@ -860,7 +865,12 @@ pub(crate) fn check_query_kernel_method(
                 params: vec![elem.clone()],
                 ret: Box::new(Ty::Effect(Box::new(Ty::Unit))),
             };
-            check_arg(&args[0], &f, "the `Query.forEach` function", ctx);
+            check_arg(
+                &args[0],
+                &f,
+                &format!("the `Query.{}` function", method.name),
+                ctx,
+            );
             Some(eff(Ty::Unit))
         }
         // v0.94 (ADR 0116/0120): joins & grouping are lazy builders — they project
@@ -874,7 +884,7 @@ pub(crate) fn check_query_kernel_method(
                 "bynk.types.method_not_found",
                 method.span,
                 format!(
-                    "the built-in `Query[{}]` type has no method `{}` — builders are `map`/`filter`/`flatMap`/`sortBy`/`take`/`skip`/`distinct`/`distinctBy`/`joinOn`/`leftJoin`/`join`/`groupBy`, terminals `collect`/`first`/`firstOrElse`/`count`/`fold`/`any`/`all`/`sum`/`min`/`max`/`average`/`forEach`",
+                    "the built-in `Query[{}]` type has no method `{}` — builders are `map`/`filter`/`flatMap`/`sortBy`/`take`/`skip`/`distinct`/`distinctBy`/`joinOn`/`leftJoin`/`join`/`groupBy`, terminals `collect`/`first`/`firstOrElse`/`count`/`fold`/`any`/`all`/`sum`/`min`/`max`/`average`/`forEach`/`parTraverse`",
                     elem.display(),
                     method.name
                 ),
