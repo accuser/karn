@@ -711,41 +711,45 @@ fn lower_method_call(
     stmts: &mut Vec<String>,
     cx: &mut LowerCtx,
 ) -> String {
-    // v0.104 (real-time track slice 3b): a held-`Map` operation — `<map>.<op>(…)`
-    // on a `store Map[K, Connection]` field on Workers. The map holds live sockets
-    // that cannot be persisted, so it is realised as an in-memory JS `Map` reached
-    // through `heldStore<V>(this.state, "<name>")` (keyed by the durable state
-    // object, so all instances addressing this key share it; lost on eviction).
-    // Entry ops map onto the JS `Map` surface; keys are stringified for a stable
-    // identity. The op is `Effect`-typed and awaited with `<-`, but the in-memory
-    // mutation is synchronous, so an awaited expression suffices (there is no
-    // durable flush — a held resource is never committed).
+    // v0.104/v0.105 (real-time track slice 3b): a held-`Map` operation —
+    // `<map>.<op>(…)` on a `store Map[K, Connection]` field on Workers. The live
+    // socket cannot be persisted, so the durable record stores the **connection id**
+    // (`__state.<map>` is a `Record<string(K), connId>`) and each `Connection` is
+    // re-resolved from its connId via `resolveConnection` — so a stored connection
+    // survives DO eviction (§2.9.6, slice 3b-ii). `put` records the connection's id
+    // (`connIdOf`); `get` resolves it (or `None` if the socket has since closed);
+    // `remove` resolves-closes-deletes (the §2.9 "removes-and-closes" contract). The
+    // record mutation is staged in `__state` and flushed by the same end-of-handler
+    // commit as any other persisted field.
     if let ExprKind::Ident(id) = &receiver.kind
-        && let Some(v_ts) = cx.agent_held_maps.get(&id.name).cloned()
+        && let Some(f_ts) = cx.agent_held_maps.get(&id.name).cloned()
     {
-        let handle = format!("heldStore<{v_ts}>(this.state, \"{}\")", id.name);
+        let var = cx
+            .agent_store_state
+            .as_ref()
+            .map(|(v, _)| v.clone())
+            .unwrap_or_else(|| "__state".to_string());
+        let m = format!("{var}.{}", id.name);
         let a: Vec<String> = args.iter().map(|x| lower_expr(x, stmts, cx)).collect();
         return match method.name.as_str() {
-            "put" => format!("(({handle}).set(String({}), {}), undefined)", a[0], a[1]),
-            "remove" => format!("(({handle}).delete(String({})), undefined)", a[0]),
-            "contains" => format!("({handle}).has(String({}))", a[0]),
-            "size" => format!("({handle}).size"),
-            "get" => format!(
-                "(() => {{ const __m = {handle}; const __k = String({0}); return __m.has(__k) ? Some(__m.get(__k)!) : None; }})()",
+            "put" => format!("(({m}[String({})] = connIdOf({})), undefined)", a[0], a[1]),
+            "remove" => format!(
+                "(async () => {{ const __k = String({0}); const __cid = {m}[__k]; if (__cid !== undefined) {{ const __c = resolveConnection<{f_ts}>(this.state, __cid); if (__c.tag === \"Some\") {{ await __c.value.close(); }} delete {m}[__k]; }} return undefined; }})()",
                 a[0]
             ),
-            "update" => format!(
-                "(() => {{ const __m = {handle}; const __k = String({0}); if (!__m.has(__k)) {{ throw new Error(\"Map.update: key absent\"); }} __m.set(__k, ({1})(__m.get(__k)!)); return undefined; }})()",
-                a[0], a[1]
-            ),
-            "upsert" => format!(
-                "(() => {{ const __m = {handle}; const __k = String({0}); __m.set(__k, ({2})(__m.has(__k) ? __m.get(__k)! : ({1}))); return undefined; }})()",
-                a[0], a[1], a[2]
+            "contains" => format!("(String({}) in {m})", a[0]),
+            "size" => format!("Object.keys({m}).length"),
+            "get" => format!(
+                "(() => {{ const __k = String({0}); return (__k in {m}) ? resolveConnection<{f_ts}>(this.state, {m}[__k]) : None; }})()",
+                a[0]
             ),
             // Any non-entry op is a lazy query lifting the map into a scan over its
-            // values (`[...map.values()]`).
+            // **resolved** connections (the present ones — a connId whose socket has
+            // closed drops out).
             _ => lower_query_method(
-                format!("[...({handle}).values()]"),
+                format!(
+                    "Object.values({m}).flatMap((__cid) => {{ const __c = resolveConnection<{f_ts}>(this.state, __cid); return __c.tag === \"Some\" ? [__c.value] : []; }})"
+                ),
                 method,
                 &a,
                 cx.commons.expr_types.get(&e.span),
@@ -2530,14 +2534,20 @@ fn lower_ident(e: &Expr, id: &Ident, cx: &mut LowerCtx) -> String {
     {
         return format!("{var}.{}", id.name);
     }
-    // v0.104 (real-time track slice 3b): a bare held-`Map` ident used as a value
-    // is a lazy `Query` over its (held) values — `() => [...map.values()]` over the
-    // in-memory side-table. Checked before the persisted-`Map` branch (held maps
-    // are excluded from `agent_store_maps`).
-    if let Some(v_ts) = cx.agent_held_maps.get(&id.name) {
+    // v0.104/v0.105 (real-time track slice 3b): a bare held-`Map` ident used as a
+    // value is a lazy `Query` over its **resolved** connections — the persisted
+    // `Record<K, connId>` mapped through `resolveConnection`, keeping the present
+    // ones. Checked before the persisted-`Map` branch (held maps are excluded from
+    // `agent_store_maps`).
+    if let Some(f_ts) = cx.agent_held_maps.get(&id.name) {
+        let var = cx
+            .agent_store_state
+            .as_ref()
+            .map(|(v, _)| v.as_str())
+            .unwrap_or("__state");
         return format!(
-            "(() => [...(heldStore<{v_ts}>(this.state, \"{}\")).values()])",
-            id.name
+            "(() => Object.values({var}.{name}).flatMap((__cid) => {{ const __c = resolveConnection<{f_ts}>(this.state, __cid); return __c.tag === \"Some\" ? [__c.value] : []; }}))",
+            name = id.name
         );
     }
     // v0.94 (ADR 0120): a bare `store Map` ident used as a **value** — not a

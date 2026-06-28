@@ -415,6 +415,10 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "A held value (`Connection[F]`) is still owned at scope exit — it must be disposed (stored, closed, or transferred) before the handler returns (§2.9.1, real-time track slice 2).",
     ),
     d(
+        "bynk.held.unsupported_map_op",
+        "A held `Map[K, Connection]` is given an `update`/`upsert` — a held resource cannot be transformed by a `(Connection) -> Connection` function; use `put`/`get`/`remove` (real-time track slice 3b-ii).",
+    ),
+    d(
         "bynk.held.unsupported_storage",
         "A held value (`Connection[F]`) is stored in a `Set`/`Log`/`Cache` — held values may only live in `Cell[Option[Connection]]` or `Map[K, Connection]` (§2.9.3, real-time track slice 2).",
     ),

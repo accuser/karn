@@ -6,6 +6,9 @@
 // with the `from WebSocket` protocol (slice 3); the language emits against this
 // interface, and the linearity discipline (§2.9) governs ownership at the type
 // level.
+import { Some, None, type Option } from "./result.ts";
+import type { DurableObjectState } from "./storage.ts";
+
 export interface Connection<F> {
   send(frame: F): Promise<void>;
   close(): Promise<void>;
@@ -30,20 +33,22 @@ export class TestConnection<F> implements Connection<F> {
   }
 }
 
-// v0.104 (real-time track slice 3b): the Cloudflare Workers realisation of a
-// `Connection[F]`, wrapping a server-side `WebSocket` accepted in a Durable
-// Object. A frame is sent as JSON; `close` ends the socket. (This slice uses the
-// non-hibernatable `server.accept()` model — the connection lives in the DO's
-// memory and is lost on eviction; the hibernatable `acceptWebSocket` mapping that
-// survives eviction is a follow-on increment.)
+// v0.104/v0.105 (real-time track slice 3b): the Cloudflare Workers realisation of
+// a `Connection[F]`, wrapping a server-side `WebSocket` accepted in a Durable
+// Object. A frame is sent as JSON; `close` ends the socket. The `connId` is the
+// hibernation tag the socket was accepted under (slice 3b-ii): a stored connection
+// persists this id, and `resolveConnection` re-presents the live socket by it
+// after the DO wakes — so the held value survives eviction (§2.9.6).
 export class WorkersConnection<F> implements Connection<F> {
-  // An explicit field + assignment, not a constructor parameter property — Node's
+  // Explicit fields + assignment, not constructor parameter properties — Node's
   // `--experimental-strip-types` (the `--inspect` debug path runs the emitted `.ts`
   // directly) rejects parameter properties, which are not erasable.
   private readonly ws: { send(data: string): void; close(): void };
+  readonly connId: string;
 
-  constructor(ws: { send(data: string): void; close(): void }) {
+  constructor(ws: { send(data: string): void; close(): void }, connId: string) {
     this.ws = ws;
+    this.connId = connId;
   }
 
   async send(frame: F): Promise<void> {
@@ -55,6 +60,13 @@ export class WorkersConnection<F> implements Connection<F> {
   }
 }
 
+// v0.105 (slice 3b-ii): the connection id a held `Connection` persists. The stored
+// value is this string, not the live socket (which cannot be serialised); the
+// socket is re-resolved per access via `resolveConnection`.
+export function connIdOf(conn: Connection<unknown>): string {
+  return (conn as WorkersConnection<unknown>).connId;
+}
+
 // v0.104 (real-time track slice 3b): the minimal structural surface of a
 // Cloudflare server-side `WebSocket`, so emitted Worker code type-checks under
 // `tsc --strict` without depending on `@cloudflare/workers-types`. The real
@@ -63,6 +75,47 @@ export interface WorkersWebSocket {
   accept(): void;
   send(data: string): void;
   close(code?: number, reason?: string): void;
+  // v0.105 (slice 3b-ii): hibernation attachment — small per-socket data the
+  // platform preserves across hibernation (the connId, so a waking dispatch can
+  // recover it without loading durable state).
+  serializeAttachment(value: unknown): void;
+  deserializeAttachment(): unknown;
+}
+
+// v0.105 (slice 3b-ii): the Durable Object's hibernatable-WebSocket surface.
+// `acceptWebSocket(ws, tags)` accepts a server socket so it survives the DO's
+// hibernation (unlike `ws.accept()`); `getWebSockets(tag)` re-presents the
+// accepted sockets (by tag) when the DO wakes. Narrowly typed and reached by a
+// cast so the shared `DurableObjectState` (and the bundle `makeTestState`) need
+// not carry the API.
+interface HibernatableState {
+  acceptWebSocket(ws: WorkersWebSocket, tags?: string[]): void;
+  getWebSockets(tag?: string): WorkersWebSocket[];
+}
+
+// Accept a server socket into the DO under a fresh connection id (the hibernation
+// tag), attach the id for wake-time recovery, and wrap it. The returned
+// `WorkersConnection` carries the connId a held store persists.
+export function acceptHibernatableConnection<F>(
+  state: DurableObjectState,
+  server: WorkersWebSocket,
+): WorkersConnection<F> {
+  const connId = crypto.randomUUID();
+  (state as unknown as HibernatableState).acceptWebSocket(server, [connId]);
+  server.serializeAttachment({ connId });
+  return new WorkersConnection<F>(server, connId);
+}
+
+// Re-present the live socket a stored connId names, re-wrapped as a
+// `WorkersConnection`. `None` when the platform has no such socket — a connection
+// that has since closed (normal lifecycle, not corruption).
+export function resolveConnection<F>(
+  state: DurableObjectState,
+  connId: string,
+): Option<WorkersConnection<F>> {
+  const sockets = (state as unknown as HibernatableState).getWebSockets(connId);
+  const ws = sockets[0];
+  return ws === undefined ? None : Some(new WorkersConnection<F>(ws, connId));
 }
 
 export interface WorkersWebSocketPair {
