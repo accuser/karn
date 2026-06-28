@@ -1,0 +1,15 @@
+context s
+
+type UserId = opaque String
+type ServerFrame = { text: String }
+
+-- A broadcast borrows each held connection — `send` is allowed but a consuming op
+-- (`close`/transfer) on the borrowed `c` is rejected. `bynk.held.consume_on_borrow`.
+agent Room {
+  key id: UserId
+  store conns: Map[UserId, Connection[ServerFrame]]
+  on call closeAll() -> Effect[()] {
+    let _ <- conns.parTraverse((c: Connection[ServerFrame]) => c.close())
+    ()
+  }
+}

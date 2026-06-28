@@ -1878,6 +1878,12 @@ fn lower_query_method(
         ("forEach", [f]) => {
             format!("(async () => {{ for (const __x of {source}) {{ await ({f})(__x); }} }})()")
         }
+        // v0.107 (slice 4): the parallel broadcast form — issue the effectful fn over
+        // every element concurrently and await them together, so one slow element
+        // does not head-of-line-block the rest.
+        ("parTraverse", [f]) => {
+            format!("(async () => {{ await Promise.all({source}.map((__x) => ({f})(__x))); }})()")
+        }
         _ => return None,
     })
 }

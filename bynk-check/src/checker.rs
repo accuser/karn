@@ -1883,6 +1883,16 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
                 // into a lazy `Query[V]` over its values; an entry op
                 // (`put`/`get`/…) stays the effectful map operation.
                 if is_query_op(&method.name) {
+                    // v0.107 (slice 4): record the receiver's lifted `Query[V]` type
+                    // (otherwise unrecorded — the dispatch keys off the store field,
+                    // not a typed receiver). This is the receiver's true type for any
+                    // query op; its load-bearing use is the linearity pass, which now
+                    // sees a held-bearing collection and lends the closure parameter of
+                    // `forEach`/`parTraverse` as borrowed — otherwise `ty_of(receiver)`
+                    // is `None` and the no-consume-in-a-broadcast rule is silently
+                    // unenforced.
+                    ctx.expr_types
+                        .insert(receiver.span, Ty::Query(Box::new(v.clone())));
                     check_query_kernel_method(method, args, &v, expr.span, ctx)
                 } else {
                     check_store_map_op(method, args, &k, &v, expr.span, ctx)

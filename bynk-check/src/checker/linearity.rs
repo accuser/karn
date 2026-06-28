@@ -304,13 +304,14 @@ impl Lin<'_> {
         }
 
         // The receiver is not a tracked held binding. It may be a held-bearing
-        // storage collection whose borrowing methods (`forEach`/`update`) lend a
-        // borrowed reference into a closure.
+        // storage collection whose borrowing methods (`forEach`/`parTraverse`/
+        // `update`) lend a borrowed reference into a closure (v0.107: `parTraverse`
+        // is the parallel broadcast form — its closure borrows exactly as `forEach`).
         let recv_holds_held = self
             .ty_of(receiver)
             .map(storage_value_is_held)
             .unwrap_or(false);
-        if recv_holds_held && matches!(method, "forEach" | "update") {
+        if recv_holds_held && matches!(method, "forEach" | "parTraverse" | "update") {
             self.walk_borrowing_call(args, state);
             return;
         }

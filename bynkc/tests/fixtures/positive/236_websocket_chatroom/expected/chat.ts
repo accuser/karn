@@ -45,8 +45,8 @@ export const ChatGateway = {
     const __r1 = await __makeRoom(roomId).join(deps.identity, connection, deps);
     return undefined;
   },
-  async message(connection: Connection<ServerFrame>, frame: ClientFrame, deps: { identity: UserId }): Promise<void> {
-    const __r0 = await (connection).send({ text: frame.text });
+  async message(connection: Connection<ServerFrame>, roomId: RoomId, frame: ClientFrame, deps: { identity: UserId }): Promise<void> {
+    const __r0 = await __makeRoom(roomId).post(deps.identity, frame.text, deps);
     return undefined;
   },
   async close(connection: Connection<ServerFrame>, roomId: RoomId, deps: { identity: UserId }): Promise<void> {
@@ -106,6 +106,12 @@ export class Room {
     })();
     await this.commitState(__state);
     return __result;
+  }
+
+  async post(sender: UserId, text: string, deps: {}): Promise<void> {
+    const __state = await this.loadState();
+    const __r0 = await (async () => { await Promise.all(Object.values(__state.conns).map((__x) => (async (c: Connection<ServerFrame>) => (c).send({ text: text }))(__x))); })();
+    return undefined;
   }
 
 }

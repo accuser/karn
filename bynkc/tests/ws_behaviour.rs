@@ -79,35 +79,35 @@ function assert(cond: boolean, msg: string): void {
 }
 
 async function main(): Promise<void> {
-  // The bundle realisation of a held connection: capture-and-inspect.
-  const tc = new TestConnection<{ text: string }>();
+  // The §20 chat-room, end-to-end on the bundle target (the track's completion
+  // proof). Two participants join one room; a message broadcasts to both.
   const roomId = RoomId.unsafe("room-1");
-  const user = UserId.unsafe("alice");
+  const alice = UserId.unsafe("alice");
+  const bob = UserId.unsafe("bob");
+  const tcA = new TestConnection<{ text: string }>();
+  const tcB = new TestConnection<{ text: string }>();
 
-  // Drive the WebSocket `on open` handler directly with the TestConnection —
-  // exactly what the Workers upgrade does after authenticating the actor.
-  await ChatGateway.open(tc, roomId, { identity: user });
+  // `on open` (edge upgrade): each connection sends a welcome frame, then is
+  // transferred into the same Room agent (keyed by roomId).
+  await ChatGateway.open(tcA, roomId, { identity: alice });
+  await ChatGateway.open(tcB, roomId, { identity: bob });
+  assert(tcA.sent.length === 1 && tcA.sent[0].text === "welcome", "alice got the welcome frame");
+  assert(tcB.sent.length === 1 && tcB.sent[0].text === "welcome", "bob got the welcome frame");
+  assert(!tcA.closed && !tcB.closed, "both connections are transferred (open), not closed");
 
-  // The held connection flowed through `on open`: the welcome frame was sent on
-  // it (captured by the TestConnection) before it was transferred into the agent.
-  assert(tc.sent.length === 1, `one frame sent on the connection, got ${tc.sent.length}`);
-  assert(tc.sent[0].text === "welcome", `the welcome frame was captured, got ${JSON.stringify(tc.sent[0])}`);
-  // `send` is non-consuming; `close` was never called — the connection was
-  // transferred to the agent, not disposed at the edge.
-  assert(tc.closed === false, "the connection is transferred (open), not closed");
+  // Slice 4 — broadcast: alice sends a message; `on message` posts it to the room,
+  // which `parTraverse`s every held connection and sends — so BOTH alice and bob
+  // receive it (the fan-out). The held-aware iteration borrow at work.
+  await ChatGateway.message(tcA, roomId, { text: "hello room" }, { identity: alice });
+  assert(tcA.sent.length === 2 && tcA.sent[1].text === "hello room", "alice received the broadcast");
+  assert(tcB.sent.length === 2 && tcB.sent[1].text === "hello room", "bob received the broadcast");
+  assert(!tcA.closed && !tcB.closed, "the borrowed connections stay open after the broadcast");
 
-  // Slice 3b-iii — inbound: drive `on message` with a decoded frame and the firing
-  // (borrowed) connection. The handler echoes the frame's text back on it.
-  await ChatGateway.message(tc, { text: "hello" }, { identity: user });
-  assert(tc.sent.length === 2, `the inbound echo was sent, got ${tc.sent.length} frames`);
-  assert(tc.sent[1].text === "hello", `the echo carried the inbound text, got ${JSON.stringify(tc.sent[1])}`);
-  // The connection is borrowed in `on message` — used (`send`), never disposed.
-  assert(tc.closed === false, "the borrowed connection stays open after `on message`");
-
-  // Slice 3b-iii — close: drive `on close`; it disposes the stored connection via
-  // the agent. The handler ran without error (no send/close on the firing socket).
-  await ChatGateway.close(tc, roomId, { identity: user });
-  assert(tc.sent.length === 2, "`on close` sends no frame on the firing connection");
+  // Slice 3b-iii — close: bob leaves; a subsequent broadcast reaches only alice.
+  await ChatGateway.close(tcB, roomId, { identity: bob });
+  await ChatGateway.message(tcA, roomId, { text: "after leave" }, { identity: alice });
+  assert(tcA.sent.length === 3 && tcA.sent[2].text === "after leave", "alice received the second broadcast");
+  assert(tcB.sent.length === 2, "bob (left) received no further broadcast");
 
   console.log("ALL OK");
 }
