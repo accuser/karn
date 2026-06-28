@@ -490,7 +490,7 @@ pub struct ServiceDecl {
 /// contract-mediated internal-RPC surface, not a wire protocol. Multi-endpoint
 /// protocols (`Http`, `Cron`) carry no binding — the endpoint lives on each
 /// handler; single-binding `Queue` carries its queue name.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum ServiceProtocol {
     /// No `from` clause: the service holds `on call` handlers only.
     Call,
@@ -500,6 +500,13 @@ pub enum ServiceProtocol {
     Cron,
     /// `from queue("name")` — one bound queue; handlers are `on message(...)`.
     Queue { name: String },
+    /// `from WebSocket(in: ClientFrame, out: ServerFrame)` — a held WebSocket
+    /// connection (v0.103, real-time track slice 3). `in_type` is the inbound
+    /// frame type (client→server, decoded and routed as typed agent messages);
+    /// `out_type` is the server→client frame type the held `Connection[out_type]`
+    /// carries. The service holds exactly one `on open` handler (edge auth via
+    /// `by`, then transfer of the connection to an agent).
+    WebSocket { in_type: TypeRef, out_type: TypeRef },
 }
 
 /// An agent declaration (v0.5 §3.6). Agents are state-bearing entities
@@ -753,6 +760,10 @@ pub enum HandlerKind {
     /// `on message(m: T)` — a message off the service's bound queue. The queue
     /// binding lives on the service's `ServiceProtocol::Queue` (v0.44).
     Message,
+    /// `on open ...` — the WebSocket upgrade handler (v0.103, real-time track
+    /// slice 3). Exactly one per `from WebSocket` service; carries a mandatory
+    /// `by` clause (edge auth) and receives a fresh owned `Connection[out]`.
+    Open,
 }
 
 /// HTTP methods supported by `on http` handlers (v0.9).

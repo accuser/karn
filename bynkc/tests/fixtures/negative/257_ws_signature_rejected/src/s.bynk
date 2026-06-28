@@ -1,0 +1,11 @@
+context s
+type UserId = opaque String
+type ServerFrame = { text: String }
+type ClientFrame = { text: String }
+actor Webhook { auth = Signature(secret = "S", header = "X-Sig"), identity = UserId }
+service Gw from WebSocket(in: ClientFrame, out: ServerFrame) {
+  on open by w: Webhook () -> Effect[()] {
+    let _ <- connection.close()
+    ()
+  }
+}

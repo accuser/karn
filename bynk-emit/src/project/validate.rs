@@ -54,6 +54,35 @@ pub(crate) fn check_platform_lock(
     unit_flattened: &HashMap<String, HashMap<String, String>>,
     errors: &mut Vec<CompileError>,
 ) {
+    // v0.103 (real-time track slice 3a): the `from WebSocket` protocol's Workers
+    // mapping (the Durable Object hibernatable upgrade) lands in a later
+    // increment. On the Workers target a WebSocket service is not yet emittable;
+    // the bundle target (the default) runs it against `TestConnection`.
+    if matches!(target, BuildTarget::Workers) {
+        let mut tables: Vec<&UnitTable> = unit_tables.values().collect();
+        tables.sort_by_key(|t| t.services.keys().next().cloned().unwrap_or_default());
+        for table in tables {
+            let mut svcs: Vec<&_> = table.services.values().collect();
+            svcs.sort_by_key(|s| s.name.name.clone());
+            for service in svcs {
+                if matches!(service.protocol, ServiceProtocol::WebSocket { .. }) {
+                    errors.push(
+                        CompileError::new(
+                            "bynk.target.websocket_workers_unsupported",
+                            service.name.span,
+                            format!(
+                                "the `from WebSocket` service `{}` cannot yet build on the Workers target — the Durable Object hibernatable mapping arrives in a later increment",
+                                service.name.name
+                            ),
+                        )
+                        .with_note(
+                            "build on the bundle target (the default) to develop and test the protocol against `TestConnection`",
+                        ),
+                    );
+                }
+            }
+        }
+    }
     // Per-context native sets, with the context name kept for spans/messages.
     let mut per_context: Vec<(String, std::collections::BTreeMap<Platform, String>)> = Vec::new();
     let mut names: Vec<&String> = groups.keys().collect();
@@ -701,6 +730,38 @@ fn check_provider_decls(
 /// `on call`; mismatches are `bynk.service.{missing_from,mixed_protocols}`.
 fn check_service_protocols(table: &UnitTable, errors: &mut Vec<CompileError>) {
     for service in table.services.values() {
+        // v0.103: a `from WebSocket` service holds exactly one `on open` handler
+        // (the edge upgrade); inbound frames are the agent's typed messages, not
+        // service handlers.
+        if matches!(service.protocol, ServiceProtocol::WebSocket { .. }) {
+            let opens: Vec<&Handler> = service
+                .handlers
+                .iter()
+                .filter(|h| matches!(h.kind, HandlerKind::Open))
+                .collect();
+            if opens.is_empty() {
+                errors.push(
+                    CompileError::new(
+                        "bynk.service.websocket_open_arity",
+                        service.name.span,
+                        format!(
+                            "the `from WebSocket` service `{}` has no `on open` handler — it needs exactly one (the edge upgrade)",
+                            service.name.name
+                        ),
+                    )
+                    .with_note("inbound frames arrive at the agent as typed messages; the service holds only `on open`"),
+                );
+            } else if opens.len() > 1 {
+                errors.push(CompileError::new(
+                    "bynk.service.websocket_open_arity",
+                    opens[1].span,
+                    format!(
+                        "the `from WebSocket` service `{}` has more than one `on open` handler — it needs exactly one",
+                        service.name.name
+                    ),
+                ));
+            }
+        }
         for handler in &service.handlers {
             let matches_protocol = matches!(
                 (&service.protocol, &handler.kind),
@@ -708,6 +769,7 @@ fn check_service_protocols(table: &UnitTable, errors: &mut Vec<CompileError>) {
                     | (ServiceProtocol::Http, HandlerKind::Http { .. })
                     | (ServiceProtocol::Cron, HandlerKind::Cron { .. })
                     | (ServiceProtocol::Queue { .. }, HandlerKind::Message)
+                    | (ServiceProtocol::WebSocket { .. }, HandlerKind::Open)
             );
             if matches_protocol {
                 continue;
@@ -718,6 +780,7 @@ fn check_service_protocols(table: &UnitTable, errors: &mut Vec<CompileError>) {
                         HandlerKind::Http { .. } => "from http",
                         HandlerKind::Cron { .. } => "from cron",
                         HandlerKind::Message => "from queue(\"…\")",
+                        HandlerKind::Open => "from WebSocket(in: …, out: …)",
                         HandlerKind::Call => continue,
                     };
                     errors.push(
@@ -758,6 +821,7 @@ fn protocol_label(p: &ServiceProtocol) -> &'static str {
         ServiceProtocol::Http => "from http",
         ServiceProtocol::Cron => "from cron",
         ServiceProtocol::Queue { .. } => "from queue",
+        ServiceProtocol::WebSocket { .. } => "from WebSocket",
     }
 }
 
@@ -1177,18 +1241,25 @@ fn check_actor_contracts(
                     }
                 }
                 None => {
-                    // No `by`: HTTP has no safe default; everything else inherits.
+                    // No `by`: edge protocols (HTTP, WebSocket) have no safe
+                    // default actor; the internal protocols inherit one.
                     if actors::default_actor(&service.protocol).is_none() {
-                        errors.push(
-                            CompileError::new(
-                                "bynk.actor.missing_by_on_http",
-                                handler.span,
-                                "an HTTP handler must declare its actor with a `by` clause",
-                            )
-                            .with_note(
-                                "HTTP has no safe default actor — a public route writes \
-                                 `by v: Visitor`; an authenticated route names its actor",
+                        // v0.103 (D-A): a WebSocket upgrade authenticates at the
+                        // edge before the connection is accepted — `on open` must
+                        // name its actor, no anonymous upgrade.
+                        let (msg, note) = match &service.protocol {
+                            ServiceProtocol::WebSocket { .. } => (
+                                "a WebSocket `on open` handler must declare its actor with a `by` clause",
+                                "the upgrade authenticates at the edge before accepting the connection — name the actor (`by user: Participant`), there is no anonymous upgrade",
                             ),
+                            _ => (
+                                "an HTTP handler must declare its actor with a `by` clause",
+                                "HTTP has no safe default actor — a public route writes `by v: Visitor`; an authenticated route names its actor",
+                            ),
+                        };
+                        errors.push(
+                            CompileError::new("bynk.actor.missing_by_on_http", handler.span, msg)
+                                .with_note(note),
                         );
                     }
                 }
@@ -1332,11 +1403,24 @@ fn check_service_decls(
             }
             // v0.45: the `by`-bound actor identity, in scope for the body.
             let actor_binding = handler_actor_binding(handler, &service.protocol, table, resolved);
+            // v0.103 (real-time track slice 3): an `on open` handler receives a
+            // fresh owned `Connection[out]` named `connection`. Inject it as a
+            // synthetic first parameter so the body type-checks against it and
+            // the linearity pass seeds it as an owned held binding the handler
+            // must dispose (transfer to an agent).
+            let params_for_check: Vec<Param> = match (&handler.kind, &service.protocol) {
+                (HandlerKind::Open, ServiceProtocol::WebSocket { out_type, .. }) => {
+                    let mut ps = vec![open_connection_param(out_type, handler.span)];
+                    ps.extend(handler.params.iter().cloned());
+                    ps
+                }
+                _ => handler.params.clone(),
+            };
             checker::check_handler_body(
                 &handler.body,
                 &handler.return_type,
                 handler.return_type.span(),
-                &handler.params,
+                &params_for_check,
                 resolved,
                 &mut typed.expr_types,
                 errors,
@@ -1359,6 +1443,20 @@ fn check_service_decls(
                 HashMap::new(),
             );
         }
+    }
+}
+
+/// v0.103: the synthetic `connection: Connection[out]` parameter an `on open`
+/// handler receives — a fresh, owned held binding the framework supplies and the
+/// handler must dispose (§2.9.4).
+fn open_connection_param(out_type: &TypeRef, span: Span) -> Param {
+    Param {
+        name: Ident {
+            name: "connection".to_string(),
+            span,
+        },
+        type_ref: TypeRef::Connection(Box::new(out_type.clone()), span),
+        span,
     }
 }
 

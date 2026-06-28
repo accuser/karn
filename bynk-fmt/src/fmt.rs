@@ -1060,6 +1060,13 @@ impl<'a> Formatter<'a> {
             ServiceProtocol::Queue { name } => {
                 format!(" from queue(\"{}\")", escape_string(name))
             }
+            ServiceProtocol::WebSocket { in_type, out_type } => {
+                format!(
+                    " from WebSocket(in: {}, out: {})",
+                    type_ref_to_string(in_type),
+                    type_ref_to_string(out_type)
+                )
+            }
         };
         self.push(&format!("service {}{} {{", s.name.name, from));
         self.newline();
@@ -1231,12 +1238,18 @@ impl<'a> Formatter<'a> {
             HandlerKind::Message => {
                 self.push("on message");
             }
+            HandlerKind::Open => {
+                self.push("on open");
+            }
         }
         // v0.45: the `by <binder>: <Actor>` clause sits between the config and
         // the parameters. The Http/Cron config prefixes already emit a trailing
         // space; Call/Message do not, so add one before the clause.
         if let Some(by) = &h.by_clause {
-            if matches!(h.kind, HandlerKind::Call | HandlerKind::Message) {
+            if matches!(
+                h.kind,
+                HandlerKind::Call | HandlerKind::Message | HandlerKind::Open
+            ) {
                 self.push(" ");
             }
             let actors = by

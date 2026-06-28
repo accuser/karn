@@ -491,6 +491,7 @@ pub(crate) fn collect_handler_labels(commons: &TypedCommons) -> Option<String> {
                         HandlerKind::Call => {
                             ("call".to_string(), handler_op_label("call", &h.params))
                         }
+                        HandlerKind::Open => ("open".to_string(), "WebSocket open".to_string()),
                     };
                     entries.push(pair);
                 }
@@ -754,6 +755,9 @@ pub(crate) fn emit_service(
                 queue_idx += 1;
                 name
             }
+            // v0.103: the WebSocket upgrade handler — one per service, the
+            // surface method the upgrade dispatch calls.
+            HandlerKind::Open => "open".to_string(),
         };
         // For service handlers the operation name is the handler kind
         // (e.g. `call`). v0.5 has only one handler kind, so the service is a
@@ -763,6 +767,17 @@ pub(crate) fn emit_service(
             .iter()
             .map(|p| format!("{}: {}", p.name.name, ts_type_ref(&p.type_ref)))
             .collect();
+        // v0.103: an `on open` handler receives the fresh `connection` as its
+        // first parameter (the synthetic binding the checker added; emit it so
+        // the lowered body's `connection` reference resolves).
+        if matches!(handler.kind, HandlerKind::Open)
+            && let ServiceProtocol::WebSocket { out_type, .. } = &s.protocol
+        {
+            params.insert(
+                0,
+                format!("connection: Connection<{}>", ts_type_ref(out_type)),
+            );
+        }
         // Lower the body first so we can detect cross-context usage and
         // adjust the deps shape accordingly.
         let mut body_out = String::new();
@@ -2061,11 +2076,13 @@ pub(crate) fn emit_agent(
             .map(|m| m.name.clone())
             .unwrap_or_else(|| match &h.kind {
                 HandlerKind::Call => "call".to_string(),
-                // HTTP/cron/queue handlers are service-only (rejected in agents
-                // by the parser); these arms are defensive and unreachable here.
-                HandlerKind::Http { .. } | HandlerKind::Cron { .. } | HandlerKind::Message => {
-                    "call".to_string()
-                }
+                // HTTP/cron/queue/open handlers are service-only (rejected in
+                // agents by the parser); these arms are defensive and unreachable
+                // here.
+                HandlerKind::Http { .. }
+                | HandlerKind::Cron { .. }
+                | HandlerKind::Message
+                | HandlerKind::Open => "call".to_string(),
             });
         writeln!(
             out,

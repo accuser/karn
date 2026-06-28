@@ -2342,6 +2342,43 @@ impl<'a> Parser<'a> {
                 self.expect(TokenKind::RParen, "to close the queue binding")?;
                 Ok(ServiceProtocol::Queue { name })
             }
+            // v0.103 (real-time track slice 3): `from WebSocket(in: T, out: T)`.
+            // `WebSocket` is a contextual identifier (not a keyword), like the
+            // built-in type names.
+            Some(TokenKind::Ident)
+                if self
+                    .peek()
+                    .is_some_and(|t| self.slice(t.span) == "WebSocket") =>
+            {
+                self.bump();
+                self.expect(
+                    TokenKind::LParen,
+                    "expected `(in: ClientFrame, out: ServerFrame)` after `from WebSocket`",
+                )?;
+                let in_label = self.expect_ident("expected `in:` in the WebSocket header")?;
+                if in_label.name != "in" {
+                    return Err(CompileError::new(
+                        "bynk.service.websocket_header",
+                        in_label.span,
+                        "the WebSocket header binds frame types as `in: <type>, out: <type>`",
+                    ));
+                }
+                self.expect(TokenKind::Colon, "after `in`")?;
+                let in_type = self.parse_type_ref("as the WebSocket `in:` frame type")?;
+                self.expect(TokenKind::Comma, "between the `in:` and `out:` frame types")?;
+                let out_label = self.expect_ident("expected `out:` in the WebSocket header")?;
+                if out_label.name != "out" {
+                    return Err(CompileError::new(
+                        "bynk.service.websocket_header",
+                        out_label.span,
+                        "the WebSocket header binds frame types as `in: <type>, out: <type>`",
+                    ));
+                }
+                self.expect(TokenKind::Colon, "after `out`")?;
+                let out_type = self.parse_type_ref("as the WebSocket `out:` frame type")?;
+                self.expect(TokenKind::RParen, "to close the WebSocket header")?;
+                Ok(ServiceProtocol::WebSocket { in_type, out_type })
+            }
             _ => {
                 let (span, found) = match self.peek() {
                     Some(t) => (t.span, t.kind.describe()),
@@ -2351,7 +2388,7 @@ impl<'a> Parser<'a> {
                     "bynk.service.unknown_protocol",
                     span,
                     format!(
-                        "unknown protocol after `from` — found {found}, expected `http`, `cron`, or `queue`"
+                        "unknown protocol after `from` — found {found}, expected `http`, `cron`, `queue`, or `WebSocket`"
                     ),
                 )
                 .with_note(
@@ -2692,6 +2729,8 @@ impl<'a> Parser<'a> {
         let kind = match kind_ident.name.as_str() {
             "call" => HandlerKind::Call,
             "message" => HandlerKind::Message,
+            // v0.103: the WebSocket upgrade handler — `on open by … (params) …`.
+            "open" => HandlerKind::Open,
             "schedule" => {
                 self.expect(TokenKind::LParen, "before the cron schedule expression")?;
                 let expr_tok = self.expect(

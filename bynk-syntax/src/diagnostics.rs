@@ -1112,6 +1112,14 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         &["service_decl"],
     ),
     d(
+        "bynk.service.websocket_header",
+        "The `from WebSocket` header is malformed — it binds frame types as `WebSocket(in: <type>, out: <type>)` (real-time track slice 3).",
+    ),
+    d(
+        "bynk.service.websocket_open_arity",
+        "A `from WebSocket` service must hold exactly one `on open` handler — the edge upgrade; inbound frames arrive at the agent as typed messages (real-time track slice 3).",
+    ),
+    d(
         "bynk.store.annotation_kind_mismatch",
         "A storage annotation is used on a kind it does not apply to (e.g. `@ttl` on a `Map`).",
     ),
@@ -1160,6 +1168,10 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "bynk.target.vendor_required",
         "A deployment unit uses a platform-native capability but the build selects another `--platform`.",
         &["consumes_decl"],
+    ),
+    d(
+        "bynk.target.websocket_workers_unsupported",
+        "A `from WebSocket` service is built on the Workers target, whose Durable Object hibernatable mapping is not yet available — build on the bundle target (real-time track slice 3a).",
     ),
     dg(
         "bynk.test.duplicate_case_name",

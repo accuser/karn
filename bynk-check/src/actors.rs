@@ -124,7 +124,9 @@ pub fn default_actor(protocol: &ServiceProtocol) -> Option<&'static str> {
         ServiceProtocol::Call => Some("Caller"),
         ServiceProtocol::Cron => Some("Scheduler"),
         ServiceProtocol::Queue { .. } => Some("Producer"),
-        ServiceProtocol::Http => None,
+        // v0.103: like HTTP, a WebSocket upgrade has no safe default actor —
+        // `by` is mandatory on `on open` (edge auth before accept, D-A).
+        ServiceProtocol::Http | ServiceProtocol::WebSocket { .. } => None,
     }
 }
 
@@ -339,6 +341,14 @@ pub fn scheme_admissible(protocol: &ServiceProtocol, scheme: Scheme) -> bool {
     match protocol {
         ServiceProtocol::Http => {
             matches!(scheme, Scheme::None | Scheme::Bearer | Scheme::Signature)
+        }
+        // v0.103 (D-B): a WebSocket upgrade authenticates via `None` (anonymous)
+        // or `Bearer` — but the token is read from the `Sec-WebSocket-Protocol`
+        // subprotocol, since a browser `WebSocket` cannot set an `Authorization`
+        // header. `Signature` is rejected at the WS boundary: HMAC-over-body has
+        // no body on a handshake.
+        ServiceProtocol::WebSocket { .. } => {
+            matches!(scheme, Scheme::None | Scheme::Bearer)
         }
         ServiceProtocol::Call | ServiceProtocol::Cron | ServiceProtocol::Queue { .. } => {
             matches!(scheme, Scheme::Internal)
