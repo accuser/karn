@@ -78,10 +78,32 @@ error. The compiler reports an undisposed connection (`bynk.held.leak`), a use a
 disposal (`bynk.held.use_after_consume`), and branches that dispose inconsistently
 (`bynk.held.branch_divergence`).
 
-The `from WebSocket` protocol that produces real connections — and the runtime
-`Connection` implementations — arrive in a later slice of the
-[real-time track](https://github.com/accuser/bynk/blob/main/design/tracks/websocket.md);
-v0.102 builds the type and the discipline against hand-written held sources.
+### WebSocket services
+
+A `service … from WebSocket(in:, out:)` produces connections. The upgrade
+**authenticates at the edge** — like an HTTP route, `on open` must name its actor
+with `by` (there is no anonymous upgrade; a browser `WebSocket` carries a Bearer
+token in the `Sec-WebSocket-Protocol` subprotocol, since it cannot set an
+`Authorization` header) — and the handler receives a fresh, owned `Connection[out]`
+it must dispose, the canonical disposal being transfer into an agent:
+
+```bynk
+service ChatGateway from WebSocket(in: ClientFrame, out: ServerFrame) {
+  on open by user: Participant (roomId: RoomId) -> Effect[()] {
+    let _ <- connection.send(ServerFrame { text: "welcome" })
+    let _ <- Room(roomId).join(user.identity, connection)
+    ()
+  }
+}
+```
+
+The service holds **exactly one** `on open`; inbound frames arrive at the agent
+that owns the connection as ordinary typed messages. On the **bundle** target the
+connection is a `TestConnection` — a capture-and-inspect channel that records every
+frame sent — so a WebSocket service is fully developable and testable with no
+Durable Object. The **Workers** Durable Object hibernatable mapping is a later
+increment of the
+[real-time track](https://github.com/accuser/bynk/blob/main/design/tracks/websocket.md).
 
 ## The JSON codec
 

@@ -276,6 +276,10 @@ pub fn emit_worker_compose(
                     emit_queue_wrapper(&mut out, sname, queue_idx, h);
                     queue_idx += 1;
                 }
+                HandlerKind::Open => {
+                    let seam = bynk_check::actors::bearer_seam_for(h, &table.actors);
+                    emit_websocket_upgrade(&mut out, sname, h, seam.as_ref());
+                }
             }
         }
     }
@@ -403,6 +407,33 @@ fn emit_queue_wrapper(out: &mut String, sname: &str, queue_idx: usize, h: &Handl
         "      return handlers.{sname}.{method_key}({}{}deps);",
         param_args.join(", "),
         if param_args.is_empty() { "" } else { ", " },
+    );
+    let _ = writeln!(out, "    }},");
+}
+
+/// v0.103 (real-time track slice 3): emit the WebSocket upgrade route. The
+/// upgrade authenticates the actor at the edge (the Bearer seam reads the token
+/// from the `Sec-WebSocket-Protocol` subprotocol, D-B), creates a
+/// `WebSocketPair`, accepts the server socket, and invokes the `on open`
+/// surface method with a `Connection` wrapping it — then returns the `101`. Full
+/// hibernatable-Durable-Object mapping (Q7) is layered on in the platform binding.
+fn emit_websocket_upgrade(
+    out: &mut String,
+    sname: &str,
+    _h: &Handler,
+    _seam: Option<&bynk_check::actors::BearerSeam>,
+) {
+    // Implemented in stages; the route shape is wired here so the surface and
+    // entry compose. The connection-bearing body is emitted with the runtime
+    // `WorkersConnection` (Task 16); for now the route is a structural
+    // placeholder that keeps the entry valid TypeScript.
+    let _ = writeln!(
+        out,
+        "    async ws_{sname}_open(_request: Request): Promise<Response> {{"
+    );
+    let _ = writeln!(
+        out,
+        "      return new Response(\"WebSocket upgrade not yet available\", {{ status: 503 }});"
     );
     let _ = writeln!(out, "    }},");
 }

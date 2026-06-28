@@ -6,7 +6,7 @@
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](../troubleshooting/index.md).
 
-There are **318** codes in total.
+There are **321** codes in total.
 
 ## Agents
 
@@ -225,6 +225,7 @@ There are **318** codes in total.
 | `bynk.store.unknown_op` | A storage-`Map`/`Set` operation is not a recognised entry/membership method. |  |
 | `bynk.target.vendor_conflict` | One deployment unit's in-process closure uses platform-native capabilities from two mutually-exclusive platforms. | [`consumes_decl`](grammar.md#rule-consumes_decl) |
 | `bynk.target.vendor_required` | A deployment unit uses a platform-native capability but the build selects another `--platform`. | [`consumes_decl`](grammar.md#rule-consumes_decl) |
+| `bynk.target.websocket_workers_unsupported` | A `from WebSocket` service is built on the Workers target, whose Durable Object hibernatable mapping is not yet available — build on the bundle target (real-time track slice 3a). |  |
 
 ## Parser
 
@@ -364,6 +365,8 @@ There are **318** codes in total.
 | `bynk.service.outside_context` | A `service` was declared outside a context. | [`service_decl`](grammar.md#rule-service_decl) |
 | `bynk.service.return_not_effect` | A service handler's return type is not an `Effect`. | [`service_decl`](grammar.md#rule-service_decl) |
 | `bynk.service.unknown_protocol` | A `from <protocol>` names an unknown protocol (e.g. a transport like Kafka). | [`service_decl`](grammar.md#rule-service_decl) |
+| `bynk.service.websocket_header` | The `from WebSocket` header is malformed — it binds frame types as `WebSocket(in: <type>, out: <type>)` (real-time track slice 3). |  |
+| `bynk.service.websocket_open_arity` | A `from WebSocket` service must hold exactly one `on open` handler — the edge upgrade; inbound frames arrive at the agent as typed messages (real-time track slice 3). |  |
 
 ## Tests
 

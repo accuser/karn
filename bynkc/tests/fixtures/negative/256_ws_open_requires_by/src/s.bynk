@@ -1,0 +1,9 @@
+context s
+type ServerFrame = { text: String }
+type ClientFrame = { text: String }
+service Gw from WebSocket(in: ClientFrame, out: ServerFrame) {
+  on open () -> Effect[()] {
+    let _ <- connection.close()
+    ()
+  }
+}

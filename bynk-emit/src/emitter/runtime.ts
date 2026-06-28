@@ -730,3 +730,22 @@ export interface Connection<F> {
   send(frame: F): Promise<void>;
   close(): Promise<void>;
 }
+
+// v0.103: the bundle/test realisation of a `Connection[F]` — a capture-and-inspect
+// channel. The runtime-managed lifecycle in production becomes an inspectable
+// record in tests (design notes §20): `sent` holds every frame `send`-given, and
+// `closed` records disposal. A test drives an `on open` handler with a
+// `TestConnection` and asserts what the agent sent.
+export class TestConnection<F> implements Connection<F> {
+  readonly sent: F[] = [];
+  closed = false;
+
+  async send(frame: F): Promise<void> {
+    if (this.closed) throw new Error("send on a closed TestConnection");
+    this.sent.push(frame);
+  }
+
+  async close(): Promise<void> {
+    this.closed = true;
+  }
+}
