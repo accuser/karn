@@ -1,0 +1,275 @@
+//! The Bynk compiler as a wasm module for the in-browser REPL/playground (the
+//! in-browser track, slice 3 — ADR 0139).
+//!
+//! One entry — [`bynk_compile`] (wasm) / [`compile`] (native) — takes an in-memory
+//! Bynk source and returns a runnable **JavaScript module graph** plus diagnostics,
+//! with **no filesystem and no `tsc`**:
+//!
+//! ```text
+//! source ─▶ bynk_emit::compile_in_memory (Bundle / Browser)  ─▶ ProjectOutput (TS)
+//!        ─▶ bynk_strip::strip_project_to_js                   ─▶ ProjectOutput (JS)
+//!        ─▶ { files: [{ path, contents }], diagnostics }
+//! ```
+//!
+//! The pipeline reuses the on-disk path wholesale (first-party injection, the
+//! per-platform binding, the strip-only emitter), so the returned graph is the
+//! complete set the browser links: the user module, `runtime.js`, the
+//! `bynk-browser.js` binding, and `compose.js`. The crate compiles to `wasm32`
+//! (the `cdylib`); the same logic is exercised natively (the `rlib`) by the
+//! slice-3 tests, with the browser harness deferred to the REPL shell (slice 4).
+
+use std::collections::HashMap;
+use std::path::PathBuf;
+
+use bynk_check::firstparty::Platform;
+use bynk_emit::project::{AttributedError, BuildTarget, compile_in_memory};
+use bynk_syntax::CompileError;
+
+/// One emitted JavaScript module of the compiled program.
+#[derive(serde::Serialize)]
+pub struct EmittedFile {
+    /// Output-relative path (e.g. `main.js`, `runtime.js`, `bynk-browser.js`).
+    pub path: String,
+    /// The JavaScript source.
+    pub contents: String,
+}
+
+/// A diagnostic flattened for the JS side, with a 1-indexed line/column.
+#[derive(serde::Serialize)]
+pub struct Diagnostic {
+    /// The source module the diagnostic belongs to, if attributable.
+    pub path: Option<String>,
+    pub line: usize,
+    pub col: usize,
+    /// `"error"` or `"warning"`.
+    pub severity: String,
+    /// The stable diagnostic category (e.g. `bynk.parse.expected_token`).
+    pub category: String,
+    pub message: String,
+}
+
+/// The outcome of compiling one in-memory source.
+#[derive(serde::Serialize)]
+pub struct CompileResult {
+    /// Whether a runnable JavaScript graph was produced.
+    pub ok: bool,
+    /// The runnable JS module graph (empty on failure).
+    pub files: Vec<EmittedFile>,
+    /// Errors on failure, or non-failing warnings on success.
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+fn severity_str(err: &CompileError) -> &'static str {
+    match bynk_syntax::Severity::for_error(err) {
+        bynk_syntax::Severity::Error => "error",
+        bynk_syntax::Severity::Warning => "warning",
+    }
+}
+
+/// Flatten attributed errors to [`Diagnostic`]s, resolving line/col against the
+/// owning source where known (`sources`), else the user source (`fallback`).
+fn to_diagnostics(
+    errs: Vec<AttributedError>,
+    sources: &HashMap<PathBuf, String>,
+    fallback: &str,
+) -> Vec<Diagnostic> {
+    errs.into_iter()
+        .map(|a| {
+            let src = a
+                .source_path
+                .as_ref()
+                .and_then(|p| sources.get(p))
+                .map(String::as_str)
+                .unwrap_or(fallback);
+            let (line, col) = bynk_syntax::span::line_col(src, a.error.span.start);
+            Diagnostic {
+                path: a
+                    .source_path
+                    .as_ref()
+                    .map(|p| p.to_string_lossy().into_owned()),
+                line,
+                col,
+                severity: severity_str(&a.error).to_string(),
+                category: a.error.category.to_string(),
+                message: a.error.message.clone(),
+            }
+        })
+        .collect()
+}
+
+/// Compile a single in-memory Bynk source to a JavaScript module graph for the
+/// given platform (the playground passes [`Platform::Browser`]). Pure: no
+/// filesystem, no `tsc`. The in-process `Bundle` subset only; programs that reach
+/// Workers/Cloudflare-only shapes are reported as diagnostics (slice-2 platform
+/// lock), never silently mis-compiled.
+pub fn compile(source: &str, platform: Platform) -> CompileResult {
+    match compile_in_memory(source, BuildTarget::Bundle, platform) {
+        Ok(out) => match bynk_strip::strip_project_to_js(out) {
+            Ok(js) => {
+                // The user program is the single in-memory source, so warnings
+                // resolve their line/col against it (the fallback).
+                let diagnostics = to_diagnostics(js.warnings, &HashMap::new(), source);
+                let files = js
+                    .files
+                    .into_iter()
+                    .map(|f| EmittedFile {
+                        path: f.output_path.to_string_lossy().into_owned(),
+                        contents: f.typescript,
+                    })
+                    .collect();
+                CompileResult {
+                    ok: true,
+                    files,
+                    diagnostics,
+                }
+            }
+            // The emitter is strip-only (ADR 0136), so this is unreachable for a
+            // successful compile — surfaced as a diagnostic rather than a panic.
+            Err(e) => CompileResult {
+                ok: false,
+                files: Vec::new(),
+                diagnostics: vec![Diagnostic {
+                    path: None,
+                    line: 0,
+                    col: 0,
+                    severity: "error".to_string(),
+                    category: "bynk.wasm.strip_failed".to_string(),
+                    message: e.to_string(),
+                }],
+            },
+        },
+        Err(failure) => {
+            let sources: HashMap<PathBuf, String> = failure.snapshots.iter().cloned().collect();
+            CompileResult {
+                ok: false,
+                files: Vec::new(),
+                diagnostics: to_diagnostics(failure.errors, &sources, source),
+            }
+        }
+    }
+}
+
+/// Compile to a JSON string — the wasm boundary representation of [`CompileResult`].
+pub fn compile_to_json(source: &str, platform: Platform) -> String {
+    serde_json::to_string(&compile(source, platform)).unwrap_or_else(|e| {
+        format!(
+            "{{\"ok\":false,\"files\":[],\"diagnostics\":[{{\"path\":null,\"line\":0,\"col\":0,\
+             \"severity\":\"error\",\"category\":\"bynk.wasm.serialize_failed\",\"message\":{:?}}}]}}",
+            e.to_string()
+        )
+    })
+}
+
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::wasm_bindgen;
+
+/// The wasm entry point: compile an in-memory Bynk source for the browser
+/// playground, returning a JSON document
+/// `{ ok, files: [{ path, contents }], diagnostics: [{ path, line, col, severity,
+/// category, message }] }`.
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn bynk_compile(source: &str) -> String {
+    compile_to_json(source, Platform::Browser)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PROG: &str = "context app.demo\n\
+        \n\
+        consumes bynk { Clock, Logger }\n\
+        \n\
+        service demo {\n\
+        \x20 on call() -> Effect[Instant] given Clock, Logger {\n\
+        \x20   let _ <- Logger.info(\"hi\")\n\
+        \x20   let now <- Clock.now()\n\
+        \x20   now\n\
+        \x20 }\n\
+        }\n";
+
+    #[test]
+    fn compiles_browser_program_to_js_graph() {
+        let r = compile(PROG, Platform::Browser);
+        assert!(
+            r.ok,
+            "should compile: {:?}",
+            r.diagnostics.first().map(|d| &d.message)
+        );
+        // The full runnable graph: user module + runtime + browser binding + compose.
+        let paths: Vec<&str> = r.files.iter().map(|f| f.path.as_str()).collect();
+        assert!(
+            paths.iter().all(|p| p.ends_with(".js")),
+            "all JS: {paths:?}"
+        );
+        assert!(
+            paths.contains(&"runtime.js"),
+            "runtime.js present: {paths:?}"
+        );
+        assert!(
+            paths.contains(&"bynk-browser.js"),
+            "browser binding present: {paths:?}"
+        );
+        // No residual TypeScript type syntax survived the strip.
+        let user = r
+            .files
+            .iter()
+            .find(|f| f.path == "app/demo.js")
+            .expect("user module");
+        assert!(
+            !user.contents.contains(": Promise<"),
+            "annotations stripped:\n{}",
+            user.contents
+        );
+    }
+
+    #[test]
+    fn surfaces_diagnostics_for_a_bad_program() {
+        let r = compile("context app.demo\n\nthis is not bynk\n", Platform::Browser);
+        assert!(!r.ok);
+        assert!(r.files.is_empty());
+        assert!(!r.diagnostics.is_empty());
+        assert!(r.diagnostics.iter().all(|d| d.severity == "error"));
+        // Line/col point into the user source.
+        assert!(r.diagnostics.iter().any(|d| d.line >= 1));
+    }
+
+    #[test]
+    fn cloudflare_shapes_are_rejected_in_the_browser() {
+        // The slice-2 platform lock fires through the in-memory path too.
+        let prog = "context cache.store\n\
+            \n\
+            consumes bynk.cloudflare { Kv }\n\
+            \n\
+            service cache {\n\
+            \x20 on call(k: String) -> Effect[Option[String]] given Kv {\n\
+            \x20   let v <- Kv.get(k)\n\
+            \x20   v\n\
+            \x20 }\n\
+            }\n";
+        let r = compile(prog, Platform::Browser);
+        assert!(
+            !r.ok,
+            "a cloudflare-only program must not compile for the browser"
+        );
+        assert!(
+            r.diagnostics
+                .iter()
+                .any(|d| d.category == "bynk.target.vendor_required"),
+            "expected the platform lock: {:?}",
+            r.diagnostics
+                .iter()
+                .map(|d| &d.category)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn compile_to_json_is_valid_json() {
+        let json = compile_to_json(PROG, Platform::Browser);
+        let v: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        assert_eq!(v["ok"], true);
+        assert!(v["files"].as_array().is_some_and(|a| !a.is_empty()));
+    }
+}

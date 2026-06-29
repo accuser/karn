@@ -9,6 +9,10 @@ repository.workspace = true
 homepage.workspace = true
 
 [dependencies]
+# The emitter's output types (`ProjectOutput`/`CompiledFile`) — `strip_project_to_js`
+# rewrites a compiled project to a JS artefact. No cycle: `bynk-emit` does not depend
+# on `bynk-strip`, so the LSP (via `bynk-ide` → `bynk-emit`) never pulls oxc.
+bynk-emit.workspace = true
 # A pure-Rust TS parser + type-erasing transform + codegen — no Node/tsc in the
 # loop and wasm-safe (the wasm toolchain slice compiles this path to wasm32).
 oxc = { version = "0.137", features = ["semantic", "transformer", "codegen"] }

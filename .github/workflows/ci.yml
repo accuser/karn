@@ -202,6 +202,24 @@ jobs:
       - name: Check on MSRV toolchain
         run: cargo check --workspace --locked
 
+  wasm:
+    # In-browser track (slice 3): the `syntax → check → emit` pipeline plus the
+    # TS→JS strip compile to wasm32 for the playground (`bynk-wasm`). This is a
+    # build-gate — it proves the compiler still compiles for the browser target;
+    # executing the wasm in a browser/node harness lands with the REPL shell.
+    name: wasm32 build (bynk-wasm)
+    needs: changes
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.all == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: dtolnay/rust-toolchain@e081816240890017053eacbb1bdf337761dc5582 # 1.95.0
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - name: Build bynk-wasm for wasm32
+        run: cargo build --locked --target wasm32-unknown-unknown -p bynk-wasm
+
   docs:
     # Gated on `rust` as well as `docs`: the book is rendered through the three
     # in-house mdBook preprocessors (Rust), so a Rust change can change output.

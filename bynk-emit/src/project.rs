@@ -326,7 +326,7 @@ impl CompileOptions {
 pub fn compile_project(options: &CompileOptions) -> Result<ProjectOutput, ProjectFailure> {
     let (src_root, tests_root) = options.roots.resolve();
     let tests_prefix = options.roots.tests_prefix();
-    match run_checks(
+    let run = run_checks(
         &src_root,
         &tests_root,
         &tests_prefix,
@@ -335,7 +335,82 @@ pub fn compile_project(options: &CompileOptions) -> Result<ProjectOutput, Projec
         options.import_ext,
         Mode::Build,
         &HashMap::new(),
-    ) {
+        None,
+    );
+    finish_build(run, options.import_ext)
+}
+
+/// Compile a single **in-memory** Bynk source through the full project pipeline —
+/// no filesystem access (in-browser track, slice 3). The source is the in-process
+/// `Bundle` subset that `consumes bynk`; first-party injection and the per-platform
+/// binding emission run exactly as for an on-disk build, so the returned
+/// [`ProjectOutput`] is the complete module graph (the user unit + `runtime.ts` +
+/// the `bynk-<platform>.ts` binding + `compose.ts`). The wasm entry point pairs
+/// this with `bynk-strip` to produce JavaScript for the playground.
+///
+/// The module's logical path is **derived from its declared unit name** (a context
+/// `app.demo` ⇒ `app/demo.bynk`), so the name↔path alignment check passes without
+/// real files; a source that does not parse falls back to `main.bynk` and the parse
+/// error is reported normally.
+pub fn compile_in_memory(
+    source: &str,
+    target: BuildTarget,
+    platform: Platform,
+) -> Result<ProjectOutput, ProjectFailure> {
+    // A single-tree (`src_root == tests_root`) virtual project rooted at `.`: the
+    // one source file is supplied directly and its text layered in via the
+    // overlay, so discovery and every other disk read are bypassed.
+    let root = PathBuf::from(".");
+    let path = in_memory_logical_path(source);
+    let mut overlay = HashMap::new();
+    overlay.insert(path.clone(), source.to_string());
+    let run = run_checks(
+        &root,
+        &root,
+        &root,
+        target,
+        platform,
+        ImportExt::Js,
+        Mode::Build,
+        &overlay,
+        Some((vec![path], Vec::new())),
+    );
+    finish_build(run, ImportExt::Js)
+}
+
+/// Derive the conventional single-file path for an in-memory source from its
+/// declared unit name (`app.demo` ⇒ `app/demo.bynk`), so `check_path_name_alignment`
+/// is satisfied without a real file tree. Falls back to `main.bynk` when the source
+/// does not parse — `run_checks` then re-parses and reports the error against it.
+fn in_memory_logical_path(source: &str) -> PathBuf {
+    let parts: Option<Vec<String>> = lexer::tokenize(source)
+        .ok()
+        .and_then(|tokens| parser::parse_unit(&tokens, source).ok())
+        .map(|unit| {
+            let name = match &unit {
+                SourceUnit::Commons(c) => &c.name,
+                SourceUnit::Context(c) => &c.name,
+                SourceUnit::Adapter(a) => &a.name,
+                SourceUnit::Test(t) => &t.target,
+                SourceUnit::Integration(i) => &i.name,
+            };
+            name.parts.iter().map(|i| i.name.clone()).collect()
+        });
+    match parts {
+        Some(p) if !p.is_empty() => {
+            let mut path = PathBuf::from(p.join("/"));
+            path.set_extension("bynk");
+            path
+        }
+        _ => PathBuf::from("main.bynk"),
+    }
+}
+
+/// Assemble a finished [`ProjectOutput`] (or a [`ProjectFailure`]) from a
+/// [`RunChecks`] result — the shared tail of `compile_project` and
+/// `compile_in_memory`.
+fn finish_build(run: RunChecks, import_ext: ImportExt) -> Result<ProjectOutput, ProjectFailure> {
+    match run {
         RunChecks::Bailed {
             errors, snapshots, ..
         } => Err(ProjectFailure {
@@ -381,7 +456,7 @@ pub fn compile_project(options: &CompileOptions) -> Result<ProjectOutput, Projec
                 adapter_bindings,
                 npm_deps,
                 target,
-                options.import_ext,
+                import_ext,
             );
             // ADR 0117: surface non-failing warnings on the successful build
             // (errors is empty here — the guard arm above caught any).
@@ -404,6 +479,7 @@ pub fn analyse_project(root: &Path, overlay: &HashMap<PathBuf, String>) -> Proje
         ImportExt::Js,
         Mode::Analyse,
         overlay,
+        None,
     ) {
         RunChecks::Bailed {
             errors,
@@ -2442,6 +2518,12 @@ fn run_checks(
     import_ext: ImportExt,
     mode: Mode,
     overlay: &HashMap<PathBuf, String>,
+    // v0.108 (in-browser track, slice 3): when `Some`, the source files are
+    // supplied directly — `(src_files, tests_files)` — and filesystem discovery
+    // is skipped. The wasm/REPL entry feeds an in-memory single-module project
+    // this way (the source itself rides in `overlay`); `None` keeps the on-disk
+    // discovery walk for the CLI and the LSP.
+    discovered: Option<(Vec<PathBuf>, Vec<PathBuf>)>,
 ) -> RunChecks {
     let mut errors = ErrorSink::new();
     // v0.25 (ADR 0053): binding edges, recorded at the resolution sites and
@@ -2461,9 +2543,10 @@ fn run_checks(
     let mut snapshots: Vec<(PathBuf, String)> = Vec::new();
     let split_mode = src_root != tests_root;
 
-    // -- 1. Discovery. --
-    let (src_files, tests_files) =
-        match phase_discovery(src_root, tests_root, split_mode, &mut errors) {
+    // -- 1. Discovery (skipped when sources are supplied in memory). --
+    let (src_files, tests_files) = match discovered {
+        Some(files) => files,
+        None => match phase_discovery(src_root, tests_root, split_mode, &mut errors) {
             Ok(files) => files,
             Err(()) => {
                 return RunChecks::Bailed {
@@ -2475,7 +2558,8 @@ fn run_checks(
                     requirements,
                 };
             }
-        };
+        },
+    };
 
     // -- 2. Parse every file. --
     let (parsed, consumes_bynk, consumes_cloudflare) = match phase_parse(

@@ -103,6 +103,48 @@ pub fn strip_types(source: &str, filename: &str) -> Result<String, StripError> {
     Ok(Codegen::new().build(&program).code)
 }
 
+/// Rewrite a compiled [`ProjectOutput`](bynk_emit::project::ProjectOutput) from
+/// TypeScript into a JavaScript artefact (the in-browser track's first-class JS
+/// output — ADR 0137). The emitter always produces TypeScript; a JS artefact is
+/// that same output with types stripped, which is total because the emitter is
+/// strip-only (ADR 0136).
+///
+/// Every `.ts` module is type-stripped and renamed to `.js`; the `tsconfig.json`
+/// is dropped (a TypeScript-compiler config with no role for a JS artefact); any
+/// other file (e.g. `wrangler.toml`) passes through unchanged. Source maps and the
+/// debug sidecar are dropped — they map into the `.ts` the JS replaces. Import
+/// specifiers are already `.js` (the default `ImportExt`), so the renamed tree
+/// resolves as-is.
+pub fn strip_project_to_js(
+    out: bynk_emit::project::ProjectOutput,
+) -> Result<bynk_emit::project::ProjectOutput, StripError> {
+    use bynk_emit::project::CompiledFile;
+    let mut files = Vec::with_capacity(out.files.len());
+    for file in out.files {
+        let is_ts = file
+            .output_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| e == "ts");
+        if !is_ts {
+            if file.output_path.file_name().and_then(|n| n.to_str()) == Some("tsconfig.json") {
+                continue;
+            }
+            files.push(file);
+            continue;
+        }
+        let js = strip_types(&file.typescript, &file.output_path.to_string_lossy())?;
+        files.push(CompiledFile {
+            output_path: file.output_path.with_extension("js"),
+            typescript: js,
+            source_map: None,
+            debug_metadata: None,
+            ..file
+        });
+    }
+    Ok(bynk_emit::project::ProjectOutput { files, ..out })
+}
+
 fn join_diagnostics(diags: &[oxc::diagnostics::OxcDiagnostic]) -> String {
     diags
         .iter()
