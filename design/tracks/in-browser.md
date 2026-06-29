@@ -4,7 +4,7 @@
 - **Realises:** `design/bynk-design-notes.md` §18 (Tier-3 platform bindings — "other platforms have their own bindings exposing the same capability surface … the compiler injects the binding at link time based on build target"), §19 ("additional backends … leave the door open in principle"), and the §19 aside that "a REPL is ambitious and probably v2 or v3" — this track is that realisation, front-loaded by enabling slices that pay off independently.
 - **Posture:** Feature track per [ADR 0076](../decisions/0076-feature-track-posture.md). Qualifies on three axes at once: multi-increment (five-plus slices), surface not yet settled (REPL UX, capability exposure), and a **safety boundary** (the REPL executes compiler output in the user's browser).
 - **Deployment target:** `https://playground.bynk-lang.org` — registered, Cloudflare-hosted, not yet serving. A fully static, client-side app (client-side wasm compile, client-side eval): no server compute, so Cloudflare Pages is the natural host. See §3.5.
-- **Proposed front-loaded ADRs:** 0136 (strip-only emission invariant), 0137 (first-class JS artefact), 0138 (the Browser platform), 0139 (the wasm-compiled toolchain), 0140 (the REPL execution & sandbox model). Numbers provisional; last landed ADR is 0135. **Cross-track numbering:** the packaging track also drafts in this range (its 0136–0141); the convention (stated in the documentation track) is that this track is implemented first and holds **0136–0140**, packaging renumbers behind it, and the documentation track's deep-link contract sits above at **0144** — which cross-references this track's 0140 (Q7). Final numbers are reassigned at authoring time once the earliest of the three lands.
+- **Front-loaded ADRs (named, not numbered):** the strip-only emission invariant; the first-class JS artefact; the Browser platform; the wasm-compiled toolchain; the REPL execution & sandbox model. Each is created and numbered by the slice that lands it (§6) — this doc deliberately does not pre-allocate numbers, since concurrent tracks would collide. The REPL execution & sandbox ADR also ratifies the read side of the shared deep-link format settled jointly with the documentation track (Q7).
 
 ## 1. Motivation
 
@@ -189,7 +189,7 @@ unique opaque origin and may suffice; (b) defence-in-depth — serve the iframe
 document from a separate hostname (e.g. `sandbox.bynk-lang.org`, a second Pages
 project) so even a sandbox escape lands on a bare origin with nothing on it.
 *Leaning:* (b); a second Pages project is near-free and removes the app origin from
-the blast radius entirely. Decided in ADR 0140.
+the blast radius entirely. Decided in the REPL execution & sandbox ADR.
 
 ## 4. Security and threat model
 
@@ -209,7 +209,7 @@ playground links execute *other people's* Bynk. This is the track's safety bound
   requests from the playground origin invite SSRF/exfil-by-proxy and abuse. **Default
   posture: `Fetch` is withheld** in the public playground binding (calls return a
   capability-unavailable error); an opt-in "advanced/local" mode may enable it, or a
-  same-origin allowlisted proxy. Decided in ADR 0140 / Q2.
+  same-origin allowlisted proxy. Decided in the REPL execution & sandbox ADR / Q2.
 - **Secrets.** The browser binding's `Secrets` provider has no `process.env`. It
   resolves to *unavailable* (not a silent empty), so programs depending on secrets
   fail loudly and educationally rather than appearing to run with blank values.
@@ -244,8 +244,9 @@ playground links execute *other people's* Bynk. This is the track's safety bound
   (slice 4). No server, no backend — it fits the fully-static posture (§3.5). The
   format is deliberately **general-purpose, not docs-only**: it is *the* Bynk
   snippet-share mechanism (examples, bug repros, teaching links), and the
-  documentation track emits exactly these links (its ADR 0144). Settled jointly with
-  that track; ADR 0140 ratifies the read side here. A richer share-id/persistence
+  documentation track emits exactly these links (its deep-link-contract ADR). Settled
+  jointly with that track; the REPL execution & sandbox ADR ratifies the read side
+  here. A richer share-id/persistence
   service is a slice-5 *upgrade*, not a prerequisite — the hash form stands alone.
 
 ## 6. Slice decomposition (ordered)
@@ -255,21 +256,22 @@ merging the proposal authorises the build. The first three slices stand on their
 
 - **Slice 0 — strip-only invariant.** De-sugar the parameter property
   (`emit.rs:685`) unconditionally; add the "all emitted TS is strip-removable"
-  regression test; fix the `test --inspect` strip-only path. Lands ADR 0136.
-  Smallest, lowest-risk, value independent of everything below.
+  regression test; fix the `test --inspect` strip-only path. Lands the strip-only
+  emission invariant ADR. Smallest, lowest-risk, value independent of everything below.
 - **Slice 1 — first-class JS artefact.** `bynkc compile --emit js` via emit-then-strip
-  (Q1). Lands ADR 0137.
+  (Q1). Lands the first-class JS artefact ADR.
 - **Slice 2 — the Browser platform.** `Platform::Browser`,
   `bynk-check/src/firstparty/bindings/bynk-browser.ts`
   (Clock/Random/Logger over Web APIs; Fetch per Q2; Secrets withheld),
-  `--platform browser`, platform-lock wiring; `Bundle` topology only. Lands ADR 0138.
+  `--platform browser`, platform-lock wiring; `Bundle` topology only. Lands the
+  Browser platform ADR.
 - **Slice 3 — the wasm toolchain.** Decouple project discovery from `std::fs` (the
   in-memory project seam); `wasm-bindgen` `bynk_compile` entry returning `{ js,
-  diagnostics }`; size budget per Q3. Lands ADR 0139.
+  diagnostics }`; size budget per Q3. Lands the wasm-compiled toolchain ADR.
 - **Slice 4 — the REPL shell.** Web UI, the iframe+Worker sandbox, wasm-compile →
   link → eval, diagnostics surfacing, the platform-lock "unsupported-in-browser"
   path, **and decoding source from the URL hash on load** (the shared snippet/deep-link
-  format — see Q7). Lands ADR 0140 (the safety boundary). The hash *read* side is
+  format — see Q7). Lands the REPL execution & sandbox ADR (the safety boundary). The hash *read* side is
   cheap and lands here, not slice 5, because the docs track emits these links before
   the playground is otherwise feature-complete.
 - **Slice 5 — playground polish (deferred/optional).** A richer share-id/persistence
