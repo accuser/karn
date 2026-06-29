@@ -5,8 +5,13 @@ import { Ok, Err, type Result } from "./runtime.js";
 
 export class JoseJwt implements Jwt {
   // v0.18 ([M]/[N]): the signing secret is a capability dependency, not an
-  // operation parameter — compose passes { Secrets } by name.
-  constructor(private deps: { Secrets: Secrets }) {}
+  // operation parameter — compose passes { Secrets } by name. Declared field +
+  // assigning constructor (not a parameter property), so the binding strips
+  // cleanly under Node `--experimental-strip-types` (the strip-only invariant).
+  private deps: { Secrets: Secrets };
+  constructor(deps: { Secrets: Secrets }) {
+    this.deps = deps;
+  }
 
   async sign(claims: Claims): Promise<string> {
     const secret = await this.secret();

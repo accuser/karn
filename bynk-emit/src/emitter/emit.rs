@@ -682,7 +682,22 @@ pub(crate) fn emit_provider(
             .map(|c| format!("{}: {}", c.key(), cap_ref_ty(c, &ctx.cross_context)))
             .collect::<Vec<_>>()
             .join("; ");
-        writeln!(out, "  constructor(private deps: {{ {deps_ty} }}) {{}}").unwrap();
+        // The field is declared separately and assigned in the constructor body
+        // rather than written as a parameter property (`constructor(private deps:
+        // …)`). A parameter property is the one type-directed construct pure
+        // type-stripping cannot erase — Node's `--experimental-strip-types` throws
+        // `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX` on it — so this de-sugared form keeps
+        // the emitter's whole surface strip-removable (the strip-only emission
+        // invariant, ADR 0136). The field stays typed for the `tsc`/strict path,
+        // and under ES2022 `useDefineForClassFields` the declaration defines
+        // `this.deps` before the body assigns the real value; the end state is
+        // correct and strips to `constructor(deps) { this.deps = deps; }`.
+        writeln!(out, "  private deps: {{ {deps_ty} }};").unwrap();
+        writeln!(
+            out,
+            "  constructor(deps: {{ {deps_ty} }}) {{ this.deps = deps; }}"
+        )
+        .unwrap();
     }
     for op in &p.ops {
         let params: Vec<String> = op

@@ -6,8 +6,13 @@ import { Ok, Err, None, Some, type Result } from "./runtime.js";
 
 export class FetchWeather implements Weather {
   // v0.18 ([M]/[N]): outbound IO and the API key are capability
-  // dependencies (bynk.Fetch / bynk.Secrets), not raw fetch + params.
-  constructor(private deps: { Fetch: Fetch; Secrets: Secrets }) {}
+  // dependencies (bynk.Fetch / bynk.Secrets), not raw fetch + params. Declared
+  // field + assigning constructor (not a parameter property), so the binding
+  // strips cleanly under Node `--experimental-strip-types`.
+  private deps: { Fetch: Fetch; Secrets: Secrets };
+  constructor(deps: { Fetch: Fetch; Secrets: Secrets }) {
+    this.deps = deps;
+  }
 
   async current(city: string): Promise<Result<Report, WeatherError>> {
     const key = await this.deps.Secrets.get("WEATHER_API_KEY");

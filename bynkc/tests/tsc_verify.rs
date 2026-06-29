@@ -20,6 +20,20 @@ use std::process::{Command, Stdio};
 
 const REQUIRE_ENV: &str = "BYNK_REQUIRE_TSC";
 
+/// Whether the local `node` exists and is recent enough to be worth invoking for
+/// a strip check. The committed `strip_check.mjs` harness performs the precise
+/// API gate (`stripTypeScriptTypes`, Node ≥ 22.13) and exits 2 when it is
+/// unavailable; this coarse check just avoids spawning an ancient/absent Node.
+fn node_present() -> bool {
+    Command::new("node")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
 #[derive(Clone)]
 struct TscRunner {
     program: String,
@@ -420,4 +434,123 @@ fn embedded_runtime_strips_types_under_node() {
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr),
     );
+}
+
+/// In-browser track, slice 0 — the **strip-only emission invariant** (ADR 0136):
+/// *every* `.ts` bynkc emits must be erasable by pure type-stripping, not just the
+/// embedded `runtime.ts` covered above. Node runs emitted `.ts` directly under
+/// `--experimental-strip-types` on the `--inspect` debug path (and the in-browser
+/// eval this track is built toward), which rejects non-erasable TS — parameter
+/// properties, `enum`, `namespace`. `tsc` accepts all of those, so
+/// `emitted_typescript_passes_tsc_strict` cannot catch them; this test is the
+/// guard that makes the invariant load-bearing across the whole emitted surface:
+/// the de-sugared provider `given` constructor (`emit.rs`), the first-party
+/// bindings (`bynk-{cloudflare,node}.ts`, `cloudflare.binding.ts`), the emitted
+/// test scaffolding, and any user binding copied into a fixture.
+///
+/// Every project-form positive fixture is compiled and its emitted output staged
+/// into one temp root; then each `.ts` is checked with `node
+/// --experimental-strip-types --check`. Node-spawn dominates, so the per-file
+/// checks fan out across worker threads.
+#[test]
+fn all_emitted_typescript_strips_under_node() {
+    if !node_present() {
+        eprintln!(
+            "\n!!! NODE STRIP-TYPES CHECK SKIPPED (all emitted output) !!!\n\
+             `node` is not on PATH.\n"
+        );
+        return;
+    }
+
+    let dirs = fixture_dirs("positive");
+    assert!(!dirs.is_empty(), "no positive fixtures found");
+
+    let root = std::env::temp_dir().join(format!("bynk-strip-verify-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).expect("create strip-verify temp root");
+
+    let mut staged: Vec<String> = Vec::new();
+    let mut failures: Vec<String> = Vec::new();
+    for dir in &dirs {
+        let src_dir = dir.join("src");
+        // Only project-form fixtures emit a complete module graph (their own
+        // runtime.ts, bindings, test scaffolding) — the surface the invariant
+        // governs. Single-file fixtures emit one bare .ts and are covered by the
+        // emitter unit tests.
+        if !src_dir.is_dir() {
+            continue;
+        }
+        let name = dir
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("fixture")
+            .to_string();
+        let target = fixture_target(dir);
+        match compile_fixture(dir, target) {
+            Ok(out) => {
+                let fixture_root = root.join(&name);
+                if let Err(e) = write_outputs(&out, &fixture_root) {
+                    failures.push(format!(
+                        "\n=== {} ===\nfailed to write emitted output: {e}",
+                        dir.display()
+                    ));
+                } else {
+                    staged.push(name);
+                }
+            }
+            Err(errors) => failures.push(format!(
+                "\n=== {} ===\nexpected compile success but got errors:\n{}",
+                dir.display(),
+                bynkc::render_project_errors(&errors),
+            )),
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "staging for strip verification failed:\n{}",
+        failures.join("\n")
+    );
+    assert!(
+        !staged.is_empty(),
+        "no project-form positive fixtures were staged for strip verification"
+    );
+
+    // One Node process strips the whole staged tree (see strip_check.mjs).
+    let harness = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("support")
+        .join("strip_check.mjs");
+    let out = Command::new("node")
+        .arg("--no-warnings")
+        .arg(&harness)
+        .arg(&root)
+        .output()
+        .expect("run strip_check.mjs");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+
+    match out.status.code() {
+        Some(0) => {
+            let _ = fs::remove_dir_all(&root);
+        }
+        // `stripTypeScriptTypes` unavailable (Node < 22.13): skip loudly, like the
+        // `tsc`-presence and runtime strip gates above.
+        Some(2) => {
+            eprintln!(
+                "\n!!! NODE STRIP-TYPES CHECK SKIPPED (all emitted output) !!!\n\
+                 {}\n",
+                stderr.trim()
+            );
+            let _ = fs::remove_dir_all(&root);
+        }
+        _ => panic!(
+            "emitted TypeScript is not strip-removable — a non-erasable construct (a constructor \
+             parameter property, `enum`, or `namespace`) breaks both `--inspect` debug sessions \
+             and the in-browser eval path. De-sugar it in the emitter (e.g. a declared field + \
+             assigning constructor instead of a parameter property).\nFAIL <file> <code> \
+             <reason>:\n{}\n{}",
+            stdout.trim(),
+            stderr.trim(),
+        ),
+    }
 }

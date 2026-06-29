@@ -12,7 +12,8 @@ export interface Stamp {
 export const StampToken: unique symbol = Symbol("Stamp");
 
 export class ClockStamp implements Stamp {
-  constructor(private deps: { Clock: platform_time.Clock }) {}
+  private deps: { Clock: platform_time.Clock };
+  constructor(deps: { Clock: platform_time.Clock }) { this.deps = deps; }
   async make(): Promise<number> {
     const t = await this.deps.Clock.now();
     return t;
