@@ -4,7 +4,7 @@
 - **Realises:** `design/bynk-design-notes.md` §18 (Tier-3 platform bindings — "other platforms have their own bindings exposing the same capability surface … the compiler injects the binding at link time based on build target"), §19 ("additional backends … leave the door open in principle"), and the §19 aside that "a REPL is ambitious and probably v2 or v3" — this track is that realisation, front-loaded by enabling slices that pay off independently.
 - **Posture:** Feature track per [ADR 0076](../decisions/0076-feature-track-posture.md). Qualifies on three axes at once: multi-increment (five-plus slices), surface not yet settled (REPL UX, capability exposure), and a **safety boundary** (the REPL executes compiler output in the user's browser).
 - **Deployment target:** `https://playground.bynk-lang.org` — registered, Cloudflare-hosted, not yet serving. A fully static, client-side app (client-side wasm compile, client-side eval): no server compute, so Cloudflare Pages is the natural host. See §3.5.
-- **Proposed front-loaded ADRs:** 0136 (strip-only emission invariant), 0137 (first-class JS artefact), 0138 (the Browser platform), 0139 (the wasm-compiled toolchain), 0140 (the REPL execution & sandbox model). Numbers provisional; last landed ADR is 0135.
+- **Proposed front-loaded ADRs:** 0136 (strip-only emission invariant), 0137 (first-class JS artefact), 0138 (the Browser platform), 0139 (the wasm-compiled toolchain), 0140 (the REPL execution & sandbox model). Numbers provisional; last landed ADR is 0135. **Cross-track numbering:** the packaging track also drafts in this range (its 0136–0141); the convention (stated in the documentation track) is that this track is implemented first and holds **0136–0140**, packaging renumbers behind it, and the documentation track's deep-link contract sits above at **0144** — which cross-references this track's 0140 (Q7). Final numbers are reassigned at authoring time once the earliest of the three lands.
 
 ## 1. Motivation
 
@@ -239,6 +239,14 @@ playground links execute *other people's* Bynk. This is the track's safety bound
 - **Q6 — runtime/binding linking in-browser.** Confirm the stripped `runtime.ts` +
   `bynk-browser.ts` compose with emitted JS under a single module graph the iframe
   can import (e.g. via blob-URL ES modules) with no bundler.
+- **Q7 — the snippet-share / deep-link format. [DECISION]** Source is **compressed
+  into the URL *fragment*** (base64/LZ in the `#` hash); the REPL decodes it on load
+  (slice 4). No server, no backend — it fits the fully-static posture (§3.5). The
+  format is deliberately **general-purpose, not docs-only**: it is *the* Bynk
+  snippet-share mechanism (examples, bug repros, teaching links), and the
+  documentation track emits exactly these links (its ADR 0144). Settled jointly with
+  that track; ADR 0140 ratifies the read side here. A richer share-id/persistence
+  service is a slice-5 *upgrade*, not a prerequisite — the hash form stands alone.
 
 ## 6. Slice decomposition (ordered)
 
@@ -260,9 +268,13 @@ merging the proposal authorises the build. The first three slices stand on their
   diagnostics }`; size budget per Q3. Lands ADR 0139.
 - **Slice 4 — the REPL shell.** Web UI, the iframe+Worker sandbox, wasm-compile →
   link → eval, diagnostics surfacing, the platform-lock "unsupported-in-browser"
-  path. Lands ADR 0140 (the safety boundary).
-- **Slice 5 — playground polish (deferred/optional).** Shareable links, an examples
-  gallery, persistence, and LSP-in-browser (Q4). Cut once the base proves out.
+  path, **and decoding source from the URL hash on load** (the shared snippet/deep-link
+  format — see Q7). Lands ADR 0140 (the safety boundary). The hash *read* side is
+  cheap and lands here, not slice 5, because the docs track emits these links before
+  the playground is otherwise feature-complete.
+- **Slice 5 — playground polish (deferred/optional).** A richer share-id/persistence
+  service (the hash form of Q7 already works without it), an examples gallery, and
+  LSP-in-browser (Q4). Cut once the base proves out.
 
 ## 7. Risks
 
