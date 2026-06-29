@@ -25,7 +25,8 @@ export class ConsoleLogger implements Logger {
 export const ConsoleLoggerProvider = { token: LoggerToken, factory: () => new ConsoleLogger() };
 
 export class LoggingStore implements Store {
-  constructor(private deps: { Logger: Logger }) {}
+  private deps: { Logger: Logger };
+  constructor(deps: { Logger: Logger }) { this.deps = deps; }
   async put(key: string): Promise<void> {
     const __r0 = await this.deps.Logger.info("put");
     return undefined;

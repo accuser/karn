@@ -58,8 +58,15 @@ export class FetchProvider implements Fetch {
 
 export class SecretsProvider implements Secrets {
   // Decision [B]: explicit env first, then the `globalThis` probe of
-  // `process.env` — on node the probe is the normal path.
-  constructor(private env?: unknown) {}
+  // `process.env` — on node the probe is the normal path. A declared field +
+  // assigning constructor, not a parameter property: the latter is non-erasable
+  // by pure type-stripping, and this binding runs under Node
+  // `--experimental-strip-types` on the `--inspect` path (the strip-only emission
+  // invariant, ADR 0136).
+  private env?: unknown;
+  constructor(env?: unknown) {
+    this.env = env;
+  }
   async get(name: string): Promise<Option<string>> {
     const fromEnv = (this.env as Record<string, unknown> | undefined)?.[name];
     if (typeof fromEnv === "string") {

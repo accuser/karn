@@ -59,8 +59,13 @@ export class FetchProvider implements Fetch {
 export class SecretsProvider implements Secrets {
   // Decision [B]: explicit env first (workers compose passes it), then a
   // `globalThis` probe of `process.env` (bundle under node) — never bare
-  // `process`, which would demand @types/node at the tsc gate.
-  constructor(private env?: unknown) {}
+  // `process`, which would demand @types/node at the tsc gate. A declared field +
+  // assigning constructor, not a parameter property: the latter is non-erasable
+  // by pure type-stripping (the strip-only emission invariant, ADR 0136).
+  private env?: unknown;
+  constructor(env?: unknown) {
+    this.env = env;
+  }
   async get(name: string): Promise<Option<string>> {
     const fromEnv = (this.env as Record<string, unknown> | undefined)?.[name];
     if (typeof fromEnv === "string") {

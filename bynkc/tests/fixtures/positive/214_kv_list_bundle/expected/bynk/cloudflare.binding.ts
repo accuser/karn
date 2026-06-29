@@ -4,7 +4,15 @@ import type { Kv } from "./cloudflare.js";
 import { None, Some, type KVNamespace, type Option } from "../runtime.js";
 
 export class WorkersKv implements Kv {
-  constructor(private env?: unknown) {}
+  // A declared field + assigning constructor, not a parameter property
+  // (`constructor(private env …)`): a parameter property is non-erasable by pure
+  // type-stripping, so this de-sugared form keeps the binding strip-removable
+  // (the strip-only emission invariant, ADR 0136) — the emitted `.ts` runs
+  // directly under Node `--experimental-strip-types` on the `--inspect` path.
+  private env?: unknown;
+  constructor(env?: unknown) {
+    this.env = env;
+  }
 
   private ns(): KVNamespace {
     const kv = (this.env as { KV?: KVNamespace } | undefined)?.KV;

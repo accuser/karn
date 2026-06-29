@@ -24,7 +24,8 @@ export class ConsoleLogger implements Logger {
 export const ConsoleLoggerProvider = { token: LoggerToken, factory: () => new ConsoleLogger() };
 
 export class PoliteGreeter implements Greeter {
-  constructor(private deps: { Logger: Logger }) {}
+  private deps: { Logger: Logger };
+  constructor(deps: { Logger: Logger }) { this.deps = deps; }
   async greet(): Promise<void> {
     const __r0 = await this.deps.Logger.info("hello");
     return undefined;
