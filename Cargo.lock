@@ -140,8 +140,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4512299f36f043ab09a583e57bceb5a5aab7a73db1805848e8fef3c9e8c78b3"
 
 [[package]]
+name = "bumpalo"
+version = "3.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72f5acc6cb2ba439de613abc23857ec3d78374d8ed5ac84e9d11336e87da8649"
+
+[[package]]
 name = "bynk"
-version = "0.108.2"
+version = "0.108.3"
 dependencies = [
  "bynk-emit",
  "bynk-fmt",
@@ -155,7 +161,7 @@ dependencies = [
 
 [[package]]
 name = "bynk-check"
-version = "0.108.2"
+version = "0.108.3"
 dependencies = [
  "bynk-syntax",
  "regex",
@@ -163,7 +169,7 @@ dependencies = [
 
 [[package]]
 name = "bynk-emit"
-version = "0.108.2"
+version = "0.108.3"
 dependencies = [
  "bynk-check",
  "bynk-syntax",
@@ -171,21 +177,21 @@ dependencies = [
 
 [[package]]
 name = "bynk-fmt"
-version = "0.108.2"
+version = "0.108.3"
 dependencies = [
  "bynk-syntax",
 ]
 
 [[package]]
 name = "bynk-grammar"
-version = "0.108.2"
+version = "0.108.3"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
 name = "bynk-ide"
-version = "0.108.2"
+version = "0.108.3"
 dependencies = [
  "bynk-check",
  "bynk-emit",
@@ -194,7 +200,7 @@ dependencies = [
 
 [[package]]
 name = "bynk-lsp"
-version = "0.108.2"
+version = "0.108.3"
 dependencies = [
  "bynk-check",
  "bynk-fmt",
@@ -212,7 +218,7 @@ dependencies = [
 
 [[package]]
 name = "bynk-render"
-version = "0.108.2"
+version = "0.108.3"
 dependencies = [
  "ariadne",
  "bynk-syntax",
@@ -220,14 +226,15 @@ dependencies = [
 
 [[package]]
 name = "bynk-strip"
-version = "0.108.2"
+version = "0.108.3"
 dependencies = [
+ "bynk-emit",
  "oxc",
 ]
 
 [[package]]
 name = "bynk-syntax"
-version = "0.108.2"
+version = "0.108.3"
 dependencies = [
  "ariadne",
  "logos",
@@ -235,8 +242,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "bynk-wasm"
+version = "0.108.3"
+dependencies = [
+ "bynk-check",
+ "bynk-emit",
+ "bynk-strip",
+ "bynk-syntax",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "bynkc"
-version = "0.108.2"
+version = "0.108.3"
 dependencies = [
  "bynk-check",
  "bynk-emit",
@@ -820,7 +840,7 @@ dependencies = [
 
 [[package]]
 name = "mdbook-bynk-grammar"
-version = "0.108.2"
+version = "0.108.3"
 dependencies = [
  "bynk-grammar",
  "serde_json",
@@ -828,7 +848,7 @@ dependencies = [
 
 [[package]]
 name = "mdbook-bynk-highlight"
-version = "0.108.2"
+version = "0.108.3"
 dependencies = [
  "cc",
  "serde_json",
@@ -838,7 +858,7 @@ dependencies = [
 
 [[package]]
 name = "mdbook-bynk-visuals"
-version = "0.108.2"
+version = "0.108.3"
 dependencies = [
  "serde_json",
 ]
@@ -2099,6 +2119,51 @@ name = "vsimd"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c3082ca00d5a5ef149bb8b555a72ae84c9c59f7250f013ac822ac2e49b19c64"
+
+[[package]]
+name = "wasm-bindgen"
+version = "0.2.126"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b067c0c11094aef6b7a801c1e34a26affafdf3d051dba08456b868789aaf9a4"
+dependencies = [
+ "cfg-if",
+ "once_cell",
+ "rustversion",
+ "wasm-bindgen-macro",
+ "wasm-bindgen-shared",
+]
+
+[[package]]
+name = "wasm-bindgen-macro"
+version = "0.2.126"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "167ce5e579f6bcf889c4f7175a8a5a585de84e8ff93976ce393efa5f2837aab1"
+dependencies = [
+ "quote",
+ "wasm-bindgen-macro-support",
+]
+
+[[package]]
+name = "wasm-bindgen-macro-support"
+version = "0.2.126"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3997c7839262f4ef12cf90b818d6340c18e80f263f1a94bf157d0ec4420380e"
+dependencies = [
+ "bumpalo",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "wasm-bindgen-shared",
+]
+
+[[package]]
+name = "wasm-bindgen-shared"
+version = "0.2.126"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc1b4cb0cc549fcf58d7dfc081778139b3d283a081644e833e84682ad71cea24"
+dependencies = [
+ "unicode-ident",
+]
 
 [[package]]
 name = "which"
