@@ -2,9 +2,10 @@
 title: "`tree-sitter-bynk`"
 ---
 The [tree-sitter](https://tree-sitter.github.io/tree-sitter/) grammar for Bynk.
-It is the source of truth for structural tooling — syntax highlighting (including
-[this book's](/book/contributing/documentation/) code blocks) and any editor that
-speaks tree-sitter.
+It is the source of truth for structural tooling — syntax highlighting (the
+playground's live editor, and any editor that speaks tree-sitter). The static
+documentation site highlights its code blocks separately, via Expressive Code /
+Shiki from the editor's TextMate grammar.
 
 ## Layout
 
@@ -39,13 +40,15 @@ source, a `---` separator, and the expected S-expression parse tree.
 `highlights.scm` maps grammar nodes to standard highlight groups — `@keyword`
 (and `@keyword.declaration`, `.import`, `.modifier`, `.operator`), `@type`,
 `@type.builtin`, `@string`, `@number`, `@comment`, `@function`, `@variable`,
-`@operator`, `@punctuation.*`, and more. The book's highlighting preprocessor
-([`mdbook-bynk-highlight`](/book/contributing/documentation/)) compiles this
-grammar and renders ```` ```bynk ```` blocks through these groups, so doc
-highlighting stays correct as the grammar evolves.
+`@operator`, `@punctuation.*`, and more. These groups drive the editor (VS Code
+via `vscode-bynk`) and the playground's wasm tree-sitter highlighter, so
+interactive highlighting stays correct as the grammar evolves. The static
+documentation site highlights ```` ```bynk ```` blocks separately, via Expressive
+Code / Shiki from the editor's TextMate grammar, so it is not driven by these
+tree-sitter highlight groups.
 
 ## Keeping it in sync
 
 `grammar.js` is regenerated to `src/` via `tree-sitter generate`; commit the
 generated files together with the grammar change so downstream consumers (the
-docs preprocessor, editors) stay consistent.
+editors and the playground's highlighter) stay consistent.

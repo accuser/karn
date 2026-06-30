@@ -2,8 +2,8 @@
 //! Remark plugin: expand the mdBook authoring directives the Bynk Book uses, so
 //! the same source renders under Astro/Starlight (documentation track, slice 2).
 //!
-//! Handled (matching the mdBook preprocessors `mdbook-bynk-grammar` and
-//! `mdbook-bynk-visuals`):
+//! Handled (these directives originated with the now-retired mdBook
+//! preprocessors `mdbook-bynk-grammar` and `mdbook-bynk-visuals`):
 //!   - `{{#grammar <rule>}}`           → an ```ebnf code block from the committed
 //!                                        grammar render (`generated/grammar.json`).
 //!   - `{{#grammar-semantics <rule>}}` → the diagnostics bullet list for a rule

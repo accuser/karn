@@ -16,7 +16,8 @@
 //! inside productions, so the whole reference reads as language, not internals.
 //!
 //! See `bynkc/tests/grammar_reference.rs` (the appendix generator) and
-//! `mdbook-bynk-grammar` (the `{{#grammar <rule>}}` include preprocessor).
+//! `site/src/plugins/remark-bynk-directives.mjs` (the `{{#grammar <rule>}}`
+//! include directive the Book renders with).
 
 use std::error::Error;
 use std::fmt;
@@ -153,7 +154,8 @@ fn render_extra(node: &Value) -> String {
 }
 
 /// Render the complete grammar reference appendix
-/// (`docs/src/reference/grammar-appendix.md`): the generated-file header, the
+/// (`site/src/content/docs/book/reference/grammar-appendix.md`): the
+/// generated-file header, the
 /// notation note, the full `ebnf` block of every production (display names,
 /// trivial wrappers collapsed), and the Tokens & trivia section.
 pub fn render_appendix(grammar_json: &str) -> String {

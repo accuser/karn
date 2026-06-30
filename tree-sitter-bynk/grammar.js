@@ -2,7 +2,7 @@
  * @file Tree-sitter grammar for Bynk.
  *
  * Covers the syntactic surface defined by the normative specification
- * (docs/src/spec/, §3–§4), which is generated from this grammar and kept
+ * (the Book's spec/ section, §3–§4), which is generated from this grammar and kept
  * current per increment. Implements the highlighting / structural shape the
  * editor needs; semantic rules (type checking, exhaustiveness, effect
  * propagation, `given` matching) are intentionally left to the LSP.

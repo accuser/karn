@@ -31,12 +31,12 @@ reference reads as language, not internals.
 ## Consumers
 
 This is an internal build-time crate for the Bynk project — it has no runtime
-purpose in a Bynk program. Its two consumers are:
+purpose in a Bynk program. Its consumers are:
 
 - `bynkc/tests/grammar_reference.rs` — generates the appendix page, blessed
-  against the committed `docs/src/reference/grammar.md`.
-- [`mdbook-bynk-grammar`](https://github.com/accuser/bynk/tree/main/mdbook-bynk-grammar)
-  — the `{{#grammar <rule>}}` include preprocessor for the book.
+  against the committed `site/src/content/docs/book/reference/grammar.md`.
+- `site/src/plugins/remark-bynk-directives.mjs` — the `{{#grammar <rule>}}`
+  include directive the Book renders with.
 
 ## Use
 
