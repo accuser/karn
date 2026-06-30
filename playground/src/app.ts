@@ -5,13 +5,15 @@
 import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { linter, lintGutter, forceLinting } from "@codemirror/lint";
+import type { Diagnostic as CmDiagnostic } from "@codemirror/lint";
 import { bynkHighlighting } from "./highlight";
 import { bynkTreeSitterHighlighting } from "./tshighlight";
 import { encodeSnippet, decodeSnippet } from "./deeplink";
 import { SANDBOX_ORIGIN } from "./shared";
 import type { CompileResult, Diagnostic, RunReply } from "./shared";
 import { EXAMPLES } from "./examples";
-import init, { bynk_compile } from "./vendor/bynk_wasm.js";
+import init, { bynk_compile, bynk_analyze } from "./vendor/bynk_wasm.js";
 
 // The default program when there is no shared snippet in the URL: the first gallery
 // example (Hello, world).
@@ -27,6 +29,33 @@ let view: EditorView;
 // web-tree-sitter once its wasm has loaded (slice 5b).
 const highlightCompartment = new Compartment();
 let sandboxReady = false;
+// The linter no-ops until the wasm compiler has loaded (slice 5d).
+let wasmReady = false;
+
+// A CodeMirror lint source: on each (debounced) change, ask the wasm analyser for
+// diagnostics and render them inline (squiggles + gutter). Non-bailing, so type
+// errors in a context show up live — not only on Run.
+const bynkLinter = linter(
+  (view): CmDiagnostic[] => {
+    if (!wasmReady) return [];
+    const len = view.state.doc.length;
+    let diags: Diagnostic[];
+    try {
+      diags = (JSON.parse(bynk_analyze(view.state.doc.toString())) as { diagnostics: Diagnostic[] }).diagnostics;
+    } catch {
+      return [];
+    }
+    return diags
+      .map((d) => ({
+        from: Math.min(Math.max(d.from, 0), len),
+        to: Math.min(Math.max(d.to, d.from), len),
+        severity: d.severity === "error" ? ("error" as const) : ("warning" as const),
+        message: d.message,
+      }))
+      .filter((d) => d.from <= d.to);
+  },
+  { delay: 300 },
+);
 let runSeq = 0;
 const pending = new Map<number, (r: RunReply) => void>();
 
@@ -110,7 +139,7 @@ async function compileAndRun(): Promise<void> {
   } catch (e) {
     setStatus("compiler error", "error");
     renderDiagnostics([
-      { path: null, line: 0, col: 0, severity: "error", category: "bynk.wasm", message: String(e) },
+      { path: null, line: 0, col: 0, from: 0, to: 0, severity: "error", category: "bynk.wasm", message: String(e) },
     ]);
     return;
   }
@@ -229,6 +258,8 @@ function makeEditor(doc: string): void {
           ...historyKeymap,
         ]),
         highlightCompartment.of(bynkHighlighting()),
+        bynkLinter,
+        lintGutter(),
         EditorView.theme({ "&": { height: "100%" }, ".cm-scroller": { overflow: "auto" } }, { dark: true }),
       ],
     }),
@@ -275,7 +306,10 @@ async function main(): Promise<void> {
   // `import.meta.url`) so esbuild leaves the path alone and the `.wasm` is fetched
   // from the deploy root.
   await init(new URL("bynk_wasm_bg.wasm", location.href));
+  wasmReady = true;
   if (!sandboxReady) setStatus("compiler ready", "ok");
+  // Lint the initial program now that the analyser is loaded.
+  forceLinting(view);
 
   // Upgrade highlighting to web-tree-sitter once its wasm loads; on failure the
   // stream highlighter stays (slice 5b).

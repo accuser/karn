@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use bynk_check::firstparty::Platform;
-use bynk_emit::project::{AttributedError, BuildTarget, compile_in_memory};
+use bynk_emit::project::{AttributedError, BuildTarget, analyse_in_memory, compile_in_memory};
 use bynk_syntax::CompileError;
 
 /// One emitted JavaScript module of the compiled program.
@@ -41,6 +41,9 @@ pub struct Diagnostic {
     pub path: Option<String>,
     pub line: usize,
     pub col: usize,
+    /// Byte offsets of the diagnostic span (for the editor's inline lint range).
+    pub from: usize,
+    pub to: usize,
     /// `"error"` or `"warning"`.
     pub severity: String,
     /// The stable diagnostic category (e.g. `bynk.parse.expected_token`).
@@ -89,6 +92,8 @@ fn to_diagnostics(
                     .map(|p| p.to_string_lossy().into_owned()),
                 line,
                 col,
+                from: a.error.span.start,
+                to: a.error.span.end,
                 severity: severity_str(&a.error).to_string(),
                 category: a.error.category.to_string(),
                 message: a.error.message.clone(),
@@ -132,6 +137,8 @@ pub fn compile(source: &str, platform: Platform) -> CompileResult {
                     path: None,
                     line: 0,
                     col: 0,
+                    from: 0,
+                    to: 0,
                     severity: "error".to_string(),
                     category: "bynk.wasm.strip_failed".to_string(),
                     message: e.to_string(),
@@ -153,15 +160,46 @@ pub fn compile(source: &str, platform: Platform) -> CompileResult {
 pub fn compile_to_json(source: &str, platform: Platform) -> String {
     serde_json::to_string(&compile(source, platform)).unwrap_or_else(|e| {
         format!(
-            "{{\"ok\":false,\"files\":[],\"diagnostics\":[{{\"path\":null,\"line\":0,\"col\":0,\
+            "{{\"ok\":false,\"files\":[],\"diagnostics\":[{{\"path\":null,\"line\":0,\"col\":0,\"from\":0,\"to\":0,\
              \"severity\":\"error\",\"category\":\"bynk.wasm.serialize_failed\",\"message\":{:?}}}]}}",
             e.to_string()
         )
     })
 }
 
+/// The diagnostics of a single in-memory source — non-bailing analysis, no emission
+/// (the editor's live, on-type diagnostics — slice 5d).
+#[derive(serde::Serialize)]
+pub struct AnalyzeResult {
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+/// Analyse a source for diagnostics only (no compile/emit), for the given platform.
+pub fn analyze(source: &str, platform: Platform) -> AnalyzeResult {
+    let errs = analyse_in_memory(source, BuildTarget::Bundle, platform);
+    AnalyzeResult {
+        diagnostics: to_diagnostics(errs, &HashMap::new(), source),
+    }
+}
+
+/// Analyse to a JSON string — `{ diagnostics: [{ from, to, line, col, severity,
+/// category, message }] }`.
+pub fn analyze_to_json(source: &str, platform: Platform) -> String {
+    serde_json::to_string(&analyze(source, platform))
+        .unwrap_or_else(|_| "{\"diagnostics\":[]}".to_string())
+}
+
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
+
+/// The wasm entry point for live editor diagnostics: analyse an in-memory Bynk
+/// source for the browser and return `{ diagnostics: [...] }` (with byte `from`/`to`
+/// spans for inline marking). Non-bailing — all diagnostics at once.
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn bynk_analyze(source: &str) -> String {
+    analyze_to_json(source, Platform::Browser)
+}
 
 /// The wasm entry point: compile an in-memory Bynk source for the browser
 /// playground, returning a JSON document
@@ -271,5 +309,38 @@ mod tests {
         let v: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
         assert_eq!(v["ok"], true);
         assert!(v["files"].as_array().is_some_and(|a| !a.is_empty()));
+    }
+
+    #[test]
+    fn analyze_reports_check_errors_for_a_context() {
+        // A type mismatch in a *context* — returning a String where Int is declared.
+        // The non-bailing analyse must report it (slice 5d's reason to exist: plain
+        // single-source `diagnose` only checks commons, not contexts).
+        let prog = "context app.demo\n\n\
+            consumes bynk { Logger }\n\n\
+            service demo {\n\
+            \x20 on call() -> Effect[Int] given Logger {\n\
+            \x20   let _ <- Logger.info(\"x\")\n\
+            \x20   \"not an int\"\n\
+            \x20 }\n\
+            }\n";
+        let r = analyze(prog, Platform::Browser);
+        assert!(
+            r.diagnostics.iter().any(|d| d.severity == "error"),
+            "a type mismatch should be reported: {:?}",
+            r.diagnostics.iter().map(|d| &d.message).collect::<Vec<_>>()
+        );
+        // A real diagnostic carries a span for inline marking.
+        assert!(r.diagnostics.iter().any(|d| d.to > d.from));
+    }
+
+    #[test]
+    fn analyze_clean_program_has_no_errors() {
+        let r = analyze(PROG, Platform::Browser);
+        assert!(
+            r.diagnostics.iter().all(|d| d.severity != "error"),
+            "clean program should have no errors: {:?}",
+            r.diagnostics.iter().map(|d| &d.message).collect::<Vec<_>>()
+        );
     }
 }

@@ -6,15 +6,14 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
 repo="$(cd "$here/.." && pwd)"
 
-profile="debug"
-cargo_flags=()
+cd "$repo"
 if [[ "${1:-}" == "--release" ]]; then
   profile="release"
-  cargo_flags=(--release)
+  cargo build --target wasm32-unknown-unknown -p bynk-wasm --release
+else
+  profile="debug"
+  cargo build --target wasm32-unknown-unknown -p bynk-wasm
 fi
-
-cd "$repo"
-cargo build --target wasm32-unknown-unknown -p bynk-wasm "${cargo_flags[@]}"
 wasm-bindgen --target web \
   --out-dir "$here/src/vendor" \
   "$repo/target/wasm32-unknown-unknown/$profile/bynk_wasm.wasm"
