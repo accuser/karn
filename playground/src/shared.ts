@@ -21,11 +21,14 @@ export interface EmittedFile {
   contents: string;
 }
 
-/// A compile diagnostic (mirrors the wasm `bynk_compile` JSON shape).
+/// A diagnostic (mirrors the wasm `bynk_compile` / `bynk_analyze` JSON shape).
 export interface Diagnostic {
   path: string | null;
   line: number;
   col: number;
+  /// Byte offsets of the span (for the editor's inline lint range).
+  from: number;
+  to: number;
   severity: "error" | "warning";
   category: string;
   message: string;

@@ -378,6 +378,38 @@ pub fn compile_in_memory(
     finish_build(run, ImportExt::Js)
 }
 
+/// Analyse a single **in-memory** Bynk source and return all diagnostics —
+/// non-bailing, no emission (in-browser track, slice 5d). The editor calls this
+/// on every (debounced) keystroke for live diagnostics: unlike [`compile_in_memory`]
+/// (build mode, which bails at the first failing phase), this runs in `Analyse`
+/// mode, so parse / resolve / check diagnostics are recovered and reported together
+/// — and it works for a `context` (the playground's typical program), not only a
+/// commons. Same fs-free seam as `compile_in_memory`.
+pub fn analyse_in_memory(
+    source: &str,
+    target: BuildTarget,
+    platform: Platform,
+) -> Vec<AttributedError> {
+    let root = PathBuf::from(".");
+    let path = in_memory_logical_path(source);
+    let mut overlay = HashMap::new();
+    overlay.insert(path.clone(), source.to_string());
+    let run = run_checks(
+        &root,
+        &root,
+        &root,
+        target,
+        platform,
+        ImportExt::Js,
+        Mode::Analyse,
+        &overlay,
+        Some((vec![path], Vec::new())),
+    );
+    match run {
+        RunChecks::Bailed { errors, .. } | RunChecks::Checked { errors, .. } => errors.into_all(),
+    }
+}
+
 /// Derive the conventional single-file path for an in-memory source from its
 /// declared unit name (`app.demo` ⇒ `app/demo.bynk`), so `check_path_name_alignment`
 /// is satisfied without a real file tree. Falls back to `main.bynk` when the source

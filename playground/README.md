@@ -17,6 +17,7 @@ A fully static, client-side app. It deploys to two origins:
 | `src/app.ts` | The app: editor (CodeMirror 6), compile, diagnostics, run, deep-link, Share, examples picker. |
 | `src/examples.ts` | The examples gallery — curated, **runnable** in-process snippets (each verified to compile + run); the header picker loads them. |
 | `src/sandbox.ts` | The execution document: links the JS graph to blob-URL modules, runs it in a Worker under a wall-clock timeout, posts results back. |
+| live diagnostics | A CodeMirror linter (in `src/app.ts`) calls `bynk_analyze` (debounced, on-type) → inline squiggles + gutter. Non-bailing — type errors in a context show live, not only on Run. |
 | `src/deeplink.ts` | The shared snippet format: `#base64url(deflate-raw(utf8(source)))`. |
 | `src/highlight.ts` | CodeMirror Bynk highlighting (stream-based; see *Highlighting* below). |
 | `src/shared.ts` | Origin config + the postMessage protocol. |
