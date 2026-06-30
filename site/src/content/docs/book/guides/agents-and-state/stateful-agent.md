@@ -1,0 +1,169 @@
+---
+title: Build a stateful agent and keep its state zeroable
+---
+**Goal:** declare an agent that owns state, reads it, and updates it — with state
+that initialises cleanly for a never-seen key.
+
+Agents live inside a `context`.
+
+## Declare the agent
+
+Give it a `key` (its identity), one or more `store` fields, and handlers:
+
+```bynk
+context counters
+
+type CounterId = opaque String
+
+agent Counter {
+  key id: CounterId
+
+  store count: Cell[Int]
+
+  on call current() -> Effect[Int] {
+    count
+  }
+
+  on call increment() -> Effect[Int] {
+    let _ <- count.update((c) => c + 1)
+    count
+  }
+}
+```
+
+- Read a `store` field by its bare name (`count`).
+- Write it unconditionally with `:=` (the new value does **not** depend on the old
+  one).
+- When the new value *does* depend on the old one, use `count.update(fn)` — a
+  read-modify-write — rather than `:=`. A `:=` whose right-hand side names its own
+  field is rejected (see [below](#modify-a-cell-in-place)).
+- Every `store` write is committed atomically when the handler returns; there is
+  no `commit` step, and a faulting handler persists nothing.
+- Handlers return `Effect[T]`; returning a plain value in tail position is lifted
+  automatically.
+
+## Modify a cell in place
+
+A `:=` write replaces a cell's value with an expression that stands on its own:
+
+```bynk,ignore
+count := 0          -- reset
+limit := limit      -- rejected: the right-hand side reads the cell being written
+```
+
+When the new value is computed *from the old one*, reach for `update(fn)` instead.
+It takes a pure combiner `(T) -> T` and applies it to the current value:
+
+```bynk,ignore
+let _ <- count.update((c) => c + 1)   -- increment
+let _ <- count.update((c) => c * 2)   -- double
+```
+
+Why a separate operation rather than `count := count + 1`? Because the latter
+hides a *read* of the prior value inside what looks like a plain write. Making it
+`update` keeps that prior-value dependency visible (and the combiner retry-safe).
+A self-referencing `:=` is therefore rejected with
+[`bynk.cell.self_reference`](/book/reference/diagnostics/), steering you to
+`update`.
+
+`update` mutates the cell; it does not return the new value. To read-modify-write
+**and** return — as `increment` above does — await the `update`, then read the
+bare name back (the read sees the staged write):
+
+```bynk,ignore
+let _ <- count.update((c) => c + 1)
+count                                  -- the committed new value
+```
+
+## Keep state zeroable
+
+Every `store` field needs a starting value for the never-seen key that Bynk
+initialises automatically. Either the type has a zero (`Int`→`0`, `Bool`→`false`,
+`String`→`""`, `Option[T]`→`None`), or you supply an explicit initialiser with
+`=`. A field whose type excludes its zero (for example `Int where Positive`, which
+excludes `0`) and which has no initialiser is rejected with
+[`bynk.agents.non_zeroable_state_field`](/book/troubleshooting/agents-non-zeroable-state-field/).
+
+When you need "not set yet", use `Option`:
+
+```bynk
+store reading: Cell[Option[Int]]   -- starts as None — "never set"
+```
+
+When the type has no zero but you have a sensible default, give an initialiser:
+
+```bynk
+store limit: Cell[Int where Positive] = 1
+```
+
+## Beyond `Cell`: maps, sets, caches, and logs
+
+`Cell` holds a single value; the other four storage kinds hold collections and
+expose **effectful methods** (awaited with `<-`) instead of `:=`.
+
+A **`Map`** keys values; a **`Set`** holds membership:
+
+```bynk,ignore
+store members: Set[UserId]
+store profiles: Map[UserId, Profile]
+
+on call join(u: UserId, p: Profile) -> Effect[()] {
+  let _ <- members.add(u)         -- idempotent
+  let _ <- profiles.put(u, p)
+  ()
+}
+
+on call lookup(u: UserId) -> Effect[Option[Profile]] {
+  let found <- profiles.get(u)
+  found
+}
+```
+
+A **`Cache`** is a TTL-bounded map: `@ttl` is required, and any time-consulting op
+needs `given Clock` (which makes expiry testable with a mocked clock):
+
+```bynk,ignore
+store sessions: Cache[SessionId, Session] @ttl(30.minutes)
+
+on call touch(id: SessionId, s: Session) -> Effect[()] given Clock {
+  let _ <- sessions.put(id, s)    -- expires 30 minutes after it is written
+  ()
+}
+```
+
+A **`Log`** is an append-only, time-indexed sequence. `append` stamps the current
+time (so it needs `given Clock`), but the window reads take explicit `Instant`s and
+so need no clock — they return a lazy [`Query`](/book/reference/types/#query):
+
+```bynk,ignore
+store events: Log[Event] @retain(7.days)
+
+on call record(e: Event) -> Effect[()] given Clock {
+  let _ <- events.append(e)
+  ()
+}
+
+on call recent_count(since: Instant) -> Effect[Int] {
+  let n <- events.since(since).count()
+  n
+}
+```
+
+To route an equality filter through a maintained index, annotate the map with
+[`@indexed`](/book/reference/agents/#indexed-routing).
+
+## Address an agent
+
+Construct an agent with its key, then call a handler (binding the effectful
+result with `<-`):
+
+```bynk
+let c = Counter(CounterId.unsafe("a"))
+let n <- c.increment()
+```
+
+## Related
+
+- Tutorial: [Add a stateful agent](/book/tutorials/05-stateful-agent/).
+- Reference: [agents](/book/reference/agents/).
+- Troubleshooting: [`bynk.agents.non_zeroable_state_field`](/book/troubleshooting/agents-non-zeroable-state-field/).
