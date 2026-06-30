@@ -18,7 +18,7 @@ tools) get the formatter without pulling in the whole compiler. The
 
 Most users format Bynk through the CLI (`bynkc fmt`) or format-on-save in the
 editor, rather than depending on this crate directly. See
-[Format your code with `bynk-fmt`](https://github.com/accuser/bynk/blob/main/docs/src/guides/editor-and-tooling/format.md).
+[Format your code with `bynk-fmt`](https://bynk-lang.org/book/guides/editor-and-tooling/format/).
 
 ## Use
 

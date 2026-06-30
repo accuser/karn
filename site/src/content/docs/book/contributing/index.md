@@ -14,7 +14,6 @@ Bynk is a Cargo workspace plus two JavaScript/TypeScript projects:
 | `bynkc` | The compiler and CLI (`bynkc`): lex → parse → resolve → check → emit. |
 | `bynk-fmt` | A thin crate re-exporting the formatter from `bynkc::fmt`. |
 | `bynk-lsp` | The language server (`bynkc-lsp`), built on `tower-lsp`. |
-| `mdbook-bynk-highlight` | The docs' syntax-highlighting preprocessor (compiles the tree-sitter grammar). |
 | `tree-sitter-bynk` | The grammar (`grammar.js` → generated parser) and highlight queries. |
 | `vscode-bynk` | The VS Code extension. |
 
@@ -42,7 +41,7 @@ See [Testing & fixtures](/book/contributing/testing/) for how these work and how
   re-blesses fixture expectations *and* the generated reference pages. Run it
   deliberately and review the diff.
 - **The spec is the source of truth; the design notes are rationale.** The
-  normative spec under `docs/src/spec/` defines the current language and is
+  normative spec under `site/src/content/docs/book/spec/` defines the current language and is
   updated per increment; the decisions behind increments live in
   `design/decisions/`. The remaining `design/*.md` notes are rationale and
   history — some are aspirational or predate the Rust rewrite. Trust the

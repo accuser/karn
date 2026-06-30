@@ -68,7 +68,7 @@ context, complete with router, dependency wiring, the shared runtime, and a
 `wrangler.toml`. `bynkc test` needs `node` and `tsc` on `PATH`.
 
 Run `bynkc <command> --help` for every flag, and see the
-[CLI reference](https://github.com/accuser/bynk/blob/main/docs/src/reference/cli.md).
+[CLI reference](https://bynk-lang.org/book/reference/cli/).
 
 ## Library
 
@@ -103,7 +103,7 @@ TypeScript with `tsc` (CI does this).
 
 The normative definition of the language this compiler accepts is the
 specification in
-[`docs/src/spec/`](https://github.com/accuser/bynk/tree/main/docs/src/spec)
+[the normative spec](https://bynk-lang.org/book/spec/)
 (rendered in the Bynk Book), kept current per increment. The decisions behind
 the increments are recorded in
 [`design/decisions/`](https://github.com/accuser/bynk/tree/main/design/decisions).

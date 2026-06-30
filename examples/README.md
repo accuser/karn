@@ -23,7 +23,7 @@ language; the middle four lead with the **agent storage kinds** (`Map`, `Cache`,
 | [`webhook-relay`](webhook-relay/) | verifying a signed webhook, then forwarding it | http | `Fetch`, `Logger`, `Secrets` | — (all-effectful; see below) |
 
 Together they cover every entry point (http, cron; queue is covered in the
-[queue guide](../docs/src/guides/entry-points/queue.md)), both state models — **KV
+[queue guide](https://bynk-lang.org/book/guides/entry-points/queue/)), both state models — **KV
 binding storage** and **Durable-Object agents** — and the full agent storage-kind
 catalogue: a `Cell` (`rate-limiter`, `todo`), a `Map` (`todo`, `orders`), a
 `Cache` (`sessions`), and a `Log` (`event-log`). The `Query[T]` vocabulary appears
@@ -53,7 +53,7 @@ cd out/workers/<name> && npx wrangler dev         # run it locally
 ```
 
 `bynkc` lives at `target/release/bynkc` after `cargo build --release -p bynkc`
-(see the [install page](../docs/src/introduction/install.md)). The generated
+(see the [install page](https://bynk-lang.org/book/introduction/install/)). The generated
 `wrangler.toml` carries the bindings each example needs — a `[[kv_namespaces]]`
 stanza, `[[durable_objects.bindings]]`, or `crons` — with placeholder ids to fill
 in at deploy time.

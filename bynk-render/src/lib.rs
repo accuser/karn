@@ -37,7 +37,7 @@ pub fn render_errors(errors: &[CompileError], source: &str, filename: &str) -> S
 /// Render a list of compile errors to a string with colour disabled and the
 /// given filename as the source label. Unlike [`render_errors`], the output
 /// contains no ANSI escape codes, so it is byte-stable — suitable for the
-/// committed diagnostic transcripts under `docs/diagnostics/`.
+/// committed diagnostic transcripts under `site/src/diagnostics/`.
 pub fn render_errors_plain(errors: &[CompileError], source: &str, filename: &str) -> String {
     let mut out = Vec::new();
     let mut cache = (filename, Source::from(source));

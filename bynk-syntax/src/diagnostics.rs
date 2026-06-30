@@ -1,7 +1,7 @@
 //! Central registry of diagnostic codes.
 //!
 //! This is the single source of truth for the `bynk.*` codes the compiler can
-//! emit. The reference page `docs/src/reference/diagnostics.md` is generated
+//! emit. The reference page `site/src/content/docs/book/reference/diagnostics.md` is generated
 //! from [`render_markdown`], and the test `tests/diagnostics_registry.rs`
 //! asserts that this table matches exactly the set of codes used across the
 //! compiler source — so a new code cannot be introduced without documenting it
@@ -1599,7 +1599,8 @@ fn category_title(cat: &str) -> &'static str {
 }
 
 /// Render the diagnostic index as a Markdown reference page, grouped by
-/// category. This is the generator behind `docs/src/reference/diagnostics.md`.
+/// category. This is the generator behind
+/// `site/src/content/docs/book/reference/diagnostics.md`.
 pub fn render_markdown() -> String {
     use std::collections::BTreeMap;
 

@@ -77,8 +77,8 @@ wrote unmodified. Prefer a worked example? The bundled
 [`examples/hello-world`](examples/hello-world/) is a complete project you can also
 `bynkc check src`, `bynkc test .`, and deploy.
 
-See [Start a new project](docs/src/guides/projects-build-and-deployment/start-a-project.md)
-or [Compile your first program](docs/src/tutorials/01-first-program.md).
+See [Start a new project](https://bynk-lang.org/book/guides/projects-build-and-deployment/start-a-project/)
+or [Compile your first program](https://bynk-lang.org/book/tutorials/01-first-program/).
 
 ## Repository layout
 
@@ -94,25 +94,24 @@ This is a Cargo workspace. The published crates are `bynkc`, `bynk`, `bynk-fmt`,
 | [`bynk-lsp/`](bynk-lsp/) | The `bynkc-lsp` Language Server (diagnostics, hover, go-to-definition, …). | [crates.io](https://crates.io/crates/bynk-lsp) |
 | [`tree-sitter-bynk/`](tree-sitter-bynk/) | The tree-sitter grammar — the source of truth for syntax highlighting. | npm |
 | [`vscode-bynk/`](vscode-bynk/) | The VS Code extension (bundles the language server). | — |
-| [`mdbook-bynk-grammar/`](mdbook-bynk-grammar/), [`mdbook-bynk-highlight/`](mdbook-bynk-highlight/), [`mdbook-bynk-visuals/`](mdbook-bynk-visuals/) | mdBook preprocessors that build the Bynk Book. | — |
-| [`docs/`](docs/) | The Bynk Book (mdBook): tutorials, how-to guides, reference, and the normative spec. | — |
+| [`site/`](site/) | The Bynk Book (Astro + Starlight): tutorials, how-to guides, reference, and the normative spec. Published at [bynk-lang.org](https://bynk-lang.org/book/). | — |
 | [`design/`](design/) | Internal design notes and decision records (ADRs). | — |
 | [`examples/`](examples/) | Example projects. | — |
 
 ## Documentation
 
-The **[Bynk Book](docs/)** is the canonical guide and reference. It follows
-[Diátaxis](https://diataxis.fr/), grouped concern-first so each topic keeps its
-explanation, recipes, and reference together:
+The **[Bynk Book](https://bynk-lang.org/book/)** is the canonical guide and
+reference. It follows [Diátaxis](https://diataxis.fr/), grouped concern-first so
+each topic keeps its explanation, recipes, and reference together:
 
-- **[Tutorials](docs/src/tutorials/01-first-program.md)** — learn Bynk by building.
-- **[Guides](docs/src/guides/index.md)** — task-focused recipes, each section
+- **[Tutorials](https://bynk-lang.org/book/tutorials/01-first-program/)** — learn Bynk by building.
+- **[Guides](https://bynk-lang.org/book/guides/)** — task-focused recipes, each section
   opening with the *why* before the *how*.
-- **[Reference](docs/src/reference/index.md)** — exact behaviour, including the
-  [normative spec](docs/src/spec/) and [CLI reference](docs/src/reference/cli.md).
+- **[Reference](https://bynk-lang.org/book/reference/)** — exact behaviour, including the
+  [normative spec](https://bynk-lang.org/book/spec/) and [CLI reference](https://bynk-lang.org/book/reference/cli/).
 
-Build the book locally with [mdBook](https://rust-lang.github.io/mdBook/):
-`mdbook serve docs`.
+The Book's source lives in [`site/`](site/). Build it locally with
+[Astro](https://astro.build/): `cd site && npm install && npm run dev`.
 
 ## Status
 

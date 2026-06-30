@@ -12,9 +12,6 @@ members = [
     "bynk-fmt",
     "bynk-grammar",
     "bynk-lsp",
-    "mdbook-bynk-grammar",
-    "mdbook-bynk-highlight",
-    "mdbook-bynk-visuals",
 ]
 resolver = "3"
 
