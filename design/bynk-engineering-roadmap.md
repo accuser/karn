@@ -29,7 +29,7 @@ for what it touched; a single `ci-green` aggregator is the one required check:
   `all` escape hatch. `all` is true on any non-PR event or when a *global* file
   changed (a workflow, `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`). The
   cross-component edges are encoded in the gates: `test` also runs on `docs`
-  (bynkc's suite reads `docs/src/**`), `docs` also runs on `rust` (the book
+  (bynkc's suite reads `site/src/content/docs/book/**`), `docs` also runs on `rust` (the book
   renders through the Rust mdBook preprocessors), and `extension-tests` also runs
   on `rust` (it builds `bynk-lsp` from source).
 - `ci-green` — `needs:` every job, `if: always()`; red only if a needed job

@@ -2,7 +2,7 @@
 
 The design decisions that shaped Bynk's incremental evolution, one record per
 language-defining call: `Status / Context / Decision / Consequences`, each
-citing the [normative spec](../../docs/src/spec/index.md) section that now
+citing the [normative spec](../../site/src/content/docs/book/spec/index.md) section that now
 embodies it. Records were harvested from the retired per-increment instalment
 documents (see the spec's Appendix B); from v0.19 on, each increment adds its
 records here as part of the increment itself.
