@@ -1,0 +1,18 @@
+{
+  "name": "bynk-site",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Bynk documentation & web presence (documentation track) — Astro + Starlight, deployed to bynk-lang.org. Slice 1: the scaffold (placeholder landing + empty Book shell + bynk highlighting).",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.41.1",
+    "astro": "^7.0.4",
+    "sharp": "^0.35.2",
+    "starlight-links-validator": "^0.25.2"
+  }
+}

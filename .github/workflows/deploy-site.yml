@@ -1,0 +1,60 @@
+name: Deploy the docs site (Cloudflare Pages)
+
+# Slice 1 of the documentation track (ADR 0141). Builds the Astro/Starlight site
+# and uploads the static dist/ to the bynk-lang.org apex Pages project. The build
+# runs here, where the toolchain lives; Cloudflare only serves the static output.
+on:
+  # Publish when the site (or the grammar its highlighting consumes) changes on main.
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "vscode-bynk/syntaxes/bynk.tmLanguage.json"
+      - ".github/workflows/deploy-site.yml"
+  # Manual run — the first deploy (after the Pages project + DNS exist) and any
+  # redeploy without a code change.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time; don't cancel an in-progress one (mirrors pages.yml).
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build + deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+    # Secrets flow in as env so the deploy step can both hand wrangler its
+    # credentials and gate on their presence: before the maintainer adds the
+    # Cloudflare secrets, the build still runs and the upload skips, so the
+    # workflow is green rather than red on the first push.
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      # Node 22: Astro 7 floors Node at 22.12.
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: "22"
+      - name: Install deps
+        run: npm ci
+      # astro build also runs Pagefind + the internal link-checker; a broken
+      # in-site link fails here before anything deploys.
+      - name: Build the site (astro build)
+        run: npm run build
+      # Single Pages project at the apex (no sandbox split — this is static
+      # content, not a code-execution surface). `--branch=main` publishes to the
+      # project's production deployment.
+      - name: Deploy to the bynk-lang.org apex
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        run: npx --yes wrangler@4 pages deploy dist --project-name=bynk-lang --branch=main
+      - name: Note when deploy was skipped
+        if: env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == ''
+        run: echo "::notice::Cloudflare secrets not set — built site/dist but skipped the upload. See site/README.md."
