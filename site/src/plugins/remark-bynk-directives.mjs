@@ -56,6 +56,10 @@ export default function remarkBynkDirectives(options) {
       if (node.lang && node.lang.includes(",")) {
         node.lang = node.lang.split(",")[0] || null;
       }
+      // Shiki has no EBNF grammar, so a literal ```ebnf fence (the generated
+      // grammar-appendix pages) renders as a plain frame — same as the
+      // {{#grammar}} output — instead of warning that the language is missing.
+      if (node.lang === "ebnf") node.lang = null;
     });
 
     // ```mermaid fences → a real `<pre class="mermaid">` hast element that

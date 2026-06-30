@@ -107,10 +107,14 @@ jobs:
               - 'bynk-wasm/**'
             site:
               # The Astro/Starlight docs site. Highlighting is fed the editor's
-              # TextMate grammar, so a grammar edit must rebuild the site too.
+              # TextMate grammar, so a grammar edit must rebuild the site too. The
+              # sidebar is generated from SUMMARY.md and {{#include}} inlines the
+              # diagnostics fixtures, so the site build depends on both.
               - *global
               - 'site/**'
               - 'vscode-bynk/syntaxes/bynk.tmLanguage.json'
+              - 'docs/src/SUMMARY.md'
+              - 'docs/diagnostics/**'
       # Collapse "not a PR" (push/schedule) and "a global file changed" into one
       # boolean the downstream `if:`s can OR against. Pinned to the `global`
       # output so a lockfile/toolchain/workflow change fans out to everything.
@@ -293,6 +297,10 @@ jobs:
           node-version: "22"
       - name: Install deps
         run: npm ci
+      # The sidebar is generated from the mdBook SUMMARY.md; fail if the committed
+      # sidebar.json drifts from it.
+      - name: Check the generated sidebar is current
+        run: node scripts/generate-sidebar.mjs --check
       # The Book's ```mermaid diagrams render to inline SVG at build time via
       # rehype-mermaid, which drives a headless Chromium.
       - name: Install Chromium (mermaid)

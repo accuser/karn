@@ -1,8 +1,9 @@
-# §4 Syntactic grammar
-
-This chapter defines Bynk's phrase structure: how tokens ([§3](lexical-grammar.md))
+---
+title: "§4 Syntactic grammar"
+---
+This chapter defines Bynk's phrase structure: how tokens ([§3](/book/spec/lexical-grammar/))
 combine into declarations, types, expressions, patterns, and statements. Each
-production is generated from the grammar ([§2.1](conventions.md)) and embedded by
+production is generated from the grammar ([§2.1](/book/spec/conventions/)) and embedded by
 name.
 
 A production states what **parses**. Every constraint beyond parsing — name
@@ -12,7 +13,7 @@ in **§5** and not repeated here. Where a construct carries such constraints, th
 chapter forward-references §5 rather than restating them.
 
 The chapters mirror the construct groupings of the friendly
-[grammar reference](../reference/grammar.md); the productions are shared, the
+[grammar reference](/book/reference/grammar/); the productions are shared, the
 register here is the normative definition.
 
 ## §4.1 Top-level & modules
@@ -311,7 +312,7 @@ The unit type `()`.
 A generic constructor — `Result`, `Option`, `Effect`, `HttpResult`, or
 (v0.20b) `List`, `Map` — applied to bracketed type arguments.
 Well-formedness: §5 (`Map` keys are value-keyable,
-[§5.10](static-semantics.md#510-collections)); the type system: §6.
+[§5.10](/book/spec/static-semantics/#510-collections)); the type system: §6.
 
 ## §4.3 Functions, capabilities & providers
 
@@ -471,7 +472,7 @@ is valid only in a `from WebSocket` service:
 
 Well-formedness — exactly one `on open`, edge authentication, held-resource
 disposal: §5. *(The rendered grammar productions for these handler heads land with
-the tree-sitter grammar; see [Reference — grammar](../reference/grammar.md).)*
+the tree-sitter grammar; see [Reference — grammar](/book/reference/grammar/).)*
 
 ### §4.4.8 by_clause (v0.45) {#448-by_clause}
 
@@ -755,7 +756,7 @@ callee identifier and MUST sit on the **same line** as it — a `[` opening a
 new line starts a list literal. There is no `Map` literal (`{ }` is records
 and blocks) and no indexing form (`get(i)` returns `Option[T]`).
 Well-formedness — including empty-literal element-type inference:
-[§5.10](static-semantics.md#510-collections).
+[§5.10](/book/spec/static-semantics/#510-collections).
 
 ### §4.6.22 paren_expr
 

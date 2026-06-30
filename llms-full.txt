@@ -11399,13 +11399,13 @@ scope. An adapter's providers are **external** (bodiless,
 placement rules, the binding requirement, and the reserved `bynk` namespace are
 well-formedness: §5.
 
-### §4.1.7 test_decl
+### §4.1.7 test_decl {#416-test_decl}
 
 {{#grammar test_decl}}
 
 A `test` block naming the `commons` or `context` it targets. Well-formedness: §5.
 
-### §4.1.8 integration_decl
+### §4.1.8 integration_decl {#417-integration_decl}
 
 {{#grammar integration_decl}}
 
@@ -11807,7 +11807,7 @@ Well-formedness — exactly one `on open`, edge authentication, held-resource
 disposal: §5. *(The rendered grammar productions for these handler heads land with
 the tree-sitter grammar; see [Reference — grammar](../reference/grammar.md).)*
 
-### §4.4.8 by_clause (v0.45)
+### §4.4.8 by_clause (v0.45) {#448-by_clause}
 
 {{#grammar by_clause}}
 
@@ -11941,7 +11941,7 @@ including exhaustiveness: §5.
 An expression, `is`, and a pattern. Well-formedness — including the narrowing it
 introduces: §5.
 
-### §4.6.6 binary_expr
+### §4.6.6 binary_expr {#467-binary_expr}
 
 {{#grammar binary_expr}}
 

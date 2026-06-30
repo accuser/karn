@@ -1,0 +1,614 @@
+[
+  {
+    "label": "Introduction",
+    "link": "/book/"
+  },
+  {
+    "label": "Getting started",
+    "items": [
+      {
+        "label": "What is Bynk?",
+        "link": "/book/introduction/what-is-bynk/"
+      },
+      {
+        "label": "Anatomy of a Bynk service",
+        "link": "/book/introduction/anatomy-of-a-service/"
+      },
+      {
+        "label": "Coming from TypeScript",
+        "link": "/book/introduction/coming-from-typescript/"
+      },
+      {
+        "label": "Install",
+        "link": "/book/introduction/install/"
+      },
+      {
+        "label": "How these docs are organised",
+        "link": "/book/introduction/how-these-docs-are-organised/"
+      }
+    ]
+  },
+  {
+    "label": "Learn Bynk",
+    "items": [
+      {
+        "label": "1. Compile your first program",
+        "link": "/book/tutorials/01-first-program/"
+      },
+      {
+        "label": "2. Build a small HTTP service",
+        "link": "/book/tutorials/02-http-service/"
+      },
+      {
+        "label": "3. Model your data with types",
+        "link": "/book/tutorials/03-modelling-data/"
+      },
+      {
+        "label": "4. Make illegal states unrepresentable",
+        "link": "/book/tutorials/04-refined-types/"
+      },
+      {
+        "label": "5. Add a stateful agent",
+        "link": "/book/tutorials/05-stateful-agent/"
+      },
+      {
+        "label": "6. Test it",
+        "link": "/book/tutorials/06-testing/"
+      }
+    ]
+  },
+  {
+    "label": "Guides",
+    "items": [
+      {
+        "label": "Overview",
+        "link": "/book/guides/"
+      },
+      {
+        "label": "The type system",
+        "items": [
+          {
+            "label": "Overview",
+            "link": "/book/guides/type-system/"
+          },
+          {
+            "label": "The type-system philosophy",
+            "link": "/book/guides/type-system/philosophy/"
+          },
+          {
+            "label": "The refined-literal admission model",
+            "link": "/book/guides/type-system/refined-literal-admission/"
+          },
+          {
+            "label": "Define and validate untrusted input",
+            "link": "/book/guides/type-system/define-and-validate/"
+          },
+          {
+            "label": "Decode untrusted JSON into a typed value",
+            "link": "/book/guides/type-system/decode-json/"
+          },
+          {
+            "label": "Use a literal where a refined type is expected",
+            "link": "/book/guides/type-system/use-a-literal/"
+          },
+          {
+            "label": "Define sum, record, and opaque types",
+            "link": "/book/guides/type-system/define-types/"
+          },
+          {
+            "label": "Work with Result and optional values",
+            "link": "/book/guides/type-system/result-and-optionals/"
+          },
+          {
+            "label": "Pattern-match with match",
+            "link": "/book/guides/type-system/match/"
+          },
+          {
+            "label": "Narrow and bind with is",
+            "link": "/book/guides/type-system/narrow-with-is/"
+          }
+        ]
+      },
+      {
+        "label": "Program structure",
+        "items": [
+          {
+            "label": "Overview",
+            "link": "/book/guides/program-structure/"
+          },
+          {
+            "label": "How a Bynk program is shaped",
+            "link": "/book/guides/program-structure/how-a-program-is-shaped/"
+          },
+          {
+            "label": "Consume another context's services",
+            "link": "/book/guides/program-structure/consume-services/"
+          }
+        ]
+      },
+      {
+        "label": "Effects & capabilities",
+        "items": [
+          {
+            "label": "Overview",
+            "link": "/book/guides/effects-and-capabilities/"
+          },
+          {
+            "label": "Understand the capability model",
+            "link": "/book/guides/effects-and-capabilities/understand-the-capability-model/"
+          },
+          {
+            "label": "Synchronous and asynchronous sends",
+            "link": "/book/guides/effects-and-capabilities/synchronous-and-asynchronous-sends/"
+          },
+          {
+            "label": "Compose a provider from other capabilities",
+            "link": "/book/guides/effects-and-capabilities/compose-a-provider/"
+          },
+          {
+            "label": "Share a capability across contexts",
+            "link": "/book/guides/effects-and-capabilities/share-across-contexts/"
+          },
+          {
+            "label": "Wrap a library as an adapter",
+            "link": "/book/guides/effects-and-capabilities/wrap-a-library/"
+          }
+        ]
+      },
+      {
+        "label": "Agents & state",
+        "items": [
+          {
+            "label": "Overview",
+            "link": "/book/guides/agents-and-state/"
+          },
+          {
+            "label": "The agent model",
+            "link": "/book/guides/agents-and-state/the-agent-model/"
+          },
+          {
+            "label": "Build a stateful agent",
+            "link": "/book/guides/agents-and-state/stateful-agent/"
+          },
+          {
+            "label": "Model an agent as a state machine",
+            "link": "/book/guides/agents-and-state/state-machine/"
+          },
+          {
+            "label": "Understand: invariants as contracts",
+            "link": "/book/guides/agents-and-state/understand-invariants/"
+          }
+        ]
+      },
+      {
+        "label": "Entry points",
+        "items": [
+          {
+            "label": "Overview",
+            "link": "/book/guides/entry-points/"
+          },
+          {
+            "label": "Handle an HTTP request",
+            "link": "/book/guides/entry-points/http/"
+          },
+          {
+            "label": "Run a task on a schedule (cron)",
+            "link": "/book/guides/entry-points/cron/"
+          },
+          {
+            "label": "Process a queued message",
+            "link": "/book/guides/entry-points/queue/"
+          },
+          {
+            "label": "Handle a WebSocket connection",
+            "link": "/book/guides/entry-points/websocket/"
+          }
+        ]
+      },
+      {
+        "label": "Actors & access control",
+        "items": [
+          {
+            "label": "Overview",
+            "link": "/book/guides/actors/"
+          },
+          {
+            "label": "Serve public and authenticated routes",
+            "link": "/book/guides/actors/public-and-authenticated/"
+          },
+          {
+            "label": "Verify an inbound webhook",
+            "link": "/book/guides/actors/verify-webhooks/"
+          },
+          {
+            "label": "Serve several kinds of caller from one route",
+            "link": "/book/guides/actors/multiple-callers/"
+          },
+          {
+            "label": "Add an authorisation invariant",
+            "link": "/book/guides/actors/authorisation/"
+          },
+          {
+            "label": "Know which context called you",
+            "link": "/book/guides/actors/cross-context-callers/"
+          }
+        ]
+      },
+      {
+        "label": "Testing",
+        "items": [
+          {
+            "label": "Overview",
+            "link": "/book/guides/testing/"
+          },
+          {
+            "label": "The testing philosophy",
+            "link": "/book/guides/testing/philosophy/"
+          },
+          {
+            "label": "Write tests and mock collaborators",
+            "link": "/book/guides/testing/write-tests/"
+          },
+          {
+            "label": "Test a flow across Workers",
+            "link": "/book/guides/testing/integration/"
+          },
+          {
+            "label": "Run your tests",
+            "link": "/book/guides/testing/run-tests/"
+          }
+        ]
+      },
+      {
+        "label": "Projects, build & deployment",
+        "items": [
+          {
+            "label": "Overview",
+            "link": "/book/guides/projects-build-and-deployment/"
+          },
+          {
+            "label": "Why compile to TypeScript",
+            "link": "/book/guides/projects-build-and-deployment/why-compile-to-typescript/"
+          },
+          {
+            "label": "Start a new project",
+            "link": "/book/guides/projects-build-and-deployment/start-a-project/"
+          },
+          {
+            "label": "Lay out a project",
+            "link": "/book/guides/projects-build-and-deployment/layout/"
+          },
+          {
+            "label": "Run your project locally",
+            "link": "/book/guides/projects-build-and-deployment/run-locally/"
+          },
+          {
+            "label": "Target Cloudflare Workers",
+            "link": "/book/guides/projects-build-and-deployment/cloudflare-workers/"
+          }
+        ]
+      },
+      {
+        "label": "Editor & tooling",
+        "items": [
+          {
+            "label": "Overview",
+            "link": "/book/guides/editor-and-tooling/"
+          },
+          {
+            "label": "Check your environment with bynk doctor",
+            "link": "/book/guides/editor-and-tooling/doctor/"
+          },
+          {
+            "label": "Format your code with bynk-fmt",
+            "link": "/book/guides/editor-and-tooling/format/"
+          },
+          {
+            "label": "Set up editor support",
+            "link": "/book/guides/editor-and-tooling/editor-support/"
+          },
+          {
+            "label": "Debug in VS Code",
+            "link": "/book/guides/editor-and-tooling/debugging/"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "label": "Reference",
+    "items": [
+      {
+        "label": "Overview",
+        "link": "/book/reference/"
+      },
+      {
+        "label": "Syntax & grammar",
+        "items": [
+          {
+            "label": "Overview",
+            "link": "/book/reference/grammar/"
+          },
+          {
+            "label": "Complete grammar (appendix)",
+            "link": "/book/reference/grammar-appendix/"
+          }
+        ]
+      },
+      {
+        "label": "Keywords",
+        "link": "/book/reference/keywords/"
+      },
+      {
+        "label": "Glossary",
+        "link": "/book/reference/glossary/"
+      },
+      {
+        "label": "Type system",
+        "link": "/book/reference/types/"
+      },
+      {
+        "label": "Refined-type API",
+        "link": "/book/reference/refined-types/"
+      },
+      {
+        "label": "Operators & built-ins",
+        "link": "/book/reference/operators/"
+      },
+      {
+        "label": "Agents",
+        "link": "/book/reference/agents/"
+      },
+      {
+        "label": "Agent invariants",
+        "link": "/book/reference/agent-invariants/"
+      },
+      {
+        "label": "Capabilities & providers",
+        "link": "/book/reference/capabilities/"
+      },
+      {
+        "label": "First-party bynk capabilities",
+        "link": "/book/reference/bynk-capabilities/"
+      },
+      {
+        "label": "Adapters",
+        "link": "/book/reference/adapters/"
+      },
+      {
+        "label": "HTTP",
+        "link": "/book/reference/http/"
+      },
+      {
+        "label": "Cron",
+        "link": "/book/reference/cron/"
+      },
+      {
+        "label": "Queue",
+        "link": "/book/reference/queue/"
+      },
+      {
+        "label": "WebSocket",
+        "link": "/book/reference/websocket/"
+      },
+      {
+        "label": "Actors",
+        "link": "/book/reference/actors/"
+      },
+      {
+        "label": "Testing",
+        "link": "/book/reference/testing/"
+      },
+      {
+        "label": "bynk.toml manifest",
+        "link": "/book/reference/manifest/"
+      },
+      {
+        "label": "CLI (bynkc)",
+        "link": "/book/reference/cli/"
+      },
+      {
+        "label": "CLI (bynk driver)",
+        "link": "/book/reference/bynk-cli/"
+      },
+      {
+        "label": "Diagnostic index",
+        "link": "/book/reference/diagnostics/"
+      },
+      {
+        "label": "Emission",
+        "link": "/book/reference/emission/"
+      },
+      {
+        "label": "Version compatibility & changelog",
+        "link": "/book/reference/changelog/"
+      }
+    ]
+  },
+  {
+    "label": "Specification",
+    "items": [
+      {
+        "label": "Overview",
+        "link": "/book/spec/"
+      },
+      {
+        "label": "§1 Scope & conformance",
+        "link": "/book/spec/scope/"
+      },
+      {
+        "label": "§2 Notation & conventions",
+        "link": "/book/spec/conventions/"
+      },
+      {
+        "label": "§3 Lexical grammar",
+        "link": "/book/spec/lexical-grammar/"
+      },
+      {
+        "label": "§4 Syntactic grammar",
+        "link": "/book/spec/syntactic-grammar/"
+      },
+      {
+        "label": "§5 Static semantics",
+        "link": "/book/spec/static-semantics/"
+      },
+      {
+        "label": "§6 The type system",
+        "link": "/book/spec/type-system/"
+      },
+      {
+        "label": "§7 Meaning by translation",
+        "items": [
+          {
+            "label": "Overview",
+            "link": "/book/spec/emission/"
+          },
+          {
+            "label": "§7.4 The runtime library",
+            "link": "/book/spec/runtime-library/"
+          }
+        ]
+      },
+      {
+        "label": "§8 Compilation model",
+        "link": "/book/spec/compilation-model/"
+      },
+      {
+        "label": "§9 Diagnostics",
+        "link": "/book/spec/diagnostics/"
+      },
+      {
+        "label": "§10 Conformance & test corpus",
+        "link": "/book/spec/conformance/"
+      },
+      {
+        "label": "§11 Complete grammar",
+        "link": "/book/spec/grammar-appendix/"
+      },
+      {
+        "label": "Appendix A — Planned features",
+        "link": "/book/spec/appendix-planned/"
+      },
+      {
+        "label": "Appendix B — Version history",
+        "link": "/book/spec/appendix-version-history/"
+      }
+    ]
+  },
+  {
+    "label": "About Bynk",
+    "items": [
+      {
+        "label": "Why Bynk exists",
+        "link": "/book/about/why-bynk-exists/"
+      },
+      {
+        "label": "Bynk compared to TypeScript",
+        "link": "/book/about/bynk-compared-to-typescript/"
+      },
+      {
+        "label": "Versioning & roadmap",
+        "link": "/book/about/versioning-and-roadmap/"
+      }
+    ]
+  },
+  {
+    "label": "Troubleshooting",
+    "items": [
+      {
+        "label": "Overview",
+        "link": "/book/troubleshooting/"
+      },
+      {
+        "label": "bynk.refine.literal_violates",
+        "link": "/book/troubleshooting/refine-literal-violates/"
+      },
+      {
+        "label": "bynk.agents.non_zeroable_state_field",
+        "link": "/book/troubleshooting/agents-non-zeroable-state-field/"
+      },
+      {
+        "label": "bynk.agents.bad_state_initialiser",
+        "link": "/book/troubleshooting/agents-bad-state-initialiser/"
+      },
+      {
+        "label": "bynk.provider.dependency_cycle",
+        "link": "/book/troubleshooting/provider-dependency-cycle/"
+      },
+      {
+        "label": "bynk.exports.* cross-context capability errors",
+        "link": "/book/troubleshooting/exports-capability-errors/"
+      },
+      {
+        "label": "bynk.adapter.* / binding errors",
+        "link": "/book/troubleshooting/adapter-errors/"
+      },
+      {
+        "label": "bynk.types.is_base_mismatch",
+        "link": "/book/troubleshooting/is-base-mismatch/"
+      },
+      {
+        "label": "bynk.mock.* errors",
+        "link": "/book/troubleshooting/mock-errors/"
+      },
+      {
+        "label": "bynk.cron.* errors",
+        "link": "/book/troubleshooting/cron-errors/"
+      },
+      {
+        "label": "bynk.queue.* errors",
+        "link": "/book/troubleshooting/queue-errors/"
+      },
+      {
+        "label": "bynk.integration.* errors",
+        "link": "/book/troubleshooting/integration-errors/"
+      }
+    ]
+  },
+  {
+    "label": "Contributing",
+    "items": [
+      {
+        "label": "Overview",
+        "link": "/book/contributing/"
+      },
+      {
+        "label": "Compiler architecture",
+        "link": "/book/contributing/architecture/"
+      },
+      {
+        "label": "Testing & fixtures",
+        "link": "/book/contributing/testing/"
+      },
+      {
+        "label": "Working on the docs",
+        "link": "/book/contributing/documentation/"
+      }
+    ]
+  },
+  {
+    "label": "Tooling",
+    "items": [
+      {
+        "label": "Overview",
+        "link": "/book/tooling/"
+      },
+      {
+        "label": "bynk-fmt",
+        "link": "/book/tooling/bynk-fmt/"
+      },
+      {
+        "label": "bynk-lsp",
+        "link": "/book/tooling/bynk-lsp/"
+      },
+      {
+        "label": "tree-sitter-bynk",
+        "link": "/book/tooling/tree-sitter-bynk/"
+      },
+      {
+        "label": "vscode-bynk",
+        "link": "/book/tooling/vscode-bynk/"
+      }
+    ]
+  }
+]
