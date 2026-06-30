@@ -51,6 +51,7 @@ jobs:
       grammar: ${{ steps.filter.outputs.grammar }}
       decisions: ${{ steps.filter.outputs.decisions }}
       runtime: ${{ steps.filter.outputs.runtime }}
+      playground: ${{ steps.filter.outputs.playground }}
       all: ${{ steps.all.outputs.value }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -96,6 +97,13 @@ jobs:
               - *global
               - 'bynk-emit/runtime/**'
               - 'bynk-emit/src/emitter/runtime.ts'
+            playground:
+              # The in-browser REPL app. Its TypeScript is type-checked against the
+              # real wasm-bindgen glue (a debug bynk-wasm build), so a bynk-wasm
+              # export change reaching the app is caught — name bynk-wasm too.
+              - *global
+              - 'playground/**'
+              - 'bynk-wasm/**'
       # Collapse "not a PR" (push/schedule) and "a global file changed" into one
       # boolean the downstream `if:`s can OR against. Pinned to the `global`
       # output so a lockfile/toolchain/workflow change fans out to everything.
@@ -219,6 +227,43 @@ jobs:
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
       - name: Build bynk-wasm for wasm32
         run: cargo build --locked --target wasm32-unknown-unknown -p bynk-wasm
+
+  playground:
+    # Type-check the playground app (the in-browser REPL: editor, sandbox, deep
+    # link). It imports `./vendor/bynk_wasm.js` — the generated wasm-bindgen glue —
+    # so a debug bynk-wasm build is run first to produce the `.d.ts` the app types
+    # against; tsc then verifies the TypeScript. This catches a TS regression or a
+    # bynk-wasm export-shape change at PR time, before it can break the deploy
+    # workflow (deploy-playground.yml) on main. Cheaper than the deploy build: a
+    # debug wasm (no release/wasm-opt), no grammar/emscripten, no upload. The
+    # `.scm` highlight query the app imports is an ambient module (src/scm.d.ts),
+    # so tsc needs no grammar build. Gated on the `playground` filter, which also
+    # fires on bynk-wasm changes — the only Rust that affects the app's types.
+    name: Playground (type-check)
+    needs: changes
+    if: needs.changes.outputs.playground == 'true' || needs.changes.outputs.all == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: dtolnay/rust-toolchain@e081816240890017053eacbb1bdf337761dc5582 # 1.95.0
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - uses: taiki-e/install-action@9e1e5806d4a4822de933115878265be9aaa786d9 # v2
+        with:
+          tool: wasm-bindgen-cli@0.2.126
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: "20"
+      - name: Install deps
+        working-directory: playground
+        run: npm ci
+      - name: Build the wasm glue (debug — for the .d.ts the app types against)
+        working-directory: playground
+        run: npm run build:wasm
+      - name: Type-check (tsc --noEmit)
+        working-directory: playground
+        run: npx tsc --noEmit
 
   docs:
     # Gated on `rust` as well as `docs`: the book is rendered through the three
@@ -513,6 +558,8 @@ jobs:
       - clippy
       - test
       - msrv
+      - wasm
+      - playground
       - docs
       - extension
       - extension-tests
