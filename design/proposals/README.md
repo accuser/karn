@@ -3,9 +3,9 @@
 The working home for **active** increment proposals — and only active ones. A
 proposal is a **transient input** to an increment, not a durable artefact: the
 durable record of a landed increment is the code and its fixtures, the
-[normative spec](../../docs/src/spec/index.md) updated in place, the
+[normative spec](../../site/src/content/docs/book/spec/index.md) updated in place, the
 [decision records](../decisions/README.md), and the **reader-facing book**
-(`docs/src/` — guides, reference, tutorials, changelog, roadmap) left current
+(`site/src/content/docs/book/` — guides, reference, tutorials, changelog, roadmap) left current
 and reliable. The spec is normative; the book is what a newcomer or evaluator
 actually reads, and it is part of the increment, not a follow-up.
 
@@ -24,7 +24,7 @@ actually reads, and it is part of the increment, not a follow-up.
 2. **Implement.** The increment consumes the proposal: the grammar/compiler
    change with fixtures, the spec chapters updated in place, a decision record
    per language-defining call, the **book and changelog deltas** that keep
-   `docs/src/` current and reliable, the tooling deltas, and — for a
+   `site/src/content/docs/book/` current and reliable, the tooling deltas, and — for a
    language/tooling increment — the version bump (`scripts/bump-version.sh` —
    see [Versioning & release](../README.md#versioning--release)). The book delta
    is a completion criterion, not optional polish. A docs-only increment carries
@@ -52,7 +52,7 @@ The spec proves the language is *defined*; the book is what makes it *usable and
 trusted*. An increment that ships a feature but leaves the book stale has not
 landed cleanly — to a newcomer or evaluator a self-contradicting book reads as
 "not seriously maintained", which is the most expensive impression a pre-1.0
-language can give. So every increment leaves `docs/src/` **current and reliable**.
+language can give. So every increment leaves `site/src/content/docs/book/` **current and reliable**.
 Concretely, the implementing PR must, *where the increment touches them*:
 
 - **Document new or changed surface in the book, not only the spec.** A new

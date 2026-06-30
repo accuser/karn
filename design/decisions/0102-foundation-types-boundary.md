@@ -17,7 +17,7 @@ A layered graph with arrows pointing only down ([[0099]]) needs its
   attribute diagnostics to files.
 - the **`diagnostics` code registry** (`diagnostics.rs`) — the single source of
   truth for `bynk.*` codes. It is *about* `CompileError.category`, but it also
-  **generates `docs/src/reference/diagnostics.md`** and is **pinned by a
+  **generates `site/src/content/docs/book/reference/diagnostics.md`** and is **pinned by a
   workspace test** (`tests/diagnostics_registry.rs`). Two other registries have
   the same cross-crate shape: `kernel_methods.rs` (dispatched by the checker,
   *read by the LSP* for `.`-member completion, pinned by `tests/kernel_registry.rs`).
@@ -32,7 +32,7 @@ is the hinge that keeps the graph acyclic: diagnostics, positions, codes, and
 caret-drawing source cross every crate without any crate depending upward.
 
 `diagnostics.rs`'s home is therefore **`bynk-syntax`** (settled-pending this
-ADR). The doc generation it drives (`docs/src/reference/diagnostics.md`) travels
+ADR). The doc generation it drives (`site/src/content/docs/book/reference/diagnostics.md`) travels
 with it.
 
 **The now-cross-crate drift tests get explicit homes** (they were single-crate

@@ -85,8 +85,8 @@ decisions live on in the ADRs and the spec-in-place. Retired so far:
   on-open), [0133](../decisions/0133-from-websocket-hibernation.md) (hibernation),
   [0134](../decisions/0134-from-websocket-inbound.md) (inbound frames), and
   [0135](../decisions/0135-ws-broadcast-closure.md) (broadcast + closure); spec-in-place
-  in `docs/src/spec/syntactic-grammar.md` + `static-semantics.md` and
-  `docs/src/reference/websocket.md`. **Deferred follow-ons** (none blocking the theme):
+  in `site/src/content/docs/book/spec/syntactic-grammar.md` + `static-semantics.md` and
+  `site/src/content/docs/book/reference/websocket.md`. **Deferred follow-ons** (none blocking the theme):
   the `.values` accessor, lambda parameter-type inference, a non-Cloudflare `Connection`
   binding, and a streaming `Ai`/`Queue`-out consumer.
 - **`storage.md`** — the agent-local storage-kind catalogue of design notes §10:
@@ -110,8 +110,8 @@ decisions live on in the ADRs and the spec-in-place. Retired so far:
   concern, not a storage kind),
   [0123](../decisions/0123-state-block-cutover-and-codemod.md) (the parity cutover),
   and [0124](../decisions/0124-rehydration-validation-and-migration.md) (rehydration
-  validation). Spec-in-place in `docs/src/spec/syntactic-grammar.md` +
-  `static-semantics.md` and `docs/src/reference/agents.md` + `grammar.md`.
+  validation). Spec-in-place in `site/src/content/docs/book/spec/syntactic-grammar.md` +
+  `static-semantics.md` and `site/src/content/docs/book/reference/agents.md` + `grammar.md`.
   **Deferred follow-ons** (none blocking the theme): a versioned-schema migration
   capability, per-field default-on-read, a soft recovery handler, whole-collection
   invariant quantifiers (ADR 0123 D4), per-entry DO storage keys, and refined
@@ -132,7 +132,7 @@ decisions live on in the ADRs and the spec-in-place. Retired so far:
   [0118](../decisions/0118-indexed-indexing-model.md) (`@indexed`),
   [0119](../decisions/0119-durable-object-query-lowering.md) (DO lowering), and
   [0120](../decisions/0120-join-group-combiner-form.md) (the combiner form, no pair
-  type); spec-in-place in `docs/src/spec/static-semantics.md` (the query-vocabulary
+  type); spec-in-place in `site/src/content/docs/book/spec/static-semantics.md` (the query-vocabulary
   section). **Deferred follow-ons** (none blocking the theme): in-memory effectful
   iteration as a uniform method surface (`traverse`/`traverseAll`/`parTraverse`/
   `parTraverseAll` — the original slice 5, tangential to read/transform querying;
@@ -151,7 +151,7 @@ decisions live on in the ADRs and the spec-in-place. Retired so far:
   `DebugConfigurationProvider` — no bespoke Debug Adapter. Decisions in ADRs
   [0103](../decisions/0103-source-map-contract.md) (source-map contract) and
   [0104](../decisions/0104-debug-launch-model.md) (debug-launch model); guide at
-  `docs/src/guides/editor-and-tooling/debugging.md`. Phase 2's remainder was carried
+  `site/src/content/docs/book/guides/editor-and-tooling/debugging.md`. Phase 2's remainder was carried
   by `semantic-debugging.md` below.
 - **`semantic-debugging.md`** — making the debugger *speak Bynk*: an editor-side
   `DebugAdapterTracker` that rewrites js-debug's `variables`/`scopes`/`stackTrace`

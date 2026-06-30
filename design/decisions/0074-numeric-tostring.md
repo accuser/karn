@@ -1,7 +1,7 @@
 # 0074 — `toString` on the numeric kernel
 
 - **Status:** Accepted (v0.42)
-- **Spec:** `docs/src/spec/static-semantics.md` (numeric kernel), `docs/src/spec/emission.md`
+- **Spec:** `site/src/content/docs/book/spec/static-semantics.md` (numeric kernel), `site/src/content/docs/book/spec/emission.md`
 - **Relates to:** ADR 0046 (the string kernel; the UTF-16 normative precedent this follows)
 
 ## Context

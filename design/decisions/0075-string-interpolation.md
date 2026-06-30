@@ -1,7 +1,7 @@
 # 0075 — String interpolation
 
 - **Status:** Accepted (v0.43)
-- **Spec:** `docs/src/spec/lexical-grammar.md` (string literals), `docs/src/spec/static-semantics.md` (the hole rule), `docs/src/spec/emission.md` (template-literal lowering)
+- **Spec:** `site/src/content/docs/book/spec/lexical-grammar.md` (string literals), `site/src/content/docs/book/spec/static-semantics.md` (the hole rule), `site/src/content/docs/book/spec/emission.md` (template-literal lowering)
 - **Relates to:** ADR 0046 (the string kernel — *not* overridden; `+` stays numeric, `concat` stays a method), ADR 0074 (`Int`/`Float.toString` — the display contract a numeric hole rests on)
 - **Issue:** #45
 
