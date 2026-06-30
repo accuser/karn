@@ -1,0 +1,94 @@
+name: Deploy the playground (Cloudflare Pages)
+
+# Slice 0 of the documentation track. The playground (in-browser REPL) shipped in
+# `playground/` but is reachable by no one until its two origins are deployed. The
+# build runs *here* — where the Rust/wasm toolchain already lives — and uploads the
+# prebuilt `dist/` to Cloudflare Pages; we never ask Cloudflare to compile the
+# compiler. The deep-link/sandbox decisions this realises are ADR 0140.
+on:
+  # Publish when the playground (or the things it bundles) change on main.
+  push:
+    branches: [main]
+    paths:
+      - "playground/**"
+      - "bynk-wasm/**"
+      - "tree-sitter-bynk/**"
+      - ".github/workflows/deploy-playground.yml"
+  # Manual run — the first deploy (after the Pages projects + secrets exist) and
+  # any redeploy without a code change.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time; don't cancel an in-progress one (mirrors pages.yml).
+concurrency:
+  group: deploy-playground
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build + deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+    # Secrets flow in as env so the deploy steps can both (a) hand wrangler its
+    # credentials and (b) gate on their presence: before the maintainer adds the
+    # Cloudflare secrets, the build still runs and the upload steps skip, so the
+    # workflow is green rather than red on the first push.
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: dtolnay/rust-toolchain@e081816240890017053eacbb1bdf337761dc5582 # 1.95.0
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      # wasm-bindgen-cli must match the wasm-bindgen crate (Cargo.lock: 0.2.126);
+      # a version skew between the glue and the module fails at load.
+      - uses: taiki-e/install-action@9e1e5806d4a4822de933115878265be9aaa786d9 # v2
+        with:
+          tool: wasm-bindgen-cli@0.2.126
+      # wasm-opt (binaryen) shrinks the release artefact (-Oz, the size budget).
+      # build-wasm.sh applies it only when present, so this is an optimisation.
+      - name: Install binaryen (wasm-opt)
+        run: sudo apt-get update && sudo apt-get install -y binaryen
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: "20"
+      # The grammar wasm (web-tree-sitter highlighting) is built by
+      # `tree-sitter build --wasm`; the modern CLI downloads its own wasi-sdk
+      # toolchain, so no emscripten/Docker setup is needed here. It is required for
+      # the bundle: `src/vendor/highlights.scm` is a build-time import of
+      # `npm run build`, staged by this step.
+      - name: Install tree-sitter deps + generate parser
+        working-directory: tree-sitter-bynk
+        run: |
+          npm ci
+          npx tree-sitter generate
+      - name: Install playground deps
+        working-directory: playground
+        run: npm ci
+      - name: Build the wasm compiler (release + wasm-opt)
+        working-directory: playground
+        run: npm run build:wasm -- --release
+      - name: Build the grammar wasm (web-tree-sitter highlighting)
+        working-directory: playground
+        run: npm run build:grammar
+      - name: Bundle the app (production origins)
+        working-directory: playground
+        run: npm run build
+      # Deploy the SAME dist/ to two Pages projects. The app origin serves
+      # index.html + app.js + the wasm compiler; the sandbox origin serves
+      # sandbox.html + sandbox.js. The two MUST be different origins — that
+      # separation IS the safety boundary (ADR 0140): untrusted snippet code runs
+      # only on the opaque sandbox origin and can never reach the app origin's
+      # storage. `--branch=main` publishes to the project's production deployment.
+      - name: Deploy the app origin (playground.bynk-lang.org)
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        run: npx --yes wrangler@4 pages deploy playground/dist --project-name=bynk-playground --branch=main
+      - name: Deploy the sandbox origin (sandbox.bynk-lang.org)
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        run: npx --yes wrangler@4 pages deploy playground/dist --project-name=bynk-playground-sandbox --branch=main
+      - name: Note when deploy was skipped
+        if: env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == ''
+        run: echo "::notice::Cloudflare secrets not set — built dist/ but skipped the upload. See playground/README.md §Deploy."

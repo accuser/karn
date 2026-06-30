@@ -90,18 +90,28 @@ curl -X POST :8080/api/snippets -d '{"source":"context x.y\n"}'   # → {"id":"�
 
 ## Deploy (Cloudflare Pages — maintainer ops)
 
-Two Pages projects, both serving `dist/` built with the production origins (the
-default), plus the two DNS records:
+The deploy is CI-automated by `.github/workflows/deploy-playground.yml` — it builds `dist/` (release wasm + grammar + esbuild, with the production origins as the default) and uploads it to two Cloudflare Pages projects with `wrangler pages deploy`. It runs on push to `main` (when `playground/**`, `bynk-wasm/**`, or `tree-sitter-bynk/**` change) and on manual `workflow_dispatch` (Actions tab → "Deploy the playground" → Run workflow). The only thing a maintainer does is the one-time account-side setup below — that part cannot be automated from the repo.
 
-- `playground.bynk-lang.org` → the app project.
-- `sandbox.bynk-lang.org` → the same `dist/` (it serves `sandbox.html` + `sandbox.js`).
+**Security note — the app and the sandbox MUST be two distinct origins.** The sandbox origin is the safety boundary defined by [`ADR 0140`](../design/decisions/0140-repl-execution-and-sandbox.md): untrusted snippet code executes only on the opaque sandbox origin and can never reach the app origin's storage. Never collapse them to one project or one domain — doing so dissolves the boundary.
 
-Until they serve, links degrade to "coming soon" (the documentation track's plan).
+### One-time setup
 
-For short share links, deploy the `share/` Bynk Worker (compile with `--emit js`, then
-`wrangler deploy` with a real KV namespace bound as `KV`) and add a Cloudflare route so
-`playground.bynk-lang.org/api/*` reaches it — same-origin, so no CORS. Optional: the
-app falls back to `#hash` links without it.
+1. Create two Cloudflare **Pages** projects of type **Direct Upload**: `bynk-playground` (the app) and `bynk-playground-sandbox` (the sandbox). These names are exactly what the workflow's `--project-name` flags target — keep them in sync if you rename either.
+2. Attach custom domains: `playground.bynk-lang.org` → `bynk-playground`; `sandbox.bynk-lang.org` → `bynk-playground-sandbox`. Cloudflare's custom-domain flow creates the DNS records for you when the zone is Cloudflare-managed.
+3. Create a Cloudflare API token scoped to **Account → Cloudflare Pages → Edit** — nothing broader. Add it as the GitHub repo secret `CLOUDFLARE_API_TOKEN`, and add your account id as `CLOUDFLARE_ACCOUNT_ID`.
+4. Trigger the first deploy — push to `main`, or run the workflow manually.
+
+### Green-skip before the secrets exist
+
+Until both secrets are present, the workflow still builds `dist/` and simply skips the upload — it reports a notice rather than failing. So it is green from the very first push, and becomes a real deploy the moment `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are added.
+
+### Post-deploy verification
+
+Once both origins serve, re-run the checks in this README's "Verify locally" section against the production origins. Confirm the sandbox iframe loads from `https://sandbox.bynk-lang.org` — that is how you know the origin split is real and not just configured.
+
+### Short share links (deferred / optional)
+
+For short `/api/*` share links, deploy the `share/` Bynk Worker: compile with `--emit js`, then `wrangler deploy` with a real KV namespace bound as `KV`, and add a Cloudflare route so `playground.bynk-lang.org/api/*` reaches it — same-origin, so no CORS. Without it, Share falls back to the self-contained `#hash` links, so this is not required for the playground to work.
 
 ## Highlighting
 
