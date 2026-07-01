@@ -450,7 +450,11 @@ unique, MUST NOT use the reserved `/_bynk/` prefix
 and each `:name` segment MUST bind to a string-constructible parameter
 (`bynk.http.unbound_path_param`, `bynk.http.path_param_not_stringy`,
 `bynk.http.extra_param`); `GET` and `DELETE` MUST NOT take a `body`
-(`bynk.http.body_on_get_or_delete`). An cron handler MUST take at most one
+(`bynk.http.body_on_get_or_delete`). Constructing a `Raw` variant (v0.111) MUST
+supply exactly two arguments — a `Bytes` body then a `String` content-type
+(`bynk.types.variant_arity`, `bynk.types.argument_mismatch`) — and yields
+`HttpResult[()]`, the JSON body parameter `T` being unused, as for `Streaming`
+and the redirect variants. An cron handler MUST take at most one
 `Int` parameter, a valid five-field schedule, and return `Effect[Result[(), E]]`
 (the `bynk.cron.*` codes); an `on message` handler MUST take exactly one `message`
 parameter, a non-empty queue name, and the same return shape (the `bynk.queue.*`
