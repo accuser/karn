@@ -4,24 +4,47 @@ title: "`bynk-lsp`"
 The Bynk language server. The `bynk-lsp` crate builds the `bynkc-lsp` binary, a
 [tower-lsp](https://github.com/ebkalderon/tower-lsp) server that communicates
 over **stdio**. Editors talk to it; most users reach it through the
-[VS Code extension](/docs/tooling/vscode-bynk/) rather than directly.
+[VS Code extension](/docs/tooling/vscode-bynk/) rather than directly. See the
+[Set up editor support](/docs/editor-and-tooling/editor-support/) how-to for
+wiring it into an editor.
 
-## Features
+Text is synchronised in full: on every change the whole document is re-sent
+(`TextDocumentSyncKind::FULL`), and the server holds the current buffer in
+memory. When a project root with a `bynk.toml` is found, the server enables
+cross-file features; otherwise it operates in single-file mode. Project
+discovery and the analysis model that underpins these features are described in
+[Architecture](#architecture) and [Project discovery and performance](#project-discovery-and-performance).
 
-| Capability | Notes |
+## Capabilities
+
+Every capability below is advertised in the server's `ServerCapabilities` and
+backed by a request handler.
+
+| Capability | What it does |
 |---|---|
-| Diagnostics | Live, from `bynkc::diagnose` (recovering compilation); published on change. |
-| Hover | Type signatures and doc blocks; binding-correct via the project index (v0.25), with a name-match fallback for not-yet-indexed kinds. |
-| Go-to-definition | Types, functions, capabilities, services, agents; cross-file and binding-correct via the project index (v0.25). |
-| References | Project-wide, from the binding index (v0.25) — including clause lists and test units. |
-| Rename | Project-wide with `prepareRename`; validated by re-analysis + index equality, versioned edits (v0.25). |
-| Formatting | Whole-document and range formatting, via the shared [`bynk-fmt`](/docs/tooling/bynk-fmt/). |
-| Document symbols | An outline of the file for the editor's symbol view. |
-| File watching | Re-checks diagnostics when `.bynk` files change on disk. |
-
-Text is synced in full (`TextDocumentSyncKind::FULL`). When a project root with a
-`bynk.toml` is found, the server enables cross-file lookups; otherwise it works in
-single-file mode.
+| Diagnostics | Recovering compilation surfaced as squiggles — live by default (debounced, ~200–300 ms) and re-run when watched files change. With a project root diagnostics are project-wide: the whole bundle is analysed, open buffers overlaid on disk, so an error in one file shows on the file that owns it. |
+| Hover | Type signatures and doc blocks for the symbol under the cursor, resolved through the binding index so the description matches the actual definition (with a name-match fallback for kinds the index does not yet carry). |
+| Go-to-definition | Jumps to the declaration of types, functions, capabilities, services, and agents — cross-file, via the project index. Local bindings resolve scope-correctly; `uses`/`consumes` unit segments jump to the unit's source. |
+| Go-to-type-definition | From a value to the declaration of its inferred type. Reads the value's type from the round's expression types and lands on the named type's declaration. |
+| Find references | Project-wide occurrences from the binding index, including clause lists and test units. Local bindings return their definition plus uses within the file. |
+| Rename | Project-wide rename; `prepareRename` validates that the symbol is in scope and refuses out-of-scope kinds. Emits versioned edits, and re-analyses with the edits applied to reject collisions and silent re-bindings before returning. |
+| Formatting | Whole-document formatting via the shared [`bynk-fmt`](/docs/tooling/bynk-fmt/); a parse error yields no edits (the diagnostic flow reports it). |
+| Range formatting | Partial-document formatting. Per spec it may return edits wider than the requested range. |
+| Document symbols | The file outline for the editor's symbol view and quick-open. |
+| Completion | Scope- and context-aware: units after `consumes `, capabilities inside `consumes U { … }` and after `given `, in-scope locals at keyword and expression positions, and members after `.` on a typed value receiver. Documentation is resolved lazily on the focused item so the initial list stays cheap. |
+| Signature help | The active parameter of the call being typed, triggered on `(` and `,`. Covers named callees and value-receiver methods. |
+| Code lens | A reference-count lens above each top-level definition, clickable to peek the references. |
+| Call hierarchy | Incoming and outgoing calls over the binding index's call graph. |
+| Implementation | From a capability to its providers (the reverse direction, provider to capability, is served by go-to-definition). |
+| Document links | `uses`/`consumes` unit names become clickable links to the unit's source file. |
+| Document highlight | The matching binding's occurrences highlighted across the active file. |
+| Folding ranges | Structural folds and comment runs, driven by the recovered AST (no analysis round needed). |
+| Selection ranges | Expand-selection by syntactic nesting — the enclosing-node chain for each position. |
+| Code actions | Quick-fixes built from the structured suggestions carried on diagnostics, served from the cached round so they agree with the squiggles on screen. |
+| Inlay hints | Inferred-type hints for the visible range, plus materialisable ghost `given` hints for uncovered capability requirements. |
+| Semantic tokens | Resolution-aware highlighting (full document and range), additive over the client's syntactic layer, read from the cached index. |
+| Workspace symbols | Project-wide symbol search across the index's definitions, filtered by query. |
+| File watching | Re-checks diagnostics when `.bynk` files change on disk; workspace folders are supported. |
 
 ## Build
 
@@ -34,24 +57,92 @@ cargo build --release -p bynk-lsp
 The binary is `target/release/bynkc-lsp`. Put it on `PATH`, or point your editor
 at it explicitly (in VS Code, the `bynk.executablePath` setting).
 
+`bynkc-lsp --version` prints the version and exits without entering the protocol
+loop, so tooling (such as the VS Code status bar) can query it without the
+server blocking on stdin.
+
+## Architecture
+
+The `Backend` holds the mutable project state behind a `tokio::sync::RwLock`:
+
+- the **project root** (the directory containing `bynk.toml`, or `None` in
+  single-file mode),
+- the parsed **configuration** loaded from `bynk.toml`, and
+- the **open documents**, keyed by URI, each with its current text and version.
+
+A document change runs `recompile_and_publish`. In single-file mode that
+diagnoses the one buffer directly; with a project root it schedules a debounced
+project-wide round. Hover and go-to-definition first consult the binding index,
+falling back to a re-parse of the AST under the cursor for kinds the index does
+not carry; formatting delegates to `bynk-fmt`.
+
+### The analysis round
+
+Each project-wide analysis retains one round's outputs, held together so that
+every position converts against the text the analysis actually saw — not the
+live buffer, which may already have moved on. A round carries:
+
+- the **binding index** — the call graph and cross-file symbol table that
+  references, rename, definition, hover, call hierarchy, implementation, and
+  workspace symbols all read;
+- per-file analysed **snapshots** — the exact text each span is an offset into;
+  every span-to-position conversion uses these;
+- the **open-document versions** captured when the overlay was built, so rename
+  can emit versioned edits against precisely those versions;
+- the full **diagnostics** per file, including the structured suggestions that
+  code actions ride on (clean files retain an empty entry);
+- **inferred-type hints** and the **capability-requirement ledger** that drive
+  the two kinds of inlay hint;
+- **local bindings with scope ranges**, for scope-correct local navigation;
+- **expression types**, which back go-to-type-definition; and
+- a **unit-name-to-source map**, which backs document links.
+
+Because reads convert against the retained snapshots, a request that arrives
+mid-edit still resolves consistently against the last completed round rather
+than against a buffer the analysis never checked.
+
+## Project discovery and performance
+
+On initialise the server walks upward from the workspace folder (or the first
+opened file) looking for a `bynk.toml`; the directory containing it becomes the
+project root. That single fact decides the feature set:
+
+- **With a project root** — cross-file lookups, project-wide diagnostics,
+  workspace symbols, rename, and the index-backed navigation features all apply.
+  The source directory is taken from the manifest's `[paths].src`.
+- **Single-file mode (no manifest)** — each buffer is analysed on its own and
+  the workspace features are unavailable; diagnostics still work per buffer.
+
+Diagnostics are debounced (~200–300 ms), configurable via the
+[`[lsp]` key](/docs/manifest/) `diagnostics_debounce_ms` in `bynk.toml`. A
+generation counter guards the debounce: every change bumps it, and a scheduled
+round runs only if it is still the latest when the delay elapses, so a burst of
+keystrokes coalesces into a single analysis. The analysis itself runs off the
+async runtime. There is a real, if narrow, window between analysing a round and
+publishing it — which is exactly why positions convert against the analysed
+snapshots rather than the live buffer.
+
 ## Internals
 
 The crate is split into focused modules:
 
 | Module | Role |
 |---|---|
-| `main.rs` | Server entry point, `Backend` state, request dispatch. |
+| `main.rs` | Server entry point, `Backend` state, request dispatch, advertised capabilities. |
 | `position.rs` | Byte-offset ↔ LSP position conversion. |
 | `symbols.rs` | Symbol lookups for hover and go-to-definition. |
-| `index_queries.rs` | Pure queries over the project binding index: references, rename planning and validation (v0.25). |
+| `index_queries.rs` | Pure queries over the project binding index: references, rename planning and validation, call hierarchy, semantic tokens, code lenses. |
+| `completion.rs` | Context detection and candidate generation for completion. |
+| `signature_help.rs` | Call-context detection and signature labels. |
+| `inlay_hints.rs` | Inferred-type and ghost `given` hint rendering. |
+| `code_actions.rs` | Quick-fixes from diagnostics' structured suggestions. |
+| `locals_nav.rs` | Scope-correct navigation for local bindings. |
+| `structure.rs` | Folding and selection ranges from the recovered AST. |
 | `document_symbols.rs` | The document-symbol outline. |
+| `publish.rs` | The pure publish plan (which files to publish, which to clear). |
 | `project.rs` | `bynk.toml` project configuration. |
-
-`Backend` holds the project root, parsed config, and open documents behind a
-`tokio::sync::RwLock`.
 
 ## Logging
 
 The server logs to `~/.bynk-lsp.log`; the verbosity is tunable via the
-`BYNK_LSP_LOG` environment variable. `bynkc-lsp --version` prints the version
-without entering the protocol loop.
+`BYNK_LSP_LOG` environment variable (default `warn`).
