@@ -826,6 +826,11 @@ pub enum HttpVariantPayload {
     /// streaming body — the `Streaming` (200) variant (v0.101, real-time track
     /// slice 1).
     Streamed,
+    /// Carries `(body: Bytes, contentType: String)` — the author-owned raw body
+    /// written straight into the response with the declared `content-type` and
+    /// **no codec** (the typed-wire guarantee is deliberately off). The `Raw`
+    /// (200) variant (v0.111); the first two-argument payload shape.
+    Raw,
 }
 
 /// One variant of the built-in `HttpResult[T]` sum (v0.9 §3.3).
@@ -854,6 +859,15 @@ pub const HTTP_VARIANTS: &[HttpVariant] = &[
     HttpVariant {
         name: "Streaming",
         payload: HttpVariantPayload::Streamed,
+        status: 200,
+    },
+    // v0.111: a 200 whose body is an author-owned `Bytes` written straight into
+    // the response with the declared `content-type` — no codec runs. 200-only,
+    // like `Streaming`: it serves service-tier raw bodies (`robots.txt`,
+    // `sitemap.xml`, feeds, a QR PNG), not custom-status error pages.
+    HttpVariant {
+        name: "Raw",
+        payload: HttpVariantPayload::Raw,
         status: 200,
     },
     HttpVariant {

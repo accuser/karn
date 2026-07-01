@@ -54,9 +54,12 @@ The built-in HTTP-result sum ([§5.7](/book/spec/static-semantics/#57-handlers))
 common, modern HTTP status codes (RFC 9110) — success (`Ok`, `Created`,
 `Accepted`, `NoContent`), redirection carrying a `Location` URL (`Found`,
 `SeeOther`, `PermanentRedirect`, …), and the client/server failures
-(`BadRequest`, `NotFound`, `TooManyRequests`, `ServerError`, …). See the
-[HTTP reference](/book/reference/http/) for the full table. The runtime maps each
-variant to an HTTP response:
+(`BadRequest`, `NotFound`, `TooManyRequests`, `ServerError`, …). Two 200-only
+variants carry a body that bypasses JSON serialisation: `Streaming` (an
+SSE-framed `Stream[String]`) and `Raw` (a `Bytes` body written under an
+author-declared `content-type`, with `serialiseValue` bypassed entirely — no
+codec runs). See the [HTTP reference](/book/reference/http/) for the full table.
+The runtime maps each variant to an HTTP response:
 
 | Export | Role |
 |---|---|

@@ -1329,13 +1329,16 @@ pub(crate) fn check_queue_variant(
 
 /// Type-check construction of an `HttpResult[T]` variant (v0.9 §4.3).
 ///
-/// Variants come in four payload shapes:
+/// Variants come in six payload shapes:
 /// - `Value` (`Ok`, `Created`, `Accepted`) — argument's type is `T`. `T` is
 ///   taken from the expected type if available; otherwise reported as ambiguous.
 /// - `Message` (`BadRequest`, `Conflict`, `TooManyRequests`, `ServerError`, …)
 ///   — argument must be `String`.
 /// - `Location` (`Found`, `SeeOther`, `PermanentRedirect`, …) — argument must
 ///   be `String`: the redirect target URL, emitted as a `Location` header.
+/// - `Streamed` (`Streaming`) — argument must be `Stream[String]`, SSE-framed.
+/// - `Raw` (`Raw`) — two arguments, a `Bytes` body then a `String` content-type;
+///   the only two-argument shape.
 /// - `None` (`NoContent`, `NotFound`, `MethodNotAllowed`, …) — no argument
 ///   permitted; `T` is taken from the expected type or left inferred.
 pub(crate) fn check_http_variant(
@@ -1473,6 +1476,52 @@ pub(crate) fn check_http_variant(
                         "`HttpResult.{}` expects a `Stream[String]` body, but got `{}`",
                         variant.name,
                         arg_ty.display(),
+                    ),
+                ));
+                return None;
+            }
+            let t_ty = expected_t.unwrap_or(Ty::Unit);
+            Some(Ty::HttpResult(Box::new(t_ty)))
+        }
+        // v0.111: `Raw(body, contentType)` — the first two-argument shape. The
+        // body is a `Bytes` written straight into the response; the content-type
+        // is any `String`, unvalidated (opaque, ADR 0143 D3). The JSON body
+        // parameter `T` is irrelevant, as for the redirect/message/stream shapes.
+        HttpVariantPayload::Raw => {
+            if args.len() != 2 {
+                ctx.errors.push(CompileError::new(
+                    "bynk.types.variant_arity",
+                    span,
+                    format!(
+                        "`HttpResult.{}` expects 2 arguments (a `Bytes` body and a `String` content-type), but {} were given",
+                        variant.name,
+                        args.len(),
+                    ),
+                ));
+                return None;
+            }
+            let body_ty = type_of(&args[0], Some(&Ty::Base(BaseType::Bytes)), ctx)?;
+            if !compatible(&body_ty, &Ty::Base(BaseType::Bytes)) {
+                ctx.errors.push(CompileError::new(
+                    "bynk.types.argument_mismatch",
+                    args[0].span,
+                    format!(
+                        "`HttpResult.{}` expects a `Bytes` body, but got `{}`",
+                        variant.name,
+                        body_ty.display(),
+                    ),
+                ));
+                return None;
+            }
+            let ct_ty = type_of(&args[1], Some(&Ty::Base(BaseType::String)), ctx)?;
+            if !compatible(&ct_ty, &Ty::Base(BaseType::String)) {
+                ctx.errors.push(CompileError::new(
+                    "bynk.types.argument_mismatch",
+                    args[1].span,
+                    format!(
+                        "`HttpResult.{}` expects a `String` content-type, but got `{}`",
+                        variant.name,
+                        ct_ty.display(),
                     ),
                 ));
                 return None;

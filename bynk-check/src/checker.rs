@@ -2400,6 +2400,15 @@ fn variants_of(ty: &Ty, types: &HashMap<String, TypeDecl>) -> Option<Vec<Variant
                             "stream".to_string(),
                             Ty::Stream(Box::new(Ty::Base(BaseType::String))),
                         )],
+                        // v0.111: the first two-field payload. Field names are
+                        // kept byte-identical to the runtime union in
+                        // `bynk-emit/runtime/src/http.ts`. An `HttpResult` is
+                        // construct-only in handler position (never scrutinised),
+                        // so this binding exists for exhaustiveness, not a path.
+                        HttpVariantPayload::Raw => vec![
+                            ("body".to_string(), Ty::Base(BaseType::Bytes)),
+                            ("contentType".to_string(), Ty::Base(BaseType::String)),
+                        ],
                     },
                 })
                 .collect(),
