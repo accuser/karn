@@ -1,7 +1,7 @@
 //! The Bynk compiler as a wasm module for the in-browser REPL/playground (the
 //! in-browser track, slice 3 — ADR 0139).
 //!
-//! One entry — [`bynk_compile`] (wasm) / [`compile`] (native) — takes an in-memory
+//! One entry — `bynk_compile` (wasm) / `compile` (native) — takes an in-memory
 //! Bynk source and returns a runnable **JavaScript module graph** plus diagnostics,
 //! with **no filesystem and no `tsc`**:
 //!

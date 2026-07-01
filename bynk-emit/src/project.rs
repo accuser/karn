@@ -259,7 +259,7 @@ impl ImportExt {
     }
 }
 
-/// Options for [`compile`]. Construct with [`CompileOptions::single`] or
+/// Options for [`compile_project`]. Construct with [`CompileOptions::single`] or
 /// [`CompileOptions::split`], then chain `.target(…)` / `.platform(…)` /
 /// `.import_ext(…)` to override the bundle/default-platform/`.js` defaults.
 pub struct CompileOptions {

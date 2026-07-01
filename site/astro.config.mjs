@@ -47,7 +47,10 @@ export default defineConfig({
       // Build-time internal link checking (the link-check gate): a broken
       // in-site link fails `astro build`. The whole Book is migrated, so it is
       // validated strictly along with everything else.
-      plugins: [starlightLinksValidator()],
+      // `/docs/api/` is the generated rustdoc tree — built by `cargo doc` in the
+      // deploy workflow and copied into `public/docs/api/` (gitignored, absent from
+      // local builds), so the internal link-checker must not try to resolve into it.
+      plugins: [starlightLinksValidator({ exclude: ["/docs/api/**"] })],
       // Faithful `bynk` highlighting from the editor's own grammar; the fenced
       // language id is `bynk` (the grammar's own name is the display "Bynk").
       expressiveCode: {

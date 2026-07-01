@@ -2,7 +2,7 @@
 //!
 //! This crate holds the modules every other layer depends *on* and none depend
 //! *up* from: the lexer, the parser and its AST, source [`span`]s, the
-//! [`keywords`] table, the structured [`CompileError`](error::CompileError)
+//! [`keywords`] table, the structured [`CompileError`]
 //! type, and the [`diagnostics`] code registry (the single source of truth for
 //! `bynk.*` codes). Diagnostics, positions, and codes therefore cross every
 //! crate without an upward edge.

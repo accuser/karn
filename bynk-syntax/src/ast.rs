@@ -162,7 +162,7 @@ pub struct AdapterDecl {
     /// boundary types, never services).
     pub exports: Vec<ExportsDecl>,
     /// v0.18: `consumes U { Cap, … }` clauses — adapter-to-adapter capability
-    /// dependencies (spec §4.5, [N]). Braced form only; adapter targets only
+    /// dependencies (spec §4.5, \[N\]). Braced form only; adapter targets only
     /// (both enforced semantically, not in the parser).
     pub consumes: Vec<ConsumesDecl>,
     /// The `binding "<module>" requires { … }` clause, if present. Required
