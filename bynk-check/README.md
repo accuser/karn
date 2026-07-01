@@ -16,8 +16,10 @@ It holds:
   predicates, and resolves capabilities, services, agents, and actors.
 - `kernel_methods` / `builtin_names` — the registries the checker dispatches and
   the editor reads for `.`-member completion.
-- `firstparty` — the embedded first-party `bynk` surface, stdlib, and adapters.
+- `firstparty` — the embedded first-party `bynk` surface, stdlib, and adapters
+  (re-exporting `Platform`).
 - `actors` — actor-contract analysis (auth schemes, identities).
+- `requirements` — the capability/requirement analysis the checker draws on.
 - `index` / `hints` / `expr_types` / `locals` — the **captured analysis tables**
   written during checking (the binding index, inlay hints, expression types,
   scoped locals) that the IDE layer queries.
@@ -38,7 +40,7 @@ directly.
 
 ```toml
 [dependencies]
-bynk-check = "0.66"
+bynk-check = "0.109"
 ```
 
 ```rust
@@ -48,7 +50,7 @@ let resolved = resolver::resolve(commons)?;
 let typed = checker::check(resolved)?;
 ```
 
-See the [API docs](https://docs.rs/bynk-check).
+See the [API docs](https://docs.rs/bynk-check) for the full surface.
 
 ## License
 

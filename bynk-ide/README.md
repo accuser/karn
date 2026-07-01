@@ -17,18 +17,25 @@ diagnostic plus the captured analysis tables for the editor to query:
   per-file diagnostics, the binding index, inlay hints, expression types, scoped
   locals, and the unit→source map.
 
-It sits at the top of the library set, over
+## Where it sits
+
+```text
+bynk-syntax  ◀── bynk-render · bynk-fmt · bynk-check ◀── bynk-emit ◀── bynk-ide
+```
+
+`bynk-ide` is the top of the library set, over
 [`bynk-syntax`](https://crates.io/crates/bynk-syntax) +
 [`bynk-check`](https://crates.io/crates/bynk-check) +
 [`bynk-emit`](https://crates.io/crates/bynk-emit). The
 [`bynk-lsp`](https://crates.io/crates/bynk-lsp) language server is built on it, so
-it links the analysis libraries — not the whole compiler binary.
+it links the analysis libraries — not the whole compiler binary. The `bynkc`,
+`bynk`, and `bynk-lsp` binaries are front-ends over the compiler set.
 
 ## Use
 
 ```toml
 [dependencies]
-bynk-ide = "0.66"
+bynk-ide = "0.109"
 ```
 
 ```rust

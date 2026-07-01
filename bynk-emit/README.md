@@ -21,11 +21,22 @@ turns a checked program into output:
 The `workers` target emits one Worker per context; the `compile_project` result
 is an in-memory tree of TypeScript files, written to disk with `write_output`.
 
+## Where it sits
+
+```text
+bynk-syntax  ◀── bynk-render · bynk-fmt · bynk-check ◀── bynk-emit ◀── bynk-ide
+```
+
+The `bynkc`, `bynk`, and `bynk-lsp` binaries are front-ends over this set. Most
+users compile Bynk through the [`bynkc`](https://crates.io/crates/bynkc) /
+[`bynk`](https://crates.io/crates/bynk) CLIs rather than depending on this crate
+directly.
+
 ## Use
 
 ```toml
 [dependencies]
-bynk-emit = "0.66"
+bynk-emit = "0.109"
 ```
 
 ```rust
@@ -36,9 +47,7 @@ let output = compile_project(&options)?;       // in-memory TypeScript tree
 bynk_emit::write_output(&output, &build_dir)?; // write it to disk
 ```
 
-Most users compile Bynk through the [`bynkc`](https://crates.io/crates/bynkc) /
-[`bynk`](https://crates.io/crates/bynk) CLIs rather than depending on this crate
-directly. See the [API docs](https://docs.rs/bynk-emit).
+See the [API docs](https://docs.rs/bynk-emit) for the full surface.
 
 ## License
 
