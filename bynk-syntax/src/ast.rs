@@ -1138,6 +1138,13 @@ pub enum BaseType {
     /// with `Duration` (`Instant ± Duration -> Instant`, `Instant − Instant ->
     /// Duration`). Supersedes ADR 0112 D4's `Int`↔`Duration` clock-math mix.
     Instant,
+    /// `Bytes` (v0.110, ADR 0142) — an immutable finite octet sequence, the
+    /// seventh base type. Unlike its neighbours it does **not** erase to TS
+    /// `number`: a `Bytes` lowers to a `Uint8Array`. No source literal
+    /// (constructed via `Bytes.fromUtf8`/`fromBase64`/`empty`); `==` compares
+    /// by content (real emitter codegen, not host `===`); wires as a base64
+    /// JSON string; not `Map`-keyable and not orderable.
+    Bytes,
 }
 
 impl BaseType {
@@ -1149,6 +1156,7 @@ impl BaseType {
             BaseType::Float => "Float",
             BaseType::Duration => "Duration",
             BaseType::Instant => "Instant",
+            BaseType::Bytes => "Bytes",
         }
     }
 }

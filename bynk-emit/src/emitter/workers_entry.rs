@@ -762,6 +762,16 @@ pub(crate) fn deserialise_call(t: &TypeRef, json_expr: &str, path: &str) -> Stri
         TypeRef::Fn(..) | TypeRef::Query(..) | TypeRef::Stream(..) | TypeRef::Connection(..) => {
             unreachable!("function/query/stream types are rejected at boundaries")
         }
+        // v0.110 (ADR 0142 D8): a `Bytes` at a `workers` boundary is diagnosed
+        // as not-yet-supported by the project validator, so this arm is
+        // normally unreachable. Emit a correct base64 decode anyway (defence in
+        // depth — never a silent mis-encode) rather than fall through to the
+        // number/string typeof check.
+        TypeRef::Base(BaseType::Bytes, _) => {
+            format!(
+                "(typeof {json_expr} === \"string\" ? ((__b) => __b.tag === \"Some\" ? Ok(__b.value) : Err({{ kind: \"StructuralMismatch\", path: \"{path}\", expected: \"base64 string\", actual: \"invalid base64\" }})) (__bynkBytesFromBase64({json_expr})) : Err({{ kind: \"StructuralMismatch\", path: \"{path}\", expected: \"base64 string\", actual: typeof {json_expr} }})) as Result<any, BoundaryError>"
+            )
+        }
         TypeRef::Base(b, _) => {
             let typeof_str = match b {
                 BaseType::Int => "number",
@@ -769,6 +779,8 @@ pub(crate) fn deserialise_call(t: &TypeRef, json_expr: &str, path: &str) -> Stri
                 BaseType::Bool => "boolean",
                 BaseType::Float => "number",
                 BaseType::Duration | BaseType::Instant => "number",
+                // Unreachable: handled by the dedicated `Bytes` arm above.
+                BaseType::Bytes => "string",
             };
             // v0.22b: bare `Int` params validate integrality (ADR 0049). v0.86:
             // a `Duration` is whole milliseconds, so it validates integrality too.

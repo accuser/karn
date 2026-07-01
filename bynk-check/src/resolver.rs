@@ -1522,7 +1522,15 @@ fn check_expr_references(
                 && !name_in_scope(&id.name, params, scopes)
                 && matches!(
                     id.name.as_str(),
-                    "List" | "Map" | "Int" | "Float" | "Json" | "Duration" | "Instant" | "Stream"
+                    "List"
+                        | "Map"
+                        | "Int"
+                        | "Float"
+                        | "Json"
+                        | "Duration"
+                        | "Instant"
+                        | "Stream"
+                        | "Bytes"
                 )
                 && !types.contains_key(&id.name)
             {
@@ -1535,6 +1543,8 @@ fn check_expr_references(
                     "Instant" => &["fromEpochMillis"],
                     // v0.100: `Stream.of(xs)`.
                     "Stream" => &["of"],
+                    // v0.110 (ADR 0142): `Bytes.fromUtf8(s)`/`fromBase64(s)`/`empty()`.
+                    "Bytes" => &["fromUtf8", "fromBase64", "empty"],
                     _ => &["parse"],
                 };
                 let only = allowed.join("`/`");

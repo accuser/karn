@@ -609,6 +609,9 @@ fn refined_default(decl: &TypeDecl) -> Option<String> {
         }
         // v0.86: `Duration` carries no refinement; `0` millis is its default.
         BaseType::Duration | BaseType::Instant => Some("0".to_string()),
+        // v0.110: `Bytes` carries no refinement; the empty octet sequence is
+        // its default.
+        BaseType::Bytes => Some("new Uint8Array()".to_string()),
     }
 }
 
@@ -629,6 +632,7 @@ fn base_default_ts(base: BaseType) -> String {
         BaseType::Bool => "true".to_string(),
         BaseType::Float => "0".to_string(),
         BaseType::Duration | BaseType::Instant => "0".to_string(),
+        BaseType::Bytes => "new Uint8Array()".to_string(),
     }
 }
 
@@ -1053,6 +1057,28 @@ fn lower_method_call(
     {
         return lower_expr(&args[0], stmts, cx);
     }
+    // v0.110 (ADR 0142 D2): the `Bytes` static constructors. `fromUtf8` is the
+    // UTF-8 encoding of a string (total); `fromBase64` is a guarded base64
+    // decode returning `Option` (`None` on invalid base64); `empty` is the
+    // zero octet sequence.
+    if let ExprKind::Ident(id) = &receiver.kind
+        && id.name == BYTES
+    {
+        match (method.name.as_str(), args.len()) {
+            ("fromUtf8", 1) => {
+                let s = lower_expr(&args[0], stmts, cx);
+                return format!("new TextEncoder().encode({s})");
+            }
+            ("fromBase64", 1) => {
+                let s = lower_expr(&args[0], stmts, cx);
+                return format!("__bynkBytesFromBase64({s})");
+            }
+            ("empty", 0) => {
+                return "new Uint8Array()".to_string();
+            }
+            _ => {}
+        }
+    }
     // v0.100: `Stream.of(xs)` — the deterministic in-memory source. A `Stream`
     // lowers to a host async iterable; `of` wraps a list as an async generator.
     // Emitted inline (no runtime import), like the collection kernels.
@@ -1244,6 +1270,14 @@ fn lower_method_call(
             // renders the number.
             Ty::Base(BaseType::Instant) => {
                 if let Some(s) = lower_instant_kernel(receiver, method, args, stmts, cx) {
+                    return s;
+                }
+            }
+            // v0.110 (ADR 0142): the `Bytes` kernel. `length` is the octet
+            // count; `toBase64` encodes; `decodeUtf8` is a guarded UTF-8 decode
+            // returning `Option`.
+            Ty::Base(BaseType::Bytes) => {
+                if let Some(s) = lower_bytes_kernel(receiver, method, args, stmts, cx) {
                     return s;
                 }
             }
@@ -2120,6 +2154,34 @@ fn lower_instant_kernel(
     }
 }
 
+/// v0.110 (ADR 0142 D3/D4): lower a `Bytes` kernel method. `length` is the
+/// `Uint8Array.length` (octet count, not any string length); `toBase64` is a
+/// total encode; `decodeUtf8` is a guarded fatal decode returning `Option`
+/// (`None` on an invalid UTF-8 sequence).
+fn lower_bytes_kernel(
+    receiver: &Expr,
+    method: &Ident,
+    args: &[Expr],
+    stmts: &mut Vec<String>,
+    cx: &mut LowerCtx,
+) -> Option<String> {
+    match (method.name.as_str(), args) {
+        ("length", []) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            Some(format!("({recv}).length"))
+        }
+        ("toBase64", []) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            Some(format!("__bynkBytesToBase64({recv})"))
+        }
+        ("decodeUtf8", []) => {
+            let recv = lower_expr(receiver, stmts, cx);
+            Some(format!("__bynkBytesDecodeUtf8({recv})"))
+        }
+        _ => None,
+    }
+}
+
 /// v0.22a: lower a built-in `String` kernel method (ADR 0046). Pinned
 /// semantics: `replace` is replace-**all** (`replaceAll`); `chars()` is
 /// code **points** (`[...s]`), not code units; `slice` clamps negative
@@ -2727,6 +2789,20 @@ fn lower_bin_op(
             format!("{l} / {r}")
         } else {
             format!("Math.trunc({l} / {r})")
+        }
+    } else if matches!(op, BinOp::Eq | BinOp::NotEq)
+        && cx.commons.expr_types.get(&lhs.span).and_then(|t| t.base()) == Some(BaseType::Bytes)
+    {
+        // v0.110 (ADR 0142 D4): `Bytes` is the one base type whose `==` is not
+        // host `===`. It erases to `Uint8Array`, so `===` is reference equality
+        // (`Bytes.fromUtf8("a") === Bytes.fromUtf8("a")` is `false`). Equality
+        // must compare by content — operand-typed dispatch, exactly like `Div`.
+        // The checker rejects mixed operands, so the left operand decides.
+        let eq = format!("__bynkBytesEqual({l}, {r})");
+        if op == BinOp::Eq {
+            eq
+        } else {
+            format!("!{eq}")
         }
     } else {
         format!("{l} {} {r}", ts_binop(op))
