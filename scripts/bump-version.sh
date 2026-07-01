@@ -68,6 +68,13 @@ sed -i.bak -E "s/current version, v[0-9]+\.[0-9]+/current version, v$mm/" \
 	"$book/spec/scope.md" "$book/spec/appendix-version-history.md" "$book/spec/index.md"
 find "$book" "$docs" -name '*.bak' -delete
 
+# The crate READMEs show a `[dependencies]` example pinned to the current
+# MAJOR.MINOR (e.g. `bynk-syntax = "0.66"`); keep those in step with the release
+# so they don't drift. Only the in-workspace `bynk-*` dep lines are rewritten.
+sed -i.bak -E "s/^([[:space:]]*bynk[a-z-]* = )\"[0-9]+\.[0-9]+\"/\1\"$mm\"/" \
+	bynk*/README.md
+find . -maxdepth 2 -name 'README.md.bak' -delete
+
 # Regenerate the inlined Book (site/public/llms-full.txt) so its banners track the
 # bump. It reads the version straight from Cargo.toml and the Book markdown, so no
 # site build is needed.

@@ -1,6 +1,7 @@
 # bynk-lsp
 
 [![crates.io](https://img.shields.io/crates/v/bynk-lsp.svg)](https://crates.io/crates/bynk-lsp)
+[![docs.rs](https://img.shields.io/docsrs/bynk-lsp)](https://docs.rs/bynk-lsp)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
 The **Language Server for the [Bynk](https://github.com/accuser/bynk)
@@ -55,7 +56,8 @@ This produces the **`bynkc-lsp`** binary. Requires a stable Rust toolchain,
 [VS Code extension](https://github.com/accuser/bynk/tree/main/vscode-bynk),
 which bundles and launches it automatically. For other editors, point your LSP
 client at the `bynkc-lsp` binary and associate it with the `bynk` language /
-`.bynk` files. See
+`.bynk` files. See the
+[`bynk-lsp` tooling docs](https://bynk-lang.org/docs/tooling/bynk-lsp/) and
 [Set up editor support](https://bynk-lang.org/docs/editor-and-tooling/editor-support/).
 
 The server discovers a project by walking up to the nearest `bynk.toml` (falling

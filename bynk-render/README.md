@@ -11,9 +11,11 @@ Given a slice of `bynk_syntax::CompileError` plus the source and a filename, it
 produces the human and machine forms of a Bynk diagnostic:
 
 - **human** — rich, source-pointing [`ariadne`](https://crates.io/crates/ariadne)
-  output (with a colourless variant for byte-stable transcripts), and
+  output (with a colourless variant for byte-stable transcripts),
 - **`short`** — one terse `path:line:col: severity[category]: message` line per
-  error, the format the editor problem-matcher parses.
+  error, the format the editor problem-matcher parses, and
+- **`json`** — the structured line form the same span/severity data feeds for
+  machine consumers.
 
 Every Bynk front-end renders through this one crate, so the CLI, the project
 builder, and the editor all display the same error identically. The crate is a
@@ -22,11 +24,22 @@ pure presentation layer: it depends on
 and never sees the checker or emitter — structured diagnostics flow *down* into
 it, never the other way.
 
+## Where it sits
+
+```text
+bynk-syntax  ◀── bynk-render · bynk-fmt · bynk-check ◀── bynk-emit ◀── bynk-ide
+```
+
+The `bynkc`, `bynk`, and `bynk-lsp` binaries are front-ends over this set. Most
+users see this crate's output through the
+[`bynkc`](https://crates.io/crates/bynkc) / [`bynk`](https://crates.io/crates/bynk)
+CLIs rather than depending on it directly.
+
 ## Use
 
 ```toml
 [dependencies]
-bynk-render = "0.66"
+bynk-render = "0.109"
 ```
 
 ```rust
@@ -35,10 +48,7 @@ bynk_render::print_errors(errors, source, filename);          // ariadne, to std
 let short = bynk_render::render_errors_short(errors, source, filename);
 ```
 
-Most users see this crate's output through the
-[`bynkc`](https://crates.io/crates/bynkc) / [`bynk`](https://crates.io/crates/bynk)
-CLIs rather than depending on it directly. See the
-[API docs](https://docs.rs/bynk-render).
+See the [API docs](https://docs.rs/bynk-render) for the full surface.
 
 ## License
 

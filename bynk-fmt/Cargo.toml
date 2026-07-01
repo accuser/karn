@@ -5,6 +5,8 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Formatter for the Bynk DSL (used by bynkc-lsp)."
+keywords = ["compiler", "dsl", "formatter", "language"]
+categories = ["development-tools", "compilers"]
 
 [lib]
 path = "src/lib.rs"

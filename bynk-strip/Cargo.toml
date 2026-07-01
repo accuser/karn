@@ -1,6 +1,8 @@
 [package]
 name = "bynk-strip"
 description = "Strip-only TypeScript→JavaScript for Bynk's first-class JS artefact (the in-browser track). Erases TypeScript type syntax via oxc, preserving runtime semantics and all value imports; the emitter's strip-only invariant (ADR 0136) guarantees every input is erasable."
+keywords = ["compiler", "dsl", "typescript", "javascript", "language"]
+categories = ["compilers", "development-tools"]
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -5,6 +5,8 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "bynkc-lsp — the Language Server for the Bynk DSL."
+keywords = ["compiler", "dsl", "lsp", "language-server", "language"]
+categories = ["development-tools", "compilers"]
 # v0.29 (ADR 0058): the legend drift guard reads ../vscode-bynk/package.json,
 # which is not part of this crate's package — keep it out of the published
 # tarball so a standalone `cargo test` on the crates.io release can't fail on

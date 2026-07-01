@@ -20,11 +20,21 @@ Most users format Bynk through the CLI (`bynkc fmt`) or format-on-save in the
 editor, rather than depending on this crate directly. See
 [Format your code with `bynk-fmt`](https://bynk-lang.org/docs/editor-and-tooling/format/).
 
+## Where it sits
+
+```text
+bynk-syntax  ◀── bynk-render · bynk-fmt · bynk-check ◀── bynk-emit ◀── bynk-ide
+```
+
+`bynk-fmt` sits directly on the `bynk-syntax` leaf, alongside the other
+first-layer libraries. The `bynkc`, `bynk`, and `bynk-lsp` binaries are
+front-ends over the compiler set.
+
 ## Use
 
 ```toml
 [dependencies]
-bynk-fmt = "0.66"
+bynk-fmt = "0.109"
 ```
 
 ```rust

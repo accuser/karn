@@ -5,6 +5,8 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Shared grammar definitions for the Bynk DSL."
+keywords = ["compiler", "dsl", "grammar", "ebnf", "language"]
+categories = ["compilers", "parser-implementations"]
 
 [lib]
 path = "src/lib.rs"
