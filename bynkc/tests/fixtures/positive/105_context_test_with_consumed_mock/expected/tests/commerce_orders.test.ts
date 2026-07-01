@@ -5,22 +5,25 @@ import { Ok, Err, Some, None, type Result, type Option, type ValidationError } f
 import * as commerce_orders from "./../commerce/orders.js";
 import * as commerce_payment from "./../commerce/payment.js";
 
-class AssertionError extends Error {
+class ExpectationError extends Error {
   location: string;
   start: number;
   end: number;
-  constructor(location: string, start: number, end: number) {
-    super(`assertion failed at ${location}`);
+  constructor(location: string, start: number, end: number, detail: string) {
+    super(`${detail}\n  at ${location}`);
     this.location = location;
     this.start = start;
     this.end = end;
   }
 }
-function __bynkAssertionFailure(location: string, start: number, end: number) {
-  return new AssertionError(location, start, end);
+function __bynkExpectFailure(location: string, start: number, end: number, detail: string) {
+  return new ExpectationError(location, start, end, detail);
 }
-function __bynkAssert(cond: boolean, location: string, start: number, end: number): void {
-  if (!cond) { throw __bynkAssertionFailure(location, start, end); }
+function __bynkExpect(cond: boolean, location: string, start: number, end: number, detail: string): void {
+  if (!cond) { throw __bynkExpectFailure(location, start, end, detail); }
+}
+function __bynkShow(v: unknown): string {
+  try { return typeof v === "bigint" ? String(v) : (JSON.stringify(v) ?? String(v)); } catch { return String(v); }
 }
 
 class MockPayment {
@@ -41,10 +44,10 @@ async function test_place_succeeds_for_positive_amounts() {
     const { AuthId, PaymentError } = commerce_payment as any;
     const Payment = (deps as any).surface?.Payment;
     const r = await place.call(50, deps);
-    if (!(r.tag === "Ok")) { throw __bynkAssertionFailure("tests/orders.test.bynk:14:12", 330, 340); }
+    if (!(r.tag === "Ok")) { throw __bynkExpectFailure("tests/orders.test.bynk:14:12", 331, 341, "expect r is Ok(_)"); }
     return { pass: true };
   } catch (e) {
-    if (e instanceof AssertionError) {
+    if (e instanceof ExpectationError) {
       return { pass: false, error: { message: e.message, location: e.location } };
     }
     return { pass: false, error: { message: String(e), location: "unknown" } };
@@ -58,10 +61,10 @@ async function test_place_fails_for_zero() {
     const { AuthId, PaymentError } = commerce_payment as any;
     const Payment = (deps as any).surface?.Payment;
     const r = await place.call(0, deps);
-    if (!(r.tag === "Err")) { throw __bynkAssertionFailure("tests/orders.test.bynk:19:12", 416, 427); }
+    if (!(r.tag === "Err")) { throw __bynkExpectFailure("tests/orders.test.bynk:19:12", 417, 428, "expect r is Err(_)"); }
     return { pass: true };
   } catch (e) {
-    if (e instanceof AssertionError) {
+    if (e instanceof ExpectationError) {
       return { pass: false, error: { message: e.message, location: e.location } };
     }
     return { pass: false, error: { message: String(e), location: "unknown" } };

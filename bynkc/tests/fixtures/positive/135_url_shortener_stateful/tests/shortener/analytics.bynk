@@ -19,7 +19,7 @@ Construction note: refined values use `ShortCode.of(...)` (Result), unwrapped
 with a match — finding #7 (refined-construction ergonomics) is not yet
 addressed, hence the verbosity.
 ---
-test shortener.analytics
+suite shortener.analytics
 
 uses shortener.core
 
@@ -27,55 +27,55 @@ uses shortener.core
 STATE-INIT PROBE. A fresh Hits key, read before any write, should report 0.
 This is the cleanest isolation of agent state initialisation in the suite.
 ---
-test "a fresh Hits key reads count as 0" {
+case "a fresh Hits key reads count as 0" {
 	match ShortCode.of("fresh1") {
-		Err(_) => assert false
+		Err(_) => expect false
 		Ok(code) => {
 			let reading <- count.call(code)
 			match reading {
-				Ok(total) => assert total == 0
-				Err(_)    => assert false
+				Ok(total) => expect total == 0
+				Err(_)    => expect false
 			}
 		}
 	}
 }
 
-test "recording a hit returns a running total" {
+case "recording a hit returns a running total" {
 	match ShortCode.of("abc123") {
-		Err(_) => assert false
+		Err(_) => expect false
 		Ok(code) => {
 			let result <- track.call(code)
 			match result {
-				Ok(total) => assert total == 1
-				Err(_)    => assert false
+				Ok(total) => expect total == 1
+				Err(_)    => expect false
 			}
 		}
 	}
 }
 
-test "two hits on the same code accumulate" {
+case "two hits on the same code accumulate" {
 	match ShortCode.of("abc123") {
-		Err(_) => assert false
+		Err(_) => expect false
 		Ok(code) => {
 			let _ <- track.call(code)
 			let second <- track.call(code)
 			match second {
-				Ok(total) => assert total == 2
-				Err(_)    => assert false
+				Ok(total) => expect total == 2
+				Err(_)    => expect false
 			}
 		}
 	}
 }
 
-test "count reads back the current total without incrementing" {
+case "count reads back the current total without incrementing" {
 	match ShortCode.of("zzz999") {
-		Err(_) => assert false
+		Err(_) => expect false
 		Ok(code) => {
 			let _ <- track.call(code)
 			let reading <- count.call(code)
 			match reading {
-				Ok(total) => assert total == 1
-				Err(_)    => assert false
+				Ok(total) => expect total == 1
+				Err(_)    => expect false
 			}
 		}
 	}

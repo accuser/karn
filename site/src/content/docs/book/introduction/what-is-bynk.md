@@ -49,7 +49,7 @@ capability, a stateful agent, and an HTTP service — read
 - **Compiles to TypeScript.** You get JavaScript-ecosystem interop and a
   natural fit for Cloudflare Workers, with a static type system in front of it.
   See [Why compile to TypeScript](/book/guides/projects-build-and-deployment/why-compile-to-typescript/).
-- **Testing is built in.** `test` blocks, `assert`, dependency `mocks`, and
+- **Testing is built in.** `suite`/`case` blocks, `expect`, dependency `mocks`, and
   [`Mock[T]`](/book/reference/glossary/#term-mock) value fabrication ship with the
   language.
 

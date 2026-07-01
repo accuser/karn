@@ -7,22 +7,25 @@ import worker_ops_jobs from "../workers/ops-jobs/index.js";
 import * as platform_time from "../workers/platform-time/handlers.js";
 import worker_platform_time from "../workers/platform-time/index.js";
 
-class AssertionError extends Error {
+class ExpectationError extends Error {
   location: string;
   start: number;
   end: number;
-  constructor(location: string, start: number, end: number) {
-    super(`assertion failed at ${location}`);
+  constructor(location: string, start: number, end: number, detail: string) {
+    super(`${detail}\n  at ${location}`);
     this.location = location;
     this.start = start;
     this.end = end;
   }
 }
-function __bynkAssertionFailure(location: string, start: number, end: number) {
-  return new AssertionError(location, start, end);
+function __bynkExpectFailure(location: string, start: number, end: number, detail: string) {
+  return new ExpectationError(location, start, end, detail);
 }
-function __bynkAssert(cond: boolean, location: string, start: number, end: number): void {
-  if (!cond) { throw __bynkAssertionFailure(location, start, end); }
+function __bynkExpect(cond: boolean, location: string, start: number, end: number, detail: string): void {
+  if (!cond) { throw __bynkExpectFailure(location, start, end, detail); }
+}
+function __bynkShow(v: unknown): string {
+  try { return typeof v === "bigint" ? String(v) : (JSON.stringify(v) ?? String(v)); } catch { return String(v); }
 }
 
 function makeHarness() {
@@ -39,10 +42,10 @@ async function test_tick_reads_the_clock_and_succeeds() {
   try {
     const deps = makeHarness();
     const r = await callService(deps.env.OPS_JOBS, "tick", {  }, ops_jobs.deserialise_Result_Int_TickError, "integration");
-    if (!(r.tag === "Ok")) { throw __bynkAssertionFailure("check.bynk:11:12", 364, 374); }
+    if (!(r.tag === "Ok")) { throw __bynkExpectFailure("check.bynk:11:12", 365, 375, "expect r is Ok(_)"); }
     return { pass: true };
   } catch (e) {
-    if (e instanceof AssertionError) {
+    if (e instanceof ExpectationError) {
       return { pass: false, error: { message: e.message, location: e.location } };
     }
     return { pass: false, error: { message: String(e), location: "unknown" } };

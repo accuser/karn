@@ -48,16 +48,6 @@
       "summary": "Two agents share a name."
     }
   ],
-  "assert_expr": [
-    {
-      "code": "bynk.assert.non_bool",
-      "summary": "`assert` was given a non-`Bool` expression."
-    },
-    {
-      "code": "bynk.assert.outside_test",
-      "summary": "`assert` was used outside a test case body."
-    }
-  ],
   "base_type": [
     {
       "code": "bynk.parse.expected_base_type",
@@ -148,6 +138,12 @@
     {
       "code": "bynk.parse.expected_capability_op",
       "summary": "Expected a capability operation."
+    }
+  ],
+  "case": [
+    {
+      "code": "bynk.suite.duplicate_case_name",
+      "summary": "Two `case`s share a description."
     }
   ],
   "consumes_decl": [
@@ -264,6 +260,16 @@
     {
       "code": "bynk.types.err_value_mismatch",
       "summary": "An `Err` payload has the wrong type."
+    }
+  ],
+  "expect_expr": [
+    {
+      "code": "bynk.expect.not_bool",
+      "summary": "`expect` was given a non-`Bool` predicate."
+    },
+    {
+      "code": "bynk.expect.outside_case",
+      "summary": "`expect` was used outside a `case` body."
     }
   ],
   "exports_decl": [
@@ -888,26 +894,20 @@
       "summary": "A string literal is not terminated."
     }
   ],
+  "suite_decl": [
+    {
+      "code": "bynk.parse.unexpected_suite",
+      "summary": "A `suite` appeared where it is not allowed."
+    },
+    {
+      "code": "bynk.suite.unknown_target",
+      "summary": "A `suite` targets a unit that does not exist."
+    }
+  ],
   "sum_type": [
     {
       "code": "bynk.resolve.duplicate_variant",
       "summary": "A sum type declares a variant twice."
-    }
-  ],
-  "test_case": [
-    {
-      "code": "bynk.test.duplicate_case_name",
-      "summary": "Two test cases share a description."
-    }
-  ],
-  "test_decl": [
-    {
-      "code": "bynk.parse.unexpected_test",
-      "summary": "A `test` appeared where it is not allowed."
-    },
-    {
-      "code": "bynk.test.unknown_target",
-      "summary": "A `test` block targets a unit that does not exist."
     }
   ],
   "type_decl": [

@@ -29,7 +29,7 @@
               },
               {
                 "type": "SYMBOL",
-                "name": "test_decl"
+                "name": "suite_decl"
               }
             ]
           }
@@ -256,7 +256,7 @@
         }
       ]
     },
-    "test_decl": {
+    "suite_decl": {
       "type": "PREC_RIGHT",
       "value": 0,
       "content": {
@@ -264,7 +264,7 @@
         "members": [
           {
             "type": "STRING",
-            "value": "test"
+            "value": "suite"
           },
           {
             "type": "FIELD",
@@ -317,7 +317,7 @@
         "members": [
           {
             "type": "STRING",
-            "value": "test"
+            "value": "suite"
           },
           {
             "type": "STRING",
@@ -430,7 +430,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "test_case"
+          "name": "case"
         }
       ]
     },
@@ -607,7 +607,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "test_case"
+          "name": "case"
         }
       ]
     },
@@ -4067,12 +4067,12 @@
         }
       ]
     },
-    "test_case": {
+    "case": {
       "type": "SEQ",
       "members": [
         {
           "type": "STRING",
-          "value": "test"
+          "value": "case"
         },
         {
           "type": "FIELD",
@@ -4152,7 +4152,7 @@
           "value": 1,
           "content": {
             "type": "SYMBOL",
-            "name": "assert_expr"
+            "name": "expect_expr"
           }
         }
       ]
@@ -4342,7 +4342,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "assert_expr"
+          "name": "expect_expr"
         },
         {
           "type": "SYMBOL",
@@ -4358,7 +4358,7 @@
         }
       ]
     },
-    "assert_expr": {
+    "expect_expr": {
       "type": "PREC_RIGHT",
       "value": 0,
       "content": {
@@ -4366,7 +4366,7 @@
         "members": [
           {
             "type": "STRING",
-            "value": "assert"
+            "value": "expect"
           },
           {
             "type": "FIELD",

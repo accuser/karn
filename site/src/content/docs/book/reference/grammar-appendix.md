@@ -10,21 +10,21 @@ The complete Bynk grammar, generated from the `tree-sitter-bynk` grammar. For th
 **Notation.** `"x"` a literal token · `/x/` a regular expression · `( … )?` optional · `( … )*` zero or more · `( … )+` one or more · `a | b` choice · `ε` empty. Rule names are the readable display names (a leading `_` denotes an internal helper rule; trivial wrappers are collapsed). `doc_block` is an external token — a `--- … ---` documentation block.
 
 ```ebnf
-source_file ::= (commons_decl | context_decl | adapter_decl | integration_decl | test_decl)+ | item_fragment+ | expr_fragment
+source_file ::= (commons_decl | context_decl | adapter_decl | integration_decl | suite_decl)+ | item_fragment+ | expr_fragment
 item_fragment ::= context_body_item | handler | store_field | key_decl
 expr_fragment ::= statement+ expression? | expression
 commons_decl ::= "commons" qualified_name ("{" commons_body_item* "}" | commons_body_item*)
 context_decl ::= "context" qualified_name ("{" context_body_item* "}" | context_body_item*)
 adapter_decl ::= "adapter" qualified_name ("{" adapter_body_item* "}" | adapter_body_item*)
-test_decl ::= "test" qualified_name ("{" test_body_item* "}" | test_body_item*)
-integration_decl ::= "test" "integration" string_literal ("{" wires_decl integration_body_item* "}" | wires_decl integration_body_item*)
+suite_decl ::= "suite" qualified_name ("{" test_body_item* "}" | test_body_item*)
+integration_decl ::= "suite" "integration" string_literal ("{" wires_decl integration_body_item* "}" | wires_decl integration_body_item*)
 wires_decl ::= "wires" qualified_name ("," qualified_name)*
-integration_body_item ::= uses_decl | test_case
+integration_body_item ::= uses_decl | case
 qualified_name ::= identifier ("." identifier)*
 commons_body_item ::= uses_decl | type_decl | fn_decl | capability_decl | provider_decl | service_decl | agent_decl | actor_decl
 context_body_item ::= uses_decl | consumes_decl | exports_decl | type_decl | fn_decl | capability_decl | provider_decl | service_decl | agent_decl | actor_decl
 adapter_body_item ::= binding_decl | uses_decl | consumes_decl | exports_decl | type_decl | fn_decl | capability_decl | provider_decl | service_decl | agent_decl | actor_decl
-test_body_item ::= uses_decl | consumes_decl | mocks_decl | test_case
+test_body_item ::= uses_decl | consumes_decl | mocks_decl | case
 uses_decl ::= "uses" qualified_name
 consumes_decl ::= "consumes" qualified_name ("as" identifier | "{" (identifier ("," identifier)*)? ","? "}")?
 binding_decl ::= "binding" string_literal ("requires" "{" (binding_requirement ("," binding_requirement)*)? ","? "}")?
@@ -84,16 +84,16 @@ scheme_config ::= "(" scheme_arg ("," scheme_arg)* ")"
 scheme_arg ::= identifier "=" (string_literal | number_literal)
 by_clause ::= "by" (identifier ":")? identifier ("|" identifier)*
 mocks_decl ::= "mocks" identifier "=" identifier "{" provider_op* "}"
-test_case ::= "test" string_literal block
+case ::= "case" string_literal block
 block ::= "{" statement* expression? "}"
-statement ::= let_stmt | effect_let_stmt | effect_send_stmt | assign_stmt | assert_expr
+statement ::= let_stmt | effect_let_stmt | effect_send_stmt | assign_stmt | expect_expr
 let_stmt ::= "let" binding_name (":" type_ref)? "=" expression
 effect_let_stmt ::= "let" binding_name (":" type_ref)? "<-" expression
 effect_send_stmt ::= "~>" expression
 assign_stmt ::= identifier ":=" expression
 binding_name ::= identifier | "_"
-expression ::= if_expr | match_expr | is_expr | assert_expr | binary_expr | unary_expr | primary
-assert_expr ::= "assert" expression
+expression ::= if_expr | match_expr | is_expr | expect_expr | binary_expr | unary_expr | primary
+expect_expr ::= "expect" expression
 if_expr ::= "if" expression block "else" (if_expr | block)
 match_expr ::= "match" expression "{" match_arm* "}"
 match_arm ::= pattern "=>" expression ","?

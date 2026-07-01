@@ -7,22 +7,25 @@ import worker_demo_api from "../workers/demo-api/index.js";
 import * as demo_counter from "../workers/demo-counter/handlers.js";
 import worker_demo_counter from "../workers/demo-counter/index.js";
 
-class AssertionError extends Error {
+class ExpectationError extends Error {
   location: string;
   start: number;
   end: number;
-  constructor(location: string, start: number, end: number) {
-    super(`assertion failed at ${location}`);
+  constructor(location: string, start: number, end: number, detail: string) {
+    super(`${detail}\n  at ${location}`);
     this.location = location;
     this.start = start;
     this.end = end;
   }
 }
-function __bynkAssertionFailure(location: string, start: number, end: number) {
-  return new AssertionError(location, start, end);
+function __bynkExpectFailure(location: string, start: number, end: number, detail: string) {
+  return new ExpectationError(location, start, end, detail);
 }
-function __bynkAssert(cond: boolean, location: string, start: number, end: number): void {
-  if (!cond) { throw __bynkAssertionFailure(location, start, end); }
+function __bynkExpect(cond: boolean, location: string, start: number, end: number, detail: string): void {
+  if (!cond) { throw __bynkExpectFailure(location, start, end, detail); }
+}
+function __bynkShow(v: unknown): string {
+  try { return typeof v === "bigint" ? String(v) : (JSON.stringify(v) ?? String(v)); } catch { return String(v); }
 }
 
 function makeHarness() {
@@ -45,17 +48,17 @@ async function test_two_ticks_on_the_same_id_accumulate_across_the_wire() {
         switch (__d.tag) {
           case "Ok": {
             const n = __d.value;
-            return __bynkAssert((n === 2), "check.bynk:8:24", 239, 245);
+            return __bynkExpect((n === 2), "check.bynk:8:24", 240, 246, "expect n == 2");
           }
           case "Err": {
-            return __bynkAssert((false), "check.bynk:9:24", 269, 274);
+            return __bynkExpect((false), "check.bynk:9:24", 270, 275, "expect false");
           }
         }
         throw new Error("non-exhaustive match");
       })(b));
     return { pass: true };
   } catch (e) {
-    if (e instanceof AssertionError) {
+    if (e instanceof ExpectationError) {
       return { pass: false, error: { message: e.message, location: e.location } };
     }
     return { pass: false, error: { message: String(e), location: "unknown" } };
@@ -70,17 +73,17 @@ async function test_a_fresh_id_starts_from_zero_in_a_new_case() {
         switch (__d.tag) {
           case "Ok": {
             const n = __d.value;
-            return __bynkAssert((n === 1), "check.bynk:16:24", 409, 415);
+            return __bynkExpect((n === 1), "check.bynk:16:24", 410, 416, "expect n == 1");
           }
           case "Err": {
-            return __bynkAssert((false), "check.bynk:17:24", 439, 444);
+            return __bynkExpect((false), "check.bynk:17:24", 440, 445, "expect false");
           }
         }
         throw new Error("non-exhaustive match");
       })(a));
     return { pass: true };
   } catch (e) {
-    if (e instanceof AssertionError) {
+    if (e instanceof ExpectationError) {
       return { pass: false, error: { message: e.message, location: e.location } };
     }
     return { pass: false, error: { message: String(e), location: "unknown" } };

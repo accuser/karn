@@ -219,15 +219,15 @@ adapter tokens {
 
 **See also.** [Adapters](/book/reference/adapters/) · [Wrap a library as an adapter](/book/guides/effects-and-capabilities/wrap-a-library/).
 
-### test_decl {#rule-test_decl}
+### suite_decl {#rule-suite_decl}
 
-{{#grammar test_decl}}
+{{#grammar suite_decl}}
 
-A `test` block targeting a `commons` or `context`, holding its test cases and
+A `suite` block targeting a `commons` or `context`, holding its `case`s and
 mocks.
 
 **Static semantics.**
-{{#grammar-semantics test_decl}}
+{{#grammar-semantics suite_decl}}
 
 **See also.** [Testing](/book/reference/testing/) · [Write tests and mock collaborators](/book/guides/testing/write-tests/).
 
@@ -235,7 +235,7 @@ mocks.
 
 {{#grammar integration_decl}}
 
-A `test integration` block that wires several contexts together and exercises a
+A `suite integration` block that wires several contexts together and exercises a
 flow across their boundaries.
 
 **Static semantics.**
@@ -282,7 +282,7 @@ boundary types, inline pure helpers and `uses`, external providers, and
 
 {{#grammar _test_body_item}}
 
-The declarations allowed in a `test` block, including `mocks` and test cases.
+The declarations allowed in a `suite` block, including `mocks` and `case`s.
 
 ### qualified_name {#rule-qualified_name}
 
@@ -1307,14 +1307,14 @@ and discards it.
 `name := expr` (v0.81, storage track) — a `Cell` store write. The unconditional
 write form; `.update(fn)` is the read-modify-write form. ADR 0108.
 
-### assert_expr {#rule-assert_expr}
+### expect_expr {#rule-expect_expr}
 
-{{#grammar assert_expr}}
+{{#grammar expect_expr}}
 
-`assert` — checks a `Bool` condition in a test case.
+`expect` — checks a `Bool` predicate in a `case`.
 
 **Static semantics.**
-{{#grammar-semantics assert_expr}}
+{{#grammar-semantics expect_expr}}
 
 ### binding_name {#rule-_binding_name}
 
@@ -1324,25 +1324,25 @@ The name bound by a `let`: an identifier, or `_` to discard.
 
 ## Testing constructs
 
-Test cases, mocks, and integration wiring. See also the top-level
-[`test_decl`](#rule-test_decl) and [`integration_decl`](#rule-integration_decl).
+Cases, mocks, and integration wiring. See also the top-level
+[`suite_decl`](#rule-suite_decl) and [`integration_decl`](#rule-integration_decl).
 
-### test_case {#rule-test_case}
+### case {#rule-case}
 
-{{#grammar test_case}}
+{{#grammar case}}
 
-A single named test case with a block body, typically ending in `assert`s.
+A single named `case` with a block body, typically ending in `expect`s.
 
 **Example.**
 ```bynk,ignore
-test "a fresh counter starts at zero" {
+case "a fresh counter starts at zero" {
   let n <- Counter(CounterId.unsafe("fresh")).current()
-  assert n == 0
+  expect n == 0
 }
 ```
 
 **Static semantics.**
-{{#grammar-semantics test_case}}
+{{#grammar-semantics case}}
 
 **See also.** [Testing](/book/reference/testing/) · [Write tests and mock collaborators](/book/guides/testing/write-tests/).
 
@@ -1351,7 +1351,7 @@ test "a fresh counter starts at zero" {
 {{#grammar mocks_decl}}
 
 `mocks` — supplies a test implementation of a capability for the cases in a
-`test` block.
+`suite` block.
 
 **Static semantics.**
 {{#grammar-semantics mocks_decl}}

@@ -376,7 +376,7 @@ fn walk_exprs(e: &Expr, f: &mut impl FnMut(&Expr)) {
         }
         ExprKind::Lambda(l) => walk_exprs(&l.body, f),
         ExprKind::EffectPure(i)
-        | ExprKind::Assert(i)
+        | ExprKind::Expect(i)
         | ExprKind::UnaryOp(_, i)
         | ExprKind::Paren(i)
         | ExprKind::Ok(i)
@@ -454,7 +454,7 @@ pub(crate) fn block_uses_send(b: &Block) -> bool {
         match s {
             Statement::Send(_) => true,
             Statement::Let(l) | Statement::EffectLet(l) => expr(&l.value),
-            Statement::Assert(a) => expr(&a.value),
+            Statement::Expect(a) => expr(&a.value),
             Statement::Assign(a) => expr(&a.value),
         }
     }
@@ -529,7 +529,7 @@ pub(crate) fn block_writes_state(b: &Block, m: StoreKinds<'_>) -> bool {
         match s {
             Statement::Assign(_) => true,
             Statement::Let(l) | Statement::EffectLet(l) => expr(&l.value, m),
-            Statement::Assert(a) => expr(&a.value, m),
+            Statement::Expect(a) => expr(&a.value, m),
             Statement::Send(s) => expr(&s.value, m),
         }
     }
@@ -570,7 +570,7 @@ fn walk_block_exprs(b: &Block, f: &mut impl FnMut(&Expr)) {
     for s in &b.statements {
         match s {
             Statement::Let(l) | Statement::EffectLet(l) => walk_exprs(&l.value, f),
-            Statement::Assert(a) => walk_exprs(&a.value, f),
+            Statement::Expect(a) => walk_exprs(&a.value, f),
             Statement::Send(s) => walk_exprs(&s.value, f),
             Statement::Assign(a) => walk_exprs(&a.value, f),
         }
@@ -1204,7 +1204,7 @@ fn collect_refs_in_block(
                 }
                 collect_refs_in_expr(&l.value, local_to_file, commons, ctx, out);
             }
-            Statement::Assert(a) => {
+            Statement::Expect(a) => {
                 collect_refs_in_expr(&a.value, local_to_file, commons, ctx, out);
             }
             Statement::Send(s) => {
@@ -1263,7 +1263,7 @@ fn collect_refs_in_expr(
         ExprKind::EffectPure(inner) => {
             collect_refs_in_expr(inner, local_to_file, commons, ctx, out);
         }
-        ExprKind::Assert(inner) => {
+        ExprKind::Expect(inner) => {
             collect_refs_in_expr(inner, local_to_file, commons, ctx, out);
         }
         ExprKind::Mock { args, .. } => {

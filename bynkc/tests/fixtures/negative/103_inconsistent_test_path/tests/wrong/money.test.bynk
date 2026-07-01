@@ -1,6 +1,6 @@
-test commerce.money {
-  test "wrong placement" {
+suite commerce.money {
+  case "wrong placement" {
     let m = Money.fromMinorUnits(5)
-    assert m is Ok(_)
+    expect m is Ok(_)
   }
 }

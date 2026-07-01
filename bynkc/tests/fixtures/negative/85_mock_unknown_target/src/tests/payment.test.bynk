@@ -1,11 +1,11 @@
-test commerce.payment {
+suite commerce.payment {
   mocks DoesNotExist = SomeImpl {
     fn op() -> Int {
       0
     }
   }
 
-  test "x" {
-    assert true
+  case "x" {
+    expect true
   }
 }

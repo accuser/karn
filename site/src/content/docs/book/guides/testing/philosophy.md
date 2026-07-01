@@ -1,15 +1,34 @@
 ---
 title: The testing philosophy
 ---
-Testing is built into Bynk rather than bolted on: `test` blocks, `assert`,
+Testing is built into Bynk rather than bolted on: `suite`/`case` blocks, `expect`,
 `Mock[T]`, and `mocks` are language constructs. This page explains why they exist
 in the form they do.
 
+## One predicate surface
+
+Bynk already has a way to state a checked claim: an **invariant** is a pure `Bool`
+predicate — `is`, `implies`, the operators, pure methods — enforced at the commit
+boundary. A test's `expect` is *that same predicate*, aimed at a value instead of a
+committed state:
+
+```bynk
+expect    balance >= 0          -- in a case
+invariant nonneg: balance >= 0  -- on an agent
+ensures   nonneg: result >= 0   -- on a function
+```
+
+There is no second assertion grammar and no matcher library to learn — one
+predicate surface across production code and tests (ADR 0144). Moving from writing
+code to verifying it introduces no new vocabulary; a failure reports the structure
+of the predicate — `expected` versus `actual` — because there is one predicate
+shape to render.
+
 ## Tests are part of the language, not a library
 
-Because tests are a language construct, the compiler understands them. `assert` is
-valid *only* inside a test case — used anywhere else it is a compile error
-(`bynk.assert.outside_test`), so test-only logic can never leak into production
+Because tests are a language construct, the compiler understands them. `expect` is
+valid *only* inside a `case` — used anywhere else it is a compile error
+(`bynk.expect.outside_case`), so test-only logic can never leak into production
 code. The same is true of `Mock[T]`. This is the type-system philosophy turned on
 the test suite: the boundary between test and production code is enforced, not
 merely conventional.

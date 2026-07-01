@@ -1,10 +1,10 @@
 ---
 title: Test a flow across Workers
 ---
-A unit test (`test <context> { … }`) checks one context with its collaborators
+A unit test (`suite <context> { … }`) checks one context with its collaborators
 replaced by `mocks`. That never runs the real cross-context wire — the
 serialise → JSON → deserialise → projection path that only the workers target
-emits. A **`test integration`** block fills that gap: it stands several contexts
+emits. A **`suite integration`** block fills that gap: it stands several contexts
 up as the Workers they deploy as, wires their Service Bindings together, and runs
 a flow end to end through the real wire — no mocks.
 
@@ -63,17 +63,17 @@ Put it under the project's `tests/` tree. `wires` lists every participating
 context; cases call in by qualified name.
 
 ```bynk
-test integration "checkout" {
+suite integration "checkout" {
   wires shop.orders, shop.payment
 
-  test "small order authorises across the wire" {
+  case "small order authorises across the wire" {
     let r <- shop.orders.place(100)
-    assert r is Ok(_)
+    expect r is Ok(_)
   }
 
-  test "large order is rejected end to end" {
+  case "large order is rejected end to end" {
     let r <- shop.orders.place(50000)
-    assert r is Err(_)
+    expect r is Err(_)
   }
 }
 ```
@@ -119,5 +119,5 @@ is needed.
   state starting empty and resetting **per case**. So a service that drives an
   agent can be exercised end to end, and you can assert on accumulated state.
 
-See the [testing reference](/book/reference/testing/#test-integration--multi-worker-integration-tests)
+See the [testing reference](/book/reference/testing/#suite-integration--multi-worker-integration-tests)
 and [`bynk.integration.*` errors](/book/troubleshooting/integration-errors/).

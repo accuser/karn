@@ -1,8 +1,8 @@
 ---
 title: "`bynk.integration.*` errors"
 ---
-These diagnostics come from `test integration` blocks (multi-Worker integration
-tests). See the [testing reference](/book/reference/testing/#test-integration--multi-worker-integration-tests)
+These diagnostics come from `suite integration` blocks (multi-Worker integration
+tests). See the [testing reference](/book/reference/testing/#suite-integration--multi-worker-integration-tests)
 and [Test a flow across Workers](/book/guides/testing/integration/).
 
 ## `bynk.integration.too_few_participants`
@@ -56,7 +56,7 @@ context needs a Worker to route to.
 [bynk.integration.mock_in_integration] `mocks` is not allowed in an integration test
 ```
 
-**Cause:** a `mocks` declaration appears inside `test integration`. Integration
+**Cause:** a `mocks` declaration appears inside `suite integration`. Integration
 tests wire participants with their **real** implementations — that is the point.
 
 **Fix:** remove the mock. To substitute a collaborator, write a unit test
@@ -68,4 +68,4 @@ tests wire participants with their **real** implementations — that is the poin
 [bynk.integration.duplicate_suite] integration test `"checkout"` is declared more than once
 ```
 
-**Fix:** give each `test integration` a unique suite name.
+**Fix:** give each `suite integration` a unique suite name.

@@ -1,11 +1,11 @@
-test commerce.money {
+suite commerce.money {
   mocks NotAllowed = SomeImpl {
     fn op(x: Int) -> Int {
       x
     }
   }
 
-  test "x" {
-    assert true
+  case "x" {
+    expect true
   }
 }

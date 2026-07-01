@@ -647,10 +647,11 @@ duplicate a participant or suite name, and MUST wire every consumed dependency
 
 ## §5.9 Testing constructs
 
-An `assert` MUST occur only in a test case body and MUST be given a `Bool`
-(`bynk.assert.outside_test`, `bynk.assert.non_bool`). A `test` block MUST target
-an existing unit and MUST NOT duplicate a case description
-(`bynk.test.unknown_target`, `bynk.test.duplicate_case_name`).
+An `expect` MUST occur only in a `case` body and MUST be given a `Bool` predicate
+(`bynk.expect.outside_case`, `bynk.expect.not_bool`) — the same invariant
+predicate surface as `invariant`/`ensures` (one predicate surface, ADR 0144). A
+`suite` MUST target an existing unit and MUST NOT duplicate a case description
+(`bynk.suite.unknown_target`, `bynk.suite.duplicate_case_name`).
 
 `Mock[T]` MUST occur only in a test body (`bynk.mock.outside_test`), name a
 resolvable type (`bynk.mock.unknown_type`), and receive pins that are
@@ -658,8 +659,8 @@ compile-time literals of the right arity satisfying the type
 (`bynk.mock.pin_not_literal`, `bynk.mock.arity`, `bynk.mock.literal_violates`); a
 type that cannot be fabricated MUST be pinned (`bynk.mock.needs_pin`,
 `bynk.mock.unsupported_kind`). A `mocks` block MUST name an in-scope capability,
-match its signature, and MUST NOT be used in an integration test or a commons
-test (`bynk.mock.unknown_target`, `bynk.mock.signature_mismatch`,
+match its signature, and MUST NOT be used in an integration suite or a commons
+suite (`bynk.mock.unknown_target`, `bynk.mock.signature_mismatch`,
 `bynk.integration.mock_in_integration`, `bynk.mock.in_commons_test`).
 
 {{#grammar-semantics mock_expr}}

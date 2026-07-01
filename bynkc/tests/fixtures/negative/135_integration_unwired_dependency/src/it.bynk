@@ -1,4 +1,4 @@
-test integration "x" {
+suite integration "x" {
   wires app.cons, app.bystander
-  test "t" { let r <- app.cons.run() assert r is Ok(_) }
+  case "t" { let r <- app.cons.run() expect r is Ok(_) }
 }

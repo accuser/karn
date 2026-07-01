@@ -319,16 +319,16 @@ fn can_mock_bare(ty: &Ty, types: &HashMap<String, TypeDecl>, depth: u32) -> bool
     }
 }
 
-pub(crate) fn check_assert(inner: &Expr, span: Span, ctx: &mut Ctx) -> Option<Ty> {
+pub(crate) fn check_expect(inner: &Expr, span: Span, ctx: &mut Ctx) -> Option<Ty> {
     if !ctx.in_test_body {
         ctx.errors.push(
             CompileError::new(
-                "bynk.assert.outside_test",
+                "bynk.expect.outside_case",
                 span,
-                "`assert` is only valid inside a test case body",
+                "`expect` is only valid inside a `case` body",
             )
             .with_note(
-                "assertion expressions verify conditions at test runtime; use them only inside `test \"...\" { ... }` blocks",
+                "expectations verify predicates at test runtime; use them only inside `case \"...\" { ... }` blocks",
             ),
         );
     }
@@ -337,10 +337,10 @@ pub(crate) fn check_assert(inner: &Expr, span: Span, ctx: &mut Ctx) -> Option<Ty
         && !compatible(&actual, &Ty::Base(BaseType::Bool))
     {
         ctx.errors.push(CompileError::new(
-            "bynk.assert.non_bool",
+            "bynk.expect.not_bool",
             inner.span,
             format!(
-                "`assert` expression has type `{}`, but a `Bool` is required",
+                "`expect` predicate has type `{}`, but a `Bool` is required",
                 actual.display(),
             ),
         ));
@@ -954,7 +954,7 @@ fn body_performs_effects(e: &Expr, ctx: &Ctx) -> bool {
                         return true;
                     }
                 }
-                Statement::Assert(a) => {
+                Statement::Expect(a) => {
                     if body_performs_effects(&a.value, ctx) {
                         return true;
                     }
@@ -1037,7 +1037,7 @@ fn body_performs_effects(e: &Expr, ctx: &Ctx) -> bool {
         | ExprKind::Err(i)
         | ExprKind::Some(i)
         | ExprKind::Question(i)
-        | ExprKind::Assert(i) => body_performs_effects(i, ctx),
+        | ExprKind::Expect(i) => body_performs_effects(i, ctx),
         ExprKind::RecordConstruction { fields, .. } => fields.iter().any(|f| {
             f.value
                 .as_ref()

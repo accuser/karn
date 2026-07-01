@@ -186,16 +186,6 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "An agent `store` field has no initialiser and no implicit zero value.",
         &["store_field"],
     ),
-    dg(
-        "bynk.assert.non_bool",
-        "`assert` was given a non-`Bool` expression.",
-        &["assert_expr"],
-    ),
-    dg(
-        "bynk.assert.outside_test",
-        "`assert` was used outside a test case body.",
-        &["assert_expr"],
-    ),
     d(
         "bynk.boundary.structural_mismatch",
         "Data crossing a context boundary did not match the expected shape.",
@@ -331,6 +321,16 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "bynk.effect.fn_value_in_pure_context",
         "An effectful function value was called in a pure context; like a capability call, it is legal only where the enclosing body is effectful.",
         &["call"],
+    ),
+    dg(
+        "bynk.expect.not_bool",
+        "`expect` was given a non-`Bool` predicate.",
+        &["expect_expr"],
+    ),
+    dg(
+        "bynk.expect.outside_case",
+        "`expect` was used outside a `case` body.",
+        &["expect_expr"],
     ),
     dg(
         "bynk.exports.capability_not_provided",
@@ -781,9 +781,9 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
     ),
     d("bynk.parse.unexpected_eof", "Unexpected end of input."),
     dg(
-        "bynk.parse.unexpected_test",
-        "A `test` appeared where it is not allowed.",
-        &["test_decl"],
+        "bynk.parse.unexpected_suite",
+        "A `suite` appeared where it is not allowed.",
+        &["suite_decl"],
     ),
     d(
         "bynk.parse.unknown_effect_method",
@@ -1167,6 +1167,16 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "bynk.store.unknown_op",
         "A storage-`Map`/`Set` operation is not a recognised entry/membership method.",
     ),
+    dg(
+        "bynk.suite.duplicate_case_name",
+        "Two `case`s share a description.",
+        &["case"],
+    ),
+    dg(
+        "bynk.suite.unknown_target",
+        "A `suite` targets a unit that does not exist.",
+        &["suite_decl"],
+    ),
     d(
         "bynk.target.browser_bundle_only",
         "The `browser` platform builds only the in-process `Bundle` topology; `--target workers` is not a browser build.",
@@ -1180,16 +1190,6 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "bynk.target.vendor_required",
         "A deployment unit uses a platform-native capability but the build selects another `--platform`.",
         &["consumes_decl"],
-    ),
-    dg(
-        "bynk.test.duplicate_case_name",
-        "Two test cases share a description.",
-        &["test_case"],
-    ),
-    dg(
-        "bynk.test.unknown_target",
-        "A `test` block targets a unit that does not exist.",
-        &["test_decl"],
     ),
     d(
         "bynk.types.ambiguous_constructor",
@@ -1575,13 +1575,13 @@ pub fn category(code: &str) -> &str {
 fn category_title(cat: &str) -> &'static str {
     match cat {
         "agent" | "agents" => "Agents",
-        "assert" => "Assertions",
         "boundary" => "Boundaries",
         "capability" => "Capabilities",
         "consumes" => "Consumes",
         "context" => "Contexts",
         "cron" => "Cron",
         "effect" => "Effects",
+        "expect" => "Expectations",
         "exports" => "Exports",
         "given" => "Given capabilities",
         "http" => "HTTP",
@@ -1595,7 +1595,7 @@ fn category_title(cat: &str) -> &'static str {
         "refine" => "Refinement",
         "resolve" => "Resolution",
         "service" => "Services",
-        "test" => "Tests",
+        "suite" => "Suites and cases",
         "types" => "Type checking",
         "uses" => "Uses",
         _ => "Other",

@@ -200,7 +200,7 @@ fn walk_block_for_constraints(
             Statement::Let(l) | Statement::EffectLet(l) => {
                 walk_expr_for_constraints(&l.value, typed, consumed, local, errors);
             }
-            Statement::Assert(a) => {
+            Statement::Expect(a) => {
                 walk_expr_for_constraints(&a.value, typed, consumed, local, errors);
             }
             Statement::Send(s) => {
@@ -443,7 +443,7 @@ fn walk_expr_for_constraints(
         ExprKind::EffectPure(inner) => {
             walk_expr_for_constraints(inner, typed, consumed, local, errors);
         }
-        ExprKind::Assert(inner) => {
+        ExprKind::Expect(inner) => {
             walk_expr_for_constraints(inner, typed, consumed, local, errors);
         }
         ExprKind::Mock { args, .. } => {
@@ -2119,7 +2119,7 @@ fn walk_block_for_index_filters(
     for stmt in &block.statements {
         let v = match stmt {
             Statement::Let(l) | Statement::EffectLet(l) => &l.value,
-            Statement::Assert(a) => &a.value,
+            Statement::Expect(a) => &a.value,
             Statement::Send(s) => &s.value,
             Statement::Assign(a) => &a.value,
         };
@@ -2158,7 +2158,7 @@ fn walk_expr_for_index_filters(
         | ExprKind::Err(x)
         | ExprKind::Some(x)
         | ExprKind::EffectPure(x)
-        | ExprKind::Assert(x) => walk_expr_for_index_filters(x, store_maps, cb),
+        | ExprKind::Expect(x) => walk_expr_for_index_filters(x, store_maps, cb),
         ExprKind::Lambda(lam) => walk_expr_for_index_filters(&lam.body, store_maps, cb),
         ExprKind::Block(b) => walk_block_for_index_filters(b, store_maps, cb),
         ExprKind::If {

@@ -22,13 +22,6 @@ There are **328** codes in total.
 | `bynk.agents.bad_state_initialiser` | An agent `store` field initialiser is not a static value of the field's type. | [`store_field`](/book/reference/grammar/#rule-store_field) |
 | `bynk.agents.non_zeroable_state_field` | An agent `store` field has no initialiser and no implicit zero value. | [`store_field`](/book/reference/grammar/#rule-store_field) |
 
-## Assertions
-
-| Code | Summary | Construct |
-|---|---|---|
-| `bynk.assert.non_bool` | `assert` was given a non-`Bool` expression. | [`assert_expr`](/book/reference/grammar/#rule-assert_expr) |
-| `bynk.assert.outside_test` | `assert` was used outside a test case body. | [`assert_expr`](/book/reference/grammar/#rule-assert_expr) |
-
 ## Boundaries
 
 | Code | Summary | Construct |
@@ -84,6 +77,13 @@ There are **328** codes in total.
 | `bynk.effect.capability_in_pure_context` | A capability was used in a pure context. |  |
 | `bynk.effect.cross_context_in_pure_context` | A cross-context call was made in a pure context. |  |
 | `bynk.effect.fn_value_in_pure_context` | An effectful function value was called in a pure context; like a capability call, it is legal only where the enclosing body is effectful. | [`call`](/book/reference/grammar/#rule-call) |
+
+## Expectations
+
+| Code | Summary | Construct |
+|---|---|---|
+| `bynk.expect.not_bool` | `expect` was given a non-`Bool` predicate. | [`expect_expr`](/book/reference/grammar/#rule-expect_expr) |
+| `bynk.expect.outside_case` | `expect` was used outside a `case` body. | [`expect_expr`](/book/reference/grammar/#rule-expect_expr) |
 
 ## Exports
 
@@ -271,7 +271,7 @@ There are **328** codes in total.
 | `bynk.parse.unexpected_adapter` | An `adapter` appeared where it is not allowed. |  |
 | `bynk.parse.unexpected_context` | A `context` appeared where it is not allowed. | [`context_decl`](/book/reference/grammar/#rule-context_decl) |
 | `bynk.parse.unexpected_eof` | Unexpected end of input. |  |
-| `bynk.parse.unexpected_test` | A `test` appeared where it is not allowed. | [`test_decl`](/book/reference/grammar/#rule-test_decl) |
+| `bynk.parse.unexpected_suite` | A `suite` appeared where it is not allowed. | [`suite_decl`](/book/reference/grammar/#rule-suite_decl) |
 | `bynk.parse.unknown_effect_method` | An unknown method on `Effect`. |  |
 | `bynk.parse.unknown_handler_kind` | An unknown handler form (expected `call`, an HTTP method, `schedule`, or `message`). | [`handler`](/book/reference/grammar/#rule-handler) |
 | `bynk.parse.unknown_predicate` | An unknown refinement predicate. | [`predicate_name`](/book/reference/grammar/#rule-predicate_name) |
@@ -375,12 +375,12 @@ There are **328** codes in total.
 | `bynk.service.websocket_multiple` | A context holds more than one `from WebSocket` service — at v1 the Workers upgrade routes by the `Upgrade: websocket` header alone, so one WebSocket service per context (real-time track slice 3b). |  |
 | `bynk.service.websocket_open_arity` | A `from WebSocket` service must hold exactly one `on open` handler (the edge upgrade), and at most one `on message` (inbound) and one `on close` (real-time track slice 3/3b-iii). |  |
 
-## Tests
+## Suites and cases
 
 | Code | Summary | Construct |
 |---|---|---|
-| `bynk.test.duplicate_case_name` | Two test cases share a description. | [`test_case`](/book/reference/grammar/#rule-test_case) |
-| `bynk.test.unknown_target` | A `test` block targets a unit that does not exist. | [`test_decl`](/book/reference/grammar/#rule-test_decl) |
+| `bynk.suite.duplicate_case_name` | Two `case`s share a description. | [`case`](/book/reference/grammar/#rule-case) |
+| `bynk.suite.unknown_target` | A `suite` targets a unit that does not exist. | [`suite_decl`](/book/reference/grammar/#rule-suite_decl) |
 
 ## Type checking
 

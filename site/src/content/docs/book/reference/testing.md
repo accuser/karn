@@ -1,45 +1,49 @@
 ---
 title: Testing
 ---
-## `test` blocks
+## `suite` blocks
 
-A test file is a `test` block naming its target unit, containing named cases:
+A test file is a `suite` block naming its target unit, containing named `case`s:
 
 ```bynk
-test counters {
-  test "a fresh counter starts at zero" {
+suite counters {
+  case "a fresh counter starts at zero" {
     let n <- Counter(CounterId.unsafe("fresh")).current()
-    assert n == 0
+    expect n == 0
   }
 }
 ```
 
-Case descriptions within a block must be unique
-(`bynk.test.duplicate_case_name`); the target must exist
-(`bynk.test.unknown_target`). Test files live under the project's `tests/` tree —
+Case descriptions within a suite must be unique
+(`bynk.suite.duplicate_case_name`); the target must exist
+(`bynk.suite.unknown_target`). Test files live under the project's `tests/` tree —
 see [Lay out a project](/book/guides/projects-build-and-deployment/layout/).
 
-## `assert`
+## `expect`
 
-`assert <bool-expr>` checks a condition. It exists in both statement form (a line
-in a test body) and expression form (e.g. inside a `match` arm). The expression
-must be `Bool` (`bynk.assert.non_bool`), and `assert` is valid **only** inside a
-test case (`bynk.assert.outside_test`). Pairs naturally with `is`:
-`assert r is Ok(_)`.
+`expect <bool-predicate>` checks a predicate. It exists in both statement form (a
+line in a `case` body) and expression form (e.g. inside a `match` arm). The
+predicate must be `Bool` (`bynk.expect.not_bool`), and `expect` is valid **only**
+inside a `case` (`bynk.expect.outside_case`). It is the **same predicate surface**
+as `invariant`/`ensures` — `is`, `implies`, the operators, pure methods (one
+predicate surface, ADR 0144) — so it pairs naturally with `is`: `expect r is
+Ok(_)`. When the predicate is a top-level comparison (`==`, `!=`, `<`, `<=`, `>`,
+`>=`), a failure reports the predicate and its **expected-vs-actual** operands, not
+just a location.
 
 ## `mocks` — collaborator substitution
 
 Replace a capability the unit under test depends on with a test implementation:
 
 ```bynk
-test payments {
+suite payments {
   mocks Logger = SilentLogger {
     fn log(msg: String) -> Effect[()] {
       ()
     }
   }
 
-  test "…" { … }
+  case "…" { … }
 }
 ```
 
@@ -68,21 +72,21 @@ literal (`bynk.mock.pin_not_literal`), must satisfy the refinement
 (`bynk.mock.pin_unsupported`). See
 [`bynk.mock.*` errors](/book/troubleshooting/mock-errors/).
 
-## `test integration` — multi-Worker integration tests
+## `suite integration` — multi-Worker integration tests
 
-A `test` block exercises **one** unit, with collaborators replaced by `mocks`. A
-`test integration` block exercises a **flow across several contexts**, each stood
+A `suite` block exercises **one** unit, with collaborators replaced by `mocks`. A
+`suite integration` block exercises a **flow across several contexts**, each stood
 up as the Worker it actually deploys as, with **no** mocks — so the real
 cross-context wire (serialise → JSON → deserialise → structural projection) is
 under test, which unit tests never touch.
 
 ```bynk
-test integration "checkout" {
+suite integration "checkout" {
   wires shop.orders, shop.payment
 
-  test "small order authorises across the wire" {
+  case "small order authorises across the wire" {
     let r <- shop.orders.place(100)
-    assert r is Ok(_)
+    expect r is Ok(_)
   }
 }
 ```
@@ -155,6 +159,6 @@ or `"fail"`. A project that doesn't compile yields `error.kind == "compile"`
 Add `--no-run` for **discovery**: `bynkc test --no-run --format json` lists every
 suite and case **without running them** — a pure compile (no `tsc`, no Node, no
 `out/` written). Each case carries `outcome: "discovered"` and its declaration
-`location` (the `test "…"` name). The suite/case names match a normal run's, so a
+`location` (the `case "…"` name). The suite/case names match a normal run's, so a
 consumer can list tests first and fold in pass/fail from a later run. This is how
 the VS Code Test Explorer populates its tree before you run anything.

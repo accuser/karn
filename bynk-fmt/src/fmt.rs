@@ -230,7 +230,7 @@ impl<'a> Formatter<'a> {
         match unit {
             SourceUnit::Commons(c) => self.format_commons(c),
             SourceUnit::Context(c) => self.format_context(c),
-            SourceUnit::Test(t) => self.format_test(t),
+            SourceUnit::Suite(t) => self.format_test(t),
             SourceUnit::Integration(i) => self.format_integration(i),
             SourceUnit::Adapter(a) => self.format_adapter(a),
         }
@@ -326,7 +326,7 @@ impl<'a> Formatter<'a> {
         if let Some(doc) = &i.documentation {
             self.emit_doc(doc);
         }
-        let header = format!("test integration \"{}\"", escape_string(&i.suite));
+        let header = format!("suite integration \"{}\"", escape_string(&i.suite));
         match i.form {
             CommonsForm::Brace => {
                 self.push(&header);
@@ -369,7 +369,7 @@ impl<'a> Formatter<'a> {
             if let Some(doc) = &c.documentation {
                 self.emit_doc(doc);
             }
-            self.push(&format!("test \"{}\" ", escape_string(&c.name)));
+            self.push(&format!("case \"{}\" ", escape_string(&c.name)));
             self.format_block(&c.body);
             self.newline();
         }
@@ -379,12 +379,12 @@ impl<'a> Formatter<'a> {
         }
     }
 
-    fn format_test(&mut self, t: &TestDecl) {
+    fn format_test(&mut self, t: &SuiteDecl) {
         self.emit_leading_comments(&t.trivia.leading);
         if let Some(doc) = &t.documentation {
             self.emit_doc(doc);
         }
-        let header = format!("test {}", t.target.joined());
+        let header = format!("suite {}", t.target.joined());
         match t.form {
             CommonsForm::Brace => {
                 self.push(&header);
@@ -408,7 +408,7 @@ impl<'a> Formatter<'a> {
         &mut self,
         uses: &[UsesDecl],
         mocks: &[MockDecl],
-        cases: &[TestCase],
+        cases: &[Case],
         trailing_comments: &[String],
     ) {
         let mut first = true;
@@ -469,7 +469,7 @@ impl<'a> Formatter<'a> {
             if let Some(doc) = &c.documentation {
                 self.emit_doc(doc);
             }
-            self.push(&format!("test \"{}\" ", escape_string(&c.name)));
+            self.push(&format!("case \"{}\" ", escape_string(&c.name)));
             self.format_block(&c.body);
             self.newline();
             first = false;
@@ -1320,7 +1320,7 @@ impl<'a> Formatter<'a> {
             // `x == y()`), breaking idempotency. The parser re-derives the
             // implicit unit tail, so omitting it is loss-free.
             let implicit_unit_after_assert = matches!(b.tail.kind, ExprKind::UnitLit)
-                && matches!(b.statements.last(), Some(Statement::Assert(_)))
+                && matches!(b.statements.last(), Some(Statement::Expect(_)))
                 && b.tail_leading_comments.is_empty();
             if !implicit_unit_after_assert {
                 f.format_expr(&b.tail);
@@ -1352,8 +1352,8 @@ impl<'a> Formatter<'a> {
                 self.push(" <- ");
                 self.format_expr(&l.value);
             }
-            Statement::Assert(a) => {
-                self.push("assert ");
+            Statement::Expect(a) => {
+                self.push("expect ");
                 self.format_expr(&a.value);
             }
             Statement::Send(s) => {
@@ -1453,7 +1453,7 @@ fn annotation_to_string(ann: &Annotation) -> String {
 fn statement_trivia(s: &Statement) -> &Trivia {
     match s {
         Statement::Let(l) | Statement::EffectLet(l) => &l.trivia,
-        Statement::Assert(a) => &a.trivia,
+        Statement::Expect(a) => &a.trivia,
         Statement::Send(s) => &s.trivia,
         Statement::Assign(a) => &a.trivia,
     }
@@ -1765,7 +1765,7 @@ fn expr_with_prec(e: &Expr, parent_prec: u8) -> String {
             }
         }
         ExprKind::EffectPure(v) => format!("Effect.pure({})", expr_with_prec(v, 0)),
-        ExprKind::Assert(v) => format!("assert {}", expr_with_prec(v, 0)),
+        ExprKind::Expect(v) => format!("expect {}", expr_with_prec(v, 0)),
         ExprKind::Mock { type_ref, args } => {
             let t = type_ref_to_string(type_ref);
             if args.is_empty() {
@@ -1827,7 +1827,7 @@ fn format_block_oneline(b: &Block) -> String {
         // Omit the implicit `()` tail after a trailing `assert` (see
         // `format_block`) — printing it breaks round-trip idempotency.
         let implicit_unit_after_assert = matches!(b.tail.kind, ExprKind::UnitLit)
-            && matches!(b.statements.last(), Some(Statement::Assert(_)));
+            && matches!(b.statements.last(), Some(Statement::Expect(_)));
         if !implicit_unit_after_assert {
             out.push('\t');
             out.push_str(&expr_with_prec(&b.tail, 0));
@@ -1856,7 +1856,7 @@ fn stmt_to_string(s: &Statement) -> String {
             out.push_str(&format!(" <- {}", expr_with_prec(&l.value, 0)));
             out
         }
-        Statement::Assert(a) => format!("assert {}", expr_with_prec(&a.value, 0)),
+        Statement::Expect(a) => format!("expect {}", expr_with_prec(&a.value, 0)),
         Statement::Send(s) => format!("~> {}", expr_with_prec(&s.value, 0)),
         Statement::Assign(a) => format!("{} := {}", a.target.name, expr_with_prec(&a.value, 0)),
     }

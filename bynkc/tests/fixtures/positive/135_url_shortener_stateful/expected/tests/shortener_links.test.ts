@@ -6,22 +6,25 @@ import * as shortener_links from "./../shortener/links.js";
 import * as shortener_analytics from "./../shortener/analytics.js";
 import * as shortener_core from "./../shortener/core.js";
 
-class AssertionError extends Error {
+class ExpectationError extends Error {
   location: string;
   start: number;
   end: number;
-  constructor(location: string, start: number, end: number) {
-    super(`assertion failed at ${location}`);
+  constructor(location: string, start: number, end: number, detail: string) {
+    super(`${detail}\n  at ${location}`);
     this.location = location;
     this.start = start;
     this.end = end;
   }
 }
-function __bynkAssertionFailure(location: string, start: number, end: number) {
-  return new AssertionError(location, start, end);
+function __bynkExpectFailure(location: string, start: number, end: number, detail: string) {
+  return new ExpectationError(location, start, end, detail);
 }
-function __bynkAssert(cond: boolean, location: string, start: number, end: number): void {
-  if (!cond) { throw __bynkAssertionFailure(location, start, end); }
+function __bynkExpect(cond: boolean, location: string, start: number, end: number, detail: string): void {
+  if (!cond) { throw __bynkExpectFailure(location, start, end, detail); }
+}
+function __bynkShow(v: unknown): string {
+  try { return typeof v === "bigint" ? String(v) : (JSON.stringify(v) ?? String(v)); } catch { return String(v); }
 }
 
 class MockAnalytics {
@@ -53,7 +56,7 @@ async function test_a_fresh_Link_key_resolves_to_NotFound() {
     void (await (async (__d) => {
         switch (__d.tag) {
           case "Err": {
-            return __bynkAssert((false), "tests/shortener/links.bynk:50:20", 1664, 1669);
+            return __bynkExpect((false), "tests/shortener/links.bynk:50:20", 1665, 1670, "expect false");
           }
           case "Ok": {
             const code = __d.value;
@@ -61,17 +64,17 @@ async function test_a_fresh_Link_key_resolves_to_NotFound() {
             const outcome = await link.resolve(deps);
             switch (outcome.tag) {
               case "Ok": {
-                return __bynkAssert((false), "tests/shortener/links.bynk:55:21", 1783, 1788);
+                return __bynkExpect((false), "tests/shortener/links.bynk:55:21", 1784, 1789, "expect false");
               }
               case "Err": {
                 const linkError = outcome.error;
                 return ((__d) => {
         switch (__d.tag) {
           case "NotFound": {
-            return __bynkAssert((true), "tests/shortener/links.bynk:57:30", 1858, 1862);
+            return __bynkExpect((true), "tests/shortener/links.bynk:57:30", 1859, 1863, "expect true");
           }
           case "AlreadyExists": {
-            return __bynkAssert((false), "tests/shortener/links.bynk:58:30", 1892, 1897);
+            return __bynkExpect((false), "tests/shortener/links.bynk:58:30", 1893, 1898, "expect false");
           }
         }
         throw new Error("non-exhaustive match");
@@ -85,7 +88,7 @@ async function test_a_fresh_Link_key_resolves_to_NotFound() {
       })(ShortCode.of("fresh2")));
     return { pass: true };
   } catch (e) {
-    if (e instanceof AssertionError) {
+    if (e instanceof ExpectationError) {
       return { pass: false, error: { message: e.message, location: e.location } };
     }
     return { pass: false, error: { message: String(e), location: "unknown" } };
@@ -103,24 +106,24 @@ async function test_creating_a_link_stores_the_target_and_returns_its_code() {
     void (await (async (__d) => {
         switch (__d.tag) {
           case "Err": {
-            return __bynkAssert((false), "tests/shortener/links.bynk:67:20", 2034, 2039);
+            return __bynkExpect((false), "tests/shortener/links.bynk:67:20", 2035, 2040, "expect false");
           }
           case "Ok": {
             const code = __d.value;
             return await (async (__d) => {
         switch (__d.tag) {
           case "Err": {
-            return __bynkAssert((false), "tests/shortener/links.bynk:69:21", 2112, 2117);
+            return __bynkExpect((false), "tests/shortener/links.bynk:69:21", 2113, 2118, "expect false");
           }
           case "Ok": {
             const url = __d.value;
             const outcome = await create.call(code, url, deps);
             switch (outcome.tag) {
               case "Ok": {
-                return __bynkAssert((true), "tests/shortener/links.bynk:73:23", 2218, 2222);
+                return __bynkExpect((true), "tests/shortener/links.bynk:73:23", 2219, 2223, "expect true");
               }
               case "Err": {
-                return __bynkAssert((false), "tests/shortener/links.bynk:74:23", 2245, 2250);
+                return __bynkExpect((false), "tests/shortener/links.bynk:74:23", 2246, 2251, "expect false");
               }
             }
             throw new Error("non-exhaustive match");
@@ -134,7 +137,7 @@ async function test_creating_a_link_stores_the_target_and_returns_its_code() {
       })(ShortCode.of("test01")));
     return { pass: true };
   } catch (e) {
-    if (e instanceof AssertionError) {
+    if (e instanceof ExpectationError) {
       return { pass: false, error: { message: e.message, location: e.location } };
     }
     return { pass: false, error: { message: String(e), location: "unknown" } };
@@ -152,14 +155,14 @@ async function test_creating_the_same_code_twice_is_rejected() {
     void (await (async (__d) => {
         switch (__d.tag) {
           case "Err": {
-            return __bynkAssert((false), "tests/shortener/links.bynk:83:20", 2373, 2378);
+            return __bynkExpect((false), "tests/shortener/links.bynk:83:20", 2374, 2379, "expect false");
           }
           case "Ok": {
             const code = __d.value;
             return await (async (__d) => {
         switch (__d.tag) {
           case "Err": {
-            return __bynkAssert((false), "tests/shortener/links.bynk:85:21", 2451, 2456);
+            return __bynkExpect((false), "tests/shortener/links.bynk:85:21", 2452, 2457, "expect false");
           }
           case "Ok": {
             const url = __d.value;
@@ -167,17 +170,17 @@ async function test_creating_the_same_code_twice_is_rejected() {
             const second = await create.call(code, url, deps);
             switch (second.tag) {
               case "Ok": {
-                return __bynkAssert((false), "tests/shortener/links.bynk:90:22", 2590, 2595);
+                return __bynkExpect((false), "tests/shortener/links.bynk:90:22", 2591, 2596, "expect false");
               }
               case "Err": {
                 const linkError = second.error;
                 return ((__d) => {
         switch (__d.tag) {
           case "AlreadyExists": {
-            return __bynkAssert((true), "tests/shortener/links.bynk:92:31", 2667, 2671);
+            return __bynkExpect((true), "tests/shortener/links.bynk:92:31", 2668, 2672, "expect true");
           }
           case "NotFound": {
-            return __bynkAssert((false), "tests/shortener/links.bynk:93:31", 2702, 2707);
+            return __bynkExpect((false), "tests/shortener/links.bynk:93:31", 2703, 2708, "expect false");
           }
         }
         throw new Error("non-exhaustive match");
@@ -195,7 +198,7 @@ async function test_creating_the_same_code_twice_is_rejected() {
       })(ShortCode.of("dup001")));
     return { pass: true };
   } catch (e) {
-    if (e instanceof AssertionError) {
+    if (e instanceof ExpectationError) {
       return { pass: false, error: { message: e.message, location: e.location } };
     }
     return { pass: false, error: { message: String(e), location: "unknown" } };
@@ -213,14 +216,14 @@ async function test_resolving_a_registered_code_returns_its_target() {
     void (await (async (__d) => {
         switch (__d.tag) {
           case "Err": {
-            return __bynkAssert((false), "tests/shortener/links.bynk:103:20", 2843, 2848);
+            return __bynkExpect((false), "tests/shortener/links.bynk:103:20", 2844, 2849, "expect false");
           }
           case "Ok": {
             const code = __d.value;
             return await (async (__d) => {
         switch (__d.tag) {
           case "Err": {
-            return __bynkAssert((false), "tests/shortener/links.bynk:105:21", 2926, 2931);
+            return __bynkExpect((false), "tests/shortener/links.bynk:105:21", 2927, 2932, "expect false");
           }
           case "Ok": {
             const url = __d.value;
@@ -230,10 +233,10 @@ async function test_resolving_a_registered_code_returns_its_target() {
             switch (outcome.tag) {
               case "Ok": {
                 const target = outcome.value;
-                return __bynkAssert((target === url), "tests/shortener/links.bynk:111:27", 3090, 3103);
+                return __bynkExpect((target === url), "tests/shortener/links.bynk:111:27", 3091, 3104, "expect target == url");
               }
               case "Err": {
-                return __bynkAssert((false), "tests/shortener/links.bynk:112:27", 3130, 3135);
+                return __bynkExpect((false), "tests/shortener/links.bynk:112:27", 3131, 3136, "expect false");
               }
             }
             throw new Error("non-exhaustive match");
@@ -247,7 +250,7 @@ async function test_resolving_a_registered_code_returns_its_target() {
       })(ShortCode.of("res001")));
     return { pass: true };
   } catch (e) {
-    if (e instanceof AssertionError) {
+    if (e instanceof ExpectationError) {
       return { pass: false, error: { message: e.message, location: e.location } };
     }
     return { pass: false, error: { message: String(e), location: "unknown" } };

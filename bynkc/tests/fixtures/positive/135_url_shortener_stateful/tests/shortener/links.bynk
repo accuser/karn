@@ -19,7 +19,7 @@ analytics fixture probes a fresh Int field, this one a fresh Option field.
 Construction note: `ShortCode.of(...)` / `Url.of(...)` return Result and are
 unwrapped with a match (finding #7 outstanding).
 ---
-test shortener.links
+suite shortener.links
 
 uses shortener.core
 
@@ -45,52 +45,52 @@ mocks Analytics = MockAnalytics {
 STATE-INIT PROBE. A fresh Link key, resolved before any registration, should
 report NotFound — which holds only if the Option state initialises to None.
 ---
-test "a fresh Link key resolves to NotFound" {
+case "a fresh Link key resolves to NotFound" {
 	match ShortCode.of("fresh2") {
-		Err(_) => assert false
+		Err(_) => expect false
 		Ok(code) => {
 			let link = Link(code)
 			let outcome <- link.resolve()
 			match outcome {
-				Ok(_) => assert false
+				Ok(_) => expect false
 				Err(linkError) => match linkError {
-					NotFound      => assert true
-					AlreadyExists => assert false
+					NotFound      => expect true
+					AlreadyExists => expect false
 				}
 			}
 		}
 	}
 }
 
-test "creating a link stores the target and returns its code" {
+case "creating a link stores the target and returns its code" {
 	match ShortCode.of("test01") {
-		Err(_) => assert false
+		Err(_) => expect false
 		Ok(code) => match Url.of("https://example.com") {
-			Err(_) => assert false
+			Err(_) => expect false
 			Ok(url) => {
 				let outcome <- create.call(code, url)
 				match outcome {
-					Ok(_)  => assert true
-					Err(_) => assert false
+					Ok(_)  => expect true
+					Err(_) => expect false
 				}
 			}
 		}
 	}
 }
 
-test "creating the same code twice is rejected" {
+case "creating the same code twice is rejected" {
 	match ShortCode.of("dup001") {
-		Err(_) => assert false
+		Err(_) => expect false
 		Ok(code) => match Url.of("https://example.com") {
-			Err(_) => assert false
+			Err(_) => expect false
 			Ok(url) => {
 				let _ <- create.call(code, url)
 				let second <- create.call(code, url)
 				match second {
-					Ok(_) => assert false
+					Ok(_) => expect false
 					Err(linkError) => match linkError {
-						AlreadyExists => assert true
-						NotFound      => assert false
+						AlreadyExists => expect true
+						NotFound      => expect false
 					}
 				}
 			}
@@ -98,18 +98,18 @@ test "creating the same code twice is rejected" {
 	}
 }
 
-test "resolving a registered code returns its target" {
+case "resolving a registered code returns its target" {
 	match ShortCode.of("res001") {
-		Err(_) => assert false
+		Err(_) => expect false
 		Ok(code) => match Url.of("https://example.com/page") {
-			Err(_) => assert false
+			Err(_) => expect false
 			Ok(url) => {
 				let _ <- create.call(code, url)
 				let link = Link(code)
 				let outcome <- link.resolve()
 				match outcome {
-					Ok(target) => assert target == url
-					Err(_)     => assert false
+					Ok(target) => expect target == url
+					Err(_)     => expect false
 				}
 			}
 		}

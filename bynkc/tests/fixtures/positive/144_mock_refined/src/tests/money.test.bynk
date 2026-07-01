@@ -1,12 +1,12 @@
-test commerce.money {
+suite commerce.money {
   -- v0.9.4 Part B (slice 1): `Mock[T]` for refined types in a test body.
-  test "bare mock produces a default-valued quantity" {
+  case "bare mock produces a default-valued quantity" {
     let d = Mock[Quantity]
-    assert d == d
+    expect d == d
   }
 
-  test "pinned mock takes the given literal" {
+  case "pinned mock takes the given literal" {
     let q = Mock[Quantity](50)
-    assert q == q
+    expect q == q
   }
 }

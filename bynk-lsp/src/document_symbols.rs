@@ -28,7 +28,7 @@ pub fn outline(source: &str) -> Vec<DocumentSymbol> {
     match unit {
         SourceUnit::Commons(c) => vec![commons_symbol(source, &c)],
         SourceUnit::Context(c) => vec![context_symbol(source, &c)],
-        SourceUnit::Test(t) => vec![test_symbol(source, &t)],
+        SourceUnit::Suite(t) => vec![test_symbol(source, &t)],
         SourceUnit::Integration(i) => vec![integration_symbol(source, &i)],
         SourceUnit::Adapter(a) => vec![adapter_symbol(source, &a)],
     }
@@ -72,7 +72,7 @@ fn integration_symbol(source: &str, i: &IntegrationDecl) -> DocumentSymbol {
     )
 }
 
-fn test_symbol(source: &str, t: &TestDecl) -> DocumentSymbol {
+fn test_symbol(source: &str, t: &SuiteDecl) -> DocumentSymbol {
     let mut children: Vec<DocumentSymbol> = Vec::new();
     for m in &t.mocks {
         children.push(make_symbol(

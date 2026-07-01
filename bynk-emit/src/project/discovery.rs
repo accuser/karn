@@ -51,7 +51,7 @@ impl ParsedFile {
             SourceUnit::Commons(c) => &c.items,
             SourceUnit::Context(c) => &c.items,
             SourceUnit::Adapter(a) => &a.items,
-            SourceUnit::Test(_) | SourceUnit::Integration(_) => {
+            SourceUnit::Suite(_) | SourceUnit::Integration(_) => {
                 // Tests don't contribute CommonsItem items; the production
                 // pipeline never asks them to. Return a singleton empty vec.
                 static EMPTY: std::sync::OnceLock<Vec<CommonsItem>> = std::sync::OnceLock::new();
@@ -65,7 +65,7 @@ impl ParsedFile {
             SourceUnit::Commons(c) => &c.uses,
             SourceUnit::Context(c) => &c.uses,
             SourceUnit::Adapter(a) => &a.uses,
-            SourceUnit::Test(t) => &t.uses,
+            SourceUnit::Suite(t) => &t.uses,
             SourceUnit::Integration(i) => &i.uses,
         }
     }
@@ -79,7 +79,7 @@ impl ParsedFile {
             // An integration test's participant edges are resolved separately
             // (the harness root consumes every participant); it has no
             // `consumes` of its own.
-            SourceUnit::Test(_) | SourceUnit::Integration(_) => &[],
+            SourceUnit::Suite(_) | SourceUnit::Integration(_) => &[],
         }
     }
 
@@ -100,9 +100,9 @@ impl ParsedFile {
         }
     }
 
-    pub(crate) fn test(&self) -> Option<&TestDecl> {
+    pub(crate) fn test(&self) -> Option<&SuiteDecl> {
         match &self.unit {
-            SourceUnit::Test(t) => Some(t),
+            SourceUnit::Suite(t) => Some(t),
             _ => None,
         }
     }
@@ -132,7 +132,7 @@ impl ParsedFile {
                 c.form,
                 c.span,
             ),
-            SourceUnit::Test(t) => (
+            SourceUnit::Suite(t) => (
                 t.target.clone(),
                 t.uses.clone(),
                 t.documentation.clone(),
@@ -180,7 +180,7 @@ pub(crate) fn parse_source(
     let kind = match &unit {
         SourceUnit::Commons(_) => UnitKind::Commons,
         SourceUnit::Context(_) => UnitKind::Context,
-        SourceUnit::Test(_) => UnitKind::Test,
+        SourceUnit::Suite(_) => UnitKind::Test,
         SourceUnit::Integration(_) => UnitKind::Integration,
         SourceUnit::Adapter(_) => UnitKind::Adapter,
     };

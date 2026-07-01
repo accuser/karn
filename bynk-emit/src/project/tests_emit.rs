@@ -88,7 +88,7 @@ pub(crate) fn process_tests(
                 let span = first_test_target_span(indices, parsed);
                 errors.push(
                     CompileError::new(
-                        "bynk.test.unknown_target",
+                        "bynk.suite.unknown_target",
                         span,
                         format!(
                             "test target `{target_name}` is not a declared commons or context in this project",
@@ -112,7 +112,7 @@ pub(crate) fn process_tests(
                         had_dup = true;
                         errors.push(
                             CompileError::new(
-                                "bynk.test.duplicate_case_name",
+                                "bynk.suite.duplicate_case_name",
                                 case.name_span,
                                 format!(
                                     "test case `\"{}\"` is declared more than once in tests targeting `{target_name}`",
@@ -442,7 +442,7 @@ pub(crate) fn process_integration_tests(
                     if let Some(prev) = seen_cases.get(&case.name) {
                         errors.push(
                             CompileError::new(
-                                "bynk.test.duplicate_case_name",
+                                "bynk.suite.duplicate_case_name",
                                 case.name_span,
                                 format!(
                                     "test case `\"{}\"` is declared more than once in integration test `\"{}\"`",
@@ -539,12 +539,12 @@ pub(crate) fn process_integration_tests(
 /// Type-check one integration test case body. The body lives in a synthetic
 /// harness root that consumes every participant; entry calls
 /// (`ctx.service(args)`) are therefore ordinary cross-context calls. The body
-/// has type `Effect[Result[(), AssertionError]]` (modelled as
+/// has type `Effect[Result[(), ExpectationError]]` (modelled as
 /// `Effect[Result[(), ValidationError]]`, as in unit tests).
 fn check_integration_case_body(
     participants: &[String],
     uses_targets: &[String],
-    case: &TestCase,
+    case: &Case,
     cross_context: &resolver::CrossContextInfo,
     unit_tables: &HashMap<String, UnitTable>,
     errors: &mut Vec<CompileError>,
@@ -728,7 +728,7 @@ fn emit_integration_module(
     }
     out.push('\n');
 
-    out.push_str(&assertion_runtime_helpers());
+    out.push_str(&expectation_runtime_helpers());
 
     // The env-graph harness: stand each participant up as an in-process Worker
     // and wire its Service Bindings to its siblings; the root env binds to all.
@@ -785,7 +785,7 @@ fn emit_integration_module(
         module_smb.merge(&body_smb, &body_src, &out, body_base, src_id);
         out.push_str("    return { pass: true };\n");
         out.push_str("  } catch (e) {\n");
-        out.push_str("    if (e instanceof AssertionError) {\n");
+        out.push_str("    if (e instanceof ExpectationError) {\n");
         out.push_str(
             "      return { pass: false, error: { message: e.message, location: e.location } };\n",
         );
@@ -1296,14 +1296,14 @@ fn check_op_body_with_privileged_view(
         HashMap::new(),
         std::collections::HashSet::new(),
     );
-    let _ = in_test_body; // Mock op bodies are not test bodies; assert is not valid here.
+    let _ = in_test_body; // Mock op bodies are not test bodies; expect is not valid here.
 }
 
 #[allow(clippy::too_many_arguments)]
 fn check_test_case_body(
     target_name: &str,
     target_kind: UnitKind,
-    case: &TestCase,
+    case: &Case,
     unit_tables: &HashMap<String, UnitTable>,
     unit_uses: &HashMap<String, Vec<String>>,
     unit_consumes: &HashMap<String, Vec<String>>,
@@ -1323,8 +1323,8 @@ fn check_test_case_body(
     let _ = target_kind;
     let mut expr_types: HashMap<Span, checker::Ty> = HashMap::new();
     // Synthesise an Effect[Result[(), ValidationError]] return type as a
-    // stand-in for Effect[Result[(), AssertionError]]. v0.7 doesn't model an
-    // explicit AssertionError type — the runtime catches it instead.
+    // stand-in for Effect[Result[(), ExpectationError]]. v0.7 doesn't model an
+    // explicit ExpectationError type — the runtime catches it instead.
     let unit_span = case.span;
     let synthetic_return = TypeRef::Effect(
         Box::new(TypeRef::Result(
@@ -1416,7 +1416,7 @@ fn check_test_case_body(
     };
     let _ = checker::type_of_block(&case.body, Some(&return_ty), &mut ctx);
     // Don't enforce return-type equality; the test runner discards the
-    // tail expression and recovers success/failure from assertion outcome.
+    // tail expression and recovers success/failure from expectation outcome.
     // Don't enforce "every given used" — capabilities are implicitly
     // available in a test body.
 }
@@ -1612,8 +1612,8 @@ fn emit_test_module(
     }
     out.push('\n');
 
-    // Assertion helper used by lowered `assert` statements.
-    out.push_str(&assertion_runtime_helpers());
+    // Expectation helper used by lowered `expect` statements.
+    out.push_str(&expectation_runtime_helpers());
 
     // Emit mock implementations. Sort by target name so emission is
     // deterministic regardless of the mock map's hash iteration order (a test
@@ -1750,33 +1750,39 @@ fn relative_import_for_test(target_dir: &Path) -> String {
     }
 }
 
-fn assertion_runtime_helpers() -> String {
+fn expectation_runtime_helpers() -> String {
     let mut out = String::new();
     // Fields are declared and assigned explicitly rather than via TS parameter
     // properties: parameter properties are a transform-only construct that Node's
     // strip-only type-stripping rejects (ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX), and
     // `bynkc test --inspect` runs this `.ts` directly under strip-only Node (slice
     // 2, ADR 0104). The explicit form is equivalent and strip-clean.
-    out.push_str("class AssertionError extends Error {\n");
+    out.push_str("class ExpectationError extends Error {\n");
     out.push_str("  location: string;\n");
     out.push_str("  start: number;\n");
     out.push_str("  end: number;\n");
-    out.push_str("  constructor(location: string, start: number, end: number) {\n");
-    out.push_str("    super(`assertion failed at ${location}`);\n");
+    out.push_str("  constructor(location: string, start: number, end: number, detail: string) {\n");
+    out.push_str("    super(`${detail}\\n  at ${location}`);\n");
     out.push_str("    this.location = location;\n");
     out.push_str("    this.start = start;\n");
     out.push_str("    this.end = end;\n");
     out.push_str("  }\n");
     out.push_str("}\n");
     out.push_str(
-        "function __bynkAssertionFailure(location: string, start: number, end: number) {\n",
+        "function __bynkExpectFailure(location: string, start: number, end: number, detail: string) {\n",
     );
-    out.push_str("  return new AssertionError(location, start, end);\n");
+    out.push_str("  return new ExpectationError(location, start, end, detail);\n");
     out.push_str("}\n");
     out.push_str(
-        "function __bynkAssert(cond: boolean, location: string, start: number, end: number): void {\n",
+        "function __bynkExpect(cond: boolean, location: string, start: number, end: number, detail: string): void {\n",
     );
-    out.push_str("  if (!cond) { throw __bynkAssertionFailure(location, start, end); }\n");
+    out.push_str("  if (!cond) { throw __bynkExpectFailure(location, start, end, detail); }\n");
+    out.push_str("}\n");
+    // v0.112: render a runtime value for the expected-vs-actual failure report.
+    out.push_str("function __bynkShow(v: unknown): string {\n");
+    out.push_str(
+        "  try { return typeof v === \"bigint\" ? String(v) : (JSON.stringify(v) ?? String(v)); } catch { return String(v); }\n",
+    );
     out.push_str("}\n\n");
     out
 }
@@ -2082,7 +2088,7 @@ fn emit_test_deps(
 #[allow(clippy::too_many_arguments)]
 fn emit_test_case_function(
     runner_name: &str,
-    case: &TestCase,
+    case: &Case,
     target_name: &str,
     target_kind: UnitKind,
     mocks: &HashMap<String, ResolvedMock>,
@@ -2228,7 +2234,7 @@ fn emit_test_case_function(
     case_smb.merge(&body_smb, &body_src, &out, body_base, 0);
     out.push_str("    return { pass: true };\n");
     out.push_str("  } catch (e) {\n");
-    out.push_str("    if (e instanceof AssertionError) {\n");
+    out.push_str("    if (e instanceof ExpectationError) {\n");
     out.push_str(
         "      return { pass: false, error: { message: e.message, location: e.location } };\n",
     );
