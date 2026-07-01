@@ -31,7 +31,7 @@ pub struct Diagnostic {
 /// Best-effort single-file compilation that always returns diagnostics.
 ///
 /// Used by the LSP server: lex → parse-with-recovery → resolve → check, with
-/// each phase accumulating its diagnostics. The returned [`SourceUnit`] is
+/// each phase accumulating its diagnostics. The returned `SourceUnit` is
 /// `Some` whenever the parser produced one (which is true for any file with a
 /// recognisable header, even if individual items failed). Resolve and check
 /// run only when both the lexer and parser produced a unit; their errors are

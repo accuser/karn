@@ -148,6 +148,21 @@ jobs:
       - name: Run clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+  api-docs:
+    # Guards the /docs/api/ rustdoc the deploy publishes (documentation track
+    # follow-on). -D warnings makes a broken intra-doc link fail the build, so the
+    # published API docs can't rot; the deploy regenerates the same tree leniently.
+    name: API docs (cargo doc)
+    needs: changes
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.all == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: dtolnay/rust-toolchain@e081816240890017053eacbb1bdf337761dc5582 # 1.95.0
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - name: Build the crate API docs (strict)
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace
+
   test:
     # Matrix across all three host OSes: fixtures compare emitted TypeScript
     # byte-for-byte, so a path-separator / line-ending / tsc-shim difference can
@@ -558,6 +573,7 @@ jobs:
       - changes
       - fmt
       - clippy
+      - api-docs
       - test
       - msrv
       - wasm

@@ -1,6 +1,6 @@
 //! `bynk` — the Bynk driver.
 //!
-//! A thin orchestrator over the [`bynkc`] compiler and the Node toolchain:
+//! A thin orchestrator over the `bynkc` compiler and the Node toolchain:
 //! `bynk` is to `bynkc` what `cargo` is to `rustc`. The compiler stays pure
 //! (compile / check / fmt / test); environment orchestration — "is `wrangler`
 //! installed", "is your machine ready" — lives here (ADR: introduce the `bynk`

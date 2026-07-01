@@ -269,6 +269,7 @@ Types/variants: `Bool` `Int` `Float` `String` `Duration` `Instant` `Effect`
 - [`bynk.toml` manifest](/docs/manifest/) · [Emission](/docs/emission/): project configuration and the TypeScript each construct emits.
 - [Editor & tooling](/docs/editor-and-tooling/): `bynk doctor`, the formatter, editor support, debugging.
 - [Tool reference](/docs/tooling/): `bynk-fmt`, `bynk-lsp`, `tree-sitter-bynk`, `vscode-bynk`.
+- [Crate API docs](/docs/api/): generated rustdoc for every workspace crate (contributors/embedders).
 
 ### Reference (exact behaviour)
 - [Syntax & grammar](/book/reference/grammar/) and [complete grammar appendix](/book/reference/grammar-appendix/)

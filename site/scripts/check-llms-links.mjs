@@ -27,6 +27,9 @@ const text = fs.readFileSync(LLMS, "utf8");
 const broken = [];
 for (const m of text.matchAll(/\]\((\/(?:book|docs)\/[^)]*)\)/g)) {
   const route = m[1];
+  // `/docs/api/…` is the generated rustdoc tree (built by cargo doc in the deploy
+  // workflow), not a committed content page — nothing to resolve here.
+  if (route.startsWith("/docs/api/")) continue;
   const prefix = `/${route.split("/")[1]}/`;
   const root = ROOTS[prefix];
   const slug = route.slice(prefix.length).replace(/\/$/, "");
