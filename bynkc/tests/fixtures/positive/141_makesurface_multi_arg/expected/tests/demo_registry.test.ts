@@ -4,22 +4,25 @@
 import { Ok, Err, Some, None, type Result, type Option, type ValidationError } from "../runtime.js";
 import * as demo_registry from "./../demo/registry.js";
 
-class AssertionError extends Error {
+class ExpectationError extends Error {
   location: string;
   start: number;
   end: number;
-  constructor(location: string, start: number, end: number) {
-    super(`assertion failed at ${location}`);
+  constructor(location: string, start: number, end: number, detail: string) {
+    super(`${detail}\n  at ${location}`);
     this.location = location;
     this.start = start;
     this.end = end;
   }
 }
-function __bynkAssertionFailure(location: string, start: number, end: number) {
-  return new AssertionError(location, start, end);
+function __bynkExpectFailure(location: string, start: number, end: number, detail: string) {
+  return new ExpectationError(location, start, end, detail);
 }
-function __bynkAssert(cond: boolean, location: string, start: number, end: number): void {
-  if (!cond) { throw __bynkAssertionFailure(location, start, end); }
+function __bynkExpect(cond: boolean, location: string, start: number, end: number, detail: string): void {
+  if (!cond) { throw __bynkExpectFailure(location, start, end, detail); }
+}
+function __bynkShow(v: unknown): string {
+  try { return typeof v === "bigint" ? String(v) : (JSON.stringify(v) ?? String(v)); } catch { return String(v); }
 }
 
 class TestClock {
@@ -40,14 +43,14 @@ async function test_create_accepts_two_args_and_threads_deps() {
     void (await (async (__d) => {
         switch (__d.tag) {
           case "Err": {
-            return __bynkAssert((false), "tests/demo/registry.bynk:15:20", 285, 290);
+            return __bynkExpect((false), "tests/demo/registry.bynk:15:20", 286, 291, "expect false");
           }
           case "Ok": {
             const code = __d.value;
             return await (async (__d) => {
         switch (__d.tag) {
           case "Err": {
-            return __bynkAssert((false), "tests/demo/registry.bynk:17:21", 366, 371);
+            return __bynkExpect((false), "tests/demo/registry.bynk:17:21", 367, 372, "expect false");
           }
           case "Ok": {
             const target = __d.value;
@@ -55,10 +58,10 @@ async function test_create_accepts_two_args_and_threads_deps() {
             switch (outcome.tag) {
               case "Ok": {
                 const t = outcome.value;
-                return __bynkAssert((t === 7), "tests/demo/registry.bynk:21:23", 478, 484);
+                return __bynkExpect((t === 7), "tests/demo/registry.bynk:21:23", 479, 485, "expect t == 7");
               }
               case "Err": {
-                return __bynkAssert((false), "tests/demo/registry.bynk:22:23", 507, 512);
+                return __bynkExpect((false), "tests/demo/registry.bynk:22:23", 508, 513, "expect false");
               }
             }
             throw new Error("non-exhaustive match");
@@ -72,7 +75,7 @@ async function test_create_accepts_two_args_and_threads_deps() {
       })(Code.of("abc123")));
     return { pass: true };
   } catch (e) {
-    if (e instanceof AssertionError) {
+    if (e instanceof ExpectationError) {
       return { pass: false, error: { message: e.message, location: e.location } };
     }
     return { pass: false, error: { message: String(e), location: "unknown" } };

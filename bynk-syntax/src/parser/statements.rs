@@ -118,7 +118,7 @@ impl<'a> Parser<'a> {
             // detected by lookahead rather than a leading keyword.
             let is_statement = matches!(
                 self.peek_kind(),
-                Some(TokenKind::Let) | Some(TokenKind::Assert) | Some(TokenKind::TildeArrow)
+                Some(TokenKind::Let) | Some(TokenKind::Expect) | Some(TokenKind::TildeArrow)
             ) || self.assign_ahead();
             if is_statement {
                 let mut stmt = self.parse_statement()?;
@@ -128,7 +128,7 @@ impl<'a> Parser<'a> {
                         l.trivia.leading = leading;
                         l.trivia.trailing = trailing;
                     }
-                    Statement::Assert(a) => {
+                    Statement::Expect(a) => {
                         a.trivia.leading = leading;
                         a.trivia.trailing = trailing;
                     }
@@ -150,7 +150,7 @@ impl<'a> Parser<'a> {
         // v0.7: a block whose last statement is an `assert` may close without
         // an explicit tail expression. The implicit tail is `()` (unit).
         if self.peek_kind() == Some(TokenKind::RBrace)
-            && matches!(statements.last(), Some(Statement::Assert(_)))
+            && matches!(statements.last(), Some(Statement::Expect(_)))
         {
             let close = self.expect(TokenKind::RBrace, "to close the block")?;
             let tail = Expr {
@@ -194,11 +194,11 @@ impl<'a> Parser<'a> {
                 trivia: Trivia::default(),
             }));
         }
-        if self.peek_kind() == Some(TokenKind::Assert) {
-            let kw = self.expect(TokenKind::Assert, "to start an assert statement")?;
+        if self.peek_kind() == Some(TokenKind::Expect) {
+            let kw = self.expect(TokenKind::Expect, "to start an expect statement")?;
             let value = self.parse_expr()?;
             let span = kw.span.merge(value.span);
-            return Ok(Statement::Assert(AssertStmt {
+            return Ok(Statement::Expect(ExpectStmt {
                 value,
                 span,
                 trivia: Trivia::default(),

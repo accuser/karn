@@ -32,17 +32,17 @@ There are **60** reserved keywords.
 | `agent` | Declare a stateful, keyed agent inside a context. |
 | `and` | Combine refinement predicates (`where A and B`). |
 | `as` | Alias a consumed context (`consumes X as Y`). |
-| `assert` | Assert a condition inside a test case. |
 | `binding` | Name an adapter's TypeScript binding module (`binding "<module>"`). |
 | `by` | Name the actor a handler consumes (`on … by <name>: <Actor>`). |
 | `capability` | Declare a capability (a dependency interface) in a context. |
+| `case` | Declare a test case inside a `suite` (`case "…" { … }`). |
 | `commons` | Declare a pure, stateless module of types and functions. |
 | `consumes` | Declare a dependency on another context's services. |
 | `context` | Declare a deployable context (services, agents, capabilities). |
 | `cron` | The cron protocol on a service header (`from cron`). |
 | `else` | The alternative branch of an `if` expression. |
 | `enum` | Declare a payloadless sum type (`enum { A, B }`). |
-| `expect` | Reserved keyword. |
+| `expect` | Assert a predicate inside a test case (`expect <bool-predicate>`). |
 | `exports` | Declare which types a context exposes, and how. |
 | `false` | The boolean literal `false`. |
 | `fn` | Declare a function. |
@@ -64,10 +64,10 @@ There are **60** reserved keywords.
 | `record` | Reserved keyword (records are written `type X = { … }`). |
 | `self` | The current agent instance, inside a handler. |
 | `service` | Declare a service (a group of handlers) in a context. |
-| `test` | Declare a test block or a test case. |
+| `suite` | Declare a test suite targeting a unit (`suite <target> { case … }`). |
 | `transparent` | Export a type with its structure visible (`exports transparent { … }`). |
 | `true` | The boolean literal `true`. |
 | `type` | Declare a type: alias, record, sum, opaque, or refined. |
 | `uses` | Bring a commons into scope. |
 | `where` | Attach refinement predicates to a base type. |
-| `wires` | List the contexts a `test integration` stands up as Workers. |
+| `wires` | List the contexts a `suite integration` stands up as Workers. |

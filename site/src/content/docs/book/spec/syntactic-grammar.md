@@ -66,31 +66,31 @@ scope. An adapter's providers are **external** (bodiless,
 placement rules, the binding requirement, and the reserved `bynk` namespace are
 well-formedness: §5.
 
-### §4.1.7 test_decl {#416-test_decl}
+### §4.1.7 suite_decl {#416-test_decl}
 
-{{#grammar test_decl}}
+{{#grammar suite_decl}}
 
-A `test` block naming the `commons` or `context` it targets. Well-formedness: §5.
+A `suite` block naming the `commons` or `context` it targets. Well-formedness: §5.
 
 ### §4.1.8 integration_decl {#417-integration_decl}
 
 {{#grammar integration_decl}}
 
-A `test integration` block: the keyword `test integration`, a name, a `wires`
+A `suite integration` block: the keyword `suite integration`, a name, a `wires`
 clause, and integration body items. Well-formedness: §5.
 
 ### §4.1.9 wires_decl
 
 {{#grammar wires_decl}}
 
-The comma-separated list of contexts an integration test wires together.
+The comma-separated list of contexts an integration suite wires together.
 Well-formedness: §5.
 
 ### §4.1.10 integration_body_item
 
 {{#grammar _integration_body_item}}
 
-What may appear in an integration test: `uses` declarations and test cases.
+What may appear in an integration suite: `uses` declarations and `case`s.
 
 ### §4.1.11 commons_body_item
 
@@ -867,11 +867,11 @@ An identifier, `:=`, and an expression — a `Cell` store write. Well-formedness
 including that the target is a `store Cell` field and the right-hand side does not
 read it: §5 (ADR 0108).
 
-### §4.8.7 assert_expr
+### §4.8.7 expect_expr
 
-{{#grammar assert_expr}}
+{{#grammar expect_expr}}
 
-`assert` and a condition. Well-formedness: §5.
+`expect` and a `Bool` predicate. Well-formedness: §5.
 
 ### §4.8.8 binding_name
 
@@ -881,14 +881,14 @@ The name bound by a `let`: an identifier, or `_` to discard the value.
 
 ## §4.9 Testing constructs
 
-Test cases and mocks. See also the top-level `test_decl`
+Cases and mocks. See also the top-level `suite_decl`
 ([§4.1.6](#416-test_decl)) and `integration_decl` ([§4.1.7](#417-integration_decl)).
 
-### §4.9.1 test_case
+### §4.9.1 case
 
-{{#grammar test_case}}
+{{#grammar case}}
 
-`test`, a description string, and a block body. Well-formedness: §5.
+`case`, a description string, and a block body. Well-formedness: §5.
 
 ### §4.9.2 mocks_decl
 

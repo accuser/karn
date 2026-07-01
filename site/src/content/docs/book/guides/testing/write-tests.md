@@ -1,20 +1,20 @@
 ---
 title: "Write tests, mock collaborators, and pin a `Mock[T]`"
 ---
-**Goal:** write and run tests, assert outcomes, fabricate values, and replace a
+**Goal:** write and run tests, state expectations, fabricate values, and replace a
 dependency.
 
 Tests live in a project's `tests/` tree (see
-[Lay out a project](/book/guides/projects-build-and-deployment/layout/)). A test file is a `test` block naming
-its target unit, containing named cases.
+[Lay out a project](/book/guides/projects-build-and-deployment/layout/)). A test file is a `suite` block naming
+its target unit, containing named `case`s.
 
 ## Write and run
 
 ```bynk
-test counters {
-  test "a fresh counter starts at zero" {
+suite counters {
+  case "a fresh counter starts at zero" {
     let n <- Counter(CounterId.unsafe("fresh")).current()
-    assert n == 0
+    expect n == 0
   }
 }
 ```
@@ -26,7 +26,10 @@ bynkc test .
 ```
 
 `bynkc test` compiles the project, type-checks it with `tsc`, and runs it with
-Node, so both must be on your path. `assert` is valid only inside a test case.
+Node, so both must be on your path. `expect` is valid only inside a `case`. It
+takes the same `Bool` predicate an `invariant` does (`is`, `implies`, the
+operators, pure methods) — one predicate surface across code and tests — and a
+failure reports the predicate structure: `expected` versus `actual`.
 
 ## Fabricate values with `Mock[T]`
 
@@ -34,12 +37,12 @@ Node, so both must be on your path. `assert` is valid only inside a test case.
 refinement; pass an argument to pin a specific value:
 
 ```bynk
-test quantities {
-  test "mocks" {
+suite quantities {
+  case "mocks" {
     let a = Mock[Quantity]       -- a valid Quantity
     let b = Mock[Quantity](50)   -- pinned to 50
-    assert a == a
-    assert b == b
+    expect a == a
+    expect b == b
   }
 }
 ```
@@ -53,16 +56,16 @@ instead. `Mock[T]` is test-only.
 Replace a capability the code under test depends on:
 
 ```bynk
-test payments {
+suite payments {
   mocks Logger = SilentLogger {
     fn log(msg: String) -> Effect[()] {
       ()
     }
   }
 
-  test "authorise succeeds for a positive amount" {
+  case "authorise succeeds for a positive amount" {
     let r <- authorise.call(100)
-    assert r is Ok(_)
+    expect r is Ok(_)
   }
 }
 ```

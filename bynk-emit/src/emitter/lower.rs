@@ -259,23 +259,38 @@ fn emit_statement(out: &mut String, stmt: &Statement, cx: &mut LowerCtx, indent:
                 None => write_line(out, indent, &format!("const {bind_name} = await {value};")),
             }
         }
-        Statement::Assert(a) => {
-            // Inside a test case body, `assert expr` lowers to a runtime check
-            // that throws an AssertionError so the surrounding test-case
-            // runner catches it and records the failure.
+        Statement::Expect(a) => {
+            // Inside a test case body, `expect <pred>` lowers to a runtime check
+            // that throws an ExpectationError so the surrounding test-case runner
+            // catches it and records the failure (v0.112, renamed from `assert`).
+            let span_start = a.value.span.start;
+            let span_end = a.value.span.end;
+            let location = expect_location(cx, span_start);
+            let src = expect_source_text(cx, a.value.span);
             let mut stmts = Vec::new();
-            let value = lower_expr(&a.value, &mut stmts, cx);
+            let cond = lower_expr(&a.value, &mut stmts, cx);
+            // Structural expected-vs-actual for a top-level comparison. The
+            // predicate is pure (ADR 0144), so re-evaluating the operands for the
+            // failure message is observationally identical to the condition.
+            let detail = if let ExprKind::BinOp(op, l, r) = &a.value.kind
+                && let Some(sym) = comparison_op_symbol(*op)
+            {
+                let lv = lower_expr(l, &mut stmts, cx);
+                let rv = lower_expr(r, &mut stmts, cx);
+                format!(
+                    "\"expect {src}\\n  expected: {src}\\n  actual:   \" + __bynkShow(({lv})) + \" {sym} \" + __bynkShow(({rv}))"
+                )
+            } else {
+                format!("\"expect {src}\"")
+            };
             for s in &stmts {
                 write_line(out, indent, s);
             }
-            let span_start = a.value.span.start;
-            let span_end = a.value.span.end;
-            let location = assert_location(cx, span_start);
             write_line(
                 out,
                 indent,
                 &format!(
-                    "if (!({value})) {{ throw __bynkAssertionFailure(\"{location}\", {span_start}, {span_end}); }}",
+                    "if (!({cond})) {{ throw __bynkExpectFailure(\"{location}\", {span_start}, {span_end}, {detail}); }}",
                 ),
             );
         }
@@ -318,12 +333,12 @@ fn emit_statement(out: &mut String, stmt: &Statement, cx: &mut LowerCtx, indent:
     }
 }
 
-/// v0.59: the `location` string an `assert` failure carries. With a test-body
+/// v0.59: the `location` string an `expect` failure carries. With a test-body
 /// [`AssertLoc`](crate::emitter::AssertLoc) in scope it is a real, escaped
 /// `path:line:col` (so `--format json` consumers can link to the source);
-/// otherwise it falls back to the bare byte offset (asserts only appear in test
+/// otherwise it falls back to the bare byte offset (`expect`s only appear in test
 /// bodies, so the fallback is defensive).
-fn assert_location(cx: &LowerCtx, offset: usize) -> String {
+fn expect_location(cx: &LowerCtx, offset: usize) -> String {
     match &cx.assert_loc {
         Some(loc) => {
             let (line, col) = bynk_syntax::span::line_col(&loc.source, offset);
@@ -334,6 +349,34 @@ fn assert_location(cx: &LowerCtx, offset: usize) -> String {
             crate::emitter::escape_ts_string(&format!("{path}:{line}:{col}"))
         }
         None => format!("offset {offset}"),
+    }
+}
+
+/// v0.112: the trimmed, TS-escaped source text of an `expect` predicate, embedded
+/// in the structural failure report (`expect <src>`). Escaped for a
+/// double-quoted TS string literal (no surrounding quotes); empty when no
+/// test-body source is in scope (defensive — `expect`s only appear in test bodies).
+fn expect_source_text(cx: &LowerCtx, span: bynk_syntax::span::Span) -> String {
+    match &cx.assert_loc {
+        Some(loc) => {
+            let raw = loc.source.get(span.start..span.end).unwrap_or("").trim();
+            crate::emitter::escape_ts_string(raw)
+        }
+        None => String::new(),
+    }
+}
+
+/// v0.112: the source operator symbol for a comparison `BinOp`, or `None` for
+/// non-comparison operators (which get the source-text-only failure report).
+fn comparison_op_symbol(op: BinOp) -> Option<&'static str> {
+    match op {
+        BinOp::Eq => Some("=="),
+        BinOp::NotEq => Some("!="),
+        BinOp::Lt => Some("<"),
+        BinOp::LtEq => Some("<="),
+        BinOp::Gt => Some(">"),
+        BinOp::GtEq => Some(">="),
+        _ => None,
     }
 }
 
@@ -527,15 +570,20 @@ pub(crate) fn lower_expr(e: &Expr, stmts: &mut Vec<String>, cx: &mut LowerCtx) -
             base,
             overrides,
         } => lower_record_spread(base, overrides, stmts, cx),
-        ExprKind::Assert(inner) => {
-            // v0.9.1: assert as an expression. Emit a runtime helper call
-            // that returns void (i.e., evaluates to `undefined` at runtime
-            // and is treated as the unit value `()` in Bynk terms).
+        ExprKind::Expect(inner) => {
+            // v0.9.1: expect as an expression (v0.112, renamed from `assert`).
+            // Emit a runtime helper call that returns void (i.e., evaluates to
+            // `undefined` at runtime and is treated as the unit value `()` in Bynk
+            // terms). The expression form reports the predicate source only — the
+            // statement form carries the structural expected-vs-actual report.
             let value = lower_expr(inner, stmts, cx);
             let span_start = inner.span.start;
             let span_end = inner.span.end;
-            let location = assert_location(cx, span_start);
-            format!("__bynkAssert(({value}), \"{location}\", {span_start}, {span_end})")
+            let location = expect_location(cx, span_start);
+            let src = expect_source_text(cx, inner.span);
+            format!(
+                "__bynkExpect(({value}), \"{location}\", {span_start}, {span_end}, \"expect {src}\")"
+            )
         }
         ExprKind::Mock { type_ref, args } => lower_mock(type_ref, args, stmts, cx),
     }

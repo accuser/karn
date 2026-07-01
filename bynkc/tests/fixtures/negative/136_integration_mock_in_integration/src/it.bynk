@@ -1,5 +1,5 @@
-test integration "x" {
+suite integration "x" {
   wires app.a, app.b
   mocks C = MockC { fn f() -> Effect[Int] { 9 } }
-  test "t" { let r <- app.a.ping() assert r == 1 }
+  case "t" { let r <- app.a.ping() expect r == 1 }
 }

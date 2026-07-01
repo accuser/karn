@@ -1,4 +1,4 @@
-test commerce.payment {
+suite commerce.payment {
   mocks Logger = First {
     fn log(msg: String) -> Effect[()] {
       Effect.pure(())
@@ -11,7 +11,7 @@ test commerce.payment {
     }
   }
 
-  test "x" {
-    assert true
+  case "x" {
+    expect true
   }
 }

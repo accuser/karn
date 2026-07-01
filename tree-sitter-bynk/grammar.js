@@ -22,7 +22,7 @@
 // @ts-check
 
 const PREC = {
-  assert: 0,
+  expect: 0,
   // v0.80: `implies` is the lowest-precedence binary operator (below `||`).
   implies: 1,
   or: 2,
@@ -87,7 +87,7 @@ module.exports = grammar({
             $.context_decl,
             $.adapter_decl,
             $.integration_decl,
-            $.test_decl,
+            $.suite_decl,
           ),
         ),
         repeat1($._item_fragment),
@@ -144,10 +144,10 @@ module.exports = grammar({
     // (a test case is `test "string" …`, so it never collides with a new
     // `test <qualified_name>` unit — but the disambiguation needs one extra
     // token of lookahead, handled by a declared conflict).
-    test_decl: ($) =>
+    suite_decl: ($) =>
       prec.right(
         seq(
-          "test",
+          "suite",
           field("target", $.qualified_name),
           choice(
             seq("{", repeat($._test_body_item), "}"),
@@ -163,7 +163,7 @@ module.exports = grammar({
     integration_decl: ($) =>
       prec.right(
         seq(
-          "test",
+          "suite",
           "integration",
           field("name", $.string_literal),
           choice(
@@ -175,7 +175,7 @@ module.exports = grammar({
 
     wires_decl: ($) => seq("wires", sep1(field("participant", $.qualified_name), ",")),
 
-    _integration_body_item: ($) => choice($.uses_decl, $.test_case),
+    _integration_body_item: ($) => choice($.uses_decl, $.case),
 
     qualified_name: ($) => sep1($.identifier, "."),
 
@@ -228,7 +228,7 @@ module.exports = grammar({
       ),
 
     _test_body_item: ($) =>
-      choice($.uses_decl, $.consumes_decl, $.mocks_decl, $.test_case),
+      choice($.uses_decl, $.consumes_decl, $.mocks_decl, $.case),
 
     // -- Headers / clauses --
 
@@ -815,8 +815,8 @@ module.exports = grammar({
         repeat($.provider_op),
         "}",
       ),
-    test_case: ($) =>
-      seq("test", field("name", $.string_literal), field("body", $.block)),
+    case: ($) =>
+      seq("case", field("name", $.string_literal), field("body", $.block)),
 
     // -- Block & statements --
 
@@ -834,7 +834,7 @@ module.exports = grammar({
         $.effect_let_stmt,
         $.effect_send_stmt,
         $.assign_stmt,
-        prec(1, $.assert_expr),
+        prec(1, $.expect_expr),
       ),
 
     let_stmt: ($) =>
@@ -869,15 +869,15 @@ module.exports = grammar({
         $.if_expr,
         $.match_expr,
         $.is_expr,
-        $.assert_expr,
+        $.expect_expr,
         $.binary_expr,
         $.unary_expr,
         $._primary,
       ),
 
     // v0.9.1: `assert` is an expression of type `()`.
-    assert_expr: ($) =>
-      prec.right(PREC.assert, seq("assert", field("cond", $._expression))),
+    expect_expr: ($) =>
+      prec.right(PREC.expect, seq("expect", field("cond", $._expression))),
 
     if_expr: ($) =>
       seq(

@@ -204,8 +204,8 @@ pub struct RequiresDep {
 pub enum SourceUnit {
     Commons(Commons),
     Context(Context),
-    Test(TestDecl),
-    /// v0.16: a `test integration "name" { wires … }` multi-Worker integration
+    Suite(SuiteDecl),
+    /// v0.16: a `suite integration "name" { wires … }` multi-Worker integration
     /// test. Its `name()` is synthesised from the suite name.
     Integration(IntegrationDecl),
     /// v0.17: an `adapter` unit — the host boundary (capability contract +
@@ -218,7 +218,7 @@ impl SourceUnit {
         match self {
             SourceUnit::Commons(c) => &c.name,
             SourceUnit::Context(c) => &c.name,
-            SourceUnit::Test(t) => &t.target,
+            SourceUnit::Suite(t) => &t.target,
             SourceUnit::Integration(i) => &i.name,
             SourceUnit::Adapter(a) => &a.name,
         }
@@ -228,7 +228,7 @@ impl SourceUnit {
         match self {
             SourceUnit::Commons(c) => c.span,
             SourceUnit::Context(c) => c.span,
-            SourceUnit::Test(t) => t.span,
+            SourceUnit::Suite(t) => t.span,
             SourceUnit::Integration(i) => i.span,
             SourceUnit::Adapter(a) => a.span,
         }
@@ -238,7 +238,7 @@ impl SourceUnit {
         match self {
             SourceUnit::Commons(_) => "commons",
             SourceUnit::Context(_) => "context",
-            SourceUnit::Test(_) => "test",
+            SourceUnit::Suite(_) => "suite",
             SourceUnit::Integration(_) => "integration test",
             SourceUnit::Adapter(_) => "adapter",
         }
@@ -251,7 +251,7 @@ impl SourceUnit {
 /// test cases plus optional mock declarations. As with commons and contexts, a
 /// test may be split across multiple files (fragment form).
 #[derive(Debug, Clone)]
-pub struct TestDecl {
+pub struct SuiteDecl {
     /// The targeted commons or context.
     pub target: QualifiedName,
     /// `uses` clauses brought in by this test fragment.
@@ -259,7 +259,7 @@ pub struct TestDecl {
     /// Provider or consumed-context mocks declared for the test.
     pub mocks: Vec<MockDecl>,
     /// The individual test cases.
-    pub cases: Vec<TestCase>,
+    pub cases: Vec<Case>,
     /// Surface form: brace-delimited body or headerless fragment.
     pub form: CommonsForm,
     /// Optional documentation block attached to the test declaration.
@@ -296,7 +296,7 @@ pub struct MockOp {
 
 /// A `test "name" { body }` block inside a test declaration (v0.7 §3.3).
 #[derive(Debug, Clone)]
-pub struct TestCase {
+pub struct Case {
     /// The test name, taken from the string literal.
     pub name: String,
     /// The span of the string literal — used for diagnostics and runtime
@@ -326,7 +326,7 @@ pub struct IntegrationDecl {
     /// `uses` clauses bringing commons into the case bodies.
     pub uses: Vec<UsesDecl>,
     /// The individual test cases.
-    pub cases: Vec<TestCase>,
+    pub cases: Vec<Case>,
     /// Surface form: brace-delimited body or headerless fragment.
     pub form: CommonsForm,
     pub documentation: Option<String>,
@@ -1398,9 +1398,9 @@ pub enum Statement {
     Let(LetStmt),
     /// `let name (: T)? <- expr` — effectful binding (v0.5).
     EffectLet(LetStmt),
-    /// `assert expr` — verify a Bool expression at test runtime (v0.7).
-    /// Only valid inside test case bodies.
-    Assert(AssertStmt),
+    /// `expect expr` — verify a Bool predicate at test runtime (v0.7; renamed
+    /// from `assert` in v0.112). Only valid inside test case bodies.
+    Expect(ExpectStmt),
     /// `~> expr` — an asynchronous fire-and-forget send (v0.79). The caller does
     /// not await the reply; legal only when the reply is `Effect[()]`. No binder.
     Send(SendStmt),
@@ -1414,7 +1414,7 @@ impl Statement {
     pub fn span(&self) -> Span {
         match self {
             Statement::Let(l) | Statement::EffectLet(l) => l.span,
-            Statement::Assert(a) => a.span,
+            Statement::Expect(a) => a.span,
             Statement::Send(s) => s.span,
             Statement::Assign(a) => a.span,
         }
@@ -1422,7 +1422,7 @@ impl Statement {
 }
 
 #[derive(Debug, Clone)]
-pub struct AssertStmt {
+pub struct ExpectStmt {
     pub value: Expr,
     pub span: Span,
     pub trivia: Trivia,
@@ -1656,10 +1656,10 @@ pub enum ExprKind {
     /// `Effect.pure(value)` — wrap a synchronous value into `Effect[T]`
     /// (v0.5). Recognised in the parser as a special-form.
     EffectPure(Box<Expr>),
-    /// `assert expr` — assertion as an expression of type `()` (v0.9.1).
-    /// Valid only inside test bodies. Evaluates `expr` (must be Bool); if
-    /// false, the surrounding test case fails.
-    Assert(Box<Expr>),
+    /// `expect expr` — expectation as an expression of type `()` (v0.9.1;
+    /// renamed from `assert` in v0.112). Valid only inside test bodies. Evaluates
+    /// `expr` (must be Bool); if false, the surrounding test case fails.
+    Expect(Box<Expr>),
     /// `Mock[T]`, `Mock[T](args)` — test-context value construction (v0.9.4).
     /// `args` is empty for the bare form and holds the pin arguments for
     /// `Mock[T](...)`. The record-override form `Mock[T] { ... }` is not yet

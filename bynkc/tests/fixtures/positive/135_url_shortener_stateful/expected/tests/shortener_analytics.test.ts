@@ -5,22 +5,25 @@ import { Ok, Err, Some, None, makeTestState, type Result, type Option, type Vali
 import * as shortener_analytics from "./../shortener/analytics.js";
 import * as shortener_core from "./../shortener/core.js";
 
-class AssertionError extends Error {
+class ExpectationError extends Error {
   location: string;
   start: number;
   end: number;
-  constructor(location: string, start: number, end: number) {
-    super(`assertion failed at ${location}`);
+  constructor(location: string, start: number, end: number, detail: string) {
+    super(`${detail}\n  at ${location}`);
     this.location = location;
     this.start = start;
     this.end = end;
   }
 }
-function __bynkAssertionFailure(location: string, start: number, end: number) {
-  return new AssertionError(location, start, end);
+function __bynkExpectFailure(location: string, start: number, end: number, detail: string) {
+  return new ExpectationError(location, start, end, detail);
 }
-function __bynkAssert(cond: boolean, location: string, start: number, end: number): void {
-  if (!cond) { throw __bynkAssertionFailure(location, start, end); }
+function __bynkExpect(cond: boolean, location: string, start: number, end: number, detail: string): void {
+  if (!cond) { throw __bynkExpectFailure(location, start, end, detail); }
+}
+function __bynkShow(v: unknown): string {
+  try { return typeof v === "bigint" ? String(v) : (JSON.stringify(v) ?? String(v)); } catch { return String(v); }
 }
 
 function makeTestDeps() {
@@ -36,7 +39,7 @@ async function test_a_fresh_Hits_key_reads_count_as_0() {
     void (await (async (__d) => {
         switch (__d.tag) {
           case "Err": {
-            return __bynkAssert((false), "tests/shortener/analytics.bynk:32:20", 1357, 1362);
+            return __bynkExpect((false), "tests/shortener/analytics.bynk:32:20", 1358, 1363, "expect false");
           }
           case "Ok": {
             const code = __d.value;
@@ -44,10 +47,10 @@ async function test_a_fresh_Hits_key_reads_count_as_0() {
             switch (reading.tag) {
               case "Ok": {
                 const total = reading.value;
-                return __bynkAssert((total === 0), "tests/shortener/analytics.bynk:36:25", 1457, 1467);
+                return __bynkExpect((total === 0), "tests/shortener/analytics.bynk:36:25", 1458, 1468, "expect total == 0");
               }
               case "Err": {
-                return __bynkAssert((false), "tests/shortener/analytics.bynk:37:25", 1492, 1497);
+                return __bynkExpect((false), "tests/shortener/analytics.bynk:37:25", 1493, 1498, "expect false");
               }
             }
             throw new Error("non-exhaustive match");
@@ -57,7 +60,7 @@ async function test_a_fresh_Hits_key_reads_count_as_0() {
       })(ShortCode.of("fresh1")));
     return { pass: true };
   } catch (e) {
-    if (e instanceof AssertionError) {
+    if (e instanceof ExpectationError) {
       return { pass: false, error: { message: e.message, location: e.location } };
     }
     return { pass: false, error: { message: String(e), location: "unknown" } };
@@ -73,7 +76,7 @@ async function test_recording_a_hit_returns_a_running_total() {
     void (await (async (__d) => {
         switch (__d.tag) {
           case "Err": {
-            return __bynkAssert((false), "tests/shortener/analytics.bynk:45:20", 1613, 1618);
+            return __bynkExpect((false), "tests/shortener/analytics.bynk:45:20", 1614, 1619, "expect false");
           }
           case "Ok": {
             const code = __d.value;
@@ -81,10 +84,10 @@ async function test_recording_a_hit_returns_a_running_total() {
             switch (result.tag) {
               case "Ok": {
                 const total = result.value;
-                return __bynkAssert((total === 1), "tests/shortener/analytics.bynk:49:25", 1711, 1721);
+                return __bynkExpect((total === 1), "tests/shortener/analytics.bynk:49:25", 1712, 1722, "expect total == 1");
               }
               case "Err": {
-                return __bynkAssert((false), "tests/shortener/analytics.bynk:50:25", 1746, 1751);
+                return __bynkExpect((false), "tests/shortener/analytics.bynk:50:25", 1747, 1752, "expect false");
               }
             }
             throw new Error("non-exhaustive match");
@@ -94,7 +97,7 @@ async function test_recording_a_hit_returns_a_running_total() {
       })(ShortCode.of("abc123")));
     return { pass: true };
   } catch (e) {
-    if (e instanceof AssertionError) {
+    if (e instanceof ExpectationError) {
       return { pass: false, error: { message: e.message, location: e.location } };
     }
     return { pass: false, error: { message: String(e), location: "unknown" } };
@@ -110,7 +113,7 @@ async function test_two_hits_on_the_same_code_accumulate() {
     void (await (async (__d) => {
         switch (__d.tag) {
           case "Err": {
-            return __bynkAssert((false), "tests/shortener/analytics.bynk:58:20", 1864, 1869);
+            return __bynkExpect((false), "tests/shortener/analytics.bynk:58:20", 1865, 1870, "expect false");
           }
           case "Ok": {
             const code = __d.value;
@@ -119,10 +122,10 @@ async function test_two_hits_on_the_same_code_accumulate() {
             switch (second.tag) {
               case "Ok": {
                 const total = second.value;
-                return __bynkAssert((total === 2), "tests/shortener/analytics.bynk:63:25", 1991, 2001);
+                return __bynkExpect((total === 2), "tests/shortener/analytics.bynk:63:25", 1992, 2002, "expect total == 2");
               }
               case "Err": {
-                return __bynkAssert((false), "tests/shortener/analytics.bynk:64:25", 2026, 2031);
+                return __bynkExpect((false), "tests/shortener/analytics.bynk:64:25", 2027, 2032, "expect false");
               }
             }
             throw new Error("non-exhaustive match");
@@ -132,7 +135,7 @@ async function test_two_hits_on_the_same_code_accumulate() {
       })(ShortCode.of("abc123")));
     return { pass: true };
   } catch (e) {
-    if (e instanceof AssertionError) {
+    if (e instanceof ExpectationError) {
       return { pass: false, error: { message: e.message, location: e.location } };
     }
     return { pass: false, error: { message: String(e), location: "unknown" } };
@@ -148,7 +151,7 @@ async function test_count_reads_back_the_current_total_without_incrementing() {
     void (await (async (__d) => {
         switch (__d.tag) {
           case "Err": {
-            return __bynkAssert((false), "tests/shortener/analytics.bynk:72:20", 2163, 2168);
+            return __bynkExpect((false), "tests/shortener/analytics.bynk:72:20", 2164, 2169, "expect false");
           }
           case "Ok": {
             const code = __d.value;
@@ -157,10 +160,10 @@ async function test_count_reads_back_the_current_total_without_incrementing() {
             switch (reading.tag) {
               case "Ok": {
                 const total = reading.value;
-                return __bynkAssert((total === 1), "tests/shortener/analytics.bynk:77:25", 2292, 2302);
+                return __bynkExpect((total === 1), "tests/shortener/analytics.bynk:77:25", 2293, 2303, "expect total == 1");
               }
               case "Err": {
-                return __bynkAssert((false), "tests/shortener/analytics.bynk:78:25", 2327, 2332);
+                return __bynkExpect((false), "tests/shortener/analytics.bynk:78:25", 2328, 2333, "expect false");
               }
             }
             throw new Error("non-exhaustive match");
@@ -170,7 +173,7 @@ async function test_count_reads_back_the_current_total_without_incrementing() {
       })(ShortCode.of("zzz999")));
     return { pass: true };
   } catch (e) {
-    if (e instanceof AssertionError) {
+    if (e instanceof ExpectationError) {
       return { pass: false, error: { message: e.message, location: e.location } };
     }
     return { pass: false, error: { message: String(e), location: "unknown" } };

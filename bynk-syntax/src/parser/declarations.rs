@@ -51,18 +51,18 @@ impl<'a> Parser<'a> {
                 a.trivia = header_trivia;
                 Ok(SourceUnit::Adapter(a))
             }
-            Some(TokenKind::Test) => {
-                // v0.16: `test integration "name" { … }` is the integration-test
+            Some(TokenKind::Suite) => {
+                // v0.16: `suite integration "name" { … }` is the integration-test
                 // kind. `integration` is contextual — it's an ordinary identifier
-                // everywhere except directly after `test` and before a string
-                // literal (the suite name). Anything else is a v0.7 unit test.
+                // everywhere except directly after `suite` and before a string
+                // literal (the suite name). Anything else is a v0.7 unit suite.
                 let next = self.tokens.get(self.pos + 1);
                 let after = self.tokens.get(self.pos + 2).map(|t| t.kind);
                 let is_integration = matches!(next, Some(t)
                     if t.kind == TokenKind::Ident
                         && self.slice(t.span) == "integration")
                     && after == Some(TokenKind::StrLit);
-                let start = self.expect(TokenKind::Test, "to start the test declaration")?;
+                let start = self.expect(TokenKind::Suite, "to start the suite declaration")?;
                 let doc = self.finalize_doc(leading_doc, start.span);
                 if is_integration {
                     let mut i = self.parse_integration(start.span, doc)?;
@@ -75,7 +75,7 @@ impl<'a> Parser<'a> {
                     _ => self.parse_test_fragment(start.span, name, doc)?,
                 };
                 t.trivia = header_trivia;
-                Ok(SourceUnit::Test(t))
+                Ok(SourceUnit::Suite(t))
             }
             Some(_) => {
                 let t = self.peek().unwrap();
@@ -90,12 +90,12 @@ impl<'a> Parser<'a> {
                     "bynk.parse.expected_unit_header",
                     t.span,
                     format!(
-                        "expected `commons`, `context`, or `test` to start the file, found {}",
+                        "expected `commons`, `context`, or `suite` to start the file, found {}",
                         t.kind.describe()
                     ),
                 )
                 .with_note(
-                    "every `.bynk` file begins with either a `commons`, `context`, or `test` declaration",
+                    "every `.bynk` file begins with either a `commons`, `context`, or `suite` declaration",
                 ))
             }
             None => {
@@ -109,7 +109,7 @@ impl<'a> Parser<'a> {
                 Err(CompileError::new(
                     "bynk.parse.unexpected_eof",
                     self.eof_span(),
-                    "expected `commons`, `context`, or `test` to start the file, found end of file",
+                    "expected `commons`, `context`, or `suite` to start the file, found end of file",
                 ))
             }
         }
@@ -557,7 +557,7 @@ impl<'a> Parser<'a> {
         start: Span,
         target: QualifiedName,
         documentation: Option<String>,
-    ) -> Result<TestDecl, CompileError> {
+    ) -> Result<SuiteDecl, CompileError> {
         self.expect(TokenKind::LBrace, "after the test target name")?;
         let mut uses = Vec::new();
         let mut mocks = Vec::new();
@@ -607,7 +607,7 @@ impl<'a> Parser<'a> {
                         Err(e) => self.handle_item_err(e)?,
                     }
                 }
-                Some(TokenKind::Test) => {
+                Some(TokenKind::Case) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
                     match self.parse_test_case() {
@@ -651,7 +651,7 @@ impl<'a> Parser<'a> {
             }
         }
         let end = self.expect(TokenKind::RBrace, "to close the test body")?;
-        Ok(TestDecl {
+        Ok(SuiteDecl {
             target,
             uses,
             mocks,
@@ -669,7 +669,7 @@ impl<'a> Parser<'a> {
         start: Span,
         target: QualifiedName,
         documentation: Option<String>,
-    ) -> Result<TestDecl, CompileError> {
+    ) -> Result<SuiteDecl, CompileError> {
         let mut uses = Vec::new();
         let mut mocks = Vec::new();
         let mut cases = Vec::new();
@@ -722,7 +722,7 @@ impl<'a> Parser<'a> {
                         Err(e) => self.handle_item_err(e)?,
                     }
                 }
-                Some(TokenKind::Test) => {
+                Some(TokenKind::Case) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
                     match self.parse_test_case() {
@@ -772,7 +772,7 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        Ok(TestDecl {
+        Ok(SuiteDecl {
             target,
             uses,
             mocks,
@@ -872,7 +872,7 @@ impl<'a> Parser<'a> {
                         Err(e) => self.handle_item_err(e)?,
                     }
                 }
-                Some(TokenKind::Test) => {
+                Some(TokenKind::Case) => {
                     let next_span = self.peek().unwrap().span;
                     let doc = self.finalize_doc(item_doc, next_span);
                     match self.parse_test_case() {
@@ -967,7 +967,7 @@ impl<'a> Parser<'a> {
             // Allow a trailing comma before the next item/`}`.
             if matches!(
                 self.peek_kind(),
-                Some(TokenKind::RBrace) | Some(TokenKind::Uses) | Some(TokenKind::Test) | None
+                Some(TokenKind::RBrace) | Some(TokenKind::Uses) | Some(TokenKind::Case) | None
             ) {
                 break;
             }
@@ -1049,13 +1049,13 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_test_case(&mut self) -> Result<TestCase, CompileError> {
-        let kw = self.expect(TokenKind::Test, "to start a test case")?;
+    fn parse_test_case(&mut self) -> Result<Case, CompileError> {
+        let kw = self.expect(TokenKind::Case, "to start a test case")?;
         let name_tok = self.expect(TokenKind::StrLit, "as the test case name")?;
         let name = parse_string_literal(self.slice(name_tok.span), name_tok.span)?;
         let body = self.parse_block("to open the test case body")?;
         let span = kw.span.merge(body.span);
-        Ok(TestCase {
+        Ok(Case {
             name,
             name_span: name_tok.span,
             body,

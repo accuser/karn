@@ -730,7 +730,7 @@ fn check_block_references(
                     scopes.last_mut().unwrap().insert(l.name.name.clone(), ());
                 }
             }
-            Statement::Assert(a) => {
+            Statement::Expect(a) => {
                 check_expr_references(
                     &a.value,
                     params,
@@ -881,7 +881,7 @@ fn check_expr_references(
                 errors,
             );
         }
-        ExprKind::Assert(inner) => {
+        ExprKind::Expect(inner) => {
             check_expr_references(
                 inner,
                 params,

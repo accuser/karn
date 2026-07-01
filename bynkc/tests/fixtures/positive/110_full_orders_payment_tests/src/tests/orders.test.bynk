@@ -1,4 +1,4 @@
-test commerce.orders {
+suite commerce.orders {
   mocks Payment = MockPayment {
     fn authorise(amount: Int) -> Effect[Result[AuthId, PaymentError]] {
       if amount > 50000 {
@@ -9,16 +9,16 @@ test commerce.orders {
     }
   }
 
-  test "small order places successfully" {
+  case "small order places successfully" {
     let result <- place.call(5000)
-    assert result is Ok(_)
+    expect result is Ok(_)
   }
 
-  test "large order is declined" {
+  case "large order is declined" {
     let result <- place.call(100000)
     match result {
-      Err(PaymentDeclined) => { assert true }
-      _                    => { assert false }
+      Err(PaymentDeclined) => { expect true }
+      _                    => { expect false }
     }
   }
 }

@@ -2,7 +2,7 @@
 title: Test it
 ---
 A language built around correctness should make tests easy, and Bynk builds
-testing in: `test` blocks, `assert`, value fabrication with `Mock[T]`, and
+testing in: `suite`/`case` blocks, `expect`, value fabrication with `Mock[T]`, and
 collaborator mocking with `mocks`. In this final tutorial we test the shortener
 from [Tutorial 5](/book/tutorials/05-stateful-agent/) and meet each of those tools.
 
@@ -38,36 +38,36 @@ Move the `shortener.bynk` you built into `src/`. Each test file's path under
 
 ## Write a test and assert
 
-A test file is a `test` block naming its target, containing one or more named
-cases. Inside a case, `assert` checks a condition. Put this in
+A test file is a `suite` block naming its target, containing one or more named
+cases. Inside a case, `expect` checks a predicate. Put this in
 `tests/shortener.bynk`:
 
 ```bynk,ignore
-test shortener
+suite shortener
 
-test "a fresh code resolves to NotFound" {
+case "a fresh code resolves to NotFound" {
   match ShortCode.of("fresh2") {
-    Err(_) => assert false
+    Err(_) => expect false
     Ok(code) => {
       let link = Link(code)
       let outcome <- link.resolve()
-      assert outcome is Err(_)
+      expect outcome is Err(_)
     }
   }
 }
 
-test "register then resolve returns the target" {
+case "register then resolve returns the target" {
   match ShortCode.of("reg001") {
-    Err(_) => assert false
+    Err(_) => expect false
     Ok(code) => match Url.of("https://example.com/page") {
-      Err(_) => assert false
+      Err(_) => expect false
       Ok(url) => {
         let link = Link(code)
         let _ <- link.register(url)
         let outcome <- link.resolve()
         match outcome {
-          Ok(view) => assert view.target == url
-          Err(_) => assert false
+          Ok(view) => expect view.target == url
+          Err(_) => expect false
         }
       }
     }
@@ -118,14 +118,14 @@ it produces a value that satisfies
 the refinement; pass an argument to pin a specific one:
 
 ```bynk,ignore
-test "a fabricated code is a valid ShortCode" {
+case "a fabricated code is a valid ShortCode" {
   let code = Mock[ShortCode]
-  assert code == code
+  expect code == code
 }
 
-test "a pinned mock takes the given value" {
+case "a pinned mock takes the given value" {
   let code = Mock[ShortCode]("abc123")
-  assert code == code
+  expect code == code
 }
 ```
 
@@ -148,12 +148,12 @@ mocks CodeGen = TestCodeGen {
   }
 }
 
-test "create mints a code via the mocked generator" {
+case "create mints a code via the mocked generator" {
   match Url.of("https://example.com") {
-    Err(_) => assert false
+    Err(_) => expect false
     Ok(url) => {
       let outcome <- create.call(url)
-      assert outcome is Ok(_)
+      expect outcome is Ok(_)
     }
   }
 }

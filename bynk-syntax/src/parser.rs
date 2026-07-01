@@ -112,11 +112,11 @@ pub fn parse(tokens: &[Token], source: &str) -> Result<Commons, Vec<CompileError
                 "contexts must be compiled as part of a project — pass the source directory, e.g. `bynkc compile --target bundle --output out src`",
             ),
         ]),
-        SourceUnit::Test(t) => Err(vec![
+        SourceUnit::Suite(t) => Err(vec![
             CompileError::new(
-                "bynk.parse.unexpected_test",
+                "bynk.parse.unexpected_suite",
                 t.span,
-                "expected a `commons` declaration but found a `test` declaration",
+                "expected a `commons` declaration but found a `suite` declaration",
             )
             .with_note(
                 "tests must be compiled as part of a project — pass the source directory, e.g. `bynkc compile --target bundle --output out src`",
@@ -124,9 +124,9 @@ pub fn parse(tokens: &[Token], source: &str) -> Result<Commons, Vec<CompileError
         ]),
         SourceUnit::Integration(i) => Err(vec![
             CompileError::new(
-                "bynk.parse.unexpected_test",
+                "bynk.parse.unexpected_suite",
                 i.span,
-                "expected a `commons` declaration but found an integration test",
+                "expected a `commons` declaration but found an integration suite",
             )
             .with_note(
                 "tests must be compiled as part of a project — pass the source directory, e.g. `bynkc compile --target bundle --output out src`",
@@ -320,7 +320,8 @@ impl<'a> Parser<'a> {
                 | TokenKind::Service
                 | TokenKind::Agent
                 | TokenKind::Mocks
-                | TokenKind::Test
+                | TokenKind::Suite
+                | TokenKind::Case
                 | TokenKind::RBrace
                 | TokenKind::Commons
                 | TokenKind::Context => return,
@@ -415,10 +416,10 @@ impl<'a> Parser<'a> {
             // parameters using it. It retains its keyword meaning only at
             // handler-decl-level (`on call(...)`).
             //
-            // v0.7: `test` is contextual too — it introduces the test
-            // declaration kind at the file top level, but is a perfectly
-            // valid commons or context name otherwise.
-            Some(t) if matches!(t.kind, TokenKind::On | TokenKind::Test) => {
+            // v0.7 / v0.112: `suite` and `case` are contextual too — they
+            // introduce the suite declaration and its cases, but are perfectly
+            // valid commons/context/field names otherwise.
+            Some(t) if matches!(t.kind, TokenKind::On | TokenKind::Suite | TokenKind::Case) => {
                 self.bump();
                 Ok(Ident {
                     name: self.slice(t.span).to_string(),
@@ -577,9 +578,10 @@ fn is_reserved_keyword(kind: TokenKind) -> bool {
             | Service
             | Actor
             | By
-            | Assert
             | Expect
             | Mocks
+            | Suite
+            | Case
     )
 }
 

@@ -7,22 +7,25 @@ import worker_shop_orders from "../workers/shop-orders/index.js";
 import * as shop_payment from "../workers/shop-payment/handlers.js";
 import worker_shop_payment from "../workers/shop-payment/index.js";
 
-class AssertionError extends Error {
+class ExpectationError extends Error {
   location: string;
   start: number;
   end: number;
-  constructor(location: string, start: number, end: number) {
-    super(`assertion failed at ${location}`);
+  constructor(location: string, start: number, end: number, detail: string) {
+    super(`${detail}\n  at ${location}`);
     this.location = location;
     this.start = start;
     this.end = end;
   }
 }
-function __bynkAssertionFailure(location: string, start: number, end: number) {
-  return new AssertionError(location, start, end);
+function __bynkExpectFailure(location: string, start: number, end: number, detail: string) {
+  return new ExpectationError(location, start, end, detail);
 }
-function __bynkAssert(cond: boolean, location: string, start: number, end: number): void {
-  if (!cond) { throw __bynkAssertionFailure(location, start, end); }
+function __bynkExpect(cond: boolean, location: string, start: number, end: number, detail: string): void {
+  if (!cond) { throw __bynkExpectFailure(location, start, end, detail); }
+}
+function __bynkShow(v: unknown): string {
+  try { return typeof v === "bigint" ? String(v) : (JSON.stringify(v) ?? String(v)); } catch { return String(v); }
 }
 
 function makeHarness() {
@@ -39,10 +42,10 @@ async function test_small_order_authorises_across_the_wire() {
   try {
     const deps = makeHarness();
     const r = await callService(deps.env.SHOP_ORDERS, "place", 100 as JsonValue, shop_orders.deserialise_Result_Int_OrderError, "integration");
-    if (!(r.tag === "Ok")) { throw __bynkAssertionFailure("checkout.bynk:11:12", 358, 368); }
+    if (!(r.tag === "Ok")) { throw __bynkExpectFailure("checkout.bynk:11:12", 359, 369, "expect r is Ok(_)"); }
     return { pass: true };
   } catch (e) {
-    if (e instanceof AssertionError) {
+    if (e instanceof ExpectationError) {
       return { pass: false, error: { message: e.message, location: e.location } };
     }
     return { pass: false, error: { message: String(e), location: "unknown" } };
@@ -53,10 +56,10 @@ async function test_large_order_is_rejected_end_to_end() {
   try {
     const deps = makeHarness();
     const r = await callService(deps.env.SHOP_ORDERS, "place", 50000 as JsonValue, shop_orders.deserialise_Result_Int_OrderError, "integration");
-    if (!(r.tag === "Err")) { throw __bynkAssertionFailure("checkout.bynk:16:12", 469, 480); }
+    if (!(r.tag === "Err")) { throw __bynkExpectFailure("checkout.bynk:16:12", 470, 481, "expect r is Err(_)"); }
     return { pass: true };
   } catch (e) {
-    if (e instanceof AssertionError) {
+    if (e instanceof ExpectationError) {
       return { pass: false, error: { message: e.message, location: e.location } };
     }
     return { pass: false, error: { message: String(e), location: "unknown" } };

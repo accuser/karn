@@ -57,7 +57,6 @@ pub const KEYWORDS: &[KeywordInfo] = &[
     k("agent", "Declare a stateful, keyed agent inside a context."),
     k("and", "Combine refinement predicates (`where A and B`)."),
     k("as", "Alias a consumed context (`consumes X as Y`)."),
-    k("assert", "Assert a condition inside a test case."),
     k(
         "binding",
         "Name an adapter's TypeScript binding module (`binding \"<module>\"`).",
@@ -69,6 +68,10 @@ pub const KEYWORDS: &[KeywordInfo] = &[
     k(
         "capability",
         "Declare a capability (a dependency interface) in a context.",
+    ),
+    k(
+        "case",
+        "Declare a test case inside a `suite` (`case \"…\" { … }`).",
     ),
     k(
         "commons",
@@ -88,7 +91,10 @@ pub const KEYWORDS: &[KeywordInfo] = &[
     ),
     k("else", "The alternative branch of an `if` expression."),
     k("enum", "Declare a payloadless sum type (`enum { A, B }`)."),
-    k("expect", "Reserved keyword."),
+    k(
+        "expect",
+        "Assert a predicate inside a test case (`expect <bool-predicate>`).",
+    ),
     k("exports", "Declare which types a context exposes, and how."),
     k("false", "The boolean literal `false`."),
     k("fn", "Declare a function."),
@@ -152,7 +158,10 @@ pub const KEYWORDS: &[KeywordInfo] = &[
         "service",
         "Declare a service (a group of handlers) in a context.",
     ),
-    k("test", "Declare a test block or a test case."),
+    k(
+        "suite",
+        "Declare a test suite targeting a unit (`suite <target> { case … }`).",
+    ),
     k(
         "transparent",
         "Export a type with its structure visible (`exports transparent { … }`).",
@@ -166,7 +175,7 @@ pub const KEYWORDS: &[KeywordInfo] = &[
     k("where", "Attach refinement predicates to a base type."),
     k(
         "wires",
-        "List the contexts a `test integration` stands up as Workers.",
+        "List the contexts a `suite integration` stands up as Workers.",
     ),
 ];
 

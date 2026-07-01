@@ -9,7 +9,7 @@ title: "`bynk.mock.*` errors"
 [bynk.mock.outside_test] Error: `Mock[T]` is only valid inside a test case body
 ```
 
-**Cause:** you used `Mock[T]` outside a `test "…" { … }` case — for example in a
+**Cause:** you used `Mock[T]` outside a `case "…" { … }` — for example in a
 regular function.
 
 **Fix:** move the `Mock[T]` into a test case. To construct a value in production

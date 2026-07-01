@@ -14,15 +14,15 @@ impl<'a> Parser<'a> {
         // v0.9.1: `assert e` is an expression of type `()`. Parsed at the
         // topmost precedence so `assert x == 1` binds as `assert (x == 1)`.
         // In statement position the block parser still consumes `assert` as
-        // a Statement::Assert (preserving the v0.7+ form), so this production
+        // a Statement::Expect (preserving the v0.7+ form), so this production
         // only fires when `assert` appears in true expression position
         // (e.g., a match-arm body).
-        if self.peek_kind() == Some(TokenKind::Assert) {
-            let kw = self.expect(TokenKind::Assert, "to start an assert expression")?;
+        if self.peek_kind() == Some(TokenKind::Expect) {
+            let kw = self.expect(TokenKind::Expect, "to start an expect expression")?;
             let value = self.parse_expr()?;
             let span = kw.span.merge(value.span);
             return Ok(Expr {
-                kind: ExprKind::Assert(Box::new(value)),
+                kind: ExprKind::Expect(Box::new(value)),
                 span,
             });
         }

@@ -105,15 +105,15 @@ pub enum TokenKind {
     // v0.6 keywords
     #[token("as")]
     As,
-    // v0.7 keywords
-    #[token("assert")]
-    Assert,
+    // v0.7 keywords (v0.112: `assert`→`expect`, `test`→`suite`/`case`)
     #[token("expect")]
     Expect,
     #[token("mocks")]
     Mocks,
-    #[token("test")]
-    Test,
+    #[token("suite")]
+    Suite,
+    #[token("case")]
+    Case,
     // v0.16 keyword
     #[token("wires")]
     Wires,
@@ -336,10 +336,10 @@ impl TokenKind {
             Exports => "`exports`",
             Transparent => "`transparent`",
             As => "`as`",
-            Assert => "`assert`",
             Expect => "`expect`",
             Mocks => "`mocks`",
-            Test => "`test`",
+            Suite => "`suite`",
+            Case => "`case`",
             Wires => "`wires`",
             Adapter => "`adapter`",
             Binding => "`binding`",
@@ -1033,8 +1033,8 @@ mod tests {
     fn v0_7_keywords() {
         use TokenKind::*;
         assert_eq!(
-            kinds("assert expect mocks test"),
-            vec![Assert, Expect, Mocks, Test],
+            kinds("expect mocks suite case"),
+            vec![Expect, Mocks, Suite, Case],
         );
     }
 

@@ -517,7 +517,7 @@ pub fn check_handler_body(
 /// - `bynk.invariant.cross_agent_reference` — a predicate names another agent
 ///   (§14 closes that door; sagas/scenarios are the cross-agent tools).
 /// - `bynk.invariant.impure_predicate` — a predicate uses an effectful or
-///   test-only construct (Effect, `?` propagation, `assert`, `Mock`).
+///   test-only construct (Effect, `?` propagation, `expect`, `Mock`).
 /// - `bynk.invariant.not_bool` — the predicate does not type to `Bool`.
 ///
 /// Store `Cell` fields are placed in scope as the predicate's locals; invariants
@@ -683,7 +683,7 @@ fn predicate_impure_construct(e: &Expr) -> Option<Span> {
     match &e.kind {
         ExprKind::EffectPure(_)
         | ExprKind::Question(_)
-        | ExprKind::Assert(_)
+        | ExprKind::Expect(_)
         | ExprKind::Mock { .. } => Some(e.span),
         _ => predicate_children(e)
             .into_iter()
@@ -716,7 +716,7 @@ fn predicate_children(e: &Expr) -> Vec<&Expr> {
         | ExprKind::Question(inner)
         | ExprKind::Some(inner)
         | ExprKind::EffectPure(inner)
-        | ExprKind::Assert(inner) => vec![inner],
+        | ExprKind::Expect(inner) => vec![inner],
         ExprKind::Is { value, .. } => vec![value.as_ref()],
         ExprKind::FieldAccess { receiver, .. } => vec![receiver.as_ref()],
         ExprKind::MethodCall { receiver, args, .. } => {
@@ -850,7 +850,7 @@ pub struct Ctx<'a> {
     /// grouped (v0.29.10). Empty for pure functions / non-context code.
     pub caps: CapabilityCtx,
     /// True when the body being checked is a test case body. Permits
-    /// `assert` statements (v0.7).
+    /// `expect` statements (v0.7; renamed from `assert` in v0.112).
     pub in_test_body: bool,
     /// The target unit's service names, populated for test case bodies
     /// (v0.25). `svc.call(args)` in a test invokes the target's service —
@@ -1422,16 +1422,16 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                     ctx.bind(l.name.name.clone(), final_ty);
                 }
             }
-            Statement::Assert(a) => {
+            Statement::Expect(a) => {
                 if !ctx.in_test_body {
                     ctx.errors.push(
                         CompileError::new(
-                            "bynk.assert.outside_test",
+                            "bynk.expect.outside_case",
                             a.span,
-                            "`assert` is only valid inside a test case body",
+                            "`expect` is only valid inside a `case` body",
                         )
                         .with_note(
-                            "assertion statements verify conditions at test runtime; use them only inside `test \"...\" { ... }` blocks",
+                            "expectations verify predicates at test runtime; use them only inside `case \"...\" { ... }` blocks",
                         ),
                     );
                 }
@@ -1440,10 +1440,10 @@ pub fn type_of_block(block: &Block, expected: Option<&Ty>, ctx: &mut Ctx) -> Opt
                     && !compatible(&actual, &Ty::Base(BaseType::Bool))
                 {
                     ctx.errors.push(CompileError::new(
-                        "bynk.assert.non_bool",
+                        "bynk.expect.not_bool",
                         a.value.span,
                         format!(
-                            "`assert` expression has type `{}`, but a `Bool` is required",
+                            "`expect` predicate has type `{}`, but a `Bool` is required",
                             actual.display(),
                         ),
                     ));
@@ -1973,7 +1973,7 @@ pub fn type_of(expr: &Expr, expected: Option<&Ty>, ctx: &mut Ctx) -> Option<Ty> 
             expected,
             ctx,
         ),
-        ExprKind::Assert(inner) => check_assert(inner, expr.span, ctx),
+        ExprKind::Expect(inner) => check_expect(inner, expr.span, ctx),
         ExprKind::Mock { type_ref, args } => check_mock(type_ref, args, expr.span, ctx),
     };
     if let Some(ty) = &ty {
