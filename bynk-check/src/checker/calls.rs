@@ -1747,6 +1747,15 @@ pub(crate) fn check_method_call(
     {
         return check_instant_static(method, args, span, ctx);
     }
+    // v0.110 (ADR 0142 D2): the `Bytes` static constructors —
+    // `Bytes.fromUtf8(s)` / `Bytes.fromBase64(s)` / `Bytes.empty()`.
+    if let ExprKind::Ident(id) = &receiver.kind
+        && id.name == BYTES
+        && ctx.lookup(BYTES).is_none()
+        && !ctx.input.types.contains_key(BYTES)
+    {
+        return check_bytes_static(method, args, span, ctx);
+    }
     // v0.22b: the typed JSON codec statics (ADR 0045).
     if let ExprKind::Ident(id) = &receiver.kind
         && id.name == JSON
@@ -1809,6 +1818,10 @@ pub(crate) fn check_method_call(
         // v0.90 (ADR 0114): the `Instant` kernel — `toEpochMillis`/`toString`.
         Ty::Base(BaseType::Instant) => {
             return check_instant_kernel_method(method, args, span, ctx);
+        }
+        // v0.110 (ADR 0142): the `Bytes` kernel — `length`/`toBase64`/`decodeUtf8`.
+        Ty::Base(BaseType::Bytes) => {
+            return check_bytes_kernel_method(method, args, span, ctx);
         }
         // v0.22a: the string kernel (ADR 0046).
         Ty::Base(BaseType::String) => {

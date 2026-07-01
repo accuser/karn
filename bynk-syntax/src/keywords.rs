@@ -17,6 +17,10 @@ pub struct KeywordInfo {
 pub const KEYWORDS: &[KeywordInfo] = &[
     k("Bool", "The boolean base type."),
     k(
+        "Bytes",
+        "The binary base type — an immutable octet sequence, erased to `Uint8Array` (`Bytes.fromUtf8(s)`).",
+    ),
+    k(
         "Duration",
         "The time-span base type, in milliseconds (`5.minutes`).",
     ),

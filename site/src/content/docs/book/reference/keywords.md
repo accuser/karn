@@ -7,11 +7,12 @@ title: Keywords
 
 Every reserved keyword, with a one-line description. Reserved words cannot be used as identifiers.
 
-There are **59** reserved keywords.
+There are **60** reserved keywords.
 
 | Keyword | Meaning |
 |---|---|
 | `Bool` | The boolean base type. |
+| `Bytes` | The binary base type — an immutable octet sequence, erased to `Uint8Array` (`Bytes.fromUtf8(s)`). |
 | `Duration` | The time-span base type, in milliseconds (`5.minutes`). |
 | `Effect` | The effectful-computation type, `Effect[T]`. |
 | `Err` | The error variant of `Result`. |

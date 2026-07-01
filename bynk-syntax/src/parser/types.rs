@@ -247,11 +247,15 @@ impl<'a> Parser<'a> {
                     self.bump();
                     Ok((BaseType::Instant, t.span))
                 }
+                TokenKind::Bytes => {
+                    self.bump();
+                    Ok((BaseType::Bytes, t.span))
+                }
                 _ => Err(CompileError::new(
                     "bynk.parse.expected_base_type",
                     t.span,
                     format!(
-                        "expected `Int`, `String`, `Bool`, `Float`, or `Duration`, found {}",
+                        "expected `Int`, `String`, `Bool`, `Float`, `Duration`, `Instant`, or `Bytes`, found {}",
                         t.kind.describe()
                     ),
                 )
@@ -534,6 +538,10 @@ impl<'a> Parser<'a> {
                 TokenKind::Instant => {
                     self.bump();
                     Ok(TypeRef::Base(BaseType::Instant, t.span))
+                }
+                TokenKind::Bytes => {
+                    self.bump();
+                    Ok(TypeRef::Base(BaseType::Bytes, t.span))
                 }
                 TokenKind::Result => {
                     self.bump();

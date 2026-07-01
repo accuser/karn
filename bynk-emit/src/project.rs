@@ -2857,6 +2857,16 @@ fn run_checks(
         errors.extend_for(None, lock_errors);
     }
 
+    // v0.110 (ADR 0142 D8): under `--target workers`, a bare `Bytes` in a wire
+    // signature crosses the erased cross-context boundary, which does not
+    // base64-encode it. Diagnose it rather than mis-encode; the typed paths
+    // (`bundle` calls, `store`/record fields) round-trip a `Bytes` fine.
+    if target == BuildTarget::Workers {
+        let mut bytes_boundary_errors: Vec<CompileError> = Vec::new();
+        check_bytes_workers_boundaries(&parsed, &mut bytes_boundary_errors);
+        errors.extend_for(None, bytes_boundary_errors);
+    }
+
     RunChecks::Checked {
         errors,
         snapshots,
