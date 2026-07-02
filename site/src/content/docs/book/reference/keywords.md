@@ -7,7 +7,7 @@ title: Keywords
 
 Every reserved keyword, with a one-line description. Reserved words cannot be used as identifiers.
 
-There are **61** reserved keywords.
+There are **63** reserved keywords.
 
 | Keyword | Meaning |
 |---|---|
@@ -41,6 +41,7 @@ There are **61** reserved keywords.
 | `context` | Declare a deployable context (services, agents, capabilities). |
 | `cron` | The cron protocol on a service header (`from cron`). |
 | `else` | The alternative branch of an `if` expression. |
+| `ensures` | Declare a function postcondition — a pure `Bool` clause over the parameters and `result` (`ensures <name>: <pred>`). |
 | `enum` | Declare a payloadless sum type (`enum { A, B }`). |
 | `expect` | Assert a predicate inside a test case (`expect <bool-predicate>`). |
 | `exports` | Declare which types a context exposes, and how. |
@@ -63,6 +64,7 @@ There are **61** reserved keywords.
 | `provides` | Provide an implementation of a capability. |
 | `queue` | The queue protocol on a service header (`from queue("name")`). |
 | `record` | Reserved keyword (records are written `type X = { … }`). |
+| `requires` | Declare a function precondition — a pure `Bool` clause over the parameters (`requires <name>: <pred>`). |
 | `self` | The current agent instance, inside a handler. |
 | `service` | Declare a service (a group of handlers) in a context. |
 | `suite` | Declare a test suite targeting a unit (`suite <target> { case … }`). |

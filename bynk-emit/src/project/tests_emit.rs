@@ -70,6 +70,10 @@ pub(crate) fn process_tests(
     unit_uses: &HashMap<String, Vec<String>>,
     tests_prefix: &Path,
     import_ext: ImportExt,
+    // v0.115: whether the build emits the contract guard (dev/test). The runner
+    // attack relies on the guard to assert `ensures`, so it is emitted only when
+    // the guard is (they are always paired — `bynkc test` sets both).
+    contracts: bool,
     errors: &mut Vec<CompileError>,
     refs: &mut RefSink,
 ) -> (Vec<CompiledFile>, Vec<RunnableTest>) {
@@ -276,6 +280,7 @@ pub(crate) fn process_tests(
             exports_visibility,
             tests_prefix,
             import_ext,
+            contracts,
         );
         if let Some((path, source, source_map, runnable)) = emit_out {
             outputs.push(CompiledFile {
@@ -1434,6 +1439,174 @@ fn check_test_case_body(
     // tail expression and recovers success/failure from expectation outcome.
     // Don't enforce "every given used" — capabilities are implicitly
     // available in a test body.
+
+    // v0.115: flag a `case` that merely restates a contract already declared at
+    // the source (`bynk.contract.restated_by_test`) — an `expect` that is
+    // α-equivalent to an `ensures` clause over the same bound arguments. The dev
+    // guard and the runner attack already check it. Conservative: under-flagging
+    // is acceptable, over-flagging is not.
+    check_restated_contract(&case.body, &resolved, errors);
+}
+
+/// v0.115: within a test body, flag an `expect` that re-states a contract's
+/// `ensures`. Fires only on the clearest restatement: a binding `let r = f(args)`
+/// (or `r <- f(args)`) of a contracted free function's result, followed by an
+/// `expect E` that is α-equivalent to one of `f`'s `ensures` predicates under the
+/// substitution `result → r`, `params → args`. Syntactic — never semantic — so a
+/// merely-equivalent (but differently written) test is not flagged.
+fn check_restated_contract(
+    body: &Block,
+    resolved: &ResolvedCommons,
+    errors: &mut Vec<CompileError>,
+) {
+    // Map each locally-bound name to the contracted free function + call args it
+    // was bound from (`let r = f(a, b)`).
+    let mut bound: HashMap<String, (&FnDecl, &[Expr])> = HashMap::new();
+    for stmt in &body.statements {
+        let (name, value) = match stmt {
+            Statement::Let(l) | Statement::EffectLet(l) => (&l.name.name, &l.value),
+            _ => continue,
+        };
+        if let ExprKind::Call {
+            name: callee, args, ..
+        } = &value.kind
+            && let Some(f) = resolved.fns.get(&callee.name)
+            && matches!(&f.name, FnName::Free(_))
+            && !f.ensures.is_empty()
+            && f.params.len() == args.len()
+        {
+            bound.insert(name.clone(), (f, args.as_slice()));
+        }
+    }
+    if bound.is_empty() {
+        return;
+    }
+    for stmt in &body.statements {
+        let Statement::Expect(e) = stmt else { continue };
+        for (result_name, (f, args)) in &bound {
+            // subst: result → r, each param → its call argument.
+            let result_ident = Expr {
+                kind: ExprKind::Ident(Ident {
+                    name: result_name.clone(),
+                    span: e.span,
+                }),
+                span: e.span,
+            };
+            let mut subst: HashMap<&str, &Expr> = HashMap::new();
+            subst.insert("result", &result_ident);
+            for (p, a) in f.params.iter().zip(args.iter()) {
+                subst.insert(p.name.name.as_str(), a);
+            }
+            for c in &f.ensures {
+                if expr_alpha_eq_subst(&c.predicate, &e.value, &subst) {
+                    let FnName::Free(fname) = &f.name else {
+                        continue;
+                    };
+                    errors.push(
+                        CompileError::new(
+                            "bynk.contract.restated_by_test",
+                            e.span,
+                            format!(
+                                "this `expect` restates the `ensures {}` contract of `{}`, which is already checked at every call and by the runner",
+                                c.name.name, fname.name
+                            ),
+                        )
+                        .with_note(
+                            "a contract is checked everywhere for free — delete the restating test, or keep a `case` only for a specific witnessed value",
+                        ),
+                    );
+                    break;
+                }
+            }
+        }
+    }
+}
+
+/// Structural (α-)equality of two predicate expressions, ignoring spans, where a
+/// bare identifier in `pattern` that appears in `subst` must match the
+/// corresponding substituted expression in `actual` (the rest compares by shape).
+/// Deliberately conservative — only the operators/leaves a contract predicate can
+/// contain are compared; anything unrecognised is unequal.
+fn expr_alpha_eq_subst(pattern: &Expr, actual: &Expr, subst: &HashMap<&str, &Expr>) -> bool {
+    if let ExprKind::Ident(id) = &pattern.kind
+        && let Some(replacement) = subst.get(id.name.as_str())
+    {
+        return expr_struct_eq(replacement, actual);
+    }
+    match (&pattern.kind, &actual.kind) {
+        (ExprKind::Ident(a), ExprKind::Ident(b)) => a.name == b.name,
+        (ExprKind::IntLit(a), ExprKind::IntLit(b)) => a == b,
+        (ExprKind::BoolLit(a), ExprKind::BoolLit(b)) => a == b,
+        (ExprKind::StrLit(a), ExprKind::StrLit(b)) => a == b,
+        (ExprKind::Paren(a), _) => expr_alpha_eq_subst(a, actual, subst),
+        (_, ExprKind::Paren(b)) => expr_alpha_eq_subst(pattern, b, subst),
+        (ExprKind::BinOp(oa, la, ra), ExprKind::BinOp(ob, lb, rb)) => {
+            oa == ob && expr_alpha_eq_subst(la, lb, subst) && expr_alpha_eq_subst(ra, rb, subst)
+        }
+        (ExprKind::UnaryOp(oa, a), ExprKind::UnaryOp(ob, b)) => {
+            oa == ob && expr_alpha_eq_subst(a, b, subst)
+        }
+        (
+            ExprKind::MethodCall {
+                receiver: ra,
+                method: ma,
+                args: aa,
+                ..
+            },
+            ExprKind::MethodCall {
+                receiver: rb,
+                method: mb,
+                args: ab,
+                ..
+            },
+        ) => {
+            ma.name == mb.name
+                && aa.len() == ab.len()
+                && expr_alpha_eq_subst(ra, rb, subst)
+                && aa
+                    .iter()
+                    .zip(ab.iter())
+                    .all(|(x, y)| expr_alpha_eq_subst(x, y, subst))
+        }
+        _ => false,
+    }
+}
+
+/// Plain structural equality of two expressions ignoring spans — used to compare
+/// a substituted argument against its use in the test predicate.
+fn expr_struct_eq(a: &Expr, b: &Expr) -> bool {
+    match (&a.kind, &b.kind) {
+        (ExprKind::Ident(x), ExprKind::Ident(y)) => x.name == y.name,
+        (ExprKind::IntLit(x), ExprKind::IntLit(y)) => x == y,
+        (ExprKind::BoolLit(x), ExprKind::BoolLit(y)) => x == y,
+        (ExprKind::StrLit(x), ExprKind::StrLit(y)) => x == y,
+        (ExprKind::Paren(x), _) => expr_struct_eq(x, b),
+        (_, ExprKind::Paren(y)) => expr_struct_eq(a, y),
+        (ExprKind::BinOp(oa, la, ra), ExprKind::BinOp(ob, lb, rb)) => {
+            oa == ob && expr_struct_eq(la, lb) && expr_struct_eq(ra, rb)
+        }
+        (ExprKind::UnaryOp(oa, x), ExprKind::UnaryOp(ob, y)) => oa == ob && expr_struct_eq(x, y),
+        (
+            ExprKind::MethodCall {
+                receiver: ra,
+                method: ma,
+                args: aa,
+                ..
+            },
+            ExprKind::MethodCall {
+                receiver: rb,
+                method: mb,
+                args: ab,
+                ..
+            },
+        ) => {
+            ma.name == mb.name
+                && aa.len() == ab.len()
+                && expr_struct_eq(ra, rb)
+                && aa.iter().zip(ab.iter()).all(|(x, y)| expr_struct_eq(x, y))
+        }
+        _ => false,
+    }
 }
 
 /// v0.114: the recursion cap for property-binding generability (mirrors the
@@ -1870,6 +2043,94 @@ fn build_privileged_resolved(
 /// Emit a single test module TypeScript file plus the [`RunnableTest`]
 /// pointer used by the top-level runner.
 #[allow(clippy::too_many_arguments)]
+/// v0.115 (testing track slice 3): can this contracted free function be attacked
+/// by the runner — *a contract is a property that is always on.* The runner
+/// generates arguments over the parameters' refinement domains, filters by the
+/// `requires` (inputs failing a precondition are discarded, exactly as a
+/// `for all … where` does), calls the function, and the dev/test call-site guard
+/// asserts each `ensures`, throwing a shrinkable `BynkContractError` on
+/// violation. Returns `false` when there is nothing to attack: no `ensures`, no
+/// (nameable) parameters, an effectful return (its inputs include the world —
+/// dev-guard only), a non-primitive parameter (its generated fields are `bigint`
+/// and could mix with `number` arithmetic — dev-guard only), or a parameter the
+/// generator cannot inhabit (an over-narrow / `Matches`-pinned refinement) —
+/// never a false error, mirroring an over-narrow `where`.
+fn is_attackable_contract(f: &FnDecl, resolved: &ResolvedCommons) -> bool {
+    if !matches!(&f.name, FnName::Free(_)) {
+        return false;
+    }
+    if f.ensures.is_empty() || f.params.is_empty() {
+        return false;
+    }
+    if matches!(&f.return_type, TypeRef::Effect(_, _)) {
+        return false;
+    }
+    if f.params.iter().any(|p| p.name.name == "_") {
+        return false;
+    }
+    for p in &f.params {
+        let Some(ty) = checker::resolve_type_ref(&p.type_ref, &resolved.types) else {
+            return false;
+        };
+        // Restrict to primitive (or refined-over-primitive) parameters: a
+        // generated composite carries `bigint` fields that would mix with the
+        // function's `number` arithmetic. Composite-param contracts are covered
+        // by the dev guard.
+        if numeric_or_scalar_base(&ty, &resolved.types).is_none() {
+            return false;
+        }
+        if !prop_binding_generable(&ty, &resolved.types, PROP_GEN_DEPTH) {
+            return false;
+        }
+    }
+    true
+}
+
+/// The primitive base type a parameter erases to — `Some(base)` for a base type
+/// or a refinement/opaque over one, `None` for a composite (record/sum/list/map/
+/// option/result/etc.). Used to (a) gate a contract as attackable and (b) decide
+/// whether a generated argument needs `Number(…)` coercion before the call
+/// (`Int` generates a `bigint`, but functions do `number` arithmetic — v0.114's
+/// generator/erasure split, harmless until a generated value flows into a call).
+fn numeric_or_scalar_base(ty: &checker::Ty, types: &HashMap<String, TypeDecl>) -> Option<BaseType> {
+    match ty {
+        checker::Ty::Base(b) => Some(*b),
+        checker::Ty::Named { name, .. } => match &types.get(name)?.body {
+            TypeBody::Refined { base, .. } | TypeBody::Opaque { base, .. } => Some(*base),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// v0.115: the target unit's contracted free functions the runner can attack, in
+/// deterministic (name) order, paired with the resolved view for gen/coercion.
+fn attackable_contracts(
+    target_name: &str,
+    unit_tables: &HashMap<String, UnitTable>,
+    unit_uses: &HashMap<String, Vec<String>>,
+    unit_consumes: &HashMap<String, Vec<String>>,
+    unit_consumes_aliases: &HashMap<String, HashMap<String, String>>,
+) -> Option<(ResolvedCommons, Vec<FnDecl>)> {
+    let (resolved, _) = build_privileged_resolved(
+        target_name,
+        unit_tables,
+        unit_uses,
+        unit_consumes,
+        unit_consumes_aliases,
+    )?;
+    let table = unit_tables.get(target_name)?;
+    let mut fns: Vec<FnDecl> = table
+        .fns
+        .values()
+        .filter(|f| is_attackable_contract(f, &resolved))
+        .cloned()
+        .collect();
+    fns.sort_by_key(|a| a.name.display());
+    Some((resolved, fns))
+}
+
+#[allow(clippy::too_many_arguments)]
 fn emit_test_module(
     target_name: &str,
     target_kind: UnitKind,
@@ -1883,6 +2144,7 @@ fn emit_test_module(
     exports_visibility: &HashMap<String, HashMap<String, Visibility>>,
     tests_prefix: &Path,
     import_ext: ImportExt,
+    contracts: bool,
 ) -> Option<(PathBuf, String, Option<String>, RunnableTest)> {
     let _ = exports_visibility;
     let ext = import_ext.as_str();
@@ -1955,12 +2217,31 @@ fn emit_test_module(
     // Expectation helper used by lowered `expect` statements.
     out.push_str(&expectation_runtime_helpers());
 
+    // v0.115: the target unit's contracted free functions the runner can attack
+    // (each `ensures` is a generative check that is always on). Emitted only when
+    // the contract guard is (the attack relies on the guard to assert `ensures`);
+    // `bynkc test` sets both, `bynkc compile` neither.
+    let (attack_resolved, attack_fns) = if contracts {
+        attackable_contracts(
+            target_name,
+            unit_tables,
+            unit_uses,
+            unit_consumes,
+            unit_consumes_aliases,
+        )
+        .map(|(r, fns)| (Some(r), fns))
+        .unwrap_or((None, Vec::new()))
+    } else {
+        (None, Vec::new())
+    };
+
     // v0.114: the generative-property runtime — emitted only when this module
-    // declares a `property`, so modules with only `case`s stay byte-for-byte
-    // unchanged.
-    let has_properties = indices
-        .iter()
-        .any(|&i| parsed[i].test().is_some_and(|t| !t.properties.is_empty()));
+    // declares a `property` (or v0.115 attacks a contract), so modules with only
+    // `case`s stay byte-for-byte unchanged.
+    let has_properties = !attack_fns.is_empty()
+        || indices
+            .iter()
+            .any(|&i| parsed[i].test().is_some_and(|t| !t.properties.is_empty()));
     if has_properties {
         out.push_str(&property_runtime_helpers());
         out.push('\n');
@@ -2086,6 +2367,51 @@ fn emit_test_module(
         }
     }
 
+    // v0.115: emit one async runner per contract attack. Each shares the property
+    // runtime and the run's seed lineage, so contract failures shrink and
+    // reproduce exactly like a hand-written `property`. The report location uses a
+    // representative test file of the target (the attack has no source line).
+    let rep_rel_path: String = indices
+        .iter()
+        .find_map(|&i| {
+            parsed[i].test().map(|_| {
+                tests_prefix
+                    .join(&parsed[i].source_path)
+                    .to_string_lossy()
+                    .into_owned()
+            })
+        })
+        .unwrap_or_default();
+    for f in &attack_fns {
+        let FnName::Free(fname) = &f.name else {
+            continue;
+        };
+        let attack_name = format!("contract {}", fname.name);
+        discovered.push(DiscoveredCase {
+            name: attack_name.clone(),
+            location: None,
+        });
+        let mut idx = prop_runners.len();
+        let runner_name = format!("__prop_{}", sanitise_case_name(&attack_name, &mut idx));
+        let prop_ordinal = prop_runners.len();
+        prop_runners.push(runner_name.clone());
+        let attack_text = emit_contract_attack_function(
+            &runner_name,
+            f,
+            attack_resolved.as_ref().unwrap(),
+            prop_ordinal,
+            target_name,
+            target_kind,
+            unit_tables,
+            unit_uses,
+            unit_consumes,
+            unit_consumes_aliases,
+            &rep_rel_path,
+        );
+        out.push_str(&attack_text);
+        out.push('\n');
+    }
+
     // Module-level runner.
     out.push_str("export async function run() {\n");
     out.push_str("  const results = [];\n");
@@ -2116,6 +2442,19 @@ fn emit_test_module(
             ));
             prop_index += 1;
         }
+    }
+    // v0.115: run the contract attacks (they follow every source-declared
+    // property in `prop_runners`, so the index continues).
+    for f in &attack_fns {
+        let FnName::Free(fname) = &f.name else {
+            continue;
+        };
+        let runner_name = &prop_runners[prop_index];
+        let escaped = emitter::escape_ts_string(&format!("contract {}", fname.name));
+        out.push_str(&format!(
+            "  results.push({{ name: \"{escaped}\", ...(await {runner_name}()) }});\n"
+        ));
+        prop_index += 1;
     }
     out.push_str("  return results;\n");
     out.push_str("}\n");
@@ -2752,6 +3091,12 @@ function __bynkShrinkString(v: string, min: number): string[] {
   }
   return out;
 }
+function __bynkIsFailure(e: any): e is Error {
+  // A shrinkable property/contract failure: an `expect` assertion, or a v0.115
+  // function-contract guard violation thrown from the attacked function. The
+  // `e is Error` predicate narrows the caught value so `e.message` type-checks.
+  return e instanceof ExpectationError || (!!e && e.name === "BynkContractError");
+}
 async function __bynkShrink(gens: any[], where: ((v: any[]) => boolean) | null, body: (v: any[]) => Promise<void>, vals: any[]): Promise<any[]> {
   let current = vals.slice();
   let improved = true;
@@ -2766,7 +3111,7 @@ async function __bynkShrink(gens: any[], where: ((v: any[]) => boolean) | null, 
         trial[i] = c;
         if (where && !where(trial)) continue;
         let failed = false;
-        try { await body(trial); } catch (e) { failed = e instanceof ExpectationError; }
+        try { await body(trial); } catch (e) { failed = __bynkIsFailure(e); }
         if (failed) { current = trial; improved = true; break; }
       }
     }
@@ -2786,7 +3131,7 @@ async function __bynkRunProperty(spec: { seed: number, cases: number, gens: any[
     try {
       await spec.body(vals);
     } catch (e) {
-      if (!(e instanceof ExpectationError)) {
+      if (!__bynkIsFailure(e)) {
         return { pass: false, error: { message: String(e), location: spec.location } };
       }
       const shrunk = await __bynkShrink(spec.gens, spec.where, spec.body, vals);
@@ -2795,7 +3140,7 @@ async function __bynkRunProperty(spec: { seed: number, cases: number, gens: any[
       const seedHex = "0x" + (__bynkSeed >>> 0).toString(16);
       const shown = spec.gens.map((g, i) => `${g.name} = ${g.show(shrunk[i])}`).join(", ");
       let detail = e.message;
-      try { await spec.body(shrunk); } catch (e2) { if (e2 instanceof ExpectationError) detail = e2.message; }
+      try { await spec.body(shrunk); } catch (e2) { if (__bynkIsFailure(e2)) detail = (e2 as any).message; }
       const firstLine = String(detail).split("\n")[0];
       const message = `property failed after ${ran} cases (seed ${seedHex})\n  shrunk counterexample:  ${shown}\n  ${firstLine}\n  reproduce: bynkc test ${spec.file} --seed ${seedHex}`;
       return { pass: false, error: { message, location: spec.location } };
@@ -3281,6 +3626,142 @@ fn emit_test_property_function(
     out.push_str(&format!(
         "    return await __bynkRunProperty({{ seed: __bynkMix(__bynkSeed, {prop_ordinal}), cases: 100, gens: __gens, where: __where, body: __body, name: \"{}\", location: \"{}\", file: \"{}\" }});\n",
         emitter::escape_ts_string(&prop.name),
+        emitter::escape_ts_string(&rel_path_fwd),
+        emitter::escape_ts_string(&rel_path_fwd),
+    ));
+    out.push_str("}\n");
+    out
+}
+
+/// v0.115 (testing track slice 3): emit one async runner that *attacks* a
+/// contracted free function — generate arguments over the parameter domains
+/// (v0.114 engine), filter by the conjunction of `requires` (`__where`), call
+/// the function (`__body`), and let the dev/test call-site guard assert each
+/// `ensures`, throwing a shrinkable `BynkContractError` on violation. Mirrors
+/// [`emit_test_property_function`], but the body is a direct call (the guard is
+/// the assertion) with `Int` arguments coerced to `number` (the generator makes
+/// `bigint`; functions do `number` arithmetic).
+#[allow(clippy::too_many_arguments)]
+fn emit_contract_attack_function(
+    runner_name: &str,
+    f: &FnDecl,
+    resolved: &ResolvedCommons,
+    prop_ordinal: usize,
+    target_name: &str,
+    target_kind: UnitKind,
+    unit_tables: &HashMap<String, UnitTable>,
+    unit_uses: &HashMap<String, Vec<String>>,
+    unit_consumes: &HashMap<String, Vec<String>>,
+    unit_consumes_aliases: &HashMap<String, HashMap<String, String>>,
+    rel_path: &str,
+) -> String {
+    let FnName::Free(fname) = &f.name else {
+        return String::new();
+    };
+    let mut out = String::new();
+    out.push_str(&format!("async function {runner_name}() {{\n"));
+    emit_test_scope_setup(
+        &mut out,
+        target_name,
+        target_kind,
+        unit_tables,
+        unit_uses,
+        unit_consumes,
+        unit_consumes_aliases,
+    );
+    let _ = target_kind;
+
+    // Generator descriptors, one per parameter, over the target's privileged view.
+    out.push_str("    const __gens = [\n");
+    for p in &f.params {
+        let bg = checker::resolve_type_ref(&p.type_ref, &resolved.types)
+            .map(|t| binding_gen(&t, &resolved.types))
+            .unwrap_or(BindingGen {
+                boundaries: Vec::new(),
+                gen_ts: "undefined".to_string(),
+                shrink: "[]".to_string(),
+            });
+        out.push_str(&format!(
+            "      {{ name: \"{}\", boundaries: [{}], gen: (rng: any) => {}, shrink: (v: any) => {}, show: (v: any) => __bynkShow(v) }},\n",
+            emitter::escape_ts_string(&p.name.name),
+            bg.boundaries.join(", "),
+            bg.gen_ts,
+            bg.shrink
+        ));
+    }
+    out.push_str("    ];\n");
+
+    let param_names: Vec<String> = f.params.iter().map(|p| p.name.name.clone()).collect();
+    let destructure = format!("const [{}] = __vals;", param_names.join(", "));
+
+    // `__where` — the conjunction of `requires`, lowered over the parameter tuple
+    // (comparisons tolerate the `bigint`/`number` split, so no coercion here).
+    let where_pred = f.requires.iter().rev().fold(None, |acc: Option<Expr>, c| {
+        Some(match acc {
+            None => c.predicate.clone(),
+            Some(rest) => Expr {
+                kind: ExprKind::BinOp(BinOp::And, Box::new(c.predicate.clone()), Box::new(rest)),
+                span: f.span,
+            },
+        })
+    });
+    if let Some(w) = where_pred {
+        let mut typed = synthetic_typed_commons_for_target(target_name, unit_tables, unit_uses);
+        let cross = bynk_check::resolver::CrossContextInfo::default();
+        let synth = Block {
+            statements: Vec::new(),
+            tail: Box::new(w.clone()),
+            span: w.span,
+            tail_leading_comments: Vec::new(),
+        };
+        let (src, _) = emitter::lower_block_to_async_body(
+            &synth,
+            &TypeRef::Base(BaseType::Bool, w.span),
+            &mut typed,
+            &cross,
+        );
+        out.push_str("    const __where = (__vals: any[]) => {\n");
+        out.push_str(&format!("      {destructure}\n"));
+        for line in src.lines() {
+            out.push_str("      ");
+            out.push_str(line);
+            out.push('\n');
+        }
+        out.push_str("    };\n");
+    } else {
+        out.push_str("    const __where = null;\n");
+    }
+
+    // `__body` — call the (guarded) function with coerced arguments. `Int`
+    // parameters generate a `bigint`; coerce to `number` so the function's
+    // arithmetic doesn't mix types. The guard asserts the `ensures`.
+    let call_args: Vec<String> = f
+        .params
+        .iter()
+        .map(|p| {
+            let base = checker::resolve_type_ref(&p.type_ref, &resolved.types)
+                .and_then(|t| numeric_or_scalar_base(&t, &resolved.types));
+            if base == Some(BaseType::Int) {
+                format!("Number({})", p.name.name)
+            } else {
+                p.name.name.clone()
+            }
+        })
+        .collect();
+    out.push_str("    const __body = async (__vals: any[]) => {\n");
+    out.push_str(&format!("      {destructure}\n"));
+    out.push_str(&format!(
+        "      {}({});\n",
+        fname.name,
+        call_args.join(", ")
+    ));
+    out.push_str("    };\n");
+
+    let rel_path_fwd = rel_path.replace('\\', "/");
+    let name = format!("contract {}", fname.name);
+    out.push_str(&format!(
+        "    return await __bynkRunProperty({{ seed: __bynkMix(__bynkSeed, {prop_ordinal}), cases: 100, gens: __gens, where: __where, body: __body, name: \"{}\", location: \"{}\", file: \"{}\" }});\n",
+        emitter::escape_ts_string(&name),
         emitter::escape_ts_string(&rel_path_fwd),
         emitter::escape_ts_string(&rel_path_fwd),
     ));

@@ -1914,9 +1914,10 @@ impl<'a> Parser<'a> {
         let module = parse_string_literal(self.slice(mod_tok.span), mod_tok.span)?;
         let mut span = kw.span.merge(mod_tok.span);
         let mut requires = Vec::new();
-        if self.peek_kind() == Some(TokenKind::Ident)
-            && self.slice(self.peek().unwrap().span) == "requires"
-        {
+        // v0.115: `requires` is a keyword (contract clauses). In a `binding`
+        // it heads the optional dependency map (`requires { "pkg": "range" }`);
+        // the two uses never overlap syntactically.
+        if self.peek_kind() == Some(TokenKind::Requires) {
             self.bump(); // `requires`
             self.expect(TokenKind::LBrace, "to open the `requires` map")?;
             loop {

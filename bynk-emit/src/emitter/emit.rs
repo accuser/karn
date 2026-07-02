@@ -391,6 +391,9 @@ pub(crate) fn emit_free_fn(
     f: &FnDecl,
     commons: &TypedCommons,
     source_map: Option<&RefCell<SourceMapBuilder>>,
+    // v0.115: emit the contract call-site guard (dev/test profile). Stripped
+    // (false) in the deploy build for zero runtime cost (DECISION J).
+    contracts: bool,
 ) {
     let FnName::Free(name) = &f.name else {
         return;
@@ -431,9 +434,79 @@ pub(crate) fn emit_free_fn(
     let empty = bynk_check::resolver::CrossContextInfo::default();
     let mut cx = LowerCtx::new(commons, &empty).with_source_map(source_map);
     let async_tail = is_effectful_return(&f.return_type);
-    emit_block_as_function_body(out, &f.body, &mut cx, INDENT_STEP, async_tail);
+    let guarded = contracts && (!f.requires.is_empty() || !f.ensures.is_empty());
+    if guarded {
+        emit_contract_guarded_body(out, f, &mut cx, async_tail);
+    } else {
+        emit_block_as_function_body(out, &f.body, &mut cx, INDENT_STEP, async_tail);
+    }
     writeln!(out, "}}").unwrap();
     writeln!(out).unwrap();
+}
+
+/// v0.115: emit a contracted free function's body behind the dev/test call-site
+/// guard (DECISION J). Preconditions (`requires`) are checked on entry; the body
+/// runs into a captured `result`; postconditions (`ensures`) are checked over
+/// `result` before it is returned. Each violation throws with the clause name
+/// and the offending argument/`result` values. This wrapper is emitted only in
+/// the dev/test profile and is O(1) in code size (one guard, not per call site).
+fn emit_contract_guarded_body(out: &mut String, f: &FnDecl, cx: &mut LowerCtx, async_tail: bool) {
+    let FnName::Free(name) = &f.name else {
+        return;
+    };
+    let fn_name = name.name.clone();
+    // A `${…}` interpolation of each in-scope value for the failure report.
+    let param_dump = |extra_result: bool| -> String {
+        let mut parts: Vec<String> = f
+            .params
+            .iter()
+            .filter(|p| p.name.name != "_")
+            .map(|p| format!("{n}=${{{n}}}", n = p.name.name))
+            .collect();
+        if extra_result {
+            parts.push("result=${result}".to_string());
+        }
+        parts.join(", ")
+    };
+    // Precondition guards — parameters are the TS function params, in scope.
+    for c in &f.requires {
+        let mut stmts = Vec::new();
+        let pred = lower_expr(&c.predicate, &mut stmts, cx);
+        for s in &stmts {
+            writeln!(out, "  {s}").unwrap();
+        }
+        writeln!(
+            out,
+            "  if (!({pred})) {{ const __e = new Error(`contract violated: precondition \\`{clause}\\` of {fn_name} ({dump})`); __e.name = \"BynkContractError\"; throw __e; }}",
+            clause = c.name.name,
+            dump = param_dump(false),
+        )
+        .unwrap();
+    }
+    // Run the original body, capturing its value as `result` for the `ensures`.
+    if async_tail {
+        writeln!(out, "  const result = await (async () => {{").unwrap();
+    } else {
+        writeln!(out, "  const result = (() => {{").unwrap();
+    }
+    emit_block_as_function_body(out, &f.body, cx, INDENT_STEP * 2, async_tail);
+    writeln!(out, "  }})();").unwrap();
+    // Postcondition guards — `result` (and the parameters) are in scope.
+    for c in &f.ensures {
+        let mut stmts = Vec::new();
+        let pred = lower_expr(&c.predicate, &mut stmts, cx);
+        for s in &stmts {
+            writeln!(out, "  {s}").unwrap();
+        }
+        writeln!(
+            out,
+            "  if (!({pred})) {{ const __e = new Error(`contract violated: postcondition \\`{clause}\\` of {fn_name} ({dump})`); __e.name = \"BynkContractError\"; throw __e; }}",
+            clause = c.name.name,
+            dump = param_dump(true),
+        )
+        .unwrap();
+    }
+    writeln!(out, "  return result;").unwrap();
 }
 
 pub(crate) fn is_effectful_return(r: &TypeRef) -> bool {

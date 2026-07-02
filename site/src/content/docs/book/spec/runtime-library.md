@@ -199,7 +199,7 @@ Held connections are never serialised into the durable state record; on Workers 
 `Map[K, Connection]` lives in an in-memory side-table keyed alongside the durable
 state.
 
-## §7.4.10 Generative properties (v0.114)
+## §7.4.10 Generative properties and contracts (v0.114, v0.115)
 
 A generative `property` has **no** runtime-library export: like the expectation
 helpers, the generator, the seeded PRNG, the case loop, and the shrinker are
@@ -228,3 +228,19 @@ emission satisfies, not an exported API.
   reproduce line — reusing the expected-vs-actual renderer for the failing
   `expect`. The report rides the existing runner `message` field; the pinned
   `--format json` shape is unchanged.
+
+### Contract runner attack (v0.115)
+
+A contracted pure function reachable from a test target is **attacked** by the
+same generative runtime (ADR 0150): the runner draws arguments over the
+parameters' refinement domains, filters them by the conjunction of the function's
+`requires` (exactly as a `where` filters — a rejected tuple skips without
+consuming a case), and calls the function. The dev/test call-site guard
+([§7.3.5b](/book/spec/emission/#735b-function-contracts-v0115)) asserts each
+`ensures` and throws on violation; the runner treats the guard's contract error
+as a shrinkable failure, so a broken `ensures` reports a case count, the root
+seed, and a shrunk counterexample with a `--seed` reproduce line — identical in
+shape to a `property` failure. The attack is emitted per module alongside the
+guard (dev/test only), never in the release build. `Int` arguments are coerced to
+`number` at the call (generation produces `bigint`; functions do `number`
+arithmetic).

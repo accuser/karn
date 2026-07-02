@@ -656,6 +656,22 @@ pub struct Invariant {
     pub trivia: Trivia,
 }
 
+/// A function contract clause (v0.115 §, testing track slice 3). A named
+/// predicate on a `fn` signature — a `requires` (precondition) or `ensures`
+/// (postcondition). A contract is the invariant predicate attached to a
+/// function (ADR 0144 — one predicate surface): the predicate is a pure `Bool`
+/// expression over the parameters (`requires`) or the parameters plus `result`
+/// (`ensures`), with `implies`/`is` and pure methods, mirroring [`Invariant`].
+/// The name rides the failure report and the redundant-test dedup.
+#[derive(Debug, Clone)]
+pub struct Contract {
+    pub name: Ident,
+    /// The predicate expression — an ordinary `Bool`-typed expression over the
+    /// parameters (and, for an `ensures`, the contextual `result` binding).
+    pub predicate: Expr,
+    pub span: Span,
+}
+
 /// An actor declaration (v0.45 §3.7). An actor is a nominal *contract type*
 /// describing an external party at a boundary — not a runnable entity. A
 /// handler consumes an actor on its `by` clause; the boundary verifies the
@@ -1366,6 +1382,14 @@ pub struct FnDecl {
     pub name: FnName,
     pub params: Vec<Param>,
     pub return_type: TypeRef,
+    /// v0.115: preconditions (`requires <name>: <pred>`), parsed between the
+    /// return type and the body. A contract clause is the invariant predicate
+    /// attached to a function (ADR 0144 — one predicate surface); `requires`
+    /// scopes over the parameters only.
+    pub requires: Vec<Contract>,
+    /// v0.115: postconditions (`ensures <name>: <pred>`). Scopes over the
+    /// parameters *and* `result`, the contextual binding for the return value.
+    pub ensures: Vec<Contract>,
     pub body: Block,
     /// True when the first parameter is the special `self` parameter. Only
     /// valid for method declarations.

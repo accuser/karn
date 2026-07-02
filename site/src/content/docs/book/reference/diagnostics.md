@@ -7,7 +7,7 @@ title: Diagnostic index
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](/book/troubleshooting/).
 
-There are **330** codes in total.
+There are **335** codes in total.
 
 ## Agents
 
@@ -58,6 +58,16 @@ There are **330** codes in total.
 | `bynk.context.external_construction` | A context-owned type was constructed from outside that context. |  |
 | `bynk.context.external_provider` | A bodiless (external) provider was declared outside an `adapter`. | [`provider_decl`](/book/reference/grammar/#rule-provider_decl) |
 | `bynk.context.opaque_inspection` | An opaquely-exported type was inspected from outside its context. |  |
+
+## Contracts
+
+| Code | Summary | Construct |
+|---|---|---|
+| `bynk.contract.duplicate_name` | A function declares two contract clauses (`requires`/`ensures`) with the same name. |  |
+| `bynk.contract.impure_predicate` | A contract predicate uses an effectful or test-only construct; a contract clause must be pure. |  |
+| `bynk.contract.not_bool` | A contract predicate does not have type `Bool`. |  |
+| `bynk.contract.restated_by_test` | A `case`/`property` merely restates a contract clause already declared at the function; the test is redundant. |  |
+| `bynk.contract.result_in_requires` | A precondition (`requires`) references `result`; the return value is only in scope inside an `ensures`. |  |
 
 ## Cron
 

@@ -137,7 +137,7 @@ pub fn emit(commons: &TypedCommons) -> String {
         if let CommonsItem::Fn(f) = item
             && let FnName::Free(_) = &f.name
         {
-            emit_free_fn(&mut body, f, commons, None);
+            emit_free_fn(&mut body, f, commons, None, false);
         }
     }
     // v0.22b: module-local codec helpers for Json.encode/decode targets.
@@ -159,6 +159,7 @@ pub fn emit(commons: &TypedCommons) -> String {
 fn single_file_ctx() -> EmitProjectCtx {
     EmitProjectCtx {
         import_ext: crate::project::ImportExt::Js,
+        contracts: false,
         source_path: PathBuf::new(),
         commons_name: String::new(),
         local_files: Vec::new(),
@@ -243,7 +244,7 @@ pub fn emit_project(
             && let FnName::Free(_) = &f.name
         {
             smb.borrow_mut().record(out.len(), f.span);
-            emit_free_fn(&mut out, f, commons, Some(&smb));
+            emit_free_fn(&mut out, f, commons, Some(&smb), ctx.contracts);
         }
     }
     // v0.5: behavioural items follow the type/fn declarations.

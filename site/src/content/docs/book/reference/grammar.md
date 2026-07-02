@@ -575,6 +575,31 @@ commons demo {
 
 **See also.** [Operators & built-ins](/book/reference/operators/).
 
+### requires_clause {#rule-requires_clause}
+
+{{#grammar requires_clause}}
+
+A function **precondition** (v0.115): `requires <name>: <predicate>`, between the
+return type and the body. A pure `Bool` predicate over the parameters — the one
+predicate surface. Checked at every call in the dev/test build and used to filter
+the runner's generated arguments; `result` is not in scope
+(`bynk.contract.result_in_requires`).
+
+**See also.** [Contracts](/book/reference/testing/#contracts).
+
+### ensures_clause {#rule-ensures_clause}
+
+{{#grammar ensures_clause}}
+
+A function **postcondition** (v0.115): `ensures <name>: <predicate>`. A pure
+`Bool` predicate over the parameters **and** `result` (the return value; the
+awaited element for an `Effect`). Checked at every call in the dev/test build and
+generated against by the runner (a contract is a property that is always on). A
+`case`/`property` that merely restates it is flagged
+(`bynk.contract.restated_by_test`).
+
+**See also.** [Contracts](/book/reference/testing/#contracts).
+
 ### method_name {#rule-method_name}
 
 {{#grammar method_name}}

@@ -93,6 +93,12 @@ function __bynkShrinkString(v: string, min: number): string[] {
   }
   return out;
 }
+function __bynkIsFailure(e: any): e is Error {
+  // A shrinkable property/contract failure: an `expect` assertion, or a v0.115
+  // function-contract guard violation thrown from the attacked function. The
+  // `e is Error` predicate narrows the caught value so `e.message` type-checks.
+  return e instanceof ExpectationError || (!!e && e.name === "BynkContractError");
+}
 async function __bynkShrink(gens: any[], where: ((v: any[]) => boolean) | null, body: (v: any[]) => Promise<void>, vals: any[]): Promise<any[]> {
   let current = vals.slice();
   let improved = true;
@@ -107,7 +113,7 @@ async function __bynkShrink(gens: any[], where: ((v: any[]) => boolean) | null, 
         trial[i] = c;
         if (where && !where(trial)) continue;
         let failed = false;
-        try { await body(trial); } catch (e) { failed = e instanceof ExpectationError; }
+        try { await body(trial); } catch (e) { failed = __bynkIsFailure(e); }
         if (failed) { current = trial; improved = true; break; }
       }
     }
@@ -127,7 +133,7 @@ async function __bynkRunProperty(spec: { seed: number, cases: number, gens: any[
     try {
       await spec.body(vals);
     } catch (e) {
-      if (!(e instanceof ExpectationError)) {
+      if (!__bynkIsFailure(e)) {
         return { pass: false, error: { message: String(e), location: spec.location } };
       }
       const shrunk = await __bynkShrink(spec.gens, spec.where, spec.body, vals);
@@ -136,7 +142,7 @@ async function __bynkRunProperty(spec: { seed: number, cases: number, gens: any[
       const seedHex = "0x" + (__bynkSeed >>> 0).toString(16);
       const shown = spec.gens.map((g, i) => `${g.name} = ${g.show(shrunk[i])}`).join(", ");
       let detail = e.message;
-      try { await spec.body(shrunk); } catch (e2) { if (e2 instanceof ExpectationError) detail = e2.message; }
+      try { await spec.body(shrunk); } catch (e2) { if (__bynkIsFailure(e2)) detail = (e2 as any).message; }
       const firstLine = String(detail).split("\n")[0];
       const message = `property failed after ${ran} cases (seed ${seedHex})\n  shrunk counterexample:  ${shown}\n  ${firstLine}\n  reproduce: bynkc test ${spec.file} --seed ${seedHex}`;
       return { pass: false, error: { message, location: spec.location } };

@@ -243,6 +243,20 @@ that throws on failure, which the runner records as a failing case. `bynkc test`
 emits these modules, compiles them with `tsc`, and runs the aggregated runner on
 Node ([§8.4](/book/spec/compilation-model/#84-build-pipeline--conformance-to-typescript)).
 
+### §7.3.5b Function contracts (v0.115)
+
+A contracted pure function (`requires`/`ensures`, [§5.4.1a](/book/spec/static-semantics/#541a-function-contracts-v0115))
+emits behind a **build-profile switch** (ADR 0150). In the **dev/test** profile
+(`bynkc test`, `--inspect`) the function is wrapped by a call-site guard: each
+`requires` is checked on entry and each `ensures` on exit (over the bound
+`result`), throwing a contract failure that names the clause and the offending
+arguments/`result`. The guard is emitted once around the definition (O(1) in code
+size), not at each call site. In the **release** profile (`bynkc compile`) the
+guard is stripped entirely — the emitted function is identical to an uncontracted
+one, so contracts add no production cost or behaviour. The runner attack
+([§7.4.10](/book/spec/runtime-library/#7410-generative-properties-and-contracts-v0114-v0115))
+is emitted only alongside the guard.
+
 ### §7.3.5a Functions as values (v0.20a)
 
 | Construct | Emits |

@@ -3,7 +3,7 @@
 > Bynk is a statically typed, architecture-first programming language for building
 > services. Its contexts, services, agents, and the types that flow between them are
 > part of the language, not a convention layered on top. Bynk compiles to typed
-> TypeScript and targets Cloudflare Workers. It is pre-1.0 (currently v0.114).
+> TypeScript and targets Cloudflare Workers. It is pre-1.0 (currently v0.115).
 
 This file inlines the complete Bynk Book — every tutorial, guide, reference page,
 and the normative specification — concatenated in reading order, with the mdBook
@@ -20,7 +20,7 @@ curated index with a shorter primer, see `llms.txt`.
 # Source: book/index.md
 # ────────────────────────────────────────────────────────────
 
-> ⚠️ **Bynk is pre-1.0 (currently v0.114) and under active development.**
+> ⚠️ **Bynk is pre-1.0 (currently v0.115) and under active development.**
 > The language changes in small, spec-first increments. This book documents
 > **what compiles today**; planned features are marked as planned rather than
 > described as if they exist. See [Versioning & roadmap](/book/about/versioning-and-roadmap/).
@@ -4903,6 +4903,26 @@ invent a string matching an arbitrary regular expression — so a bare `Val` (or
 one; an agent, which has no domain to draw from, cannot be generated at all. The
 language would rather stop than guess.
 
+## Contracts: the claim that is always on
+
+Between a witnessing `case` and a quantifying `property` sits a third rung — the
+**contract**. A claim about *one* result of a pure function does not belong in a
+separate test at all; it belongs on the function, as an `ensures`. Bynk then
+checks it everywhere for free: at every call in the dev/test build (a guard that is
+stripped from production, so it costs nothing to ship), and by the runner, which
+generates arguments — filtered by the function's `requires` — and attacks the
+`ensures` exactly as a `property` attacks its body. A contract is a property that
+is always on.
+
+This sharpens the division of labour. A `case` witnesses a named scenario; a
+contract states what one result always guarantees; a `property` earns its keep
+only when the claim is *relational* or *spans calls* — a monotonicity, a
+round-trip — which no per-call postcondition can express. A `case`/`property` that
+merely restates a contract is redundant, and Bynk says so
+([`bynk.contract.restated_by_test`](/book/troubleshooting/contract-errors/)). The
+same one predicate surface runs at each rung: `case`, contract, `property`, and
+`invariant` are the *same* predicate, checked over different subjects.
+
 ## Isolation: mocking collaborators
 
 A unit under test usually depends on collaborators — capabilities it asks for with
@@ -4982,6 +5002,32 @@ suite quantities {
 A `Matches`-refined string cannot be fabricated blindly — a bare `Val` of one is
 rejected ([`bynk.val.needs_pin`](/book/troubleshooting/val-errors/)); pin it
 instead. `Val[T]` is test-only.
+
+## Constrain a function with `requires` / `ensures`
+
+A **contract** states what a pure function guarantees, right on its signature —
+between the return type and the body. `requires` clauses are preconditions over
+the parameters; `ensures` clauses are postconditions over the parameters and
+`result`, the return value:
+
+```bynk
+commons commerce.money
+
+fn discount(p: Int, pct: Int) -> Int
+  requires p_nonneg: p >= 0
+  requires pct_in_range: pct >= 0 && pct <= 100
+  ensures never_above: result <= p
+{
+  p - (p * pct) / 100
+}
+```
+
+You write no test for this: in the dev/test build every call checks the contract,
+and the runner **generates** arguments (filtered by `requires`) to attack the
+`ensures` — reporting a shrunk counterexample if one breaks. In the deploy build
+the checks are stripped, so contracts cost nothing in production. A contract is a
+property that is always on; reach for a `property` only when a claim is relational
+or spans calls. See the [testing reference](/book/reference/testing/#contracts).
 
 ## Check a claim across inputs with `property` / `for all`
 
@@ -6520,7 +6566,7 @@ depends on, and the providers that implement them.
 ### fn_decl {#rule-fn_decl}
 
 ```
-fn_decl ::= "fn" (method_name | identifier) ("[" identifier ("," identifier)* "]")? "(" params? ")" "->" type_ref block
+fn_decl ::= "fn" (method_name | identifier) ("[" identifier ("," identifier)* "]")? "(" params? ")" "->" type_ref requires_clause* ensures_clause* block
 ```
 
 A function or method: a name, parameters, a return type, and a block body.
@@ -6544,6 +6590,35 @@ commons demo {
 See the [diagnostic index](/book/reference/diagnostics/) for all codes.
 
 **See also.** [Operators & built-ins](/book/reference/operators/).
+
+### requires_clause {#rule-requires_clause}
+
+```
+requires_clause ::= "requires" identifier ":" expression
+```
+
+A function **precondition** (v0.115): `requires <name>: <predicate>`, between the
+return type and the body. A pure `Bool` predicate over the parameters — the one
+predicate surface. Checked at every call in the dev/test build and used to filter
+the runner's generated arguments; `result` is not in scope
+(`bynk.contract.result_in_requires`).
+
+**See also.** [Contracts](/book/reference/testing/#contracts).
+
+### ensures_clause {#rule-ensures_clause}
+
+```
+ensures_clause ::= "ensures" identifier ":" expression
+```
+
+A function **postcondition** (v0.115): `ensures <name>: <predicate>`. A pure
+`Bool` predicate over the parameters **and** `result` (the return value; the
+awaited element for an `Effect`). Checked at every call in the dev/test build and
+generated against by the runner (a contract is a property that is always on). A
+`case`/`property` that merely restates it is flagged
+(`bynk.contract.restated_by_test`).
+
+**See also.** [Contracts](/book/reference/testing/#contracts).
 
 ### method_name {#rule-method_name}
 
@@ -7760,8 +7835,10 @@ function_type_ref ::= (base_type | unit_type | validation_error_type | generic_t
 unit_type ::= "(" ")"
 validation_error_type ::= "ValidationError"
 generic_type_ref ::= ("Result" | "Option" | "Effect" | "HttpResult" | "List" | "Map" | "Stream" | "Query" | "Connection") "[" type_ref ("," type_ref)* "]"
-fn_decl ::= "fn" (method_name | identifier) ("[" identifier ("," identifier)* "]")? "(" params? ")" "->" type_ref block
+fn_decl ::= "fn" (method_name | identifier) ("[" identifier ("," identifier)* "]")? "(" params? ")" "->" type_ref requires_clause* ensures_clause* block
 method_name ::= identifier "." identifier
+requires_clause ::= "requires" identifier ":" expression
+ensures_clause ::= "ensures" identifier ":" expression
 params ::= (self_param | param) ("," param)* ","?
 self_param ::= "self"
 param ::= identifier ":" type_ref
@@ -7865,7 +7942,7 @@ line_comment ::= "--" /[^\n]*/
 
 Every reserved keyword, with a one-line description. Reserved words cannot be used as identifiers.
 
-There are **61** reserved keywords.
+There are **63** reserved keywords.
 
 | Keyword | Meaning |
 |---|---|
@@ -7899,6 +7976,7 @@ There are **61** reserved keywords.
 | `context` | Declare a deployable context (services, agents, capabilities). |
 | `cron` | The cron protocol on a service header (`from cron`). |
 | `else` | The alternative branch of an `if` expression. |
+| `ensures` | Declare a function postcondition — a pure `Bool` clause over the parameters and `result` (`ensures <name>: <pred>`). |
 | `enum` | Declare a payloadless sum type (`enum { A, B }`). |
 | `expect` | Assert a predicate inside a test case (`expect <bool-predicate>`). |
 | `exports` | Declare which types a context exposes, and how. |
@@ -7921,6 +7999,7 @@ There are **61** reserved keywords.
 | `provides` | Provide an implementation of a capability. |
 | `queue` | The queue protocol on a service header (`from queue("name")`). |
 | `record` | Reserved keyword (records are written `type X = { … }`). |
+| `requires` | Declare a function precondition — a pure `Bool` clause over the parameters (`requires <name>: <pred>`). |
 | `self` | The current agent instance, inside a handler. |
 | `service` | Declare a service (a group of handlers) in a context. |
 | `suite` | Declare a test suite targeting a unit (`suite <target> { case … }`). |
@@ -8061,6 +8140,31 @@ A generative test, the sibling of `case` in a `suite`: `for all x: T` binds `x` 
 a *generated* inhabitant of `T` and the body's `expect`s must hold across many. On
 failure it reports a shrunk counterexample and a seed to reproduce. See
 [Testing](/book/reference/testing/).
+
+### contract {#term-contract}
+
+A function's `requires` (precondition) and `ensures` (postcondition) clauses — the
+invariant predicate attached to a pure `fn`. Checked at every call in the dev/test
+build and generated against by the runner; stripped from the deploy build. A
+contract is a property that is always on. See
+[Contracts](/book/reference/testing/#contracts).
+
+### `requires` {#term-requires}
+
+A function precondition: `requires <name>: <pred>`, a pure `Bool` over the
+parameters. Guards the call and filters the runner's generated arguments (like a
+`for all … where`). `result` is not in scope in a `requires`.
+
+### `ensures` {#term-ensures}
+
+A function postcondition: `ensures <name>: <pred>`, a pure `Bool` over the
+parameters and `result`. Checked at every call and generated against by the runner.
+
+### `result` {#term-result}
+
+The contextual binding for a function's return value, in scope only inside an
+`ensures` predicate (the awaited element for an `Effect` return). Everywhere else
+`result` is an ordinary identifier.
 
 ### project vs legacy mode {#term-project-vs-legacy-mode}
 
@@ -10164,6 +10268,59 @@ counterexample with a copy-paste reproduce line — see
 [Run your tests](/book/guides/testing/run-tests/) and
 [`bynk.val.*` errors](/book/troubleshooting/val-errors/).
 
+## Contracts — `requires` / `ensures` {#contracts}
+
+A **contract** is the invariant predicate attached to a function. Between a pure
+function's return type and its body, declare any number of named `requires`
+(preconditions) and `ensures` (postconditions):
+
+```bynk
+commons commerce.money
+
+fn discount(p: Int, pct: Int) -> Int
+  requires p_nonneg: p >= 0
+  requires pct_in_range: pct >= 0 && pct <= 100
+  ensures never_above: result <= p
+  ensures never_negative: result >= 0
+{
+  p - (p * pct) / 100
+}
+```
+
+- **`requires <name>: <pred>`** is a precondition over the parameters. `result`
+  is **not** in scope (`bynk.contract.result_in_requires`).
+- **`ensures <name>: <pred>`** is a postcondition over the parameters **and**
+  `result` — the return value (the awaited element for an `Effect` return).
+  Outside an `ensures`, `result` is an ordinary identifier.
+- Each predicate is the **same predicate surface** as a `case`, a `property`, or
+  an `invariant`: a pure `Bool` with `implies`, `is`, operators, and pure methods
+  — no effects, capabilities, `expect`, or `Val`
+  (`bynk.contract.impure_predicate`, `bynk.contract.not_bool`).
+
+**Checked at two points, for free.** A contract needs no test to run:
+
+1. **At every call** in the dev/test build, a call-site guard checks each
+   `requires` on entry and each `ensures` on exit, throwing a contract failure
+   that names the clause and the offending arguments/`result`. The guard is
+   **stripped from the deploy build** (`bynkc compile`) — contracts add no
+   production cost and never change production behaviour.
+2. **By the runner.** For every contracted function reachable from a test target,
+   the runner **generates** arguments over the parameter domains (the same engine
+   `for all` uses — boundary-inclusive, seeded, shrinking), **filters** them by the
+   `requires` (exactly as a `for all … where` does — inputs failing a precondition
+   are discarded), calls the function, and checks the `ensures`. A failure reports
+   the case count, the seed, and a shrunk counterexample with the same reproduce
+   line a `property` gives. A contract is a property that is always on.
+
+**`ensures` vs `property`.** A claim about *one* result belongs in `ensures` —
+checked everywhere and generated for free. A `property` earns its keep only when
+the claim is **relational or spans calls** (monotonicity, a round-trip) — which no
+per-call postcondition can express. A `case`/`property` that merely restates a
+contract already declared at the source is redundant and flagged
+`bynk.contract.restated_by_test` (a conservative, syntactic check).
+
+See [`bynk.contract.*` errors](/book/troubleshooting/contract-errors/).
+
 ## `suite integration` — multi-Worker integration tests
 
 A `suite` block exercises **one** unit, with collaborators replaced by `mocks`. A
@@ -10265,7 +10422,7 @@ the VS Code Test Explorer populates its tree before you run anything.
 
 Every diagnostic code the compiler can emit, with a one-line summary of the cause, grouped by category. For step-by-step cause-and-fix guidance on the most common ones, see the [troubleshooting guides](/book/troubleshooting/).
 
-There are **330** codes in total.
+There are **335** codes in total.
 
 ## Agents
 
@@ -10316,6 +10473,16 @@ There are **330** codes in total.
 | `bynk.context.external_construction` | A context-owned type was constructed from outside that context. |  |
 | `bynk.context.external_provider` | A bodiless (external) provider was declared outside an `adapter`. | [`provider_decl`](/book/reference/grammar/#rule-provider_decl) |
 | `bynk.context.opaque_inspection` | An opaquely-exported type was inspected from outside its context. |  |
+
+## Contracts
+
+| Code | Summary | Construct |
+|---|---|---|
+| `bynk.contract.duplicate_name` | A function declares two contract clauses (`requires`/`ensures`) with the same name. |  |
+| `bynk.contract.impure_predicate` | A contract predicate uses an effectful or test-only construct; a contract clause must be pure. |  |
+| `bynk.contract.not_bool` | A contract predicate does not have type `Bool`. |  |
+| `bynk.contract.restated_by_test` | A `case`/`property` merely restates a contract clause already declared at the function; the test is redundant. |  |
+| `bynk.contract.result_in_requires` | A precondition (`requires`) references `result`; the return value is only in scope inside an `ensures`. |  |
 
 ## Cron
 
@@ -10738,7 +10905,7 @@ There are **330** codes in total.
 
 Bynk is pre-1.0 and developed in small, spec-first increments (see
 [Versioning & roadmap](/book/about/versioning-and-roadmap/)). This book is
-written against **v0.114**.
+written against **v0.115**.
 
 This page is a high-level summary of notable increments, not an exhaustive
 per-commit history. While Bynk is pre-1.0, increments may change behaviour.
@@ -10756,6 +10923,7 @@ per-commit history. While Bynk is pre-1.0, increments may change behaviour.
 
 | Version | Highlights |
 |---|---|
+| **v0.115.0** | **Function contracts — `requires` / `ensures`** (language/compiler; testing track slice 3). A pure `fn` may carry named contract clauses between its return type and body: **`requires <name>: <pred>`** (a precondition over the parameters) and **`ensures <name>: <pred>`** (a postcondition over the parameters and **`result`**, the return value — the awaited element for an `Effect`). Each predicate is the **same predicate surface** as a `case`/`property`/`invariant` — pure `Bool`, no new grammar. `result` is contextual (special only inside an `ensures`; an ordinary identifier elsewhere), and referencing it in a `requires` is `bynk.contract.result_in_requires`; an impure predicate is `bynk.contract.impure_predicate`, a non-`Bool` one `bynk.contract.not_bool`, and a duplicate clause name `bynk.contract.duplicate_name`. **A contract is checked at two points, for free:** (1) a **dev/test call-site guard** checks each `requires` on entry and each `ensures` on exit at every call, throwing a failure that names the clause and the offending arguments/`result` — **stripped from the deploy build** (`bynkc compile`), so contracts add no production cost or behaviour (DECISION J: per-build-profile); (2) the **runner attack** — for every contracted function reachable from a test target, the runner generates arguments over the parameter domains (the v0.114 engine — boundary-inclusive, seeded, shrinking), filters them by the `requires` (like a `for all … where`), calls the function, and checks the `ensures`, reporting a shrunk counterexample with the same reproduce line a `property` gives. A claim about one result belongs in `ensures` (checked everywhere, generated for free); a `property` earns its keep only when the claim is relational or spans calls. A `case`/`property` that merely restates a contract is flagged `bynk.contract.restated_by_test` (a conservative, syntactic check). ADR 0150. |
 | **v0.114.0** | **`property` / `for all` — generative tests, and `Val[T]` replaces `Mock[T]`** (language/compiler; testing track slice 2). A `property` is the generative sibling of `case`, legal in the same `suite`: **`for all x: T`** binds `x` to a *generated* inhabitant of `T` (comma-separated for several), an optional **`where <pred>`** (a pure `Bool`, `bynk.property.where_not_bool`) filters the generated tuples, and the body is one or more `expect`s — the **same predicate surface** as a `case`/`invariant`/`ensures`, no new assertion grammar. **Generation draws from a type's refinement domain** and includes boundary values (`Int Positive` → `1`/small positives/boundary; `InRange(a,b)` → `a`, `b`, interior; `String MinLength(k)`/`Length(k)` → at/above length; sum → each variant; record → each field; opaque → over the base). A type must be **refinement-generable**: a `String where Matches(re)` has no generator and must be pinned (`bynk.val.needs_pin`), and an **agent** cannot be generated (`bynk.val.agent_not_generable`) — behavioural agent testing is a later slice. A property that merely re-checks a refinement its type already guarantees is flagged `bynk.property.restates_refinement` (a conservative, syntactic check). **On failure** a property reports the case count, the run's root **seed**, and a **shrunk** counterexample with a copy-paste reproduce line; the new `bynkc test --seed <hex>` flag threads the root seed so a run reproduces byte-for-byte (without it, each run draws a fresh seed, printed only on failure). **`Mock[T]` is retired and replaced by `Val[T]`** — a straight rename of the value fabricator (`Val[T]` fabricates a valid inhabitant, `Val[T](v)` pins one, refinement-checked), with its diagnostics renamed `bynk.mock.*` → `bynk.val.*` (`outside_test`, `unknown_type`, `needs_pin`, `pin_not_literal`, `literal_violates`, `arity`, `pin_unsupported`, `unsupported_kind`). The **`mocks` collaborator block is unchanged** and keeps its `bynk.mock.*` codes (`unknown_target`, `duplicate_target`, `signature_mismatch`, `in_commons_test`). |
 | **v0.113.0** | **Structural test-ness — a `suite` is legal in any file, stripped from the build; flat `[paths]`** (compiler/tooling; ADR 0147, testing track slice 1b). Test-ness becomes a property of the **`suite` declaration**, not of a file's name or directory — the honest extension of ADR 0144 (the language already gates `expect` at the `case` block, not the path). **A `.bynk` file may hold more than one top-level unit:** an *atomic* file with `commons`/`context` **and** a `suite` together — the shareable, single-file, in-browser-playground case. The parser returns all top-level units per file and the project model partitions **declarations** (not files) by kind, so the source units flow to the build and the suites to `bynkc test` only. **The build strips test-only declarations:** `bynkc compile` skips every `suite` — never type-checked for the build, never emitted into the deployable — while `bynkc test` compiles and runs them; discovery scans the **whole** source tree for suites, not a designated folder. **No `.test.bynk` marker and no path-identity for a suite** — it names its target and is legal anywhere; `bynk.project.inconsistent_test_path` is retired (source units keep `inconsistent_commons_name`). **`[paths] src`/`tests` → a flat `include`/`exclude`:** `include` (trees to compile) defaults to the conventional roots that exist (`src`, and `tests` when present) or the project root itself — so a conventional *and* a flat project both need no config — and `exclude` (plus the tool's `out`/`node_modules`/dot-directories) is pruned from discovery. A consequence to accept: placement is inert in both directions (a `context` under `tests/` emits; a `suite` under `src/` is stripped) — enforce the old separation with a lint, not the build. The formatter formats every unit in a multi-unit file. Migration is at leisure: old `.test.bynk` files are ordinary `.bynk`, and legacy `[paths] src`/`tests` keys are ignored, so conventional projects build unchanged. Named follow-ons: multi-unit editor (LSP) awareness of atomic files; arbitrary N-root monorepo `include`. |
 | **v0.112.0** | **`expect` + `suite`/`case` — one predicate surface for tests** (language/compiler; ADRs 0145, 0146, cites 0144; testing track slice 1a). The first slice of the testing track. **`assert` becomes `expect`** (DECISION B, ADR 0145) and the braced **`test { … }`** container becomes **`suite`/`case`** (DECISION Q, ADR 0146) — a straight rename of the keywords, not a change of meaning: a test file is a `suite` naming its target unit, holding named `case`s, and a `case` body checks predicates with `expect`. The point is **one predicate surface** (ADR 0144): an `expect` is the *same* pure `Bool` predicate as an agent `invariant` or a function `ensures` — `is`, `implies`, the operators, pure methods — so moving from writing code to verifying it introduces **no second assertion grammar and no matcher library**; `expect r is Ok(_)` reuses `is`. `expect` is valid **only** inside a `case` (`bynk.expect.outside_case`) and must be `Bool` (`bynk.expect.not_bool`), the same fail-closed check `invariant`/`ensures` get. **Structural failure reporting:** when the predicate is a top-level comparison (`==`, `!=`, `<`, `<=`, `>`, `>=`), a failed `expect` renders the predicate *and* its **expected-vs-actual** operands (`expected: total == 900` / `actual: 950 == 900`) — because there is one predicate shape to decompose, the runner double-evaluates the operands (sound, predicates are pure per ADR 0144) and shows both sides via `__bynkShow`; the multi-line detail rides the existing `--format json` `message` field unchanged. The diagnostic family is normalised onto `bynk.expect.*` / `bynk.suite.*` (`assert`/`test` codes retired). Clean-slate rename across the whole toolchain — lexer/parser/AST, checker, emitter, formatter, tree-sitter grammar, and the VS Code TextMate keywords — with the `assert`→`expect` and `test`→`suite`/`case` codemod applied to every fixture; `expect` was already reserved (v0.7). No new runtime capability; `suite integration`/`wires` and `mocks`/`Mock[T]` are unchanged this slice (the tier dial and `provides` land later). Emission is `tsc`-clean and strips clean. |
@@ -10913,7 +11081,7 @@ Events, sagas, and storage kinds are designed but not yet shipped — see
 # ────────────────────────────────────────────────────────────
 
 The normative definition of Bynk: the language as accepted and compiled by
-`bynkc` at the **current version, v0.114**. It states what a conforming
+`bynkc` at the **current version, v0.115**. It states what a conforming
 implementation must accept, what it must reject, and what a program means. Where
 the [grammar reference](/book/reference/grammar/) is a friendly, per-construct
 lookup for people writing Bynk, this is the complete, citable definition for
@@ -10983,7 +11151,7 @@ means.
 ## §1.1 Scope
 
 This specification defines the Bynk language as accepted and compiled by `bynkc`
-at the **current version, v0.114**. It is maintained as the single source of
+at the **current version, v0.115**. It is maintained as the single source of
 truth: each language increment updates the affected chapters of this document,
 so its scope is always the shipped language. It is normative for shipped
 behaviour: where this document and the compiler disagree about a program that
@@ -11693,13 +11861,32 @@ implement them.
 ### §4.3.1 fn_decl
 
 ```
-fn_decl ::= "fn" (method_name | identifier) ("[" identifier ("," identifier)* "]")? "(" params? ")" "->" type_ref block
+fn_decl ::= "fn" (method_name | identifier) ("[" identifier ("," identifier)* "]")? "(" params? ")" "->" type_ref requires_clause* ensures_clause* block
 ```
 
 `fn`, a function name or a `Type.method` name, an optional `[A, B]`
 **type-parameter list** (v0.20a — free functions only; a type parameter is an
 unconstrained, bound-free name scoped to the signature and body), a parameter
-list, `->`, a return type, and a block body. Well-formedness: §5.
+list, `->`, a return type, any number of **contract clauses** (v0.115), and a
+block body. Well-formedness: §5.
+
+### §4.3.1a requires_clause / ensures_clause (v0.115)
+
+```
+requires_clause ::= "requires" identifier ":" expression
+```
+
+```
+ensures_clause ::= "ensures" identifier ":" expression
+```
+
+A function **contract** (testing track slice 3): named `requires` (preconditions)
+and `ensures` (postconditions) between the return type and the body, each a pure
+`Bool` predicate expression — the one predicate surface (§4.6, ADR 0144). A
+`requires` predicate is over the parameters; an `ensures` predicate is over the
+parameters and `result`, the contextual binding for the return value (an ordinary
+identifier elsewhere). Well-formedness — purity, `Bool` type, `result` scope,
+distinct names: §5 (ADR 0150).
 
 ### §4.3.2 method_name
 
@@ -12736,6 +12923,31 @@ persisted. A violation is a **fault** (`InvariantViolation`), not an outcome —
 §7 and the emission model. "Revert" is the **non-persistence of the staged
 state**, not whole-handler rollback (ADR 0107 D6): effects already performed by
 the handler stand.
+
+### §5.4.1a Function contracts (v0.115)
+
+A **contract** is the invariant predicate attached to a pure function (ADR 0150).
+A `fn` carries any number of named `requires` (preconditions) and `ensures`
+(postconditions) between its return type and body; each predicate is a pure `Bool`
+expression in the same predicate language as an invariant (`implies`, `is`,
+operators, pure methods):
+
+- a `requires` predicate is typed with the parameters in scope; a `ensures`
+  predicate is typed with the parameters **and** `result` in scope, where `result`
+  has the declared return type (the awaited element `T` for an `Effect[T]` return);
+- `result` MUST NOT appear in a `requires` (`bynk.contract.result_in_requires`) —
+  the return value is not bound on entry;
+- each predicate MUST have type `Bool` (`bynk.contract.not_bool`);
+- each MUST be pure — no capabilities, effects, or test-only constructs
+  (`bynk.contract.impure_predicate`);
+- clause names MUST be distinct across a function's `requires` and `ensures`
+  (`bynk.contract.duplicate_name`).
+
+A contract is checked at two points, and stripped from the deploy build (the
+runtime library and emission model describe the guard and the runner attack). A
+`case`/`property` whose predicate is syntactically / α-equivalent to a declared
+clause over the same bound arguments is flagged `bynk.contract.restated_by_test`
+(conservative — under-flagging is acceptable, over-flagging is not).
 
 ### §5.4.2 Held-resource linearity (v0.102)
 
@@ -13901,6 +14113,20 @@ that throws on failure, which the runner records as a failing case. `bynkc test`
 emits these modules, compiles them with `tsc`, and runs the aggregated runner on
 Node ([§8.4](/book/spec/compilation-model/#84-build-pipeline--conformance-to-typescript)).
 
+### §7.3.5b Function contracts (v0.115)
+
+A contracted pure function (`requires`/`ensures`, [§5.4.1a](/book/spec/static-semantics/#541a-function-contracts-v0115))
+emits behind a **build-profile switch** (ADR 0150). In the **dev/test** profile
+(`bynkc test`, `--inspect`) the function is wrapped by a call-site guard: each
+`requires` is checked on entry and each `ensures` on exit (over the bound
+`result`), throwing a contract failure that names the clause and the offending
+arguments/`result`. The guard is emitted once around the definition (O(1) in code
+size), not at each call site. In the **release** profile (`bynkc compile`) the
+guard is stripped entirely — the emitted function is identical to an uncontracted
+one, so contracts add no production cost or behaviour. The runner attack
+([§7.4.10](/book/spec/runtime-library/#7410-generative-properties-and-contracts-v0114-v0115))
+is emitted only alongside the guard.
+
 ### §7.3.5a Functions as values (v0.20a)
 
 | Construct | Emits |
@@ -14279,7 +14505,7 @@ Held connections are never serialised into the durable state record; on Workers 
 `Map[K, Connection]` lives in an in-memory side-table keyed alongside the durable
 state.
 
-## §7.4.10 Generative properties (v0.114)
+## §7.4.10 Generative properties and contracts (v0.114, v0.115)
 
 A generative `property` has **no** runtime-library export: like the expectation
 helpers, the generator, the seeded PRNG, the case loop, and the shrinker are
@@ -14308,6 +14534,22 @@ emission satisfies, not an exported API.
   reproduce line — reusing the expected-vs-actual renderer for the failing
   `expect`. The report rides the existing runner `message` field; the pinned
   `--format json` shape is unchanged.
+
+### Contract runner attack (v0.115)
+
+A contracted pure function reachable from a test target is **attacked** by the
+same generative runtime (ADR 0150): the runner draws arguments over the
+parameters' refinement domains, filters them by the conjunction of the function's
+`requires` (exactly as a `where` filters — a rejected tuple skips without
+consuming a case), and calls the function. The dev/test call-site guard
+([§7.3.5b](/book/spec/emission/#735b-function-contracts-v0115)) asserts each
+`ensures` and throws on violation; the runner treats the guard's contract error
+as a shrinkable failure, so a broken `ensures` reports a case count, the root
+seed, and a shrunk counterexample with a `--seed` reproduce line — identical in
+shape to a `property` failure. The attack is emitted per module alongside the
+guard (dev/test only), never in the release build. `Int` arguments are coerced to
+`number` at the call (generation produces `bigint`; functions do `number`
+arithmetic).
 
 # ────────────────────────────────────────────────────────────
 # Source: book/spec/compilation-model.md
@@ -14618,7 +14860,7 @@ thinking on what is deferred, see
 # Source: book/spec/appendix-version-history.md
 # ────────────────────────────────────────────────────────────
 
-This specification defines the language at its **current version, v0.114**
+This specification defines the language at its **current version, v0.115**
 ([§1.1](/book/spec/scope/)). Bynk is pre-1.0 and developed in small, spec-first
 increments; while it is pre-1.0, an increment may change behaviour. (v0.59 is
 tooling — `bynkc test --format json` — with **no language-surface change**; the
@@ -14837,7 +15079,7 @@ Each language increment (`v0.X`) starts as a written specification, is then
 implemented behind a growing fixture suite, and only then is considered done.
 Increments are deliberately small: a slice of grammar, a refinement to the type
 checker, a new emission detail. This is why the version number moves in fine
-steps (the book is written against v0.114) rather than in large releases.
+steps (the book is written against v0.115) rather than in large releases.
 
 The discipline that keeps it honest is the fixture suite: a large body of
 positive examples (which must compile to the expected TypeScript) and negative
@@ -14915,6 +15157,9 @@ code you saw.
   an agent state field can't be zero-initialised.
 - [`bynk.val.*` errors](/book/troubleshooting/val-errors/) — `outside_test`, `needs_pin`, and
   related `Val[T]` fabrication and `property` errors.
+- [`bynk.contract.*` errors](/book/troubleshooting/contract-errors/) — `requires`/`ensures`
+  contract clauses: `result_in_requires`, `not_bool`, `impure_predicate`,
+  `duplicate_name`, `restated_by_test`.
 
 For the complete list of codes, see the
 [diagnostic index](/book/reference/diagnostics/).

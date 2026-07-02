@@ -10,6 +10,9 @@ code you saw.
   an agent state field can't be zero-initialised.
 - [`bynk.val.*` errors](/book/troubleshooting/val-errors/) — `outside_test`, `needs_pin`, and
   related `Val[T]` fabrication and `property` errors.
+- [`bynk.contract.*` errors](/book/troubleshooting/contract-errors/) — `requires`/`ensures`
+  contract clauses: `result_in_requires`, `not_bool`, `impure_predicate`,
+  `duplicate_name`, `restated_by_test`.
 
 For the complete list of codes, see the
 [diagnostic index](/book/reference/diagnostics/).

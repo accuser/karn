@@ -106,7 +106,10 @@ fn run_test(
     // slice 1's source maps apply unchanged. A normal run keeps `.js` specifiers
     // for the `tsc → node` path.
     let options = {
-        let o = project_options(&input);
+        // v0.115: `bynkc test` compiles the dev/test profile — the function
+        // contract call-site guard is emitted (DECISION J). `bynkc compile`
+        // leaves it off, so contract checks never reach production.
+        let o = project_options(&input).contracts(true);
         if inspect {
             o.import_ext(bynkc::ImportExt::Ts)
         } else {

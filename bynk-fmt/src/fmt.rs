@@ -975,7 +975,31 @@ impl<'a> Formatter<'a> {
         self.format_params(&f.params, f.has_self);
         self.push(" -> ");
         self.format_type_ref(&f.return_type);
-        self.push(" ");
+        // v0.115: contract clauses on their own indented lines between the
+        // return type and the body (`requires`/`ensures <name>: <pred>`).
+        if f.requires.is_empty() && f.ensures.is_empty() {
+            self.push(" ");
+        } else {
+            self.newline();
+            self.indented(|f2| {
+                for c in &f.requires {
+                    f2.push(&format!(
+                        "requires {}: {}",
+                        c.name.name,
+                        expr_to_string(&c.predicate)
+                    ));
+                    f2.newline();
+                }
+                for c in &f.ensures {
+                    f2.push(&format!(
+                        "ensures {}: {}",
+                        c.name.name,
+                        expr_to_string(&c.predicate)
+                    ));
+                    f2.newline();
+                }
+            });
+        }
         self.format_block(&f.body);
         self.emit_trailing_comment(f.trivia.trailing.as_deref());
         if f.trivia.trailing.is_none() {

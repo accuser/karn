@@ -656,6 +656,204 @@ pub fn check_invariants(
     }
 }
 
+/// Check a function's contract clauses (v0.115 §, testing track slice 3). A
+/// contract is the invariant predicate attached to a function (ADR 0144 — one
+/// predicate surface): each `requires`/`ensures` is a pure `Bool`-typed
+/// expression, `requires` over the parameters and `ensures` over the parameters
+/// plus `result` (the return value; the awaited element for an `Effect`). The
+/// pass enforces, mirroring [`check_invariants`]:
+///
+/// - `bynk.contract.duplicate_name` — two clauses (across `requires`/`ensures`)
+///   share a name; the name rides the failure report and dedup.
+/// - `bynk.contract.result_in_requires` — a precondition references `result`
+///   (the return value is not yet bound on entry).
+/// - `bynk.contract.impure_predicate` — a clause uses an effectful or test-only
+///   construct (Effect, `?` propagation, `expect`, `Val`).
+/// - `bynk.contract.not_bool` — a clause does not type to `Bool`.
+///
+/// Distinct from ADR 0127's capability `@requires` annotation.
+#[allow(clippy::too_many_arguments)]
+pub fn check_contracts(
+    requires: &[Contract],
+    ensures: &[Contract],
+    // The function's parameters in scope by bare name (plus `self` for a
+    // method), the shared predicate scope for both clause kinds.
+    param_scope: &HashMap<String, Ty>,
+    // The declared return type, awaited for an `Effect` — the type of `result`
+    // inside an `ensures` predicate.
+    result_ty: &Ty,
+    // True when a parameter is literally named `result`; then `result` in a
+    // `requires` is that parameter, not the (unbound) return value.
+    has_result_param: bool,
+    fn_label: &str,
+    input: &ResolvedCommons,
+    expr_types: &mut HashMap<Span, Ty>,
+    errors: &mut Vec<CompileError>,
+    refs: &mut RefSink,
+    hints: &mut HintSink,
+    locals: &mut LocalsSink,
+    requirements: &mut RequirementSink,
+    type_vars: &HashSet<String>,
+) {
+    // Duplicate-name check across *all* clauses — the name is the dedup key for
+    // the failure report and the redundant-test flag, so it is unique per fn.
+    let mut seen: HashMap<&str, ()> = HashMap::new();
+    for c in requires.iter().chain(ensures.iter()) {
+        if seen.insert(c.name.name.as_str(), ()).is_some() {
+            errors.push(
+                CompileError::new(
+                    "bynk.contract.duplicate_name",
+                    c.name.span,
+                    format!(
+                        "{fn_label} declares more than one contract clause named `{}`",
+                        c.name.name
+                    ),
+                )
+                .with_note("give each `requires`/`ensures` clause a distinct name"),
+            );
+        }
+    }
+
+    // Type-check one clause predicate in the given scope, emitting the shared
+    // impurity / non-`Bool` diagnostics.
+    let check_clause = |c: &Contract,
+                        scope: HashMap<String, Ty>,
+                        expr_types: &mut HashMap<Span, Ty>,
+                        errors: &mut Vec<CompileError>,
+                        refs: &mut RefSink,
+                        hints: &mut HintSink,
+                        locals: &mut LocalsSink,
+                        requirements: &mut RequirementSink| {
+        if let Some(span) = predicate_impure_construct(&c.predicate) {
+            errors.push(
+                CompileError::new(
+                    "bynk.contract.impure_predicate",
+                    span,
+                    format!(
+                        "contract clause `{}` uses an effectful or test-only construct; a \
+                             contract predicate must be pure",
+                        c.name.name
+                    ),
+                )
+                .with_note(
+                    "a contract predicate may read the parameters (and `result`) and call \
+                         pure value methods, but not perform effects",
+                ),
+            );
+            return;
+        }
+        let bool_ty = Ty::Base(BaseType::Bool);
+        let mut ctx = Ctx {
+            input,
+            expr_types,
+            errors,
+            refs,
+            hints,
+            locals,
+            requirements,
+            scopes: vec![scope],
+            return_ty: bool_ty.clone(),
+            return_ty_span: c.predicate.span,
+            effectful: false,
+            agent_state_ty: None,
+            commit_seen: false,
+            caps: CapabilityCtx {
+                capabilities: HashMap::new(),
+                declared_capabilities: HashMap::new(),
+                given_remaining: HashSet::new(),
+                given_used: HashSet::new(),
+                given_entries: Vec::new(),
+                given_anchor: None,
+            },
+            in_test_body: false,
+            test_services: HashSet::new(),
+            type_vars: type_vars.clone(),
+            store_cells: HashMap::new(),
+            store_maps: HashMap::new(),
+            store_sets: HashMap::new(),
+            store_caches: HashMap::new(),
+            store_logs: HashMap::new(),
+        };
+        let pred_ty = type_of(&c.predicate, Some(&bool_ty), &mut ctx);
+        if let Some(t) = pred_ty
+            && t.base() != Some(BaseType::Bool)
+        {
+            ctx.errors.push(
+                CompileError::new(
+                    "bynk.contract.not_bool",
+                    c.predicate.span,
+                    format!(
+                        "contract clause `{}` predicate has type `{}`, but a contract clause \
+                             must be `Bool`",
+                        c.name.name,
+                        t.display()
+                    ),
+                )
+                .with_note("a contract predicate is a `Bool`-valued claim over the arguments"),
+            );
+        }
+    };
+
+    for c in requires {
+        // `result` is the *return value* — not in scope on entry. A `requires`
+        // that names it is a scope error with a bespoke diagnostic (unless a
+        // parameter is literally named `result`, in which case it is that param).
+        if !has_result_param && let Some(span) = predicate_references_result(&c.predicate) {
+            errors.push(
+                CompileError::new(
+                    "bynk.contract.result_in_requires",
+                    span,
+                    format!(
+                        "precondition `{}` references `result`, but the return value is not bound \
+                         until the function returns",
+                        c.name.name
+                    ),
+                )
+                .with_note("`result` is only in scope inside an `ensures` clause"),
+            );
+            continue;
+        }
+        check_clause(
+            c,
+            param_scope.clone(),
+            expr_types,
+            errors,
+            refs,
+            hints,
+            locals,
+            requirements,
+        );
+    }
+
+    for c in ensures {
+        // `ensures` scope = parameters + `result` (the return value; awaited for
+        // an `Effect`). A parameter named `result` is shadowed by the binding.
+        let mut scope = param_scope.clone();
+        scope.insert("result".to_string(), result_ty.clone());
+        check_clause(
+            c,
+            scope,
+            expr_types,
+            errors,
+            refs,
+            hints,
+            locals,
+            requirements,
+        );
+    }
+}
+
+/// If the predicate references `result` (a bare identifier) anywhere, return the
+/// span of the first such reference. Used to reject `result` in a `requires`.
+fn predicate_references_result(e: &Expr) -> Option<Span> {
+    match &e.kind {
+        ExprKind::Ident(id) if id.name == "result" => Some(id.span),
+        _ => predicate_children(e)
+            .into_iter()
+            .find_map(predicate_references_result),
+    }
+}
+
 /// If the predicate references another agent (by bare name, call, or qualified
 /// constructor), return the span of the first such reference. Used by the
 /// invariant well-formedness pass to forbid cross-agent predicates.
