@@ -124,6 +124,59 @@ counterexample with a copy-paste reproduce line — see
 [Run your tests](/book/guides/testing/run-tests/) and
 [`bynk.val.*` errors](/book/troubleshooting/val-errors/).
 
+## Contracts — `requires` / `ensures` {#contracts}
+
+A **contract** is the invariant predicate attached to a function. Between a pure
+function's return type and its body, declare any number of named `requires`
+(preconditions) and `ensures` (postconditions):
+
+```bynk
+commons commerce.money
+
+fn discount(p: Int, pct: Int) -> Int
+  requires p_nonneg: p >= 0
+  requires pct_in_range: pct >= 0 && pct <= 100
+  ensures never_above: result <= p
+  ensures never_negative: result >= 0
+{
+  p - (p * pct) / 100
+}
+```
+
+- **`requires <name>: <pred>`** is a precondition over the parameters. `result`
+  is **not** in scope (`bynk.contract.result_in_requires`).
+- **`ensures <name>: <pred>`** is a postcondition over the parameters **and**
+  `result` — the return value (the awaited element for an `Effect` return).
+  Outside an `ensures`, `result` is an ordinary identifier.
+- Each predicate is the **same predicate surface** as a `case`, a `property`, or
+  an `invariant`: a pure `Bool` with `implies`, `is`, operators, and pure methods
+  — no effects, capabilities, `expect`, or `Val`
+  (`bynk.contract.impure_predicate`, `bynk.contract.not_bool`).
+
+**Checked at two points, for free.** A contract needs no test to run:
+
+1. **At every call** in the dev/test build, a call-site guard checks each
+   `requires` on entry and each `ensures` on exit, throwing a contract failure
+   that names the clause and the offending arguments/`result`. The guard is
+   **stripped from the deploy build** (`bynkc compile`) — contracts add no
+   production cost and never change production behaviour.
+2. **By the runner.** For every contracted function reachable from a test target,
+   the runner **generates** arguments over the parameter domains (the same engine
+   `for all` uses — boundary-inclusive, seeded, shrinking), **filters** them by the
+   `requires` (exactly as a `for all … where` does — inputs failing a precondition
+   are discarded), calls the function, and checks the `ensures`. A failure reports
+   the case count, the seed, and a shrunk counterexample with the same reproduce
+   line a `property` gives. A contract is a property that is always on.
+
+**`ensures` vs `property`.** A claim about *one* result belongs in `ensures` —
+checked everywhere and generated for free. A `property` earns its keep only when
+the claim is **relational or spans calls** (monotonicity, a round-trip) — which no
+per-call postcondition can express. A `case`/`property` that merely restates a
+contract already declared at the source is redundant and flagged
+`bynk.contract.restated_by_test` (a conservative, syntactic check).
+
+See [`bynk.contract.*` errors](/book/troubleshooting/contract-errors/).
+
 ## `suite integration` — multi-Worker integration tests
 
 A `suite` block exercises **one** unit, with collaborators replaced by `mocks`. A

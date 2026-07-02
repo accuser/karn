@@ -170,6 +170,17 @@ pub enum TokenKind {
     Invariant,
     #[token("implies")]
     Implies,
+    // v0.115 keywords — function contracts (testing track slice 3). `requires`
+    // and `ensures` head a contract clause on a `fn` signature (between the
+    // return type and the body). `result` is deliberately *not* a keyword: it is
+    // the ordinary value name outside a contract, so it stays a usable
+    // identifier; inside an `ensures` predicate it is bound contextually as the
+    // function's return value (parsed by scope, like `for`/`all` in slice 2).
+    // Distinct from ADR 0127's capability `@requires` annotation.
+    #[token("requires")]
+    Requires,
+    #[token("ensures")]
+    Ensures,
     /// `...` — used in record-spread expressions (v0.5).
     #[token("...")]
     DotDotDot,
@@ -366,6 +377,8 @@ impl TokenKind {
             By => "`by`",
             Invariant => "`invariant`",
             Implies => "`implies`",
+            Requires => "`requires`",
+            Ensures => "`ensures`",
             ColonEq => "`:=`",
             DotDotDot => "`...`",
             LArrow => "`<-`",

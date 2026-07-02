@@ -128,6 +128,31 @@ a *generated* inhabitant of `T` and the body's `expect`s must hold across many. 
 failure it reports a shrunk counterexample and a seed to reproduce. See
 [Testing](/book/reference/testing/).
 
+### contract {#term-contract}
+
+A function's `requires` (precondition) and `ensures` (postcondition) clauses — the
+invariant predicate attached to a pure `fn`. Checked at every call in the dev/test
+build and generated against by the runner; stripped from the deploy build. A
+contract is a property that is always on. See
+[Contracts](/book/reference/testing/#contracts).
+
+### `requires` {#term-requires}
+
+A function precondition: `requires <name>: <pred>`, a pure `Bool` over the
+parameters. Guards the call and filters the runner's generated arguments (like a
+`for all … where`). `result` is not in scope in a `requires`.
+
+### `ensures` {#term-ensures}
+
+A function postcondition: `ensures <name>: <pred>`, a pure `Bool` over the
+parameters and `result`. Checked at every call and generated against by the runner.
+
+### `result` {#term-result}
+
+The contextual binding for a function's return value, in scope only inside an
+`ensures` predicate (the awaited element for an `Effect` return). Everywhere else
+`result` is an ordinary identifier.
+
 ### project vs legacy mode {#term-project-vs-legacy-mode}
 
 *Project mode* is a `bynk.toml`-driven directory layout (a `src`/`tests` split,

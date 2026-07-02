@@ -89,6 +89,19 @@ impl<'a> Parser<'a> {
         self.expect(TokenKind::RParen, "to close the parameter list")?;
         self.expect(TokenKind::Arrow, "before the return type")?;
         let return_type = self.parse_type_ref("as the return type")?;
+        // v0.115: contract clauses ride between the return type and the body —
+        // any number of `requires <name>: <pred>` then `ensures <name>: <pred>`.
+        // The two-list split is by keyword, not order; the checker enforces the
+        // scoping difference (`result` bound only in `ensures`).
+        let mut requires = Vec::new();
+        let mut ensures = Vec::new();
+        loop {
+            match self.peek_kind() {
+                Some(TokenKind::Requires) => requires.push(self.parse_contract_clause(true)?),
+                Some(TokenKind::Ensures) => ensures.push(self.parse_contract_clause(false)?),
+                _ => break,
+            }
+        }
         let body = self.parse_block("to open the function body")?;
         let span = kw.span.merge(body.span);
         Ok(FnDecl {
@@ -96,11 +109,36 @@ impl<'a> Parser<'a> {
             name,
             params,
             return_type,
+            requires,
+            ensures,
             body,
             has_self,
             documentation: None,
             span,
             trivia: Trivia::default(),
+        })
+    }
+
+    /// Parse a single contract clause (v0.115): `requires <name>: <pred>` or
+    /// `ensures <name>: <pred>`. The predicate is an ordinary expression (with
+    /// `implies`/`is`) over the parameters — and, for an `ensures`, the
+    /// contextual `result` binding; well-formedness (purity, `Bool`, `result`
+    /// scope) is the checker's job, mirroring [`parse_invariant`].
+    fn parse_contract_clause(&mut self, is_requires: bool) -> Result<Contract, CompileError> {
+        let kw = if is_requires {
+            self.expect(TokenKind::Requires, "to start a precondition clause")?
+        } else {
+            self.expect(TokenKind::Ensures, "to start a postcondition clause")?
+        };
+        let word = if is_requires { "requires" } else { "ensures" };
+        let name = self.expect_ident(&format!("expected the clause name after `{word}`"))?;
+        self.expect(TokenKind::Colon, "after the contract clause name")?;
+        let predicate = self.parse_expr()?;
+        let span = kw.span.merge(predicate.span);
+        Ok(Contract {
+            name,
+            predicate,
+            span,
         })
     }
 

@@ -460,10 +460,22 @@ module.exports = grammar({
         ")",
         "->",
         field("return_type", $._type_ref),
+        // v0.115: contract clauses between the return type and the body.
+        repeat($.requires_clause),
+        repeat($.ensures_clause),
         field("body", $.block),
       ),
     method_name: ($) =>
       seq(field("type", $.identifier), ".", field("method", $.identifier)),
+
+    // v0.115 (testing track slice 3): a function contract clause. `requires` is a
+    // precondition over the parameters; `ensures` is a postcondition over the
+    // parameters and the contextual `result` binding. The predicate is the one
+    // predicate surface (same grammar as an `invariant_decl`).
+    requires_clause: ($) =>
+      seq("requires", field("name", $.identifier), ":", field("predicate", $._expression)),
+    ensures_clause: ($) =>
+      seq("ensures", field("name", $.identifier), ":", field("predicate", $._expression)),
 
     _params: ($) =>
       seq(

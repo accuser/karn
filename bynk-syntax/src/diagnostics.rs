@@ -275,6 +275,26 @@ pub const REGISTRY: &[DiagnosticInfo] = &[
         "bynk.context.opaque_inspection",
         "An opaquely-exported type was inspected from outside its context.",
     ),
+    d(
+        "bynk.contract.duplicate_name",
+        "A function declares two contract clauses (`requires`/`ensures`) with the same name.",
+    ),
+    d(
+        "bynk.contract.impure_predicate",
+        "A contract predicate uses an effectful or test-only construct; a contract clause must be pure.",
+    ),
+    d(
+        "bynk.contract.not_bool",
+        "A contract predicate does not have type `Bool`.",
+    ),
+    d(
+        "bynk.contract.restated_by_test",
+        "A `case`/`property` merely restates a contract clause already declared at the function; the test is redundant.",
+    ),
+    d(
+        "bynk.contract.result_in_requires",
+        "A precondition (`requires`) references `result`; the return value is only in scope inside an `ensures`.",
+    ),
     dg(
         "bynk.cron.bad_params",
         "A cron handler declares more than one parameter, or a non-`Int` one.",
@@ -1590,6 +1610,7 @@ fn category_title(cat: &str) -> &'static str {
         "capability" => "Capabilities",
         "consumes" => "Consumes",
         "context" => "Contexts",
+        "contract" => "Contracts",
         "cron" => "Cron",
         "effect" => "Effects",
         "expect" => "Expectations",

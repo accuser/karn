@@ -299,6 +299,11 @@ pub struct CompileOptions {
     /// The import-specifier extension (slice 2). `Js` (default) for normal builds;
     /// `Ts` for the `bynkc test --inspect` debug build.
     pub import_ext: ImportExt,
+    /// v0.115 (testing track slice 3, DECISION J): the build profile for function
+    /// contracts. `true` (dev/test) emits the call-site guard around a contracted
+    /// `fn`; `false` (release/deploy) strips it entirely for zero runtime cost.
+    /// `bynkc test` and `--inspect` set it on; `bynkc compile` leaves it off.
+    pub contracts: bool,
 }
 
 impl CompileOptions {
@@ -309,6 +314,7 @@ impl CompileOptions {
             platform: Platform::default(),
             roots: Roots::Single(root.into()),
             import_ext: ImportExt::default(),
+            contracts: false,
         }
     }
 
@@ -324,6 +330,7 @@ impl CompileOptions {
                 paths,
             },
             import_ext: ImportExt::default(),
+            contracts: false,
         }
     }
 
@@ -338,6 +345,14 @@ impl CompileOptions {
     /// for `bynkc test --inspect` (run the `.ts` directly under Node strip-only).
     pub fn import_ext(mut self, ext: ImportExt) -> Self {
         self.import_ext = ext;
+        self
+    }
+
+    /// v0.115: enable the function-contract call-site guard (dev/test profile).
+    /// `bynkc test` and `--inspect` call this; the deploy build leaves it off so
+    /// contract checks never reach production (DECISION J).
+    pub fn contracts(mut self, on: bool) -> Self {
+        self.contracts = on;
         self
     }
 
@@ -368,6 +383,7 @@ pub fn compile_project(options: &CompileOptions) -> Result<ProjectOutput, Projec
         &HashMap::new(),
         &excludes,
         None,
+        options.contracts,
     );
     finish_build(run, options.import_ext)
 }
@@ -407,6 +423,7 @@ pub fn compile_in_memory(
         &overlay,
         &[],
         Some((vec![path], Vec::new())),
+        false,
     );
     finish_build(run, ImportExt::Js)
 }
@@ -438,6 +455,7 @@ pub fn analyse_in_memory(
         &overlay,
         &[],
         Some((vec![path], Vec::new())),
+        false,
     );
     match run {
         RunChecks::Bailed { errors, .. } | RunChecks::Checked { errors, .. } => errors.into_all(),
@@ -547,6 +565,7 @@ pub fn analyse_project(root: &Path, overlay: &HashMap<PathBuf, String>) -> Proje
         overlay,
         &[],
         None,
+        false,
     ) {
         RunChecks::Bailed {
             errors,
@@ -2075,6 +2094,7 @@ fn emit_unit(
     typed: &checker::TypedCommons,
     target: BuildTarget,
     import_ext: ImportExt,
+    contracts: bool,
     compiled: &mut Vec<CompiledFile>,
 ) {
     // Build the emitter context.
@@ -2210,6 +2230,7 @@ fn emit_unit(
             .cloned()
             .collect(),
         import_ext,
+        contracts,
     };
     // v0.72: the map's `source` is the absolute path the compiler read the file
     // from, so an editor breakpoint set on the real `.bynk` resolves to the same
@@ -2256,6 +2277,7 @@ fn check_unit_files(
     owning_context_for_emit: &Option<String>,
     target: BuildTarget,
     import_ext: ImportExt,
+    contracts: bool,
     mode: Mode,
     errors: &mut ErrorSink,
     refs: &mut RefSink,
@@ -2523,6 +2545,7 @@ fn check_unit_files(
             &typed,
             target,
             import_ext,
+            contracts,
             compiled,
         );
     }
@@ -2590,6 +2613,8 @@ fn run_checks(
     // this way (the source itself rides in `overlay`); `None` keeps the on-disk
     // discovery walk for the CLI and the LSP.
     discovered: Option<(Vec<PathBuf>, Vec<PathBuf>)>,
+    // v0.115: emit the function-contract call-site guard (dev/test profile).
+    contracts: bool,
 ) -> RunChecks {
     let mut errors = ErrorSink::new();
     // v0.25 (ADR 0053): binding edges, recorded at the resolution sites and
@@ -2814,6 +2839,7 @@ fn run_checks(
             &owning_context_for_emit,
             target,
             import_ext,
+            contracts,
             mode,
             &mut errors,
             &mut refs,
@@ -2841,6 +2867,7 @@ fn run_checks(
         &unit_uses,
         tests_prefix,
         import_ext,
+        contracts,
         &mut test_errors,
         &mut refs,
     );
@@ -3744,6 +3771,9 @@ pub struct EmitProjectCtx {
     /// for the `bynkc test --inspect` debug build). Consulted by `runtime_import_for`
     /// and the sibling/cross-commons specifier helpers.
     pub import_ext: ImportExt,
+    /// v0.115 (testing track slice 3): emit the function-contract call-site guard
+    /// (dev/test profile). Stripped in the deploy build for zero runtime cost.
+    pub contracts: bool,
 }
 
 /// Where a boundary-crossing type was declared.

@@ -326,7 +326,22 @@ implement them.
 `fn`, a function name or a `Type.method` name, an optional `[A, B]`
 **type-parameter list** (v0.20a — free functions only; a type parameter is an
 unconstrained, bound-free name scoped to the signature and body), a parameter
-list, `->`, a return type, and a block body. Well-formedness: §5.
+list, `->`, a return type, any number of **contract clauses** (v0.115), and a
+block body. Well-formedness: §5.
+
+### §4.3.1a requires_clause / ensures_clause (v0.115)
+
+{{#grammar requires_clause}}
+
+{{#grammar ensures_clause}}
+
+A function **contract** (testing track slice 3): named `requires` (preconditions)
+and `ensures` (postconditions) between the return type and the body, each a pure
+`Bool` predicate expression — the one predicate surface (§4.6, ADR 0144). A
+`requires` predicate is over the parameters; an `ensures` predicate is over the
+parameters and `result`, the contextual binding for the return value (an ordinary
+identifier elsewhere). Well-formedness — purity, `Bool` type, `result` scope,
+distinct names: §5 (ADR 0150).
 
 ### §4.3.2 method_name
 

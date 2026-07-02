@@ -78,6 +78,34 @@ pub(crate) fn check_fn(
             param_scope.insert(p.name.name.clone(), ty);
         }
     }
+    // v0.115: check the function's contract clauses (`requires`/`ensures`) in
+    // the parameter scope before the body — a contract is the invariant
+    // predicate attached to a function (ADR 0144). `result` in an `ensures` is
+    // the return value, awaited for an `Effect`.
+    if !f.requires.is_empty() || !f.ensures.is_empty() {
+        let result_ty = match &return_ty {
+            Ty::Effect(inner) => (**inner).clone(),
+            t => t.clone(),
+        };
+        let has_result_param = f.params.iter().any(|p| p.name.name == "result");
+        let fn_label = format!("function `{}`", f.name.display());
+        check_contracts(
+            &f.requires,
+            &f.ensures,
+            &param_scope,
+            &result_ty,
+            has_result_param,
+            &fn_label,
+            input,
+            expr_types,
+            errors,
+            refs,
+            hints,
+            locals,
+            requirements,
+            &vars,
+        );
+    }
     let effectful = matches!(&return_ty, Ty::Effect(_));
     let mut ctx = Ctx {
         input,

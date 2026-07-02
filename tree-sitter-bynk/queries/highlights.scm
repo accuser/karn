@@ -48,6 +48,8 @@
   "integration"
   "wires"
   "invariant"
+  "requires"
+  "ensures"
 ] @keyword.declaration
 
 [

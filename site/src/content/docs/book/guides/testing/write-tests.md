@@ -51,6 +51,32 @@ A `Matches`-refined string cannot be fabricated blindly — a bare `Val` of one 
 rejected ([`bynk.val.needs_pin`](/book/troubleshooting/val-errors/)); pin it
 instead. `Val[T]` is test-only.
 
+## Constrain a function with `requires` / `ensures`
+
+A **contract** states what a pure function guarantees, right on its signature —
+between the return type and the body. `requires` clauses are preconditions over
+the parameters; `ensures` clauses are postconditions over the parameters and
+`result`, the return value:
+
+```bynk
+commons commerce.money
+
+fn discount(p: Int, pct: Int) -> Int
+  requires p_nonneg: p >= 0
+  requires pct_in_range: pct >= 0 && pct <= 100
+  ensures never_above: result <= p
+{
+  p - (p * pct) / 100
+}
+```
+
+You write no test for this: in the dev/test build every call checks the contract,
+and the runner **generates** arguments (filtered by `requires`) to attack the
+`ensures` — reporting a shrunk counterexample if one breaks. In the deploy build
+the checks are stripped, so contracts cost nothing in production. A contract is a
+property that is always on; reach for a `property` only when a claim is relational
+or spans calls. See the [testing reference](/book/reference/testing/#contracts).
+
 ## Check a claim across inputs with `property` / `for all`
 
 Where a `case` supplies its subjects, a `property` **generates** them and checks a

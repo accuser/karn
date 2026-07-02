@@ -321,6 +321,31 @@ persisted. A violation is a **fault** (`InvariantViolation`), not an outcome —
 state**, not whole-handler rollback (ADR 0107 D6): effects already performed by
 the handler stand.
 
+### §5.4.1a Function contracts (v0.115)
+
+A **contract** is the invariant predicate attached to a pure function (ADR 0150).
+A `fn` carries any number of named `requires` (preconditions) and `ensures`
+(postconditions) between its return type and body; each predicate is a pure `Bool`
+expression in the same predicate language as an invariant (`implies`, `is`,
+operators, pure methods):
+
+- a `requires` predicate is typed with the parameters in scope; a `ensures`
+  predicate is typed with the parameters **and** `result` in scope, where `result`
+  has the declared return type (the awaited element `T` for an `Effect[T]` return);
+- `result` MUST NOT appear in a `requires` (`bynk.contract.result_in_requires`) —
+  the return value is not bound on entry;
+- each predicate MUST have type `Bool` (`bynk.contract.not_bool`);
+- each MUST be pure — no capabilities, effects, or test-only constructs
+  (`bynk.contract.impure_predicate`);
+- clause names MUST be distinct across a function's `requires` and `ensures`
+  (`bynk.contract.duplicate_name`).
+
+A contract is checked at two points, and stripped from the deploy build (the
+runtime library and emission model describe the guard and the runner attack). A
+`case`/`property` whose predicate is syntactically / α-equivalent to a declared
+clause over the same bound arguments is flagged `bynk.contract.restated_by_test`
+(conservative — under-flagging is acceptable, over-flagging is not).
+
 ### §5.4.2 Held-resource linearity (v0.102)
 
 A **held resource** is a value of the closed `Held` kind — currently the single

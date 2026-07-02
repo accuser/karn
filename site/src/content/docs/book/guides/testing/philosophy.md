@@ -61,6 +61,26 @@ invent a string matching an arbitrary regular expression — so a bare `Val` (or
 one; an agent, which has no domain to draw from, cannot be generated at all. The
 language would rather stop than guess.
 
+## Contracts: the claim that is always on
+
+Between a witnessing `case` and a quantifying `property` sits a third rung — the
+**contract**. A claim about *one* result of a pure function does not belong in a
+separate test at all; it belongs on the function, as an `ensures`. Bynk then
+checks it everywhere for free: at every call in the dev/test build (a guard that is
+stripped from production, so it costs nothing to ship), and by the runner, which
+generates arguments — filtered by the function's `requires` — and attacks the
+`ensures` exactly as a `property` attacks its body. A contract is a property that
+is always on.
+
+This sharpens the division of labour. A `case` witnesses a named scenario; a
+contract states what one result always guarantees; a `property` earns its keep
+only when the claim is *relational* or *spans calls* — a monotonicity, a
+round-trip — which no per-call postcondition can express. A `case`/`property` that
+merely restates a contract is redundant, and Bynk says so
+([`bynk.contract.restated_by_test`](/book/troubleshooting/contract-errors/)). The
+same one predicate surface runs at each rung: `case`, contract, `property`, and
+`invariant` are the *same* predicate, checked over different subjects.
+
 ## Isolation: mocking collaborators
 
 A unit under test usually depends on collaborators — capabilities it asks for with

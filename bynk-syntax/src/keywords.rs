@@ -90,6 +90,10 @@ pub const KEYWORDS: &[KeywordInfo] = &[
         "The cron protocol on a service header (`from cron`).",
     ),
     k("else", "The alternative branch of an `if` expression."),
+    k(
+        "ensures",
+        "Declare a function postcondition — a pure `Bool` clause over the parameters and `result` (`ensures <name>: <pred>`).",
+    ),
     k("enum", "Declare a payloadless sum type (`enum { A, B }`)."),
     k(
         "expect",
@@ -156,6 +160,10 @@ pub const KEYWORDS: &[KeywordInfo] = &[
     k(
         "record",
         "Reserved keyword (records are written `type X = { … }`).",
+    ),
+    k(
+        "requires",
+        "Declare a function precondition — a pure `Bool` clause over the parameters (`requires <name>: <pred>`).",
     ),
     k("self", "The current agent instance, inside a handler."),
     k(
